@@ -132,92 +132,98 @@ func DockerData(pathType string) string {
 // this one needs params from config so we use a func
 func SysConfig(basePath string) structs.SysConfig {
 	sysConfig := structs.SysConfig{
-		RemoteBackupPassword: "",
-		GracefulExit:         false,
-		LastKnownMDNS:        "",
-		Setup:                "start",
-		EndpointUrl:          "api.startram.io",
-		ApiVersion:           "v1",
-		Piers:                []string{},
-		NetCheck:             "1.1.1.1:53",
-		UpdateMode:           "auto",
-		UpdateUrl:            "https://version.groundseg.app",
-		UpdateBranch:         "latest",
-		SwapVal:              16,
-		SwapFile:             filepath.Join(basePath, "swapfile"),
-		KeyFile:              filepath.Join(basePath, "settings", "session.key"),
-		Sessions: struct {
-			Authorized   map[string]structs.SessionInfo `json:"authorized"`
-			Unauthorized map[string]structs.SessionInfo `json:"unauthorized"`
-		}{
-			Authorized:   make(map[string]structs.SessionInfo),
-			Unauthorized: make(map[string]structs.SessionInfo),
+		ConnectivityConfig: structs.ConnectivityConfig{
+			Piers:                []string{},
+			WgOn:                 false,
+			NetCheck:             "1.1.1.1:53",
+			UpdateMode:           "auto",
+			UpdateUrl:            "https://version.groundseg.app",
+			UpdateBranch:         "latest",
+			RemoteBackupPassword: "",
+			C2cInterval:          0,
+			WgRegistered:         false,
+			EndpointUrl:          "api.startram.io",
+			ApiVersion:           "v1",
 		},
-		LinuxUpdates: struct {
-			Value    int    `json:"value"`
-			Interval string `json:"interval"`
-		}{
-			Value:    1,
-			Interval: "month",
+		RuntimeConfig: structs.RuntimeConfig{
+			GracefulExit:  false,
+			LastKnownMDNS: "",
+			Setup:         "start",
+			SwapVal:       16,
+			SwapFile:      filepath.Join(basePath, "swapfile"),
+			CfgDir:        basePath,
+			LinuxUpdates: struct {
+				Value    int    `json:"value"`
+				Interval string `json:"interval"`
+			}{
+				Value:    1,
+				Interval: "month",
+			},
+			DockerData:     DockerData("basePath"),
+			GsVersion:      "v2.0.0",
+			UpdateInterval: 3600,
+			BinHash:        "",
+			Disable502:     false,
+			SnapTime:       60,
 		},
-		DockerData:     DockerData("basePath"),
-		WgOn:           false,
-		WgRegistered:   false,
-		PwHash:         "",
-		C2cInterval:    0,
-		GsVersion:      "v2.0.0",
-		CfgDir:         basePath,
-		UpdateInterval: 3600,
-		BinHash:        "",
-		Pubkey:         "",
-		Privkey:        "",
-		Salt:           "",
-		PenpaiRunning:  false,
-		PenpaiCores:    1,
-		SnapTime:       60,
-		PenpaiActive:   "TinyLlama-1.1B",
-		PenpaiModels: []structs.Penpai{
-			{
-				ModelTitle: "TinyLlama 1.1B",
-				ModelName:  "TinyLlama-1.1B",
-				ModelUrl:   "https://huggingface.co/jartine/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "Mistral 7B Instruct",
-				ModelName:  "Mistral 7B Instruct",
-				ModelUrl:   "https://huggingface.co/jartine/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "Mixtral 8x7B Instruct",
-				ModelName:  "Mixtral-8x7B-Instruct",
-				ModelUrl:   "https://huggingface.co/jartine/Mixtral-8x7B-Instruct-v0.1-llamafile/resolve/main/mixtral-8x7b-instruct-v0.1.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "WizardCoder Python 13B",
-				ModelName:  "WizardCoder-Python-13B",
-				ModelUrl:   "https://huggingface.co/jartine/wizardcoder-13b-python/resolve/main/wizardcoder-python-13b.llamafile?download=true",
-			},
-			{
-				ModelTitle: "WizardCoder Python 34B",
-				ModelName:  "WizardCoder-Python-34B",
-				ModelUrl:   "https://huggingface.co/jartine/WizardCoder-Python-34B-V1.0-llamafile/resolve/main/wizardcoder-python-34b-v1.0.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "LLaVA 1.5",
-				ModelName:  "LLaVA-1.5",
-				ModelUrl:   "https://huggingface.co/jartine/llava-v1.5-7B-GGUF/resolve/main/llava-v1.5-7b-q4.llamafile?download=true",
-			},
-			{
-				ModelTitle: "TinyLlama 1.1B",
-				ModelName:  "TinyLlama-1.1B",
-				ModelUrl:   "https://huggingface.co/jartine/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "Rocket 3B",
-				ModelName:  "Rocket-3B",
-				ModelUrl:   "https://huggingface.co/jartine/rocket-3B-llamafile/resolve/main/rocket-3b.Q5_K_M.llamafile?download=true",
+		AuthSessionConfig: structs.AuthSessionConfig{
+			PwHash:  "",
+			Salt:    "",
+			KeyFile: filepath.Join(basePath, "settings", "session.key"),
+			Sessions: structs.AuthSessionBag{
+				Authorized:   make(map[string]structs.SessionInfo),
+				Unauthorized: make(map[string]structs.SessionInfo),
 			},
 		},
+		PenpaiConfig: structs.PenpaiConfig{
+			PenpaiAllow:   true,
+			PenpaiRunning: false,
+			PenpaiCores:   1,
+			PenpaiActive:  "TinyLlama-1.1B",
+			PenpaiModels: []structs.Penpai{
+				{
+					ModelTitle: "TinyLlama 1.1B",
+					ModelName:  "TinyLlama-1.1B",
+					ModelUrl:   "https://huggingface.co/jartine/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q5_K_M.llamafile?download=true",
+				},
+				{
+					ModelTitle: "Mistral 7B Instruct",
+					ModelName:  "Mistral 7B Instruct",
+					ModelUrl:   "https://huggingface.co/jartine/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q5_K_M.llamafile?download=true",
+				},
+				{
+					ModelTitle: "Mixtral 8x7B Instruct",
+					ModelName:  "Mixtral-8x7B-Instruct",
+					ModelUrl:   "https://huggingface.co/jartine/Mixtral-8x7B-Instruct-v0.1-llamafile/resolve/main/mixtral-8x7b-instruct-v0.1.Q5_K_M.llamafile?download=true",
+				},
+				{
+					ModelTitle: "WizardCoder Python 13B",
+					ModelName:  "WizardCoder-Python-13B",
+					ModelUrl:   "https://huggingface.co/jartine/wizardcoder-13b-python/resolve/main/wizardcoder-python-13b.llamafile?download=true",
+				},
+				{
+					ModelTitle: "WizardCoder Python 34B",
+					ModelName:  "WizardCoder-Python-34B",
+					ModelUrl:   "https://huggingface.co/jartine/WizardCoder-Python-34B-V1.0-llamafile/resolve/main/wizardcoder-python-34b-v1.0.Q5_K_M.llamafile?download=true",
+				},
+				{
+					ModelTitle: "LLaVA 1.5",
+					ModelName:  "LLaVA-1.5",
+					ModelUrl:   "https://huggingface.co/jartine/llava-v1.5-7B-GGUF/resolve/main/llava-v1.5-7b-q4.llamafile?download=true",
+				},
+				{
+					ModelTitle: "TinyLlama 1.1B",
+					ModelName:  "TinyLlama-1.1B",
+					ModelUrl:   "https://huggingface.co/jartine/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q5_K_M.llamafile?download=true",
+				},
+				{
+					ModelTitle: "Rocket 3B",
+					ModelName:  "Rocket-3B",
+					ModelUrl:   "https://huggingface.co/jartine/rocket-3B-llamafile/resolve/main/rocket-3b.Q5_K_M.llamafile?download=true",
+				},
+			},
+		},
+		StartramConfig: structs.StartramConfig{},
 	}
 	return sysConfig
 }

@@ -33,10 +33,14 @@ func testWireguardRuntime() WireguardRuntime {
 			},
 		},
 		RuntimeContainerOps: RuntimeContainerOps{
-			StartContainerFn: func(string, string) (structs.ContainerState, error) {
-				return structs.ContainerState{}, nil
+			RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
+				StartContainerFn: func(string, string) (structs.ContainerState, error) {
+					return structs.ContainerState{}, nil
+				},
 			},
-			UpdateContainerStateFn: func(string, structs.ContainerState) {},
+			RuntimeContainerStateOps: RuntimeContainerStateOps{
+				UpdateContainerStateFn: func(string, structs.ContainerState) {},
+			},
 		},
 		RuntimeImageOps: RuntimeImageOps{
 			GetLatestContainerInfoFn: func(string) (map[string]string, error) {

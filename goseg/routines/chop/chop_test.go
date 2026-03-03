@@ -28,7 +28,7 @@ func TestRunChopAtLimitPassSkipsShipsWithoutSizeLimit(t *testing.T) {
 	resetChopSeamsForTest(t)
 
 	ConfForChop = func() structs.SysConfig {
-		return structs.SysConfig{Piers: []string{"~zod"}}
+		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~zod"}}}
 	}
 	UrbitConfForChop = func(string) structs.UrbitDocker {
 		return structs.UrbitDocker{
@@ -57,7 +57,7 @@ func TestRunChopAtLimitPassTriggersChopAtOrAboveLimit(t *testing.T) {
 	resetChopSeamsForTest(t)
 
 	ConfForChop = func() structs.SysConfig {
-		return structs.SysConfig{Piers: []string{"~zod", "~bus"}}
+		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~zod", "~bus"}}}
 	}
 	UrbitConfForChop = func(patp string) structs.UrbitDocker {
 		switch patp {

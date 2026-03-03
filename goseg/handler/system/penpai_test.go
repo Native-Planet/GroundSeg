@@ -46,7 +46,9 @@ func TestPenpaiHandlerValidationAndToggle(t *testing.T) {
 		t.Fatalf("expected unmarshal error")
 	}
 
-	confForPenpai = func() structs.SysConfig { return structs.SysConfig{PenpaiRunning: false} }
+	confForPenpai = func() structs.SysConfig {
+		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: false}}
+	}
 	started := false
 	startContainerForPenpai = func(name, typ string) (structs.ContainerState, error) {
 		if name == "llama-gpt-api" && typ == "llama-api" {
@@ -72,7 +74,9 @@ func TestPenpaiHandlerValidationAndToggle(t *testing.T) {
 		t.Fatalf("expected start/update/config flow, got started=%v updated=%v confUpdates=%d", started, updatedState, confUpdates)
 	}
 
-	confForPenpai = func() structs.SysConfig { return structs.SysConfig{PenpaiRunning: true} }
+	confForPenpai = func() structs.SysConfig {
+		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+	}
 	stopped := map[string]int{}
 	stopContainerByNameForPenpai = func(name string) error {
 		stopped[name]++
@@ -89,7 +93,9 @@ func TestPenpaiHandlerValidationAndToggle(t *testing.T) {
 func TestPenpaiHandlerSetModelAndSetCores(t *testing.T) {
 	t.Cleanup(resetPenpaiSeams)
 
-	confForPenpai = func() structs.SysConfig { return structs.SysConfig{PenpaiRunning: true} }
+	confForPenpai = func() structs.SysConfig {
+		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+	}
 	updateConfCalls := 0
 	updateConfTypedForPenpai = func(...config.ConfUpdateOption) error {
 		updateConfCalls++
@@ -135,7 +141,9 @@ func TestPenpaiHandlerSetModelAndSetCores(t *testing.T) {
 
 func TestPenpaiHandlerPropagatesOperationalErrors(t *testing.T) {
 	t.Cleanup(resetPenpaiSeams)
-	confForPenpai = func() structs.SysConfig { return structs.SysConfig{PenpaiRunning: true} }
+	confForPenpai = func() structs.SysConfig {
+		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+	}
 
 	stopContainerByNameForPenpai = func(string) error { return errors.New("stop failed") }
 	if err := PenpaiHandler(penpaiMessage(t, "toggle", "", 0)); err == nil {

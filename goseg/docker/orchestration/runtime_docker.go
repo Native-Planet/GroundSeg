@@ -4,9 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"groundseg/config"
-	"groundseg/docker/network"
 	"groundseg/docker/registry"
-	"os"
 	"time"
 )
 
@@ -35,40 +33,20 @@ type WireguardRuntime struct {
 }
 
 func newWireguardRuntime() WireguardRuntime {
-	wireguardRuntime := wireguardRuntimeFromConfig()
-	wireguardRuntime.StartContainerFn = StartContainer
-	wireguardRuntime.UpdateContainerStateFn = config.UpdateContainerState
-	return wireguardRuntime
+	runtime := wireguardRuntimeFromConfig()
+	runtime.StartContainerFn = StartContainer
+	runtime.UpdateContainerStateFn = config.UpdateContainerState
+	return runtime
 }
 
 func wireguardRuntimeFromConfig() WireguardRuntime {
-	networkRuntime := network.NewNetworkRuntime()
+	seams := runtimeSeams()
 	return WireguardRuntime{
-		RuntimeContextOps: RuntimeContextOps{
-			BasePathFn:  config.BasePath,
-			DockerDirFn: config.DockerDir,
-		},
-		RuntimeFileOps: RuntimeFileOps{
-			OpenFn:     os.Open,
-			ReadFileFn: os.ReadFile,
-			WriteFileFn: os.WriteFile,
-			MkdirAllFn: os.MkdirAll,
-		},
-		RuntimeImageOps: RuntimeImageOps{
-			GetLatestContainerInfoFn:  registry.GetLatestContainerInfo,
-			GetLatestContainerImageFn: latestContainerImage,
-		},
-		RuntimeWireguardOps: RuntimeWireguardOps{
-			CreateDefaultWGConfFn: config.CreateDefaultWGConf,
-			GetWgConfFn:         config.GetWgConf,
-			GetWgConfBlobFn:     getConfiguredStartramWGConfig,
-			GetWgPrivkeyFn:      config.GetWgPrivkey,
-			CopyFileToVolumeFn:   copyFileToVolumeWithTempContainer,
-		},
-		RuntimeVolumeOps: RuntimeVolumeOps{
-			VolumeExistsFn: networkRuntime.VolumeExists,
-			CreateVolumeFn: networkRuntime.CreateVolume,
-		},
+		RuntimeContextOps:   seams.contextOps,
+		RuntimeFileOps:      seams.fileOps,
+		RuntimeImageOps:     seams.imageOps,
+		RuntimeWireguardOps: seams.wireguardOps,
+		RuntimeVolumeOps:    seams.volumeOps,
 	}
 }
 
@@ -86,45 +64,21 @@ type UrbitRuntime struct {
 }
 
 func newUrbitRuntime() UrbitRuntime {
-	urbitRuntime := urbitRuntimeFromConfig()
-	urbitRuntime.StartContainerFn = StartContainer
-	urbitRuntime.CreateContainerFn = CreateContainer
-	urbitRuntime.UpdateContainerStateFn = config.UpdateContainerState
-	return urbitRuntime
+	runtime := urbitRuntimeFromConfig()
+	runtime.StartContainerFn = StartContainer
+	runtime.CreateContainerFn = CreateContainer
+	runtime.UpdateContainerStateFn = config.UpdateContainerState
+	return runtime
 }
 
 func urbitRuntimeFromConfig() UrbitRuntime {
+	seams := runtimeSeams()
 	return UrbitRuntime{
-		RuntimeSnapshotOps: RuntimeSnapshotOps{
-			ConfFn:                    config.Conf,
-			StartramSettingsSnapshotFn: config.StartramSettingsSnapshot,
-			ShipSettingsSnapshotFn:     config.ShipSettingsSnapshot,
-			ShipRuntimeSettingsSnapshotFn: config.ShipRuntimeSettingsSnapshot,
-			GetStartramConfigFn:        config.GetStartramConfig,
-			Check502SettingsSnapshotFn: config.Check502SettingsSnapshot,
-		},
-		RuntimeUrbitOps: RuntimeUrbitOps{
-			LoadUrbitConfigFn:           config.LoadUrbitConfig,
-			UrbitConfFn:                 config.UrbitConf,
-			UpdateUrbitFn:               config.UpdateUrbit,
-			UpdateUrbitRuntimeConfigFn:  config.UpdateUrbitRuntimeConfig,
-			UpdateUrbitNetworkConfigFn:  config.UpdateUrbitNetworkConfig,
-			UpdateUrbitScheduleConfigFn: config.UpdateUrbitScheduleConfig,
-			UpdateUrbitFeatureConfigFn:  config.UpdateUrbitFeatureConfig,
-			UpdateUrbitWebConfigFn:      config.UpdateUrbitWebConfig,
-			UpdateUrbitBackupConfigFn:   config.UpdateUrbitBackupConfig,
-		},
-		RuntimeContextOps: RuntimeContextOps{
-			ArchitectureFn: config.Architecture,
-			DockerDirFn:    config.DockerDir,
-		},
-		RuntimeFileOps: RuntimeFileOps{
-			WriteFileFn: os.WriteFile,
-		},
-		RuntimeImageOps: RuntimeImageOps{
-			GetLatestContainerInfoFn:  registry.GetLatestContainerInfo,
-			GetLatestContainerImageFn: latestContainerImage,
-		},
+		RuntimeSnapshotOps: seams.snapshotOps,
+		RuntimeUrbitOps:    seams.urbitOps,
+		RuntimeContextOps:  seams.contextOps,
+		RuntimeFileOps:     RuntimeFileOps{WriteFileFn: seams.fileOps.WriteFileFn},
+		RuntimeImageOps:    seams.imageOps,
 	}
 }
 
@@ -137,61 +91,17 @@ func newWireguardRuntimeForContainerConfig() WireguardRuntime {
 }
 
 func newDockerRuntime() dockerRuntime {
-	networkRuntime := network.NewNetworkRuntime()
+	seams := runtimeSeams()
 	return dockerRuntime{
-		contextOps: RuntimeContextOps{
-			BasePathFn: func() string {
-				return config.BasePath()
-			},
-			ArchitectureFn: config.Architecture,
-			DebugModeFn: func() bool {
-				return config.DebugMode()
-			},
-			DockerDirFn: func() string {
-				return config.DockerDir()
-			},
-		},
-		fileOps: RuntimeFileOps{
-			OpenFn:      os.Open,
-			ReadFileFn:  os.ReadFile,
-			WriteFileFn: os.WriteFile,
-			MkdirAllFn:  os.MkdirAll,
-		},
-		containerOps: RuntimeContainerOps{
-			StartContainerFn:            StartContainer,
-			StopContainerByNameFn:       StopContainerByName,
-			CreateContainerFn:           CreateContainer,
-			RestartContainerFn:          RestartContainer,
-			DeleteContainerFn:           DeleteContainer,
-			GetContainerRunningStatusFn: GetContainerRunningStatus,
-			AddOrGetNetworkFn:           networkRuntime.AddOrGetNetwork,
-			GetContainerStateFn:         config.GetContainerState,
-			UpdateContainerStateFn:      config.UpdateContainerState,
-			GetShipStatusFn:             GetShipStatus,
-		},
-		imageOps: RuntimeImageOps{
-			GetLatestContainerInfoFn:  GetLatestContainerInfo,
-			GetLatestContainerImageFn: latestContainerImage,
-		},
-		configOps:    defaultRuntimeSnapshot(),
-		urbitOps: defaultRuntimeUrbit(),
-		wireguardOps: RuntimeWireguardOps{
-			CreateDefaultWGConfFn: config.CreateDefaultWGConf,
-			GetWgConfFn:           config.GetWgConf,
-			GetWgConfBlobFn: func() (string, error) {
-				return config.GetStartramConfig().Conf, nil
-			},
-			GetWgPrivkeyFn: config.GetWgPrivkey,
-			CopyFileToVolumeFn: copyFileToVolumeWithTempContainer,
-		},
-		netdataOps: RuntimeNetdataOps{
-			CreateDefaultNetdataConfFn: config.CreateDefaultNetdataConf,
-		},
-		minioOps: RuntimeMinioOps{
-			CreateDefaultMcConfFn: config.CreateDefaultMcConf,
-			SetMinIOPasswordFn:    config.SetMinIOPassword,
-			GetMinIOPasswordFn:    config.GetMinIOPassword,
-		},
+		contextOps:   seams.contextOps,
+		fileOps:      seams.fileOps,
+		containerOps: defaultRuntimeContainerOps(),
+		imageOps:     seams.imageOps,
+		configOps:    seams.snapshotOps,
+		urbitOps:     seams.urbitOps,
+		wireguardOps: seams.wireguardOps,
+		netdataOps:   seams.netdataOps,
+		minioOps:     seams.minioOps,
 		commandOps: RuntimeCommandOps{
 			ExecDockerCommandFn: func(name string, cmd []string) (string, error) {
 				out, _, err := ExecDockerCommand(name, cmd)
@@ -201,10 +111,7 @@ func newDockerRuntime() dockerRuntime {
 			RandReadFn:              rand.Read,
 			CopyFileToVolumeFn:      copyFileToVolumeWithTempContainer,
 		},
-		volumeOps: RuntimeVolumeOps{
-			VolumeExistsFn: networkRuntime.VolumeExists,
-			CreateVolumeFn: networkRuntime.CreateVolume,
-		},
+		volumeOps: seams.volumeOps,
 		timerOps: RuntimeTimerOps{
 			SleepFn:        time.Sleep,
 			PollIntervalFn: runtimePollInterval,

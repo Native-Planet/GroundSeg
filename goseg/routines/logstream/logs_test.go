@@ -12,10 +12,10 @@ import (
 
 func withLoggerLogPath(t *testing.T, logPath string) {
 	t.Helper()
-	original := logger.LogPath
-	logger.LogPath = logPath
+	original := logger.LogPath()
+	logger.SetLogPath(logPath)
 	t.Cleanup(func() {
-		logger.LogPath = original
+		logger.SetLogPath(original)
 	})
 }
 

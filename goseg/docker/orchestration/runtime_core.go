@@ -1,9 +1,7 @@
 package orchestration
 
 import (
-	"groundseg/config"
 	"groundseg/internal/seams"
-	"groundseg/structs"
 )
 
 type Runtime struct {
@@ -15,59 +13,27 @@ type Runtime struct {
 // DockerTransitionRuntime contains the narrow dependencies required for transition-driven
 // container workflows like start/restart/stop handling.
 type DockerTransitionRuntime struct {
-	LoadUrbitConfigFn           func(string) error
-	UrbitConfFn                 func(string) structs.UrbitDocker
-	UpdateUrbitFn               func(string, func(*structs.UrbitDocker) error) error
-	UpdateUrbitRuntimeConfigFn  func(string, func(*structs.UrbitRuntimeConfig) error) error
-	UpdateUrbitNetworkConfigFn  func(string, func(*structs.UrbitNetworkConfig) error) error
-	UpdateUrbitScheduleConfigFn func(string, func(*structs.UrbitScheduleConfig) error) error
-	UpdateUrbitFeatureConfigFn  func(string, func(*structs.UrbitFeatureConfig) error) error
-	UpdateUrbitWebConfigFn      func(string, func(*structs.UrbitWebConfig) error) error
-	UpdateUrbitBackupConfigFn   func(string, func(*structs.UrbitBackupConfig) error) error
-	ClearLusCodeFn              func(string)
-	StartContainerFn            func(string, string) (structs.ContainerState, error)
-	GetContainerStateFn         func() map[string]structs.ContainerState
-	UpdateContainerFn           func(string, structs.ContainerState)
+	RuntimeTransitionOps
 }
 
 // DockerHealthRuntime contains the narrow dependencies required for health checks and
 // 502 recovery loops.
 type DockerHealthRuntime struct {
-	Check502SettingsSnapshotFn func() config.Check502Settings
-	GetShipStatusFn            func([]string) (map[string]string, error)
-	GetContainerNetworkFn      func(string) (string, error)
-	GetLusCodeFn               func(string) (string, error)
-	ShipSettingsSnapshotFn     func() config.ShipSettings
+	RuntimeHealthOps
 }
 
 // NewDockerTransitionRuntime builds transition-focused dependencies from the general runtime
 // seam, limiting coupling between lifecycle handlers and unrelated concerns.
 func NewDockerTransitionRuntime(runtime Runtime) DockerTransitionRuntime {
 	return DockerTransitionRuntime{
-		LoadUrbitConfigFn:           runtime.LoadUrbitConfigFn,
-		UrbitConfFn:                 runtime.UrbitConfFn,
-		UpdateUrbitFn:               runtime.UpdateUrbitFn,
-		UpdateUrbitRuntimeConfigFn:  runtime.UpdateUrbitRuntimeConfigFn,
-		UpdateUrbitNetworkConfigFn:  runtime.UpdateUrbitNetworkConfigFn,
-		UpdateUrbitScheduleConfigFn: runtime.UpdateUrbitScheduleConfigFn,
-		UpdateUrbitFeatureConfigFn:  runtime.UpdateUrbitFeatureConfigFn,
-		UpdateUrbitWebConfigFn:      runtime.UpdateUrbitWebConfigFn,
-		UpdateUrbitBackupConfigFn:   runtime.UpdateUrbitBackupConfigFn,
-		ClearLusCodeFn:              runtime.ClearLusCodeFn,
-		StartContainerFn:            runtime.StartContainerFn,
-		GetContainerStateFn:         runtime.GetContainerStateFn,
-		UpdateContainerFn:           runtime.UpdateContainerStateFn,
+		RuntimeTransitionOps: seams.Merge(RuntimeTransitionOps{}, runtime.RuntimeTransitionOps),
 	}
 }
 
 // NewDockerHealthRuntime builds health-loop focused dependencies from the general runtime seam.
 func NewDockerHealthRuntime(runtime Runtime) DockerHealthRuntime {
 	return DockerHealthRuntime{
-		Check502SettingsSnapshotFn: runtime.Check502SettingsSnapshotFn,
-		GetShipStatusFn:            runtime.GetShipStatusFn,
-		GetContainerNetworkFn:      runtime.GetContainerNetworkFn,
-		GetLusCodeFn:               runtime.GetLusCodeFn,
-		ShipSettingsSnapshotFn:     runtime.ShipSettingsSnapshotFn,
+		RuntimeHealthOps: seams.Merge(RuntimeHealthOps{}, runtime.RuntimeHealthOps),
 	}
 }
 

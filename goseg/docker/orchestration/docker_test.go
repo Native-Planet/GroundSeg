@@ -28,7 +28,7 @@ func TestGetContainerRunningStatusReturnsInitError(t *testing.T) {
 		),
 	}
 
-	if _, err := rt.GetContainerRunningStatus("test-container"); err == nil {
+	if _, err := rt.getContainerRunningStatus("test-container"); err == nil {
 		t.Fatalf("expected init failure to surface as an error")
 	}
 }

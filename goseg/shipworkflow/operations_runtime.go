@@ -20,21 +20,15 @@ import (
 )
 
 type workflowRuntime struct {
-	EmitTransitionFn        func(patp string, transitionType string, event string)
-	SleepFn                 func(time.Duration)
-	DispatchUploadImport    func(context.Context, UploadImportCommand) error
-	LookupCNAMEFn           func(string) (string, error)
-	GetShipStatusFn         func([]string) (map[string]string, error)
-	BarExitFn               func(string) error
-	StopContainerFn         func(string) error
-	DeleteContainerFn       func(string) error
-	PersistUrbitConfigFn    func(string, func(*structs.UrbitDocker) error) error
-	PersistUrbitRuntimeConfigFn  func(string, func(*structs.UrbitRuntimeConfig) error) error
-	PersistUrbitNetworkConfigFn  func(string, func(*structs.UrbitNetworkConfig) error) error
-	PersistUrbitFeatureConfigFn  func(string, func(*structs.UrbitFeatureConfig) error) error
-	PersistUrbitWebConfigFn      func(string, func(*structs.UrbitWebConfig) error) error
-	PersistUrbitScheduleConfigFn  func(string, func(*structs.UrbitScheduleConfig) error) error
-	PersistUrbitBackupConfigFn    func(string, func(*structs.UrbitBackupConfig) error) error
+	dockerOrchestration.DockerTransitionRuntime
+	dockerOrchestration.DockerHealthRuntime
+	EmitTransitionFn     func(patp string, transitionType string, event string)
+	SleepFn              func(time.Duration)
+	DispatchUploadImport func(context.Context, UploadImportCommand) error
+	LookupCNAMEFn        func(string) (string, error)
+	BarExitFn            func(string) error
+	StopContainerFn      func(string) error
+	DeleteContainerFn    func(string) error
 }
 
 var errUploadImportCoordinatorUnconfigured = fmt.Errorf("workflow runtime upload import coordinator is not configured")
@@ -69,30 +63,38 @@ func runUrbitTransition(patp string, transitionType string, plan transitionPlan[
 	)
 }
 
-func defaultWorkflowRuntime() workflowRuntime {
+func newWorkflowRuntime() workflowRuntime {
 	defaultEmit := func(patp, transitionType, event string) {
-		events.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: transitionType, Event: event})
+		events.DefaultEventRuntime().PublishUrbitTransition(context.Background(), structs.UrbitTransition{Patp: patp, Type: transitionType, Event: event})
 	}
 	defaultDispatch := func(ctx context.Context, cmd UploadImportCommand) error {
 		return unconfiguredUploadImportCoordinator(ctx, cmd)
 	}
+	orchestrationRuntime := dockerOrchestration.NewRuntime()
 	return workflowRuntime{
+		DockerTransitionRuntime: dockerOrchestration.NewDockerTransitionRuntime(orchestrationRuntime),
+		DockerHealthRuntime:     dockerOrchestration.NewDockerHealthRuntime(orchestrationRuntime),
 		EmitTransitionFn:        defaultEmit,
-		SleepFn:                time.Sleep,
+		SleepFn:                 time.Sleep,
 		DispatchUploadImport:    defaultDispatch,
-		LookupCNAMEFn:          net.LookupCNAME,
-		GetShipStatusFn:        dockerOrchestration.GetShipStatus,
-		BarExitFn:              click.BarExit,
-		StopContainerFn:        dockerOrchestration.StopContainerByName,
-		DeleteContainerFn:      dockerOrchestration.DeleteContainer,
-		PersistUrbitConfigFn:   config.UpdateUrbit,
-		PersistUrbitRuntimeConfigFn: config.UpdateUrbitRuntimeConfig,
-		PersistUrbitNetworkConfigFn: config.UpdateUrbitNetworkConfig,
-		PersistUrbitFeatureConfigFn: config.UpdateUrbitFeatureConfig,
-		PersistUrbitWebConfigFn:     config.UpdateUrbitWebConfig,
-		PersistUrbitScheduleConfigFn: config.UpdateUrbitScheduleConfig,
-		PersistUrbitBackupConfigFn:   config.UpdateUrbitBackupConfig,
+		LookupCNAMEFn:           net.LookupCNAME,
+		BarExitFn:               click.BarExit,
+		StopContainerFn:         orchestrationRuntime.StopContainerByNameFn,
+		DeleteContainerFn:       orchestrationRuntime.DeleteContainerFn,
 	}
+}
+
+var defaultWorkflowRuntimeValue = newWorkflowRuntime()
+
+func defaultWorkflowRuntime() workflowRuntime {
+	return defaultWorkflowRuntimeValue
+}
+
+func resolveWorkflowRuntime(overrides ...workflowRuntime) workflowRuntime {
+	if len(overrides) == 0 {
+		return defaultWorkflowRuntime()
+	}
+	return withDefaultsWorkflowRuntime(overrides[0])
 }
 
 type UploadImportCommand struct {
@@ -148,18 +150,28 @@ func publishTransition[T any](runtime workflowRuntime, publish func(T), event T,
 }
 
 func RunTransitionedOperation(patp, transitionType, startEvent, successEvent string, clearDelay time.Duration, operation func() error) error {
-	return runTransitionedOperation(
-		defaultWorkflowRuntime(),
-		patp,
-		transitionType,
-		startEvent,
-		successEvent,
-		clearDelay,
-		operation,
+	runtime := defaultWorkflowRuntime()
+	return runTransitionLifecycle[string](
+		runtime,
+		func(event string) {
+			emitUrbitTransition(runtime, patp, transitionType, event)
+		},
+		transitionPlan[string]{
+			EmitStart:    true,
+			StartEvent:   startEvent,
+			SuccessEvent: successEvent,
+			EmitSuccess:  successEvent != "",
+			ErrorEvent:   func(_ error) string { return "error" },
+			ClearEvent:   "",
+			ClearDelay:   clearDelay,
+		},
+		transitionStep[string]{
+			Run: operation,
+		},
 	)
 }
 
-func runTransitionedOperation(
+func runTransitionedOperationWithRuntime(
 	runtime workflowRuntime,
 	patp,
 	transitionType,
@@ -214,25 +226,7 @@ func runPhaseWorkflow(
 	clearDelay time.Duration,
 	steps ...lifecycle.Step,
 ) error {
-	runtime := defaultWorkflowRuntime()
-	return runPhaseWorkflowForRuntime(
-		runtime,
-		patp,
-		transitionType,
-		successEvent,
-		clearDelay,
-		steps...,
-	)
-}
-
-func runPhaseWorkflowForRuntime(
-	runtime workflowRuntime,
-	patp string,
-	transitionType string,
-	successEvent string,
-	clearDelay time.Duration,
-	steps ...lifecycle.Step,
-) error {
+	runtime := resolveWorkflowRuntime(defaultWorkflowRuntime())
 	phaseSteps := make([]transitionStep[string], 0, len(steps))
 	for _, step := range steps {
 		phaseSteps = append(phaseSteps, transitionStep[string]{
@@ -265,146 +259,64 @@ func WaitComplete(patp string) error {
 	}, PollWithTimeout)
 }
 
-func persistShipConf(patp string, mutate func(*structs.UrbitDocker) error) error {
-	runtime := defaultWorkflowRuntime()
-	return persistShipConfWith(runtime, patp, mutate)
+func persistShipConf(patp string, mutate func(*structs.UrbitDocker) error, runtime ...workflowRuntime) error {
+	resolvedRuntime := resolveWorkflowRuntime(runtime...)
+	resolvedRuntime = withDefaultsWorkflowRuntime(resolvedRuntime)
+	return PersistUrbitConfig(patp, mutate, resolvedRuntime.UpdateUrbitFn)
 }
 
-func persistShipConfWith(runtime workflowRuntime, patp string, mutate func(*structs.UrbitDocker) error) error {
-	runtime = withDefaultsWorkflowRuntime(runtime)
-	return PersistUrbitConfig(patp, mutate, runtime.PersistUrbitConfigFn)
-}
-
-func persistShipRuntimeConfig(patp string, mutate func(*structs.UrbitRuntimeConfig) error) error {
-	runtime := defaultWorkflowRuntime()
-	return persistShipRuntimeConfigWith(runtime, patp, mutate)
-}
-
-func persistShipRuntimeConfigWith(runtime workflowRuntime, patp string, mutate func(*structs.UrbitRuntimeConfig) error) error {
-	runtime = withDefaultsWorkflowRuntime(runtime)
-	if runtime.PersistUrbitRuntimeConfigFn != nil {
-		return runtime.PersistUrbitRuntimeConfigFn(patp, mutate)
-	}
-	return persistShipConfWith(runtime, patp, func(conf *structs.UrbitDocker) error {
-		runtimeConfig := conf.UrbitRuntimeConfig
-		if err := mutate(&runtimeConfig); err != nil {
-			return fmt.Errorf("failed to persist urbit runtime config update: %w", err)
+func persistShipUrbitConfig[T any](patp string, section dockerOrchestration.UrbitConfigSection, mutate func(*T) error, runtime ...workflowRuntime) error {
+	resolvedRuntime := resolveWorkflowRuntime(runtime...)
+	resolvedRuntime = withDefaultsWorkflowRuntime(resolvedRuntime)
+	switch section {
+	case dockerOrchestration.UrbitConfigSectionRuntime:
+		runtimeMutate, ok := any(mutate).(func(*structs.UrbitRuntimeConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitRuntimeConfig)", section)
 		}
-		conf.UrbitRuntimeConfig = runtimeConfig
-		return nil
-	})
-}
-
-func persistShipNetworkConfig(patp string, mutate func(*structs.UrbitNetworkConfig) error) error {
-	runtime := defaultWorkflowRuntime()
-	return persistShipNetworkConfigWith(runtime, patp, mutate)
-}
-
-func persistShipNetworkConfigWith(runtime workflowRuntime, patp string, mutate func(*structs.UrbitNetworkConfig) error) error {
-	runtime = withDefaultsWorkflowRuntime(runtime)
-	if runtime.PersistUrbitNetworkConfigFn != nil {
-		return runtime.PersistUrbitNetworkConfigFn(patp, mutate)
-	}
-	return persistShipConfWith(runtime, patp, func(conf *structs.UrbitDocker) error {
-		networkConfig := conf.UrbitNetworkConfig
-		if err := mutate(&networkConfig); err != nil {
-			return fmt.Errorf("failed to persist urbit network config update: %w", err)
+		return resolvedRuntime.UpdateUrbitRuntimeConfig(patp, runtimeMutate)
+	case dockerOrchestration.UrbitConfigSectionNetwork:
+		networkMutate, ok := any(mutate).(func(*structs.UrbitNetworkConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitNetworkConfig)", section)
 		}
-		conf.UrbitNetworkConfig = networkConfig
-		return nil
-	})
-}
-
-func persistShipFeatureConfig(patp string, mutate func(*structs.UrbitFeatureConfig) error) error {
-	runtime := defaultWorkflowRuntime()
-	return persistShipFeatureConfigWith(runtime, patp, mutate)
-}
-
-func persistShipFeatureConfigWith(runtime workflowRuntime, patp string, mutate func(*structs.UrbitFeatureConfig) error) error {
-	runtime = withDefaultsWorkflowRuntime(runtime)
-	if runtime.PersistUrbitFeatureConfigFn != nil {
-		return runtime.PersistUrbitFeatureConfigFn(patp, mutate)
-	}
-	return persistShipConfWith(runtime, patp, func(conf *structs.UrbitDocker) error {
-		featureConfig := conf.UrbitFeatureConfig
-		if err := mutate(&featureConfig); err != nil {
-			return fmt.Errorf("failed to persist urbit feature config update: %w", err)
+		return resolvedRuntime.UpdateUrbitNetworkConfig(patp, networkMutate)
+	case dockerOrchestration.UrbitConfigSectionSchedule:
+		scheduleMutate, ok := any(mutate).(func(*structs.UrbitScheduleConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitScheduleConfig)", section)
 		}
-		conf.UrbitFeatureConfig = featureConfig
-		return nil
-	})
-}
-
-func persistShipWebConfig(patp string, mutate func(*structs.UrbitWebConfig) error) error {
-	runtime := defaultWorkflowRuntime()
-	return persistShipWebConfigWith(runtime, patp, mutate)
-}
-
-func persistShipWebConfigWith(runtime workflowRuntime, patp string, mutate func(*structs.UrbitWebConfig) error) error {
-	runtime = withDefaultsWorkflowRuntime(runtime)
-	if runtime.PersistUrbitWebConfigFn != nil {
-		return runtime.PersistUrbitWebConfigFn(patp, mutate)
-	}
-	return persistShipConfWith(runtime, patp, func(conf *structs.UrbitDocker) error {
-		webConfig := conf.UrbitWebConfig
-		if err := mutate(&webConfig); err != nil {
-			return fmt.Errorf("failed to persist urbit web config update: %w", err)
+		return resolvedRuntime.UpdateUrbitScheduleConfig(patp, scheduleMutate)
+	case dockerOrchestration.UrbitConfigSectionFeature:
+		featureMutate, ok := any(mutate).(func(*structs.UrbitFeatureConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitFeatureConfig)", section)
 		}
-		conf.UrbitWebConfig = webConfig
-		return nil
-	})
-}
-
-func persistShipScheduleConfig(patp string, mutate func(*structs.UrbitScheduleConfig) error) error {
-	runtime := defaultWorkflowRuntime()
-	return persistShipScheduleConfigWith(runtime, patp, mutate)
-}
-
-func persistShipScheduleConfigWith(runtime workflowRuntime, patp string, mutate func(*structs.UrbitScheduleConfig) error) error {
-	runtime = withDefaultsWorkflowRuntime(runtime)
-	if runtime.PersistUrbitScheduleConfigFn != nil {
-		return runtime.PersistUrbitScheduleConfigFn(patp, mutate)
-	}
-	return persistShipConfWith(runtime, patp, func(conf *structs.UrbitDocker) error {
-		scheduleConfig := conf.UrbitScheduleConfig
-		if err := mutate(&scheduleConfig); err != nil {
-			return fmt.Errorf("failed to persist urbit schedule config update: %w", err)
+		return resolvedRuntime.UpdateUrbitFeatureConfig(patp, featureMutate)
+	case dockerOrchestration.UrbitConfigSectionWeb:
+		webMutate, ok := any(mutate).(func(*structs.UrbitWebConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitWebConfig)", section)
 		}
-		conf.UrbitScheduleConfig = scheduleConfig
-		return nil
-	})
-}
-
-func persistShipBackupConfig(patp string, mutate func(*structs.UrbitBackupConfig) error) error {
-	runtime := defaultWorkflowRuntime()
-	return persistShipBackupConfigWith(runtime, patp, mutate)
-}
-
-func persistShipBackupConfigWith(runtime workflowRuntime, patp string, mutate func(*structs.UrbitBackupConfig) error) error {
-	runtime = withDefaultsWorkflowRuntime(runtime)
-	if runtime.PersistUrbitBackupConfigFn != nil {
-		return runtime.PersistUrbitBackupConfigFn(patp, mutate)
-	}
-	return persistShipConfWith(runtime, patp, func(conf *structs.UrbitDocker) error {
-		backupConfig := conf.UrbitBackupConfig
-		if err := mutate(&backupConfig); err != nil {
-			return fmt.Errorf("failed to persist urbit backup config update: %w", err)
+		return resolvedRuntime.UpdateUrbitWebConfig(patp, webMutate)
+	case dockerOrchestration.UrbitConfigSectionBackup:
+		backupMutate, ok := any(mutate).(func(*structs.UrbitBackupConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitBackupConfig)", section)
 		}
-		conf.UrbitBackupConfig = backupConfig
-		return nil
-	})
+		return resolvedRuntime.UpdateUrbitBackupConfig(patp, backupMutate)
+	default:
+		return fmt.Errorf("unsupported urbit config section: %s", section)
+	}
 }
 
 func PersistUrbitConfigValue(patp string, mutate func(*structs.UrbitDocker) error) error {
 	return persistShipConf(patp, mutate)
 }
 
-func areSubdomainsAliases(domain1, domain2 string) (bool, error) {
-	return areSubdomainsAliasesForRuntime(defaultWorkflowRuntime(), domain1, domain2)
-}
-
-func areSubdomainsAliasesForRuntime(runtime workflowRuntime, domain1, domain2 string) (bool, error) {
-	runtime = withDefaultsWorkflowRuntime(runtime)
+func areSubdomainsAliases(domain1, domain2 string, runtime ...workflowRuntime) (bool, error) {
+	resolvedRuntime := resolveWorkflowRuntime(runtime...)
+	resolvedRuntime = withDefaultsWorkflowRuntime(resolvedRuntime)
 	firstDot := strings.Index(domain1, ".")
 	if firstDot == -1 {
 		return false, fmt.Errorf("Invalid subdomain")
@@ -412,11 +324,11 @@ func areSubdomainsAliasesForRuntime(runtime workflowRuntime, domain1, domain2 st
 	if config.GetStartramConfig().Cname != "" && domain1[firstDot+1:] == config.GetStartramConfig().Cname {
 		return true, nil
 	}
-	cname1, err := runtime.LookupCNAMEFn(domain1)
+	cname1, err := resolvedRuntime.LookupCNAMEFn(domain1)
 	if err != nil {
 		return false, fmt.Errorf("lookup CNAME for %s: %w", domain1, err)
 	}
-	cname2, err := runtime.LookupCNAMEFn(domain2)
+	cname2, err := resolvedRuntime.LookupCNAMEFn(domain2)
 	if err != nil {
 		return false, fmt.Errorf("lookup CNAME for %s: %w", domain2, err)
 	}
@@ -424,7 +336,7 @@ func areSubdomainsAliasesForRuntime(runtime workflowRuntime, domain1, domain2 st
 }
 
 func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
-	return areSubdomainsAliasesForRuntime(defaultWorkflowRuntime(), domain1, domain2)
+	return areSubdomainsAliases(domain1, domain2)
 }
 
 func AreSubdomainsAliasesWithLookup(
@@ -435,18 +347,14 @@ func AreSubdomainsAliasesWithLookup(
 	runtime := workflowRuntime{
 		LookupCNAMEFn: workflowAliasLookupFn(lookupAlias),
 	}
-	return areSubdomainsAliasesForRuntime(runtime, domain1, domain2)
+	return areSubdomainsAliases(domain1, domain2, runtime)
 }
 
-func urbitCleanDelete(patp string) error {
-	runtime := defaultWorkflowRuntime()
-	return urbitCleanDeleteForRuntime(runtime, patp)
-}
-
-func urbitCleanDeleteForRuntime(runtime workflowRuntime, patp string) error {
-	runtime = withDefaultsWorkflowRuntime(runtime)
+func urbitCleanDelete(patp string, runtime ...workflowRuntime) error {
+	resolvedRuntime := resolveWorkflowRuntime(runtime...)
+	resolvedRuntime = withDefaultsWorkflowRuntime(resolvedRuntime)
 	getShipRunningStatus := func(patp string) (string, error) {
-		statuses, err := runtime.GetShipStatusFn([]string{patp})
+		statuses, err := resolvedRuntime.GetShipStatusFn([]string{patp})
 		if err != nil {
 			return "", fmt.Errorf("Failed to get statuses for %s: %w", patp, err)
 		}
@@ -459,9 +367,9 @@ func urbitCleanDeleteForRuntime(runtime workflowRuntime, patp string) error {
 	status, err := getShipRunningStatus(patp)
 	if err == nil {
 		if strings.Contains(status, "Up") {
-			if err := runtime.BarExitFn(patp); err != nil {
+			if err := resolvedRuntime.BarExitFn(patp); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit: %v", patp, err))
-				if err = runtime.StopContainerFn(patp); err != nil {
+				if err = resolvedRuntime.StopContainerFn(patp); err != nil {
 					zap.L().Error(fmt.Sprintf("Failed to stop %s: %v", patp, err))
 				}
 			}
@@ -475,10 +383,10 @@ func urbitCleanDeleteForRuntime(runtime workflowRuntime, patp string) error {
 			if !strings.Contains(status, "Up") {
 				break
 			}
-			runtime.SleepFn(1 * time.Second)
+			resolvedRuntime.SleepFn(1 * time.Second)
 		}
 	}
-	return runtime.DeleteContainerFn(patp)
+	return resolvedRuntime.DeleteContainerFn(patp)
 }
 
 func withDefaultsWorkflowRuntime(runtime workflowRuntime) workflowRuntime {

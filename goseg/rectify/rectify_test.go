@@ -1,6 +1,7 @@
 package rectify
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"testing"
@@ -31,7 +32,11 @@ func initializeRectifyTestEnv() {
 func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	initializeRectifyTestEnv()
 	urbitTransitionHandlerOnce.Do(func() {
-		go UrbitTransitionHandler()
+		go func() {
+			if err := UrbitTransitionHandlerWithContext(context.Background()); err != nil {
+				t.Fatalf("UrbitTransitionHandlerWithContext failed: %v", err)
+			}
+		}()
 	})
 
 	current := structs.AuthBroadcast{
@@ -42,7 +47,7 @@ func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	broadcast.UpdateBroadcast(current)
 
 	eventValue := "pack-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	events.PublishUrbitTransition(structs.UrbitTransition{
+	events.DefaultEventRuntime().PublishUrbitTransition(context.Background(), structs.UrbitTransition{
 		Patp:  "zod",
 		Type:  "pack",
 		Event: eventValue,
@@ -57,14 +62,18 @@ func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 func TestNewShipTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	initializeRectifyTestEnv()
 	newShipTransitionOnce.Do(func() {
-		go NewShipTransitionHandler()
+		go func() {
+			if err := NewShipTransitionHandlerWithContext(context.Background()); err != nil {
+				t.Fatalf("NewShipTransitionHandlerWithContext failed: %v", err)
+			}
+		}()
 	})
 
 	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
 	bootStage := "booting-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	patp := "~zod-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: bootStage})
-	events.PublishNewShipTransition(structs.NewShipTransition{Type: "patp", Event: patp})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: bootStage})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "patp", Event: patp})
 
 	testutil.WaitForCondition(t, func() bool {
 		state := broadcast.GetState()
@@ -75,12 +84,16 @@ func TestNewShipTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 func TestSystemTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	initializeRectifyTestEnv()
 	systemTransitionOnce.Do(func() {
-		go SystemTransitionHandler()
+		go func() {
+			if err := SystemTransitionHandlerWithContext(context.Background()); err != nil {
+				t.Fatalf("SystemTransitionHandlerWithContext failed: %v", err)
+			}
+		}()
 	})
 
 	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
 	event := "bug-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	events.PublishSystemTransition(structs.SystemTransition{Type: "bugReportError", Event: event})
+	events.DefaultEventRuntime().PublishSystemTransition(context.Background(), structs.SystemTransition{Type: "bugReportError", Event: event})
 
 	testutil.WaitForCondition(t, func() bool {
 		state := broadcast.GetState()
@@ -91,7 +104,11 @@ func TestSystemTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 func TestRectifyUrbitAppliesStartramEvents(t *testing.T) {
 	initializeRectifyTestEnv()
 	rectifyUrbitOnce.Do(func() {
-		go RectifyUrbit()
+		go func() {
+			if err := RectifyUrbitWithContext(context.Background()); err != nil {
+				t.Fatalf("RectifyUrbitWithContext failed: %v", err)
+			}
+		}()
 	})
 
 	broadcast.UpdateBroadcast(structs.AuthBroadcast{})

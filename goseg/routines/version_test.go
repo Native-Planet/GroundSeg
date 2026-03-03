@@ -240,7 +240,9 @@ func TestUpdateDockerMinioOnlyStartsRunningPiers(t *testing.T) {
 	rt := testVersionRuntime()
 	rt.configOps = versionRuntimeConfigStub{
 		architectureFn: func() string { return "amd64" },
-		getConfFn:      func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod", "nec"}} },
+		getConfFn: func() structs.SysConfig {
+			return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"zod", "nec"}}}
+		},
 		getShipStatusFn: func([]string) (map[string]string, error) {
 			return map[string]string{
 				"zod": "Up 1 second",
@@ -261,7 +263,9 @@ func TestUpdateDockerMinioOnlyStartsRunningPiers(t *testing.T) {
 	started := 0
 	rt.configOps = versionRuntimeConfigStub{
 		architectureFn: func() string { return "amd64" },
-		getConfFn:      func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod", "nec"}} },
+		getConfFn: func() structs.SysConfig {
+			return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"zod", "nec"}}}
+		},
 		getShipStatusFn: func([]string) (map[string]string, error) {
 			return map[string]string{
 				"zod": "Up 1 second",
@@ -291,8 +295,10 @@ func TestUpdateDockerVereStoppedShipPrepFlow(t *testing.T) {
 	rt := testVersionRuntime()
 	seenStatus := ""
 	rt.configOps = versionRuntimeConfigStub{
-		architectureFn:    func() string { return "amd64" },
-		getConfFn:         func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod"}} },
+		architectureFn: func() string { return "amd64" },
+		getConfFn: func() structs.SysConfig {
+			return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"zod"}}}
+		},
 		getShipStatusFn:   func([]string) (map[string]string, error) { return map[string]string{"zod": "Exited"}, nil },
 		loadUrbitConfigFn: func(string) error { return nil },
 		urbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
@@ -327,8 +333,10 @@ func TestUpdateDockerVereStoppedShipPrepFlow(t *testing.T) {
 func TestUpdateDockerVereRunningShipRestartAndChop(t *testing.T) {
 	rt := testVersionRuntime()
 	rt.configOps = versionRuntimeConfigStub{
-		architectureFn:    func() string { return "amd64" },
-		getConfFn:         func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod"}} },
+		architectureFn: func() string { return "amd64" },
+		getConfFn: func() structs.SysConfig {
+			return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"zod"}}}
+		},
 		getShipStatusFn:   func([]string) (map[string]string, error) { return map[string]string{"zod": "Up 1 second"}, nil },
 		loadUrbitConfigFn: func(string) error { return nil },
 		urbitConfFn: func(string) structs.UrbitDocker {
@@ -379,8 +387,10 @@ func TestUpdateDockerVereRunningShipRestartAndChop(t *testing.T) {
 func TestUpdateDockerReturnsOnStatusError(t *testing.T) {
 	rt := testVersionRuntime()
 	rt.configOps = versionRuntimeConfigStub{
-		architectureFn:  func() string { return "amd64" },
-		getConfFn:       func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod"}} },
+		architectureFn: func() string { return "amd64" },
+		getConfFn: func() structs.SysConfig {
+			return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"zod"}}}
+		},
 		getShipStatusFn: func([]string) (map[string]string, error) { return nil, errors.New("status error") },
 		startContainerFn: func(string, string) (structs.ContainerState, error) {
 			t.Fatal("should not start containers when status lookup fails")

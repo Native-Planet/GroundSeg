@@ -1,0 +1,117 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 71.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Multiple modules implement repeated wrapper chains (public function -> *ForRuntime helper -> service/runtime method) with near-pass-through behavior, e.g. orchestration wrappers in `goseg/docker/orchestration/orchestration.go` and WiFi wrappers in `goseg/system/wifi.go`.",
+        "State/protocol handlers combine decoding, auth/session mutation, transport dispatch, and timeout/concurrency logic in one unit (`goseg/leak/handler.go`), and ship transition builders combine config mutation + container lifecycle branching in single closures (`goseg/shipworkflow/urbit_operations_runtime.go`).",
+        "Config patching is centralized in a very large registry with repeated parse/has/apply closures for many keys (`goseg/config/config_update_schema.go`), increasing structural drift risk and making behavioral changes high-friction."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_wrapper_sprawl",
+      "summary": "Repeated pass-through runtime wrapper layers create systemic structural duplication and blur the real ownership boundary.",
+      "related_files": [
+        "goseg/docker/orchestration/orchestration.go",
+        "goseg/system/wifi.go",
+        "goseg/session/session.go",
+        "goseg/broadcast/collectors/collectors.go"
+      ],
+      "evidence": [
+        "`orchestration.go` repeatedly defines package-level methods that only validate/forward to runtime methods, while runtime methods mostly forward again to lifecycle/network calls (e.g., lines 83-103, 116-142, 174-208).",
+        "`wifi.go` repeats exported -> `...ForRuntime` -> `newWiFiService(runtime)` forwarding for most operations (lines 328-374), adding ceremony without distinct policy boundaries.",
+        "`session.go` has a large set of runtime methods that perform nil-guard boilerplate and directly pass through to state.logstream methods (lines 222-316).",
+        "`collectors.go` duplicates default-runtime and explicit-runtime entrypoints for the same workflows (e.g., lines 437-477 and 516-547), increasing API surface with little behavioral differentiation."
+      ],
+      "suggestion": "Collapse to a single explicit seam pattern per subsystem: keep either package facade or runtime object (not both), centralize validation once, and generate or template repetitive runtime adapters where dual entrypoints are still required for tests.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "systemic_runtime_indirection"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "protocol_and_state_mixing_in_handlers",
+      "summary": "Handler modules mix protocol decoding, auth/session mutation, and dispatch side effects, producing multi-responsibility flows that are hard to evolve safely.",
+      "related_files": [
+        "goseg/leak/handler.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`leak/handler.go` combines payload decoding (`decodePacketPayload`), protocol typing/routing (`routeAction`), auth state mutation (`urbitLogin`/`urbitLogout`), channel dispatch (`sendToLeakChannel`), and timeout goroutine behavior (`watchPasswordLogoutTimeout`) in one file.",
+        "`shipworkflow/urbit_operations_runtime.go` transition builders embed both domain policy and infrastructure actions inside step closures (e.g., `buildTogglePowerSteps` lines 309-363 and `buildToggleNetworkSteps` lines 389-429).",
+        "`auth/auth.go` also carries session/runtime wiring and token authorization behavior together, reinforcing the same boundary blur between session state access and request/auth policy."
+      ],
+      "suggestion": "Split by responsibility into protocol adapters, domain transition services, and transport/state gateways; keep handlers thin orchestration points that call focused components with explicit interfaces.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "handler_boundary_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_registry_monolith",
+      "summary": "Config mutation schema is concentrated in a monolithic registry with repetitive closure triplets, making change behavior inconsistent and hard to reason about.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_test.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`config_update_schema.go` keeps a very large `confPatchRegistry` (starting line 139) where each key repeats parse/has/apply boilerplate with mostly mechanical variation.",
+        "The same file also owns parsing utilities and registry build/init logic (lines 936-1067), so schema declaration, parse strategy, and execution policy are tightly coupled.",
+        "This file size/shape (1000+ LOC) creates high blast radius for small field additions and encourages copy-paste divergence in update semantics."
+      ],
+      "suggestion": "Move to declarative field specs (typed parser + target accessor/setter) and compose update behavior from reusable primitives; split registry declaration from parser helpers and execution engine into separate files.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "schema_centralization_debt"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "ops_and_presentation_concern_mixing",
+      "summary": "Operational modules combine unrelated concerns (system mutation, diagnostics, and output formatting), reducing cohesion and increasing side-effect coupling.",
+      "related_files": [
+        "goseg/system/disk.go",
+        "goseg/logger/logger.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "`disk.go` handles filesystem creation/mount/fstab reconciliation, multipart temp cleanup, and SMART health policy in one module (e.g., lines 198-270, 282-354, 385-481).",
+        "`logger.go` mixes logger bootstrap/state management with container log retrieval and JSON response shaping (`getDockerLogs` and `RetrieveSysLogHistory`, lines 312-377).",
+        "`system/system.go` similarly mixes host metrics collection with fixer-script/cron orchestration, reinforcing broad utility-style modules instead of focused services."
+      ],
+      "suggestion": "Split modules by stable responsibility (e.g., disk provisioning vs disk health checks; logger initialization vs log-history transport formatting) and expose small composable services per concern.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "utility_module_overreach"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Dual API patterns for testability were added repeatedly without a single standardized seam strategy.",
+      "Operational code paths evolved by accretion in utility-heavy files instead of boundary-focused services.",
+      "Schema and transition logic are implemented as large closure registries, which scale by copy/paste rather than decomposition."
+    ],
+    "likely_symptoms": [
+      "runtime_wrapper_sprawl",
+      "protocol_and_state_mixing_in_handlers",
+      "config_patch_registry_monolith",
+      "ops_and_presentation_concern_mixing"
+    ],
+    "possible_false_positives": []
+  }
+}

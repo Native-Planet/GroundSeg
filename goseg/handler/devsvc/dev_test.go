@@ -59,7 +59,9 @@ func TestDevHandlerPrintMountsAndBackupTlon(t *testing.T) {
 
 	backupRoot := t.TempDir()
 	backupDirFn = func() string { return backupRoot }
-	confForDev = func() structs.SysConfig { return structs.SysConfig{Piers: []string{"~zod"}} }
+	confForDev = func() structs.SysConfig {
+		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~zod"}}}
+	}
 	called := false
 	createLocalBackupForDev = func(patp, path string) error {
 		called = true
@@ -91,7 +93,7 @@ func TestDevHandlerRemoteBackupAndRestore(t *testing.T) {
 	backupDirFn = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
 
 	confForDev = func() structs.SysConfig {
-		return structs.SysConfig{Piers: []string{patp}, RemoteBackupPassword: "pw"}
+		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{patp}, RemoteBackupPassword: "pw"}}
 	}
 	uploadedPath := ""
 	uploadLatestBackupForDev = func(ship, pw, backupRoot string) error {
@@ -127,8 +129,10 @@ func TestDevHandlerStartramReminderAndToggle(t *testing.T) {
 
 	confForDev = func() structs.SysConfig {
 		conf := structs.SysConfig{
-			WgRegistered: true,
-			Piers:        []string{"~zod", "~bus"},
+			ConnectivityConfig: structs.ConnectivityConfig{
+				WgRegistered: true,
+				Piers:        []string{"~zod", "~bus"},
+			},
 		}
 		conf.StartramSetReminder.One = false
 		conf.StartramSetReminder.Three = false
@@ -169,7 +173,9 @@ func TestDevHandlerStartramReminderAndToggle(t *testing.T) {
 		t.Fatalf("expected only opted-in ship to be notified, got %s", notified)
 	}
 
-	confForDev = func() structs.SysConfig { return structs.SysConfig{WgRegistered: false} }
+	confForDev = func() structs.SysConfig {
+		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{WgRegistered: false}}
+	}
 	if err := DevHandler(devMessage(t, "startram-reminder")); err == nil {
 		t.Fatalf("expected no startram registration error")
 	}

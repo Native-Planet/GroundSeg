@@ -1,0 +1,68 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 76.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Package-level globals (`contractCatalog`, `actionContractBindings`, `actionContractBindingsByKey`) are populated via `contractRegistryInitErr = initContractRegistry()` at import time.",
+        "The package `init()` panics when registry validation fails, making any importer transitively fail process startup (`panic(fmt.Sprintf(\"invalid protocol contract registry: %v\", ...))`).",
+        "Registry construction, validation, storage, and read APIs are all concentrated in one module, creating a central coordination hub for protocol actions and error contracts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "import_time_panic_boundary_violation",
+      "summary": "Contract registry validation runs at import time and can panic, coupling all importers to this package's startup side effects.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`var contractRegistryInitErr = initContractRegistry()` executes during package initialization.",
+        "`init()` panics if `contractRegistryInitErr != nil`, so consumers cannot handle contract-registry failures explicitly.",
+        "Public functions (for example `ValidateActionContractBindings`) still check `contractRegistryInitErr`, indicating mixed startup and runtime error paths."
+      ],
+      "suggestion": "Remove panic-driven init and expose an explicit bootstrap/constructor (for example `NewRegistry` or `LoadRegistry`) that returns errors; have callers wire startup validation in composition roots instead of import-time side effects.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_registry_lifecycle"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "god_contract_registry_module",
+      "summary": "A single file acts as the protocol governance hub (IDs, metadata policy, binding map, version semantics), increasing blast radius of contract changes.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "The same module defines contract IDs, action tokens, lifecycle metadata schema, compatibility validation rules, version parsing/comparison helpers, and runtime lookup APIs.",
+        "Adding or changing any contract requires editing centralized entry lists and per-contract version constants in this file.",
+        "The consolidated `entries` table mixes multiple domains (upload actions, c2c actions, and StarTram API error contracts) into one registry path."
+      ],
+      "suggestion": "Split registry ownership by bounded context (for example upload/c2c/startram contract providers) and compose them through a small registry interface; keep shared validation in a narrow core package to reduce cross-domain coupling.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_registry_lifecycle"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit global lifecycle management for contract state",
+      "Centralized cross-domain contract ownership in one module"
+    ],
+    "likely_symptoms": [
+      "import_time_panic_boundary_violation",
+      "god_contract_registry_module"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -13,7 +13,7 @@ import (
 func drainNewShipTransitions() {
 	for {
 		select {
-		case <-events.NewShipTransitions():
+		case <-events.DefaultEventRuntime().NewShipTransitions():
 		default:
 			return
 		}
@@ -25,7 +25,7 @@ func readNewShipTransitions(t *testing.T, count int) []structs.NewShipTransition
 	capturedEvents := make([]structs.NewShipTransition, 0, count)
 	for i := 0; i < count; i++ {
 		select {
-		case evt := <-events.NewShipTransitions():
+		case evt := <-events.DefaultEventRuntime().NewShipTransitions():
 			capturedEvents = append(capturedEvents, evt)
 		case <-time.After(2 * time.Second):
 			t.Fatalf("timed out waiting for new-ship transition %d", i+1)

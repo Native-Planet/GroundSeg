@@ -25,26 +25,18 @@ var (
 	dockerTransitionFailureWindow = 3 * time.Minute
 )
 
-func StartDockerHealthLoops() error {
-	return StartDockerHealthLoopsWithContext(context.Background())
-}
-
-func StartDockerHealthLoopsWithContext(ctx context.Context) error {
+func StartDockerHealthLoops(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return startDockerHealthLoopWithContext(ctx)
+	return startDockerHealthLoop(ctx)
 }
 
 func StartDockerSubsystem(ctx context.Context) error {
-	return StartDockerSubsystemWithContext(ctx)
-}
-
-func StartDockerSubsystemWithContext(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if err := startDockerHealthLoopWithContext(ctx); err != nil {
+	if err := startDockerHealthLoop(ctx); err != nil {
 		return err
 	}
 	errs := make(chan error, 2)
@@ -152,7 +144,7 @@ func handleSubscriptionFailure(count int, lastFailure time.Time, err error) (int
 	return count + 1, nextFailure
 }
 
-func startDockerHealthLoopWithContext(ctx context.Context) error {
+func startDockerHealthLoop(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -166,7 +158,7 @@ func startDockerHealthLoopWithContext(ctx context.Context) error {
 	healthLoopStopFn = cancel
 
 	go func() {
-		Check502LoopWithContext(loopCtx)
+		Check502Loop(loopCtx)
 		dockerHealthLoopMu.Lock()
 		healthLoopRunning = false
 		dockerHealthLoopMu.Unlock()

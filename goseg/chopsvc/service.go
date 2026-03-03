@@ -1,6 +1,7 @@
 package chopsvc
 
 import (
+	"context"
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
@@ -15,7 +16,9 @@ import (
 )
 
 var (
-	publishUrbitTransitionFn    = events.PublishUrbitTransition
+	publishUrbitTransitionFn = func(ctx context.Context, transition structs.UrbitTransition) error {
+		return events.DefaultEventRuntime().PublishUrbitTransition(ctx, transition)
+	}
 	getShipStatusFn             = orchestration.GetShipStatus
 	barExitFn                   = click.BarExit
 	stopContainerByNameFn       = orchestration.StopContainerByName
@@ -32,7 +35,7 @@ var (
 func ChopPier(patp string) error {
 	zap.L().Info(fmt.Sprintf("Chop called for %s", patp))
 	publishTransition := func(event string) {
-		publishUrbitTransitionFn(structs.UrbitTransition{Patp: patp, Type: "chop", Event: event})
+		publishUrbitTransitionFn(context.Background(), structs.UrbitTransition{Patp: patp, Type: "chop", Event: event})
 	}
 	chopError := func(err error) error {
 		publishTransition("error")

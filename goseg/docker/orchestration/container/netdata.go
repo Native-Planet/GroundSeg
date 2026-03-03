@@ -35,10 +35,93 @@ type NetdataRuntime struct {
 	PollIntervalFn              func() time.Duration
 }
 
+type netdataRuntimeRequirement func(NetdataRuntime) error
+
+func (rt NetdataRuntime) require(requirements ...netdataRuntimeRequirement) error {
+	for _, requirement := range requirements {
+		if requirement == nil {
+			continue
+		}
+		if err := requirement(rt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (rt NetdataRuntime) requireBasePath() error {
+	return rt.require(func(rt NetdataRuntime) error {
+		if rt.BasePathFn == nil {
+			return fmt.Errorf("missing base path getter")
+		}
+		return nil
+	})
+}
+
+func (rt NetdataRuntime) requireContainerMetadata() error {
+	return rt.require(func(rt NetdataRuntime) error {
+		if rt.GetLatestContainerInfoFn == nil {
+			return fmt.Errorf("missing latest netdata metadata runtime")
+		}
+		return nil
+	})
+}
+
+func (rt NetdataRuntime) requireDockerDir() error {
+	return rt.require(func(rt NetdataRuntime) error {
+		if rt.DockerDirFn == nil {
+			return fmt.Errorf("missing docker dir getter")
+		}
+		return nil
+	})
+}
+
+func (rt NetdataRuntime) requireFileReader() error {
+	return rt.require(func(rt NetdataRuntime) error {
+		if rt.ReadFileFn == nil {
+			return fmt.Errorf("missing file reader")
+		}
+		return nil
+	})
+}
+
+func (rt NetdataRuntime) requireConfigWriter() error {
+	return rt.require(
+		func(rt NetdataRuntime) error {
+			if rt.WriteFileFn == nil {
+				return fmt.Errorf("missing file writer")
+			}
+			if rt.MkdirAllFn == nil {
+				return fmt.Errorf("missing mkdirall callback")
+			}
+			if rt.VolumeExistsFn == nil {
+				return fmt.Errorf("missing volume exists callback")
+			}
+			if rt.CreateVolumeFn == nil {
+				return fmt.Errorf("missing create volume callback")
+			}
+			return nil
+		},
+		func(rt NetdataRuntime) error { return rt.requireCopyDependency() },
+	)
+}
+
+func (rt NetdataRuntime) requireCopyDependency() error {
+	return rt.require(func(rt NetdataRuntime) error {
+		if rt.CopyFileToVolumeFn == nil {
+			return fmt.Errorf("missing copy-to-volume runtime")
+		}
+		if rt.GetLatestContainerImageFn == nil {
+			return fmt.Errorf("missing image selector")
+		}
+		return nil
+	})
+}
+
 func LoadNetdataWithRuntime(rt NetdataRuntime) error {
 	zap.L().Info("Loading NetData container")
-	if rt.BasePathFn == nil {
-		return fmt.Errorf("missing base path getter")
+	if err := rt.requireBasePath(); err != nil {
+		return err
 	}
 	confPath := filepath.Join(rt.BasePathFn(), "settings", "netdata.json")
 	writeConf := func() error {
@@ -66,8 +149,8 @@ func LoadNetdataWithRuntime(rt NetdataRuntime) error {
 func NetdataContainerConfWithRuntime(rt NetdataRuntime) (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
-	if rt.GetLatestContainerInfoFn == nil {
-		return containerConfig, hostConfig, fmt.Errorf("missing latest netdata metadata runtime")
+	if err := rt.requireContainerMetadata(); err != nil {
+		return containerConfig, hostConfig, err
 	}
 	containerInfo, err := rt.GetLatestContainerInfoFn("netdata")
 	if err != nil {
@@ -117,12 +200,12 @@ func NetdataContainerConfWithRuntime(rt NetdataRuntime) (container.Config, conta
 
 func WriteNDConfWithRuntime(rt NetdataRuntime) error {
 	newConf := "[plugins]\n     apps = no\n"
-	if rt.DockerDirFn == nil {
-		return fmt.Errorf("missing docker dir getter")
+	if err := rt.requireDockerDir(); err != nil {
+		return err
 	}
 	filePath := filepath.Join(rt.DockerDirFn(), "netdataconfig", "_data", "netdata.conf")
-	if rt.ReadFileFn == nil {
-		return fmt.Errorf("missing file reader")
+	if err := rt.requireFileReader(); err != nil {
+		return err
 	}
 	existingConf, err := rt.ReadFileFn(filePath)
 	if err != nil {
@@ -137,6 +220,9 @@ func WriteNDConfWithRuntime(rt NetdataRuntime) error {
 }
 
 func writeNDConfigArtifactWithRuntime(rt NetdataRuntime, filePath string, content string) error {
+	if err := rt.requireConfigWriter(); err != nil {
+		return err
+	}
 	return artifactwriter.Write(artifactwriter.WriteConfig{
 		FilePath:            filePath,
 		Content:             content,
@@ -148,13 +234,8 @@ func writeNDConfigArtifactWithRuntime(rt NetdataRuntime, filePath string, conten
 		TargetPath:          "/etc/netdata/",
 		VolumeName:          "netdata",
 		WriterContainerName: "nd_writer",
-		SelectImageFn: func() (string, error) {
-			if rt.GetLatestContainerImageFn == nil {
-				return "", fmt.Errorf("missing image selector")
-			}
-			return rt.GetLatestContainerImageFn("netdata")
-		},
-		CopyErrorPrefix: "Failed to copy ND config file to volume",
+		SelectImageFn:       func() (string, error) { return rt.GetLatestContainerImageFn("netdata") },
+		CopyErrorPrefix:     "Failed to copy ND config file to volume",
 		EnsureVolumesFn: artifactwriter.NewVolumeInitializationPlan(artifactwriter.VolumeOps{
 			VolumeExistsFn: rt.VolumeExistsFn,
 			CreateVolumeFn: rt.CreateVolumeFn,
@@ -171,8 +252,8 @@ func CopyNDFileToVolume(filePath string, targetPath string, volumeName string) e
 }
 
 func CopyNDFileToVolumeWithRuntime(rt NetdataRuntime, filePath string, targetPath string, volumeName string) error {
-	if rt.CopyFileToVolumeFn == nil {
-		return fmt.Errorf("missing copy-to-volume runtime")
+	if err := rt.requireCopyDependency(); err != nil {
+		return err
 	}
 	return rt.CopyFileToVolumeFn(
 		filePath,

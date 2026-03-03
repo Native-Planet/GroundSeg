@@ -19,13 +19,23 @@ type versionHTTPDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-var (
-	versionStore           VersionStore    = newInMemoryVersionStore()
-	versionHTTPClient      versionHTTPDoer = http.DefaultClient
-	versionFetchRetryCount                 = 10
-	versionFetchRetryDelay                 = time.Second
-	versionFetchSleep                      = time.Sleep
-)
+type versionRuntime struct {
+	stateMu               sync.RWMutex
+	opsMu                 sync.Mutex
+	versionStore           VersionStore
+	versionHTTPClient      versionHTTPDoer
+	versionFetchRetryCount int
+	versionFetchRetryDelay time.Duration
+	versionFetchSleep      func(time.Duration)
+}
+
+var versionRuntimeState = &versionRuntime{
+	versionStore:           newInMemoryVersionStore(),
+	versionHTTPClient:      http.DefaultClient,
+	versionFetchRetryCount: 10,
+	versionFetchRetryDelay: time.Second,
+	versionFetchSleep:      time.Sleep,
+}
 
 type VersionState struct {
 	Channel     structs.Channel
@@ -77,50 +87,112 @@ func (store *inMemoryVersionStore) SetServerReady(ready bool) {
 	store.serverReady = ready
 }
 
-func SetVersionStore(store VersionStore) {
-	if store != nil {
-		versionStore = store
+func versionRuntimeSnapshot() *versionRuntime {
+	return versionRuntimeState
+}
+
+func setVersionStore(store VersionStore) {
+	if store == nil {
+		return
 	}
+	state := versionRuntimeSnapshot()
+	state.stateMu.Lock()
+	defer state.stateMu.Unlock()
+	state.versionStore = store
+}
+
+func versionStoreSnapshot() VersionStore {
+	state := versionRuntimeSnapshot()
+	state.stateMu.RLock()
+	defer state.stateMu.RUnlock()
+	return state.versionStore
+}
+
+func setVersionHTTPClient(client versionHTTPDoer) {
+	if client == nil {
+		return
+	}
+	state := versionRuntimeSnapshot()
+	state.stateMu.Lock()
+	defer state.stateMu.Unlock()
+	state.versionHTTPClient = client
+}
+
+func versionHTTPClientSnapshot() versionHTTPDoer {
+	state := versionRuntimeSnapshot()
+	state.stateMu.RLock()
+	defer state.stateMu.RUnlock()
+	return state.versionHTTPClient
+}
+
+func setVersionFetchPolicy(retries int, delay time.Duration) {
+	state := versionRuntimeSnapshot()
+	state.stateMu.Lock()
+	defer state.stateMu.Unlock()
+	if retries > 0 {
+		state.versionFetchRetryCount = retries
+	}
+	if delay > 0 {
+		state.versionFetchRetryDelay = delay
+	}
+}
+
+func setVersionFetchSleep(sleepFn func(time.Duration)) {
+	state := versionRuntimeSnapshot()
+	state.stateMu.Lock()
+	defer state.stateMu.Unlock()
+	state.versionFetchSleep = sleepFn
+}
+
+func versionFetchConfigSnapshot() (int, time.Duration, func(time.Duration)) {
+	state := versionRuntimeSnapshot()
+	state.stateMu.RLock()
+	defer state.stateMu.RUnlock()
+	sleepFn := state.versionFetchSleep
+	if sleepFn == nil {
+		sleepFn = time.Sleep
+	}
+	return state.versionFetchRetryCount, state.versionFetchRetryDelay, sleepFn
+}
+
+func SetVersionStore(store VersionStore) {
+	setVersionStore(store)
 }
 
 func SetVersionHTTPClient(client versionHTTPDoer) {
-	if client != nil {
-		versionHTTPClient = client
-	}
+	setVersionHTTPClient(client)
 }
 
 func SetVersionFetchRetryPolicy(retries int, delay time.Duration) {
-	if retries > 0 {
-		versionFetchRetryCount = retries
-	}
-	if delay > 0 {
-		versionFetchRetryDelay = delay
-	}
+	setVersionFetchPolicy(retries, delay)
 }
 
 func GetVersionState() VersionState {
-	return versionStore.Snapshot()
+	return versionStoreSnapshot().Snapshot()
 }
 
 func GetVersionChannel() structs.Channel {
-	return versionStore.Snapshot().Channel
+	return versionStoreSnapshot().Snapshot().Channel
 }
 
 func SetVersionChannel(channel structs.Channel) {
-	versionStore.SetChannel(channel)
+	versionStoreSnapshot().SetChannel(channel)
 }
 
 func IsVersionServerReady() bool {
-	return versionStore.Snapshot().ServerReady
+	return versionStoreSnapshot().Snapshot().ServerReady
 }
 
 func fetchVersionFromServer(conf structs.SysConfig) (structs.Version, error) {
-	retries := versionFetchRetryCount
+	retries, delay, sleepFn := versionFetchConfigSnapshot()
 	if retries < 1 {
 		retries = 1
 	}
-	delay := versionFetchRetryDelay
 	url := globalConfig.UpdateUrl
+	client := versionHTTPClientSnapshot()
+	if client == nil {
+		client = http.DefaultClient
+	}
 	var fetchedVersion structs.Version
 	for i := 0; i < retries; i++ {
 		req, err := http.NewRequest("GET", url, nil)
@@ -130,12 +202,12 @@ func fetchVersionFromServer(conf structs.SysConfig) (structs.Version, error) {
 		userAgent := "NativePlanet.GroundSeg-" + conf.GsVersion
 		req.Header.Set("User-Agent", userAgent)
 
-		resp, err := versionHTTPClient.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			errmsg := fmt.Sprintf("Unable to connect to update server: %v", err)
 			zap.L().Warn(errmsg)
 			if i < retries-1 {
-				versionFetchSleep(delay)
+				sleepFn(delay)
 				continue
 			}
 			return structs.Version{}, fmt.Errorf("request version metadata: %w", err)
@@ -145,7 +217,7 @@ func fetchVersionFromServer(conf structs.SysConfig) (structs.Version, error) {
 			errmsg := fmt.Sprintf("Error decoding version metadata: %v", err)
 			zap.L().Warn(errmsg)
 			if i < retries-1 {
-				versionFetchSleep(delay)
+				sleepFn(delay)
 				continue
 			}
 			return structs.Version{}, fmt.Errorf("decode version metadata: %w", err)
@@ -191,15 +263,16 @@ func PublishVersionMetadata(version structs.Version, channel structs.Channel) er
 	if err := persistVersionInfo(version); err != nil {
 		return err
 	}
-	versionStore.SetState(channel, true)
+	versionStoreSnapshot().SetState(channel, true)
 	return nil
 }
 
 // CheckVersionWithError fetches release metadata and returns the channel for the
 // current branch.
 func CheckVersionWithError() (structs.Channel, error) {
-	versMutex.Lock()
-	defer versMutex.Unlock()
+	runtime := versionRuntimeSnapshot()
+	runtime.opsMu.Lock()
+	defer runtime.opsMu.Unlock()
 
 	conf := Conf()
 	_, channel, err := ResolveLatestChannel(conf)
@@ -226,21 +299,22 @@ func SyncVersionInfo() (structs.Channel, bool) {
 // SyncVersionInfoWithError fetches remote metadata, persists it, and refreshes
 // version globals, returning the active channel or an error.
 func SyncVersionInfoWithError() (structs.Channel, error) {
-	versMutex.Lock()
-	defer versMutex.Unlock()
+	runtime := versionRuntimeSnapshot()
+	runtime.opsMu.Lock()
+	defer runtime.opsMu.Unlock()
 
 	conf := Conf()
 	fetchedVersion, channel, err := ResolveLatestChannel(conf)
 	if err != nil {
 		zap.L().Warn(fmt.Sprintf("Unable to resolve latest version channel: %v", err))
-		versionStore.SetServerReady(false)
+		versionStoreSnapshot().SetServerReady(false)
 		return GetVersionChannel(), fmt.Errorf("resolve latest version channel: %w", err)
 	}
 
 	if err := PublishVersionMetadata(fetchedVersion, channel); err != nil {
 		errmsg := fmt.Sprintf("Failed to persist version metadata: %v", err)
 		zap.L().Error(errmsg)
-		versionStore.SetServerReady(false)
+		versionStoreSnapshot().SetServerReady(false)
 		return GetVersionChannel(), fmt.Errorf("publish version metadata: %w", err)
 	}
 	return GetVersionChannel(), nil

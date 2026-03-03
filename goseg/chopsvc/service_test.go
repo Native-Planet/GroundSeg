@@ -12,7 +12,7 @@ import (
 )
 
 func resetChopSvcSeams() {
-	publishUrbitTransitionFn = func(structs.UrbitTransition) {}
+	publishUrbitTransitionFn = func(_ context.Context, _ structs.UrbitTransition) error { return nil }
 	getShipStatusFn = func([]string) (map[string]string, error) {
 		return map[string]string{}, nil
 	}
@@ -79,10 +79,11 @@ func TestChopPierRunningShipTransitionsToChopAndBackToBoot(t *testing.T) {
 		return structs.ContainerState{}, nil
 	}
 	var events []string
-	publishUrbitTransitionFn = func(t structs.UrbitTransition) {
+	publishUrbitTransitionFn = func(_ context.Context, t structs.UrbitTransition) error {
 		if t.Type == "chop" {
 			events = append(events, t.Event)
 		}
+		return nil
 	}
 
 	if err := ChopPier("~zod"); err != nil {

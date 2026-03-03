@@ -150,7 +150,7 @@ func HandleSystem(msg []byte, deps SystemDependencies) error {
 			}
 		}
 	case "wifi-toggle":
-		if err := deps.ToggleDevice(system.Device); err != nil {
+		if err := deps.ToggleDevice(system.WiFiDevice()); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't toggle wifi device: %v", err))
 		}
 	case "wifi-connect":

@@ -1,6 +1,7 @@
 package system
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os/exec"
@@ -29,9 +30,16 @@ func resetSystemSeams() {
 	configureSwapForSystemHandler = system.ConfigureSwap
 	withSwapValForSystemHandler = config.WithSwapVal
 	runUpgradeForSystemHandler = system.RunUpgrade
-	toggleDeviceForSystemHandler = system.ToggleDevice
-	connectToWifiForSystemHandler = system.ConnectToWifi
-	publishSystemTransitionForSystemHandler = events.PublishSystemTransition
+	toggleDeviceForSystemHandler = func(dev string) error {
+		return system.DefaultWiFiRuntimeService().ToggleDevice(dev)
+	}
+	connectToWifiForSystemHandler = func(ssid, password string) error {
+		return system.DefaultWiFiRuntimeService().ConnectToWifi(ssid, password)
+	}
+	publishSystemTransitionForSystemHandler = func(_ context.Context, transition structs.SystemTransition) error {
+		_ = events.DefaultEventRuntime().PublishSystemTransition(context.Background(), transition)
+		return nil
+	}
 	sleepForSystemHandler = time.Sleep
 }
 
@@ -73,7 +81,9 @@ func TestSystemHandlerTogglePenpaiFeature(t *testing.T) {
 		updateCalls++
 		return nil
 	}
-	confForSystemHandler = func() structs.SysConfig { return structs.SysConfig{PenpaiAllow: true} }
+	confForSystemHandler = func() structs.SysConfig {
+		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: true}}
+	}
 	if err := SystemHandler(systemMessage(t, "toggle-penpai-feature")); err != nil {
 		t.Fatalf("toggle disable failed: %v", err)
 	}
@@ -83,7 +93,9 @@ func TestSystemHandlerTogglePenpaiFeature(t *testing.T) {
 
 	loadCalled := false
 	loadLlamaForSystemHandler = func() error { loadCalled = true; return nil }
-	confForSystemHandler = func() structs.SysConfig { return structs.SysConfig{PenpaiAllow: false} }
+	confForSystemHandler = func() structs.SysConfig {
+		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: false}}
+	}
 	if err := SystemHandler(systemMessage(t, "toggle-penpai-feature")); err != nil {
 		t.Fatalf("toggle enable failed: %v", err)
 	}
@@ -125,7 +137,9 @@ func TestSystemHandlerGroundsegPowerAndSwap(t *testing.T) {
 		t.Fatalf("expected no exec invocations in debug mode, got %d", execCalled)
 	}
 
-	confForSystemHandler = func() structs.SysConfig { return structs.SysConfig{SwapFile: "/tmp/swapfile"} }
+	confForSystemHandler = func() structs.SysConfig {
+		return structs.SysConfig{RuntimeConfig: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
+	}
 	configureCalled := false
 	configureSwapForSystemHandler = func(file string, value int) error {
 		configureCalled = (file == "/tmp/swapfile" && value == 4)
@@ -162,10 +176,11 @@ func TestSystemHandlerUpdateWifiAndWifiConnectTransitions(t *testing.T) {
 
 	sleepForSystemHandler = func(time.Duration) {}
 	var events []string
-	publishSystemTransitionForSystemHandler = func(trans structs.SystemTransition) {
+	publishSystemTransitionForSystemHandler = func(_ context.Context, trans structs.SystemTransition) error {
 		if trans.Type == "wifiConnect" {
 			events = append(events, trans.Event)
 		}
+		return nil
 	}
 	connectToWifiForSystemHandler = func(string, string) error { return errors.New("auth failed") }
 	err := SystemHandler(systemMessage(t, "wifi-connect", func(a *structs.WsSystemAction) {

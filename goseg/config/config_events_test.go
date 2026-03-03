@@ -58,9 +58,8 @@ func TestStartConfEventLoopCancels(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(ConfigFilePath()), 0o755); err != nil {
 		t.Fatalf("failed to prepare config directory: %v", err)
 	}
-	globalConfig = structs.SysConfig{
-		C2cInterval: 60,
-	}
+	globalConfig = structs.SysConfig{}
+	globalConfig.C2cInterval = 60
 
 	ctx, cancel := context.WithCancel(context.Background())
 	events := make(chan string, 1)

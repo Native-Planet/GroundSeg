@@ -52,5 +52,5 @@ func processConfEvent(event string) {
 // ConfChannel starts the config event loop from the legacy package channel.
 func ConfChannel() {
 	// Backward-compatible entrypoint for existing code paths.
-	_ = StartConfEventLoop(context.Background(), system.ConfChannel)
+	_ = StartConfEventLoop(context.Background(), system.ConfChannel())
 }

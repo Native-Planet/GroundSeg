@@ -4,8 +4,17 @@ import (
 	"errors"
 	"groundseg/protocol/contracts"
 	"reflect"
+	"time"
 	"testing"
 )
+
+func versionBefore(reference string) string {
+	referenceTime, err := time.Parse("2006.01.02", reference)
+	if err != nil {
+		return reference
+	}
+	return referenceTime.Add(-24 * time.Hour).Format("2006.01.02")
+}
 
 func TestParseActionValidatesNamespace(t *testing.T) {
 	got, err := ParseAction(NamespaceUpload, string(ActionUploadReset))

@@ -1,6 +1,7 @@
 package rectify
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"testing"
@@ -31,10 +32,10 @@ func TestImportShipTransitionHandlerAppliesUploadTransitions(t *testing.T) {
 	errMsg := "error-" + suffix
 	extracted := 77
 
-	events.PublishImportShipTransition(structs.UploadTransition{Type: "status", Event: status})
-	events.PublishImportShipTransition(structs.UploadTransition{Type: "patp", Event: patp})
-	events.PublishImportShipTransition(structs.UploadTransition{Type: "error", Event: errMsg})
-	events.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: extracted})
+	events.DefaultEventRuntime().PublishImportShipTransition(context.Background(), structs.UploadTransition{Type: "status", Event: status})
+	events.DefaultEventRuntime().PublishImportShipTransition(context.Background(), structs.UploadTransition{Type: "patp", Event: patp})
+	events.DefaultEventRuntime().PublishImportShipTransition(context.Background(), structs.UploadTransition{Type: "error", Event: errMsg})
+	events.DefaultEventRuntime().PublishImportShipTransition(context.Background(), structs.UploadTransition{Type: "extracted", Value: extracted})
 
 	testutil.WaitForCondition(t, func() bool {
 		state := broadcast.GetState()
@@ -56,7 +57,7 @@ func TestImportShipTransitionHandlerIgnoresUnknownTransitionTypes(t *testing.T) 
 	initial.Upload.Extracted = 42
 	broadcast.UpdateBroadcast(initial)
 
-	events.PublishImportShipTransition(structs.UploadTransition{Type: "unknown", Event: "ignored"})
+	events.DefaultEventRuntime().PublishImportShipTransition(context.Background(), structs.UploadTransition{Type: "unknown", Event: "ignored"})
 	time.Sleep(100 * time.Millisecond)
 
 	state := broadcast.GetState()

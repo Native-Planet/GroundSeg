@@ -1,0 +1,109 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Function-bag runtime structs are repeated across modules (`Runtime*Ops`, `collectorRuntime`, `NetdataRuntime`, `wifiRuntime`) and rely on pervasive nil-guard wrappers instead of explicit capability boundaries.",
+        "Session/logstream API is mirrored at multiple layers: `logstreamSessionStore` and `sessionState` duplicate nearly identical method surfaces and pass-through behavior.",
+        "`collectors.go` centralizes backup snapshotting, urbit composition, profile assembly, and system hardware collection in one large file with cross-domain imports and mixed concerns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_function_bag_sprawl",
+      "summary": "Runtime dependency wiring is scattered into oversized function-bag structs that force repeated guard/wrapper code.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/docker/orchestration/container/netdata.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_ops.go` defines many granular `*Ops` structs with callback fields (e.g., lines 30-169), creating a broad, fragmented seam surface.",
+        "`goseg/broadcast/collectors/collectors.go` defines a 17-field `collectorRuntime` (lines 35-53) plus `ensureConfigured` and per-callback wrappers (lines 183-349) to compensate for optional dependencies.",
+        "`goseg/docker/orchestration/container/netdata.go` repeats the same pattern with a large runtime struct (lines 16-36) and repeated nil checks in each operation path (lines 40-48, 69-71, 120-126, 174-186)."
+      ],
+      "suggestion": "Replace broad callback bags with a few cohesive interfaces per use-case (e.g., config IO, container lifecycle, runtime snapshot), require them at construction time, and remove per-method nil fallbacks.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "capability_boundary_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_api_mirroring",
+      "summary": "Session/logstream behavior is duplicated across layers, creating pass-through bloat and drift risk.",
+      "related_files": [
+        "goseg/session/session.go",
+        "goseg/logger/logger.go"
+      ],
+      "evidence": [
+        "`goseg/session/session.go` duplicates logstream operations in both `logstreamSessionStore` (lines 40-201) and `sessionState` pass-through methods (lines 241-323) with mostly identical method coverage.",
+        "`goseg/logger/logger.go` has duplicated sink configuration entry points (`ConfigureLogstreamRuntime` lines 125-133 and `configureSystemLogSink` lines 205-213) that implement the same state mutation logic."
+      ],
+      "suggestion": "Define a single owner for logstream/session mutation and expose one minimal API; remove pass-through mirror methods and consolidate sink configuration into a single function.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "capability_boundary_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "collector_god_module",
+      "summary": "`collectors.go` mixes unrelated domains (backup, profile, system metrics, urbit projection) into one large orchestration file.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/system/disk.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/collectors/collectors.go` is 971 lines and imports many unrelated domains (`backupsvc`, `click`, `network`, `startram`, `system`) in one module (lines 6-14).",
+        "The same file handles local backup filesystem scanning (lines 276-300), profile/startram parsing (lines 836-886), and hardware/drive state shaping (lines 890-953).",
+        "System-specific concerns are already substantial in dedicated modules (`goseg/system/disk.go`, `goseg/system/system.go`), but collector keeps re-aggregating those details, increasing cross-module coupling."
+      ],
+      "suggestion": "Split collector composition into domain-focused collectors (urbit, backup, profile, system) with a thin top-level assembler; keep filesystem and hardware-specific transformations in system/backup packages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_domain_partitioning"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_routing_repetition",
+      "summary": "Transition routing uses repetitive hand-written mappings where data-driven registration would reduce duplication.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`goseg/rectify/rectify.go` repeats near-identical router entries for startram transitions (lines 324-348), each constructing the same `startramTransitionCommand` shape.",
+        "`goseg/shipworkflow/urbit_operations_runtime.go` contains many thin toggle wrappers that only forward transition IDs (lines 32-58, 102-104), plus near-parallel domain-step builders for urbit/minio alias updates (lines 106-165)."
+      ],
+      "suggestion": "Introduce declarative transition registration tables (transition ID -> handler factory/step builder) and generate simple wrappers from shared descriptors to reduce parallel code paths.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_domain_partitioning"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Dependency injection style relies on mutable callback bags instead of stable, cohesive interfaces.",
+      "Domain boundaries are not strongly enforced in broadcast/transition orchestration code, so cross-cutting concerns accumulate in aggregator files."
+    ],
+    "likely_symptoms": [
+      "session_api_mirroring",
+      "transition_routing_repetition"
+    ],
+    "possible_false_positives": []
+  }
+}

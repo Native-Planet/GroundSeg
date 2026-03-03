@@ -13,19 +13,10 @@ import (
 
 func preserveVersionGlobals(t *testing.T) {
 	t.Helper()
-	originalStore := versionStore
-	originalClient := versionHTTPClient
-	originalRetryCount := versionFetchRetryCount
-	originalRetryDelay := versionFetchRetryDelay
-	originalSleep := versionFetchSleep
+	preserveVersionFetchRuntimeState(t)
 	originalConfig := globalConfig
 	originalBasePath := BasePath()
 	t.Cleanup(func() {
-		versionStore = originalStore
-		versionHTTPClient = originalClient
-		versionFetchRetryCount = originalRetryCount
-		versionFetchRetryDelay = originalRetryDelay
-		versionFetchSleep = originalSleep
 		globalConfig = originalConfig
 		SetBasePath(originalBasePath)
 	})
@@ -53,17 +44,19 @@ func TestInMemoryVersionStoreSetters(t *testing.T) {
 func TestResolveLatestChannelAndPublishVersionMetadata(t *testing.T) {
 	preserveVersionGlobals(t)
 
-	versionFetchRetryCount = 1
-	versionFetchRetryDelay = time.Millisecond
-	versionFetchSleep = func(time.Duration) {}
+	setVersionFetchPolicy(1, time.Millisecond)
+	setVersionFetchSleep(func(time.Duration) {})
 	globalConfig.UpdateUrl = "https://updates.example/version"
-	versionHTTPClient = &stubVersionHTTPClient{
+	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{resp: newHTTPResponse(200, `{"groundseg":{"beta":{"groundseg":{"repo":"repo-beta"}}}}`)},
 		},
-	}
+	})
 
-	metadata, channel, err := ResolveLatestChannel(structs.SysConfig{GsVersion: "1.0.0", UpdateBranch: "beta"})
+	conf := structs.SysConfig{}
+	conf.GsVersion = "1.0.0"
+	conf.UpdateBranch = "beta"
+	metadata, channel, err := ResolveLatestChannel(conf)
 	if err != nil {
 		t.Fatalf("ResolveLatestChannel failed: %v", err)
 	}
@@ -75,7 +68,7 @@ func TestResolveLatestChannelAndPublishVersionMetadata(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(BasePath(), "settings"), 0o755); err != nil {
 		t.Fatalf("mkdir settings failed: %v", err)
 	}
-	versionStore = newInMemoryVersionStore()
+	setVersionStore(newInMemoryVersionStore())
 	if err := PublishVersionMetadata(metadata, channel); err != nil {
 		t.Fatalf("PublishVersionMetadata failed: %v", err)
 	}
@@ -96,17 +89,16 @@ func TestCheckVersionReturnsStoredChannelOnFailure(t *testing.T) {
 	existing := structs.Channel{Groundseg: structs.VersionDetails{Repo: "existing-repo"}}
 	store := newInMemoryVersionStore()
 	store.SetState(existing, true)
-	versionStore = store
+	setVersionStore(store)
 
 	globalConfig.UpdateUrl = "https://updates.example/version"
 	globalConfig.GsVersion = "1.0.0"
 	globalConfig.UpdateBranch = "latest"
-	versionFetchRetryCount = 1
-	versionFetchRetryDelay = time.Millisecond
-	versionFetchSleep = func(time.Duration) {}
-	versionHTTPClient = &stubVersionHTTPClient{
+	setVersionFetchPolicy(1, time.Millisecond)
+	setVersionFetchSleep(func(time.Duration) {})
+	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{{err: os.ErrDeadlineExceeded}},
-	}
+	})
 
 	got, ok := CheckVersion()
 	if ok {
@@ -123,17 +115,16 @@ func TestCheckVersionWithErrorReturnsCauseOnFailure(t *testing.T) {
 	existing := structs.Channel{Groundseg: structs.VersionDetails{Repo: "existing-repo"}}
 	store := newInMemoryVersionStore()
 	store.SetState(existing, true)
-	versionStore = store
+	setVersionStore(store)
 
 	globalConfig.UpdateUrl = "https://updates.example/version"
 	globalConfig.GsVersion = "1.0.0"
 	globalConfig.UpdateBranch = "latest"
-	versionFetchRetryCount = 1
-	versionFetchRetryDelay = time.Millisecond
-	versionFetchSleep = func(time.Duration) {}
-	versionHTTPClient = &stubVersionHTTPClient{
+	setVersionFetchPolicy(1, time.Millisecond)
+	setVersionFetchSleep(func(time.Duration) {})
+	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{{err: os.ErrDeadlineExceeded}},
-	}
+	})
 
 	got, err := CheckVersionWithError()
 	if err == nil {
@@ -154,19 +145,18 @@ func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(BasePath(), "settings"), 0o755); err != nil {
 		t.Fatalf("mkdir settings failed: %v", err)
 	}
-	versionStore = newInMemoryVersionStore()
-	versionFetchRetryCount = 1
-	versionFetchRetryDelay = time.Millisecond
-	versionFetchSleep = func(time.Duration) {}
+	setVersionStore(newInMemoryVersionStore())
+	setVersionFetchPolicy(1, time.Millisecond)
+	setVersionFetchSleep(func(time.Duration) {})
 	globalConfig.UpdateUrl = "https://updates.example/version"
 	globalConfig.GsVersion = "1.0.0"
 	globalConfig.UpdateBranch = "latest"
 
-	versionHTTPClient = &stubVersionHTTPClient{
+	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},
 		},
-	}
+	})
 	channel, ok := SyncVersionInfo()
 	if !ok || channel.Groundseg.Repo != "repo-latest" {
 		t.Fatalf("expected SyncVersionInfo success, got channel=%+v ok=%v", channel, ok)
@@ -176,11 +166,11 @@ func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
 	}
 
 	globalConfig.UpdateBranch = "missing"
-	versionHTTPClient = &stubVersionHTTPClient{
+	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},
 		},
-	}
+	})
 	channel, ok = SyncVersionInfo()
 	if ok {
 		t.Fatalf("expected SyncVersionInfo failure for missing channel")
@@ -200,19 +190,18 @@ func TestSyncVersionInfoWithErrorReturnsCauseOnFailure(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(BasePath(), "settings"), 0o755); err != nil {
 		t.Fatalf("mkdir settings failed: %v", err)
 	}
-	versionStore = newInMemoryVersionStore()
-	versionFetchRetryCount = 1
-	versionFetchRetryDelay = time.Millisecond
-	versionFetchSleep = func(time.Duration) {}
+	setVersionStore(newInMemoryVersionStore())
+	setVersionFetchPolicy(1, time.Millisecond)
+	setVersionFetchSleep(func(time.Duration) {})
 	globalConfig.UpdateUrl = "https://updates.example/version"
 	globalConfig.GsVersion = "1.0.0"
 	globalConfig.UpdateBranch = "latest"
 
-	versionHTTPClient = &stubVersionHTTPClient{
+	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},
 		},
-	}
+	})
 	channel, err := SyncVersionInfoWithError()
 	if err != nil {
 		t.Fatalf("expected SyncVersionInfoWithError success, got %v", err)
@@ -222,11 +211,11 @@ func TestSyncVersionInfoWithErrorReturnsCauseOnFailure(t *testing.T) {
 	}
 
 	globalConfig.UpdateBranch = "missing"
-	versionHTTPClient = &stubVersionHTTPClient{
+	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},
 		},
-	}
+	})
 	_, err = SyncVersionInfoWithError()
 	if err == nil {
 		t.Fatalf("expected SyncVersionInfoWithError failure")

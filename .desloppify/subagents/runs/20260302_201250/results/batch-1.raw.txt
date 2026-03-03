@@ -1,0 +1,87 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 71.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action and namespace tokens are duplicated across package boundaries: `actions.go` defines `NamespaceUpload/NamespaceC2C` and `ActionUploadOpenEndpoint/ActionUploadReset/ActionC2CConnect`, while `contracts.go` repeats equivalent literals in `ActionNamespace*` and `ActionContractBindings`.",
+        "`contracts.go` runs `ValidateActionContractBindings()` in `init()` and panics on mismatch, creating import-time failure behavior for any consumer of the package.",
+        "`actions.go` builds global registries (`uploadActionContracts`, `c2cActionContracts`, `actionContractsByNamespace`) at package load and can panic in `buildActionContractSlice` if descriptors are missing."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "duplicated_protocol_authority",
+      "summary": "Protocol action identity is defined in both packages, creating split authority and drift-prone boundaries.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`actions.go` defines namespace and action enums (`Namespace*`, `Action*`) while `contracts.go` independently defines `ActionNamespace*` plus string actions in `ActionContractBindings`.",
+        "The two packages must stay manually synchronized for the same action surface (`upload/open-endpoint`, `upload/reset`, `c2c/connect`) but no single canonical type is shared."
+      ],
+      "suggestion": "Establish a single protocol authority package for namespace/action identifiers and make both `actions` and `contracts` consume those shared typed constants; remove duplicated string literals and duplicate enums.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "split_protocol_source_of_truth"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "import_time_registry_validation_panic",
+      "summary": "Contract registry validation is executed at import time, coupling module load order to runtime availability.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`contracts.go` `init()` calls `ValidateActionContractBindings()` and panics on any invalid binding.",
+        "`actions.go` imports `contracts` and therefore inherits this side effect even when a caller may only need action parsing/metadata access."
+      ],
+      "suggestion": "Move validation out of `init()` into explicit startup/bootstrap validation so failure policy is controlled by the composition root and package imports remain side-effect free.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "import_time_side_effects"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "import_time_action_registry_construction",
+      "summary": "Action registry construction in globals introduces hidden import-time coupling and panic paths across modules.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`actions.go` initializes `uploadActionContracts`/`c2cActionContracts`/`actionContractsByNamespace` at package load via contract lookups.",
+        "`buildActionContractSlice` panics when a descriptor is absent, so package import can fail based on registry consistency instead of explicit initialization flow."
+      ],
+      "suggestion": "Replace eager global construction with explicit lazy/bootstrapped registry initialization that returns errors; keep exported read APIs but decouple package import from cross-package data validation.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "import_time_side_effects"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Split ownership of protocol action identity across `actions` and `contracts`.",
+      "Validation and registry assembly embedded in package initialization instead of explicit bootstrap boundaries."
+    ],
+    "likely_symptoms": [
+      "duplicated_protocol_authority",
+      "import_time_registry_validation_panic",
+      "import_time_action_registry_construction"
+    ],
+    "possible_false_positives": []
+  }
+}

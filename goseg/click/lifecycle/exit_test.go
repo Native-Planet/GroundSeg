@@ -30,7 +30,7 @@ func TestBarExitExecFailure(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !strings.Contains(err.Error(), "failed to get exec") {
+	if !strings.Contains(err.Error(), "failed to execute") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

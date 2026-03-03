@@ -38,7 +38,7 @@ func TestGetWifiDeviceParsesAndTrimsOutput(t *testing.T) {
 		},
 	})
 
-	devices, err := newWiFiService(runtime).wifiDevices()
+	devices, err := runtime.wifiDevices()
 	if err != nil {
 		t.Fatalf("getWifiDevice returned error: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestGetConnectedSSIDReturnsErrorForMissingInterface(t *testing.T) {
 		},
 	})
 
-	ssid, err := newWiFiService(runtime).connectedSSID(&wifi.Client{}, "wlan0")
+	ssid, err := runtime.connectedSSID(&wifi.Client{}, "wlan0")
 	if err == nil {
 		t.Fatal("expected getConnectedSSID to fail when interface is missing")
 	}
@@ -94,7 +94,7 @@ func TestGetWifiDeviceReturnsErrorForFailureOrEmptyResult(t *testing.T) {
 			return exec.Command("false")
 		},
 	})
-	if _, err := newWiFiService(runtime).wifiDevices(); err == nil {
+	if _, err := runtime.wifiDevices(); err == nil {
 		t.Fatal("expected getWifiDevice to fail when command execution fails")
 	}
 
@@ -105,10 +105,10 @@ func TestGetWifiDeviceReturnsErrorForFailureOrEmptyResult(t *testing.T) {
 			return exec.Command("sh", "-c", "printf '\\n'")
 		},
 	})
-	if _, err := newWiFiService(runtime).wifiDevices(); err == nil {
+	if _, err := runtime.wifiDevices(); err == nil {
 		t.Fatal("expected getWifiDevice to fail when no devices are listed")
 	}
-	if _, err := newWiFiService(runtime).wifiDevices(); err != nil && !errors.Is(err, ErrWifiInterfaceNotFound) {
+	if _, err := runtime.wifiDevices(); err != nil && !errors.Is(err, ErrWifiInterfaceNotFound) {
 		t.Fatalf("expected wifi interface not found error when no devices are listed, got: %v", err)
 	}
 }
@@ -124,7 +124,7 @@ func TestPrimaryWifiDeviceReturnsFirstDevice(t *testing.T) {
 		},
 	})
 
-	device, err := newWiFiService(runtime).primaryWifiDevice()
+	device, err := runtime.primaryWifiDevice()
 	if err != nil {
 		t.Fatalf("primaryWifiDevice returned error: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestListWifiSSIDsParsesValidEntriesAndSkipsMalformed(t *testing.T) {
 		},
 	})
 
-	ssids, err := newWiFiService(runtime).listSSIDs("wlan0")
+	ssids, err := runtime.listSSIDs("wlan0")
 	if err != nil {
 		t.Fatalf("ListWifiSSIDs returned error: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestListWifiSSIDsPropagatesScanFailures(t *testing.T) {
 			return "", errors.New("nmcli down")
 		},
 	})
-	if _, err := newWiFiService(runtime).listSSIDs("wlan0"); err == nil {
+	if _, err := runtime.listSSIDs("wlan0"); err == nil {
 		t.Fatal("expected ListWifiSSIDs to return an error")
 	}
 }
@@ -187,7 +187,7 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 			return "", nil
 		},
 	})
-	wifiEnabled, err := newWiFiService(runtime).ifCheck()
+	wifiEnabled, err := runtime.ifCheck()
 	if err != nil {
 		t.Fatalf("ifCheck returned error: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 		t.Fatal("expected ifCheck to return true when nmcli output contains enabled")
 	}
 
-	if err := newWiFiService(runtime).toggleDevice("wlan0"); err != nil {
+	if err := runtime.toggleDevice("wlan0"); err != nil {
 		t.Fatalf("ToggleDevice(off) returned error: %v", err)
 	}
 
@@ -207,14 +207,14 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 			return "", nil
 		},
 	})
-	if err := newWiFiService(runtime).toggleDevice("wlan0"); err != nil {
+	if err := runtime.toggleDevice("wlan0"); err != nil {
 		t.Fatalf("ToggleDevice(on) returned error: %v", err)
 	}
 
 	runtime = testWifiRuntime(wifiRuntime{
 		runCommand: func(string, ...string) (string, error) { return "", errors.New("nmcli error") },
 	})
-	wifiEnabled, err = newWiFiService(runtime).ifCheck()
+	wifiEnabled, err = runtime.ifCheck()
 	if err == nil {
 		t.Fatal("expected ifCheck to return error when command fails")
 	}
@@ -233,7 +233,7 @@ func TestConnectToWifiUsesNmcliAndPropagatesErrors(t *testing.T) {
 			return exec.Command("true")
 		},
 	})
-	if err := newWiFiService(runtime).connect("HomeWiFi", "secret"); err != nil {
+	if err := runtime.connect("HomeWiFi", "secret"); err != nil {
 		t.Fatalf("ConnectToWifi returned error: %v", err)
 	}
 	if len(calls) != 1 || !strings.Contains(calls[0], "nmcli dev wifi connect HomeWiFi password secret") {
@@ -247,7 +247,7 @@ func TestConnectToWifiUsesNmcliAndPropagatesErrors(t *testing.T) {
 			return exec.Command("false")
 		},
 	})
-	if err := newWiFiService(runtime).connect("HomeWiFi", "secret"); err == nil {
+	if err := runtime.connect("HomeWiFi", "secret"); err == nil {
 		t.Fatal("expected ConnectToWifi to return command failure")
 	}
 }
@@ -260,7 +260,7 @@ func TestDisconnectWifiUsesInjectedClientFactoryError(t *testing.T) {
 			return nil, errors.New("client unavailable")
 		},
 	})
-	if err := newWiFiService(runtime).disconnect("wlan0"); err == nil {
+	if err := runtime.disconnect("wlan0"); err == nil {
 		t.Fatal("expected DisconnectWifi to return client creation error")
 	}
 }

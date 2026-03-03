@@ -72,7 +72,9 @@ func defaultSupportRuntime() supportRuntime {
 	return supportRuntime{
 		now:                     time.Now,
 		unmarshal:               json.Unmarshal,
-		publishSystemTransition: events.PublishSystemTransition,
+		publishSystemTransition: func(transition structs.SystemTransition) {
+			_ = events.DefaultEventRuntime().PublishSystemTransition(context.Background(), transition)
+		},
 		reportRootPath:          makeBugReportPath,
 		mkdirAllFn:              os.MkdirAll,
 		removeAllFn:             os.RemoveAll,
@@ -729,10 +731,10 @@ func makeBugReportPath() (string, error) {
 // lastTwoLogs returns the two most recent log files from the directory.
 func lastTwoLogs() []string {
 	// Read the directory
-	files, err := ioutil.ReadDir(logger.LogPath)
+	files, err := ioutil.ReadDir(logger.LogPath())
 	if err != nil {
 		fmt.Printf("Failed to read directory: %v\n", err)
 		return nil
 	}
-	return logger.MostRecentPartedLogPaths(logger.LogPath, files, 2)
+	return logger.MostRecentPartedLogPaths(logger.LogPath(), files, 2)
 }

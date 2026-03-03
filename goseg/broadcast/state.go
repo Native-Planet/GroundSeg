@@ -7,34 +7,61 @@ import (
 	"groundseg/structs"
 	"groundseg/transition"
 	"maps"
-	"sync"
 	"time"
+	"sync"
 
 	"go.uber.org/zap"
 )
 
-var (
+var defaultBroadcastStateRuntime = newBroadcastStateRuntime()
+
+type broadcastStateRuntime struct {
+	sync.RWMutex      // synchronize access to broadcastState
 	broadcastState    structs.AuthBroadcast
-	scheduledPacks    = make(map[string]time.Time)
-	urbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
-	schedulePackBus   = make(chan string)
-	systemTransitions structs.SystemTransitionBroadcast
+	scheduledPacks    map[string]time.Time
+	urbitTransitions  map[string]structs.UrbitTransitionBroadcast
+	schedulePackBus   chan string
 	packMu            sync.RWMutex
 	urbTransMu        sync.RWMutex
 	sysTransMu        sync.RWMutex
-	mu                sync.RWMutex // synchronize access to broadcastState
-)
-
-func PublishSchedulePack(reason string) {
-	schedulePackBus <- reason
+	systemTransitions structs.SystemTransitionBroadcast
 }
 
-func SchedulePackEvents() <-chan string {
-	return schedulePackBus
+func newBroadcastStateRuntime() *broadcastStateRuntime {
+	return &broadcastStateRuntime{
+		broadcastState:   structs.AuthBroadcast{},
+		scheduledPacks:   make(map[string]time.Time),
+		urbitTransitions: make(map[string]structs.UrbitTransitionBroadcast),
+		schedulePackBus:  make(chan string),
+	}
+}
+
+func NewBroadcastStateRuntime() *broadcastStateRuntime {
+	return newBroadcastStateRuntime()
+}
+
+func DefaultBroadcastStateRuntime() *broadcastStateRuntime {
+	return defaultBroadcastStateRuntime
+}
+
+func resolveBroadcastStateRuntime(runtime ...*broadcastStateRuntime) *broadcastStateRuntime {
+	if len(runtime) > 0 && runtime[0] != nil {
+		return runtime[0]
+	}
+	return DefaultBroadcastStateRuntime()
+}
+
+func PublishSchedulePack(reason string, runtime ...*broadcastStateRuntime) {
+	resolved := resolveBroadcastStateRuntime(runtime...)
+	resolved.schedulePackBus <- reason
+}
+
+func SchedulePackEvents(runtime ...*broadcastStateRuntime) <-chan string {
+	return resolveBroadcastStateRuntime(runtime...).schedulePackBus
 }
 
 // take in config file and addt'l info to initialize broadcast
-func bootstrapBroadcastState() error {
+func bootstrapBroadcastState(runtime ...*broadcastStateRuntime) error {
 	zap.L().Info("Bootstrapping state")
 	// this returns a map of ship:running status
 	zap.L().Info("Resolving pier status")
@@ -48,9 +75,10 @@ func bootstrapBroadcastState() error {
 		Profile: constructProfileInfo(),
 		Apps:    constructAppsInfo(),
 	}
-	mu.Lock()
-	broadcastState = nextState
-	mu.Unlock()
+	resolved := resolveBroadcastStateRuntime(runtime...)
+	resolved.Lock()
+	resolved.broadcastState = nextState
+	resolved.Unlock()
 	// start looping info refreshes
 	StartBroadcastLoop()
 	return nil
@@ -58,14 +86,19 @@ func bootstrapBroadcastState() error {
 
 // put startram regions into broadcast struct
 func LoadStartramRegions() error {
+	return LoadStartramRegionsWithRuntime()
+}
+
+func LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime) error {
 	zap.L().Info("Retrieving StarTram region info")
 	regions, err := collectors.LoadStartramRegions()
 	if err != nil {
 		return fmt.Errorf("load startram regions: %w", err)
 	}
-	mu.Lock()
-	broadcastState.Profile.Startram.Info.Regions = regions
-	mu.Unlock()
+	resolved := resolveBroadcastStateRuntime(runtime...)
+	resolved.Lock()
+	resolved.broadcastState.Profile.Startram.Info.Regions = regions
+	resolved.Unlock()
 	return nil
 }
 
@@ -91,16 +124,18 @@ func constructSystemInfo() structs.System {
 }
 
 func UpdateScheduledPack(patp string, meldNext time.Time) error {
-	packMu.Lock()
-	defer packMu.Unlock()
-	scheduledPacks[patp] = meldNext
+	resolved := resolveBroadcastStateRuntime()
+	resolved.packMu.Lock()
+	defer resolved.packMu.Unlock()
+	resolved.scheduledPacks[patp] = meldNext
 	return nil
 }
 
 func GetScheduledPack(patp string) time.Time {
-	packMu.RLock()
-	defer packMu.RUnlock()
-	nextPack, exists := scheduledPacks[patp]
+	resolved := resolveBroadcastStateRuntime()
+	resolved.packMu.RLock()
+	defer resolved.packMu.RUnlock()
+	nextPack, exists := resolved.scheduledPacks[patp]
 	if !exists {
 		return time.Time{}
 	}
@@ -109,16 +144,18 @@ func GetScheduledPack(patp string) time.Time {
 
 // stupid update method instead of psychotic recursion
 func UpdateBroadcast(broadcast structs.AuthBroadcast) {
-	mu.Lock()
-	defer mu.Unlock()
-	broadcastState = broadcast
+	resolved := resolveBroadcastStateRuntime()
+	resolved.Lock()
+	defer resolved.Unlock()
+	resolved.broadcastState = broadcast
 }
 
 // return broadcast state
 func GetState() structs.AuthBroadcast {
-	mu.RLock()
-	defer mu.RUnlock()
-	return cloneBroadcastState(broadcastState)
+	resolved := resolveBroadcastStateRuntime()
+	resolved.RLock()
+	defer resolved.RUnlock()
+	return cloneBroadcastState(resolved.broadcastState)
 }
 
 func cloneBroadcastState(in structs.AuthBroadcast) structs.AuthBroadcast {
@@ -176,8 +213,9 @@ func ReloadUrbits() error {
 	if err != nil {
 		return fmt.Errorf("reload urbit states for broadcast: %w", err)
 	}
-	mu.Lock()
-	broadcastState.Urbits = urbits
-	mu.Unlock()
+	resolved := resolveBroadcastStateRuntime()
+	resolved.Lock()
+	resolved.broadcastState.Urbits = urbits
+	resolved.Unlock()
 	return nil
 }

@@ -1,0 +1,101 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Function-bag runtimes are heavily fragmented and repeated across modules (for example `Runtime*Ops` families in `goseg/docker/orchestration/runtime_ops.go` lines 15-187, `importerRuntime` in `goseg/importer/importer.go` lines 69-93, and `startBackgroundServicesRuntime` in `goseg/startuporchestrator/startup_orchestrator.go` lines 346-366), creating high indirection overhead before domain behavior starts.",
+        "Several modules add pass-through wrappers that mostly forward to defaults plus nil checks (for example `start...WithContext`/`...ForRuntime` layers in `goseg/system/wifi.go` lines 227-366 and `goseg/importer/importer.go` lines 1016-1200), increasing call depth without adding policy.",
+        "Compatibility aggregate models still leak through business code: `structs.UrbitDocker` embeds six sub-configs (`goseg/structs/configs.go` lines 147-154), while callers in `goseg/shipworkflow/operations_runtime.go` lines 278-395 and `goseg/rectify/rectify_services.go` lines 127-152 repeatedly unpack/repack slices of it to persist narrowly scoped updates."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 69.0,
+        "indirection_cost": 63.0,
+        "interface_honesty": 74.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_overfragmentation",
+      "summary": "Runtime dependency seams are over-fragmented into large function-bag structs, adding indirection cost without proportional behavioral isolation.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many narrowly sliced `Runtime*Ops` structs with dozens of function fields (lines 15-187) and then composes defaults mostly as direct function references (lines 256-384).",
+        "`importerRuntime` has 20+ callback fields and a long `ensureForWorkflow` gate (lines 69-202) before routing into mostly forwarded operations.",
+        "`startBackgroundServicesRuntime` also carries a large callback surface plus repetitive `withDefaults` assignment chain (lines 346-427), duplicating the same seam pattern seen in other modules."
+      ],
+      "suggestion": "Collapse each subsystem to a smaller capability interface (coarser-grained collaborators) and centralize default wiring in one constructor per bounded context; keep fine-grained seams only where tests need explicit substitution.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_granularity_mismatch"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "urbit_config_aggregate_leakage",
+      "summary": "The compatibility aggregate `UrbitDocker` leaks domain boundaries, forcing repeated manual projection logic for targeted updates.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`UrbitDocker` embeds runtime/network/schedule/web/feature/backup configs into one aggregate type (lines 147-154 in `structs/configs.go`).",
+        "`operations_runtime.go` duplicates near-identical persist helpers for each embedded config by copying out a sub-config, mutating it, and copying back (lines 278-395).",
+        "`rectify_services.go` similarly mirrors manual persistence projection when reconciling web/network fields (lines 127-152), showing callers must understand internal aggregate shape."
+      ],
+      "suggestion": "Introduce explicit repository/update methods per concern (runtime/network/web/feature/schedule/backup) and migrate call sites away from aggregate mutation fallbacks; keep `UrbitDocker` as serialization compatibility only.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_granularity_mismatch"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "inconsistent_runtime_contracts",
+      "summary": "Runtime abstraction contracts are inconsistent (panic, zero-value fallback, and error-return styles coexist), making seams dishonest for callers.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`importerRuntime` methods panic for missing callbacks in several accessors (`swapSettings`, `startramSettings`, `fileStat`, etc., lines 204-315), despite also providing `ensureForWorkflow` error checks.",
+        "`collectorRuntime` accessor methods also panic on missing runtime callbacks (for example `startramSettings`, `startramConfig`, `penpaiSettings`, lines 249-296).",
+        "`RectifyRuntime.startramSettings()` instead silently returns a zero-value settings object when callback is nil (lines 92-97 in `rectify.go`), creating different failure semantics for similar runtime seams."
+      ],
+      "suggestion": "Standardize runtime seam contracts to explicit error returns (no panics or silent zero defaults) and enforce a single validation path at construction time.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_contract_inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams were introduced as per-function callback bags without converging on stable capability interfaces.",
+      "Compatibility aggregates remained part of operational mutation flows instead of being isolated to serialization boundaries.",
+      "No uniform policy exists for missing dependency behavior in runtime adapters."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_overfragmentation",
+      "urbit_config_aggregate_leakage",
+      "inconsistent_runtime_contracts"
+    ],
+    "possible_false_positives": []
+  }
+}

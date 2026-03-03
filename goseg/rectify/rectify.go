@@ -6,11 +6,12 @@ package rectify
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/docker/events"
-	"groundseg/internal/seams"
+	"groundseg/docker/orchestration"
 	"groundseg/internal/transitionlifecycle"
 	"groundseg/shipworkflow"
 	"groundseg/startram"
@@ -20,35 +21,13 @@ import (
 	"go.uber.org/zap"
 )
 
-type rectifyConfigRuntime struct {
-	StartramSettingsSnapshotFn func() config.StartramSettings
-	GetStartramConfigFn        func() structs.StartramRetrieve
-	UpdateConfTypedFn          func(...config.ConfUpdateOption) error
-}
-
-type rectifyContainerRuntime struct {
-	GetContainerStateFn func() map[string]structs.ContainerState
-}
-
-type rectifyUrbitConfigRuntime struct {
-	UrbitConfAllFn    func() map[string]structs.UrbitDocker
-	UrbitConfFn       func(string) structs.UrbitDocker
-	LoadUrbitConfigFn func(string) error
-}
-
-type rectifyPersistenceRuntime struct {
-	UpdateUrbitFn               func(string, func(*structs.UrbitDocker) error) error
-	UpdateUrbitNetworkConfigFn  func(string, func(*structs.UrbitNetworkConfig) error) error
-	UpdateUrbitWebConfigFn      func(string, func(*structs.UrbitWebConfig) error) error
-	UpdateUrbitRuntimeConfigFn  func(string, func(*structs.UrbitRuntimeConfig) error) error
-	UpdateUrbitScheduleConfigFn func(string, func(*structs.UrbitScheduleConfig) error) error
-}
+var (
+	errRectifyStartramSettingsMissing = errors.New("rectify runtime startram settings callback is not configured")
+	errRectifyStartramConfigMissing   = errors.New("rectify runtime startram config callback is not configured")
+)
 
 type RectifyRuntime struct {
-	rectifyConfigRuntime
-	rectifyContainerRuntime
-	rectifyUrbitConfigRuntime
-	rectifyPersistenceRuntime
+	orchestration.Runtime
 }
 
 func NewRectifyRuntime() RectifyRuntime {
@@ -56,54 +35,29 @@ func NewRectifyRuntime() RectifyRuntime {
 }
 
 func NewRectifyRuntimeWithDependencies(overrides RectifyRuntime) RectifyRuntime {
-	runtime := defaultRectifyRuntime()
-	runtime.rectifyConfigRuntime = seams.Merge(runtime.rectifyConfigRuntime, overrides.rectifyConfigRuntime)
-	runtime.rectifyContainerRuntime = seams.Merge(runtime.rectifyContainerRuntime, overrides.rectifyContainerRuntime)
-	runtime.rectifyUrbitConfigRuntime = seams.Merge(runtime.rectifyUrbitConfigRuntime, overrides.rectifyUrbitConfigRuntime)
-	runtime.rectifyPersistenceRuntime = seams.Merge(runtime.rectifyPersistenceRuntime, overrides.rectifyPersistenceRuntime)
-	return runtime
+	return RectifyRuntime{Runtime: orchestration.NewRuntime(orchestration.WithRuntimeDependencies(overrides.Runtime))}
 }
 
 func defaultRectifyRuntime() RectifyRuntime {
-	return RectifyRuntime{
-		rectifyConfigRuntime: rectifyConfigRuntime{
-			StartramSettingsSnapshotFn: config.StartramSettingsSnapshot,
-			GetStartramConfigFn:        config.GetStartramConfig,
-			UpdateConfTypedFn:          config.UpdateConfTyped,
-		},
-		rectifyContainerRuntime: rectifyContainerRuntime{
-			GetContainerStateFn: config.GetContainerState,
-		},
-		rectifyUrbitConfigRuntime: rectifyUrbitConfigRuntime{
-			UrbitConfAllFn:    config.UrbitConfAll,
-			UrbitConfFn:       config.UrbitConf,
-			LoadUrbitConfigFn: config.LoadUrbitConfig,
-		},
-		rectifyPersistenceRuntime: rectifyPersistenceRuntime{
-			UpdateUrbitFn:               config.UpdateUrbit,
-			UpdateUrbitNetworkConfigFn:  config.UpdateUrbitNetworkConfig,
-			UpdateUrbitWebConfigFn:      config.UpdateUrbitWebConfig,
-			UpdateUrbitRuntimeConfigFn:  config.UpdateUrbitRuntimeConfig,
-			UpdateUrbitScheduleConfigFn: config.UpdateUrbitScheduleConfig,
-		},
-	}
+	return RectifyRuntime{Runtime: orchestration.NewRuntime()}
 }
 
-func (runtime RectifyRuntime) startramSettings() config.StartramSettings {
+func (runtime RectifyRuntime) startramSettings() (config.StartramSettings, error) {
 	if runtime.StartramSettingsSnapshotFn == nil {
-		return config.StartramSettings{}
+		return config.StartramSettings{}, errRectifyStartramSettingsMissing
 	}
-	return runtime.StartramSettingsSnapshotFn()
+	return runtime.StartramSettingsSnapshotFn(), nil
 }
 
-func UrbitTransitionHandler() {
-	runTransitionEventLoopWithoutContext("urbit", events.UrbitTransitions(), func(event structs.UrbitTransition) broadcast.BroadcastTransition {
-		return urbitTransitionCommand{event: event}
-	})
+func (runtime RectifyRuntime) startramConfig() (structs.StartramRetrieve, error) {
+	if runtime.GetStartramConfigFn == nil {
+		return structs.StartramRetrieve{}, errRectifyStartramConfigMissing
+	}
+	return runtime.GetStartramConfigFn(), nil
 }
 
 func UrbitTransitionHandlerWithContext(ctx context.Context) error {
-	return runTransitionEventLoop(ctx, "urbit", events.UrbitTransitions(), func(event structs.UrbitTransition) broadcast.BroadcastTransition {
+	return runTransitionEventLoop(ctx, "urbit", events.DefaultEventRuntime().UrbitTransitions(), func(event structs.UrbitTransition) broadcast.BroadcastTransition {
 		return urbitTransitionCommand{event: event}
 	})
 }
@@ -182,14 +136,8 @@ func setUrbitTransition(transitionState *structs.UrbitTransitionBroadcast, event
 	)
 }
 
-func NewShipTransitionHandler() {
-	runTransitionEventLoopWithoutContext("new ship", events.NewShipTransitions(), func(event structs.NewShipTransition) broadcast.BroadcastTransition {
-		return newShipTransitionCommand{event: event}
-	})
-}
-
 func NewShipTransitionHandlerWithContext(ctx context.Context) error {
-	return runTransitionEventLoop(ctx, "new ship", events.NewShipTransitions(), func(event structs.NewShipTransition) broadcast.BroadcastTransition {
+	return runTransitionEventLoop(ctx, "new ship", events.DefaultEventRuntime().NewShipTransitions(), func(event structs.NewShipTransition) broadcast.BroadcastTransition {
 		return newShipTransitionCommand{event: event}
 	})
 }
@@ -306,18 +254,6 @@ func applyTransitionUpdate(context string, transition broadcast.BroadcastTransit
 	}
 }
 
-func RectifyUrbit() {
-	runtime := NewRectifyRuntime()
-	runTransitionEventLoopWithoutContext("startram", startram.Events(), func(event structs.Event) broadcast.BroadcastTransition {
-		transitionType := transition.EventType(event.Type)
-		switcher, ok := rectifyStartramTransitionRouters[transitionType]
-		if !ok {
-			return nil
-		}
-		return switcher(runtime, event)
-	})
-}
-
 func RectifyUrbitWithContext(ctx context.Context) error {
 	runtime := NewRectifyRuntime()
 	return runTransitionEventLoop(ctx, "startram", startram.Events(), func(event structs.Event) broadcast.BroadcastTransition {
@@ -333,35 +269,24 @@ func RectifyUrbitWithContext(ctx context.Context) error {
 type rectifyStartramTransitionRouter func(RectifyRuntime, structs.Event) broadcast.BroadcastTransition
 
 var rectifyStartramTransitionRouters = map[transition.EventType]rectifyStartramTransitionRouter{
-	transition.StartramTransitionRestart: func(runtime RectifyRuntime, event structs.Event) broadcast.BroadcastTransition {
-		return startramTransitionCommand{
-			event:   event,
-			service: NewStartramTransitionService(runtime),
-		}
-	},
-	transition.StartramTransitionEndpoint: func(runtime RectifyRuntime, event structs.Event) broadcast.BroadcastTransition {
-		return startramTransitionCommand{
-			event:   event,
-			service: NewStartramTransitionService(runtime),
-		}
-	},
-	transition.StartramTransitionToggle: func(runtime RectifyRuntime, event structs.Event) broadcast.BroadcastTransition {
-		return startramTransitionCommand{
-			event:   event,
-			service: NewStartramTransitionService(runtime),
-		}
-	},
-	transition.StartramTransitionRegister: func(runtime RectifyRuntime, event structs.Event) broadcast.BroadcastTransition {
-		return startramTransitionCommand{
-			event:   event,
-			service: NewStartramTransitionService(runtime),
-		}
-	},
+	transition.StartramTransitionRestart: newStartramServiceTransitionRouter(),
+	transition.StartramTransitionEndpoint: newStartramServiceTransitionRouter(),
+	transition.StartramTransitionToggle:  newStartramServiceTransitionRouter(),
+	transition.StartramTransitionRegister: newStartramServiceTransitionRouter(),
 	transition.StartramTransitionRetrieve: func(runtime RectifyRuntime, _ structs.Event) broadcast.BroadcastTransition {
 		return startramRetrieveTransition{
 			reconciler: NewStartramRetrieveReconciler(runtime),
 		}
 	},
+}
+
+func newStartramServiceTransitionRouter() rectifyStartramTransitionRouter {
+	return func(runtime RectifyRuntime, event structs.Event) broadcast.BroadcastTransition {
+		return startramTransitionCommand{
+			event:   event,
+			service: NewStartramTransitionService(runtime),
+		}
+	}
 }
 
 type startramTransitionCommand struct {
@@ -411,12 +336,6 @@ func publishUrbitServiceRegistrationTransitionWithCurrentState(current *structs.
 	current.Urbits[patp] = urbitStruct
 }
 
-func SystemTransitionHandler() {
-	if err := SystemTransitionHandlerWithContext(context.Background()); err != nil {
-		zap.L().Warn(fmt.Sprintf("system transition handler stopped with error: %v", err))
-	}
-}
-
 func SystemTransitionHandlerWithContext(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -425,7 +344,7 @@ func SystemTransitionHandlerWithContext(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case event := <-events.SystemTransitions():
+		case event := <-events.DefaultEventRuntime().SystemTransitions():
 			applyTransitionUpdate("system", systemTransitionCommand{event: event})
 		}
 	}
@@ -457,11 +376,5 @@ func runTransitionEventLoop[T any](ctx context.Context, label string, ch <-chan 
 			}
 			applyTransitionUpdate(label, command)
 		}
-	}
-}
-
-func runTransitionEventLoopWithoutContext[T any](label string, ch <-chan T, mapEvent func(T) broadcast.BroadcastTransition) {
-	if err := runTransitionEventLoop(context.Background(), label, ch, mapEvent); err != nil {
-		zap.L().Warn(fmt.Sprintf("%s transition handler stopped with error: %v", label, err))
 	}
 }

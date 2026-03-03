@@ -1,0 +1,89 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` defines action and namespace constants (`ActionUploadOpenEndpoint`, `ActionUploadReset`, `ActionC2CConnect`, `NamespaceUpload`, `NamespaceC2C`) while `goseg/protocol/contracts/contracts.go` separately defines the canonical bindings (`ActionContractBindings`) and namespace constants, creating dual sources of truth.",
+        "`buildUploadActionContracts` in `actions.go` hardcodes upload action handling with fixed keys (`ActionUploadOpenEndpoint`, `ActionUploadReset`) instead of deriving upload payload policy from the same binding source used by `contracts`, so cross-module extension requires synchronized manual edits.",
+        "`ensureActionContractsInitialized` in `actions.go` performs global singleton initialization and panics on contract wiring errors, so a contract/binding defect in `contracts.go` can terminate any caller path that touches action metadata, increasing subsystem blast radius."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "duplicated_action_registry_sources",
+      "summary": "Action identity is modeled in both `actions` and `contracts`, creating boundary drift risk between protocol tokens and contract bindings.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`actions.go` declares action tokens and namespaces as local constants.",
+        "`contracts.go` independently declares action namespaces plus `ActionContractBindings` with string action IDs.",
+        "No compile-time or validation path enforces that `actions.Action*` constants remain exactly aligned with `contracts.ActionContractBindings` entries."
+      ],
+      "suggestion": "Promote `contracts.ActionContractBindings` (or a generated schema) to the single source of truth and derive exported action enums/views from it, eliminating duplicated token declarations across packages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "split_protocol_contract_model"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "hardcoded_upload_policy_branch",
+      "summary": "Upload action policy wiring is hardcoded in `actions` and not structurally tied to the contract binding catalog.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`buildUploadActionContracts` constructs a fixed two-item slice keyed to `ActionUploadOpenEndpoint` and `ActionUploadReset`.",
+        "The contract side already has a generic namespace binding registry (`ActionContractBindingsForNamespace`) but payload policy is not encoded there, forcing out-of-band updates when upload actions change.",
+        "Missing keys in `byAction` default to zero-value `ActionContract`, so drift can degrade behavior silently instead of failing at boundary definition time."
+      ],
+      "suggestion": "Move upload payload requirements into the shared contract/binding model (or a dedicated schema table in `contracts`) and generate `UploadActionContract` entries from that shared metadata with explicit validation for missing bindings.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "split_protocol_contract_model"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_registry_panic_coupling",
+      "summary": "Global lazy initialization with panic-based failure couples all action metadata consumers to a process-wide fatal path.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`ensureActionContractsInitialized` uses package globals plus `sync.Once` and calls `panic` if initialization fails.",
+        "Initialization depends on `contracts.ActionContractBindingsForNamespace` and `contracts.ActionContractDescriptor`, so defects in contract wiring propagate as runtime panics in unrelated callers that only read action metadata.",
+        "This creates hidden cross-module control-flow coupling instead of explicit error-bearing construction boundaries."
+      ],
+      "suggestion": "Replace panic-on-first-use global initialization with explicit constructor/bootstrap validation that returns errors, then inject the validated registry into consumers.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_registry"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol action identity and contract metadata are split across packages without a single declarative boundary model.",
+      "Registry lifecycle is hidden behind package globals rather than explicit composition-time wiring."
+    ],
+    "likely_symptoms": [
+      "duplicated_action_registry_sources",
+      "hardcoded_upload_policy_branch"
+    ],
+    "possible_false_positives": []
+  }
+}

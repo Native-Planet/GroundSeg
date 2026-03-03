@@ -30,7 +30,6 @@ var (
 	isEMMCMachine bool
 	confMutex     sync.RWMutex
 	contMutex     sync.RWMutex
-	versMutex     sync.Mutex
 	minioPwdMutex sync.Mutex
 	startramMu    sync.RWMutex
 	initOnce      sync.Once

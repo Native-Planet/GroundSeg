@@ -25,19 +25,19 @@ func (sink *testSystemLogSink) PublishSystemLog(payload []byte) {
 
 func resetSystemLogSinkForTest(t *testing.T, ch chan []byte) {
 	t.Helper()
-	originalSink := sysLogSink
-	configureSystemLogSink(&testSystemLogSink{ch: ch})
+	originalSink := getLogstreamSink()
+	ConfigureLogstreamRuntime(&testSystemLogSink{ch: ch})
 	t.Cleanup(func() {
-		configureSystemLogSink(originalSink)
+		ConfigureLogstreamRuntime(originalSink)
 	})
 }
 
 func resetLoggerGlobalsForTest(t *testing.T) {
 	t.Helper()
-	originalLogPath := LogPath
+	originalLogPath := LogPath()
 
 	t.Cleanup(func() {
-		LogPath = originalLogPath
+		SetLogPath(originalLogPath)
 	})
 }
 
@@ -78,7 +78,7 @@ func TestChanWriterWritePublishesBytes(t *testing.T) {
 
 func TestFileWriterWriteAppendsToCurrentLogFile(t *testing.T) {
 	resetLoggerGlobalsForTest(t)
-	LogPath = t.TempDir() + string(os.PathSeparator)
+	SetLogPath(t.TempDir() + string(os.PathSeparator))
 
 	writer := FileWriter{}
 	first := []byte("first line\n")
@@ -102,11 +102,11 @@ func TestFileWriterWriteAppendsToCurrentLogFile(t *testing.T) {
 
 func TestSysLogfileRollsOverWhenCurrentPartIsFull(t *testing.T) {
 	resetLoggerGlobalsForTest(t)
-	LogPath = t.TempDir() + string(os.PathSeparator)
+	SetLogPath(t.TempDir() + string(os.PathSeparator))
 
 	now := time.Now()
 	prefix := fmt.Sprintf("%d-%02d", now.Year(), now.Month())
-	part0 := filepath.Join(LogPath, fmt.Sprintf("%s-part-0.log", prefix))
+	part0 := filepath.Join(LogPath(), fmt.Sprintf("%s-part-0.log", prefix))
 	if err := os.WriteFile(part0, []byte("x"), 0o644); err != nil {
 		t.Fatalf("failed to create part-0: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestSysLogfileRollsOverWhenCurrentPartIsFull(t *testing.T) {
 	}
 
 	got := SysLogfile()
-	want := filepath.Join(LogPath, fmt.Sprintf("%s-part-1.log", prefix))
+	want := filepath.Join(LogPath(), fmt.Sprintf("%s-part-1.log", prefix))
 	if got != want {
 		t.Fatalf("unexpected rollover target: got %q want %q", got, want)
 	}
@@ -124,7 +124,7 @@ func TestSysLogfileRollsOverWhenCurrentPartIsFull(t *testing.T) {
 
 func TestPrevSysLogfileUsesPreviousMonth(t *testing.T) {
 	resetLoggerGlobalsForTest(t)
-	LogPath = t.TempDir() + string(os.PathSeparator)
+	SetLogPath(t.TempDir() + string(os.PathSeparator))
 
 	now := time.Now()
 	year := now.Year()
@@ -135,7 +135,7 @@ func TestPrevSysLogfileUsesPreviousMonth(t *testing.T) {
 	} else {
 		month--
 	}
-	want := fmt.Sprintf("%s%d-%02d.log", LogPath, year, month)
+	want := fmt.Sprintf("%s%d-%02d.log", LogPath(), year, month)
 
 	if got := PrevSysLogfile(); got != want {
 		t.Fatalf("unexpected previous logfile path: got %q want %q", got, want)
@@ -164,14 +164,19 @@ func TestMakeLogPathHandlesRelativeAndAbsoluteBasePath(t *testing.T) {
 
 func resetLoggerInitForTest(t *testing.T) {
 	t.Helper()
-	originalErr := loggerInitErr
-	originalState := loggerInitState
+	state := getLoggerState()
+	state.initMu.Lock()
+	originalErr := state.loggerInitErr
+	originalState := state.loggerInitState
 	t.Cleanup(func() {
-		loggerInitErr = originalErr
-		loggerInitState = originalState
+		state.initMu.Lock()
+		state.loggerInitErr = originalErr
+		state.loggerInitState = originalState
+		state.initMu.Unlock()
 	})
-	loggerInitState = loggerInitNotInitialized
-	loggerInitErr = nil
+	state.loggerInitState = loggerInitNotInitialized
+	state.loggerInitErr = nil
+	state.initMu.Unlock()
 }
 
 func loggerRuntimeForTest(overrides loggerRuntime) loggerRuntime {
@@ -200,8 +205,8 @@ func TestInitializeReturnsErrorWhenLogDirectoryFails(t *testing.T) {
 	if !strings.Contains(err.Error(), "log path fallback failed") && !strings.Contains(err.Error(), "configured log path unavailable") {
 		t.Fatalf("expected fallback-init error, got: %v", err)
 	}
-	if LogPath != loggerFallbackLogPath {
-		t.Fatalf("expected fallback log path to be used, got %q", LogPath)
+	if LogPath() != loggerFallbackLogPath {
+		t.Fatalf("expected fallback log path to be used, got %q", LogPath())
 	}
 }
 
@@ -248,7 +253,7 @@ func TestBuildLoggerRespectsLevel(t *testing.T) {
 
 func TestRetrieveSysLogHistoryReturnsJSONEnvelope(t *testing.T) {
 	resetLoggerGlobalsForTest(t)
-	LogPath = t.TempDir() + string(os.PathSeparator)
+	SetLogPath(t.TempDir() + string(os.PathSeparator))
 
 	logFile := SysLogfile()
 	content := strings.Join([]string{`"first"`, `"second"`}, "\n") + "\n"

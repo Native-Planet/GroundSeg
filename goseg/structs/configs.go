@@ -5,60 +5,6 @@ import (
 	"time"
 )
 
-// system.json config struct
-type SysConfig struct {
-	RemoteBackupPassword string   `json:"remoteBackupPassword"`
-	GracefulExit         bool     `json:"gracefulExit"`
-	LastKnownMDNS        string   `json:"lastKnownMDNS"`
-	Setup                string   `json:"setup"`
-	EndpointUrl          string   `json:"endpointUrl"`
-	ApiVersion           string   `json:"apiVersion"`
-	Piers                []string `json:"piers"`
-	NetCheck             string   `json:"netCheck"`
-	UpdateMode           string   `json:"updateMode"`
-	UpdateUrl            string   `json:"updateUrl"`
-	UpdateBranch         string   `json:"updateBranch"`
-	SwapVal              int      `json:"swapVal"`
-	SwapFile             string   `json:"swapFile"`
-	KeyFile              string   `json:"keyFile"`
-	Sessions             struct {
-		Authorized   map[string]SessionInfo `json:"authorized"`
-		Unauthorized map[string]SessionInfo `json:"unauthorized"`
-	} `json:"sessions"`
-	LinuxUpdates struct {
-		Value    int    `json:"value"`
-		Interval string `json:"interval"`
-	} `json:"linuxUpdates"`
-	DockerData          string `json:"dockerData"`
-	WgOn                bool   `json:"wgOn"`
-	WgRegistered        bool   `json:"wgRegistered"`
-	StartramSetReminder struct {
-		// true if reminder has been sent
-		// resets to false when ongoing == 1
-		One   bool `json:"one"`
-		Three bool `json:"three"`
-		Seven bool `json:"seven"`
-	} `json:"startramSetReminder"`
-	DiskWarning    map[string]DiskWarning `json:"diskWarning"`
-	PwHash         string                 `json:"pwHash"`
-	C2cInterval    int                    `json:"c2cInterval"`
-	GsVersion      string                 `json:"gsVersion"`
-	CfgDir         string                 `json:"CFG_DIR"`
-	UpdateInterval int                    `json:"updateInterval"`
-	BinHash        string                 `json:"binHash"`
-	Pubkey         string                 `json:"pubkey"`
-	Privkey        string                 `json:"privkey"`
-	Salt           string                 `json:"salt"`
-	PenpaiAllow    bool                   `json:"penpaiAllow"`
-	PenpaiRunning  bool                   `json:"penpaiRunning"`
-	PenpaiCores    int                    `json:"penpaiCores"`
-	PenpaiModels   []Penpai               `json:"penpaiModels"`
-	PenpaiActive   string                 `json:"penpaiActive"`
-	DisableSlsa    bool                   `json:"disableSlsa"`
-	Disable502     bool                   `json:"disable502"`
-	SnapTime       int                    `json:"snapTime"`
-}
-
 type DiskWarning struct {
 	// true if warning has been sent
 	// resets to false when disk goes below 80% usage
@@ -66,6 +12,115 @@ type DiskWarning struct {
 	Eighty     bool      `json:"eighty"`
 	Ninety     bool      `json:"ninety"`
 	NinetyFive time.Time `json:"ninetyFive"`
+}
+
+// system.json config struct grouped by domain
+type SysConfig struct {
+	ConnectivityConfig
+	StartramConfig
+	RuntimeConfig
+	AuthSessionConfig
+	PenpaiConfig
+}
+
+func (config *SysConfig) UpdateConnectivityConfig(update func(*ConnectivityConfig)) {
+	if config == nil || update == nil {
+		return
+	}
+	update(&config.ConnectivityConfig)
+}
+
+func (config *SysConfig) UpdateRuntimeConfig(update func(*RuntimeConfig)) {
+	if config == nil || update == nil {
+		return
+	}
+	update(&config.RuntimeConfig)
+}
+
+func (config *SysConfig) UpdateStartramConfig(update func(*StartramConfig)) {
+	if config == nil || update == nil {
+		return
+	}
+	update(&config.StartramConfig)
+}
+
+func (config *SysConfig) UpdatePenpaiConfig(update func(*PenpaiConfig)) {
+	if config == nil || update == nil {
+		return
+	}
+	update(&config.PenpaiConfig)
+}
+
+func (config *SysConfig) UpdateAuthSessionConfig(update func(*AuthSessionConfig)) {
+	if config == nil || update == nil {
+		return
+	}
+	update(&config.AuthSessionConfig)
+}
+
+type AuthSessionConfig struct {
+	Sessions AuthSessionBag `json:"sessions"`
+	PwHash   string         `json:"pwHash"`
+	Salt     string         `json:"salt"`
+	KeyFile  string         `json:"keyFile"`
+}
+
+type AuthSessionBag struct {
+	Authorized   map[string]SessionInfo `json:"authorized"`
+	Unauthorized map[string]SessionInfo `json:"unauthorized"`
+}
+
+type ConnectivityConfig struct {
+	Piers                []string               `json:"piers"`
+	WgOn                 bool                   `json:"wgOn"`
+	NetCheck             string                 `json:"netCheck"`
+	UpdateMode           string                 `json:"updateMode"`
+	UpdateUrl            string                 `json:"updateUrl"`
+	UpdateBranch         string                 `json:"updateBranch"`
+	RemoteBackupPassword string                 `json:"remoteBackupPassword"`
+	C2cInterval          int                    `json:"c2cInterval"`
+	DiskWarning          map[string]DiskWarning `json:"diskWarning"`
+	WgRegistered         bool                   `json:"wgRegistered"`
+	EndpointUrl          string                 `json:"endpointUrl"`
+	ApiVersion           string                 `json:"apiVersion"`
+}
+
+type RuntimeConfig struct {
+	GracefulExit  bool   `json:"gracefulExit"`
+	LastKnownMDNS string `json:"lastKnownMDNS"`
+	Setup         string `json:"setup"`
+	SwapVal       int    `json:"swapVal"`
+	SwapFile      string `json:"swapFile"`
+	LinuxUpdates  struct {
+		Value    int    `json:"value"`
+		Interval string `json:"interval"`
+	} `json:"linuxUpdates"`
+	DockerData     string `json:"dockerData"`
+	GsVersion      string `json:"gsVersion"`
+	CfgDir         string `json:"CFG_DIR"`
+	UpdateInterval int    `json:"updateInterval"`
+	BinHash        string `json:"binHash"`
+	Disable502     bool   `json:"disable502"`
+	SnapTime       int    `json:"snapTime"`
+}
+
+type StartramConfig struct {
+	StartramSetReminder struct {
+		One   bool `json:"one"`
+		Three bool `json:"three"`
+		Seven bool `json:"seven"`
+	} `json:"startramSetReminder"`
+	Pubkey      string `json:"pubkey"`
+	Privkey     string `json:"privkey"`
+	DisableSlsa bool   `json:"disableSlsa"`
+}
+
+type PenpaiConfig struct {
+	PenpaiAllow   bool     `json:"penpaiAllow"`
+	PenpaiRunning bool     `json:"penpaiRunning"`
+	PenpaiCores   int      `json:"penpaiCores"`
+	PenpaiModels  []Penpai `json:"penpaiModels"`
+	PenpaiActive  string   `json:"penpaiActive"`
 }
 
 type Penpai struct {
@@ -151,6 +206,48 @@ type UrbitDocker struct {
 	UrbitWebConfig
 	UrbitFeatureConfig
 	UrbitBackupConfig
+}
+
+func (u *UrbitDocker) UpdateRuntimeConfig(update func(*UrbitRuntimeConfig)) {
+	if u == nil || update == nil {
+		return
+	}
+	update(&u.UrbitRuntimeConfig)
+}
+
+func (u *UrbitDocker) UpdateNetworkConfig(update func(*UrbitNetworkConfig)) {
+	if u == nil || update == nil {
+		return
+	}
+	update(&u.UrbitNetworkConfig)
+}
+
+func (u *UrbitDocker) UpdateScheduleConfig(update func(*UrbitScheduleConfig)) {
+	if u == nil || update == nil {
+		return
+	}
+	update(&u.UrbitScheduleConfig)
+}
+
+func (u *UrbitDocker) UpdateWebConfig(update func(*UrbitWebConfig)) {
+	if u == nil || update == nil {
+		return
+	}
+	update(&u.UrbitWebConfig)
+}
+
+func (u *UrbitDocker) UpdateFeatureConfig(update func(*UrbitFeatureConfig)) {
+	if u == nil || update == nil {
+		return
+	}
+	update(&u.UrbitFeatureConfig)
+}
+
+func (u *UrbitDocker) UpdateBackupConfig(update func(*UrbitBackupConfig)) {
+	if u == nil || update == nil {
+		return
+	}
+	update(&u.UrbitBackupConfig)
 }
 
 // Helper function to convert a value to int, returns 0 if not an int

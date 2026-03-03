@@ -40,6 +40,11 @@ func AptUpdateLoopWithContext(ctx context.Context) error {
 	updateCheckForAptLoop()
 	conf := configForSystemRoutine()
 	checkInterval := aptUpdateCheckInterval(conf)
+	if len(conf.LastKnownMDNS) > 0 {
+		system.SetLocalUrl(conf.LastKnownMDNS)
+	} else {
+		system.SetLocalUrl(LocalDomain)
+	}
 	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
 	for {
@@ -71,7 +76,7 @@ func aptUpdateCheckInterval(conf structs.SysConfig) time.Duration {
 func mDNSServer() {
 	conf := config.Conf()
 	if !conf.GracefulExit && (len(conf.LastKnownMDNS) > 0) {
-		system.LocalUrl = conf.LastKnownMDNS
+		system.SetLocalUrl(conf.LastKnownMDNS)
 	} else {
 		domains, err := mDNSDiscovery()
 		if err != nil {
@@ -87,7 +92,7 @@ func mDNSServer() {
 				domainBase = strings.Split(LocalDomain, ".")[0]
 			}
 		}
-		system.LocalUrl = LocalDomain
+		system.SetLocalUrl(LocalDomain)
 	}
 	// advertise the http server on loop
 	// we use RegisterProxy so we can spoof the hostname
@@ -97,13 +102,14 @@ func mDNSServer() {
 			fmt.Println("Error:", err)
 			return
 		}
-		zap.L().Info(fmt.Sprintf("Announcing %v for %v", system.LocalUrl, ips))
+		localUrl := system.LocalUrl()
+		zap.L().Info(fmt.Sprintf("Announcing %v for %v", localUrl, ips))
 		server, err := zeroconf.RegisterProxy(
-			strings.Split(system.LocalUrl, ".")[0],
+			strings.Split(localUrl, ".")[0],
 			"_http._tcp",
 			"local.",
 			80,
-			strings.Split(system.LocalUrl, ".")[0],
+			strings.Split(localUrl, ".")[0],
 			ips,
 			[]string{"txtv=0", "lo=1", "la=2"},
 			nil,
@@ -111,10 +117,10 @@ func mDNSServer() {
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
 		} else {
-			zap.L().Info(fmt.Sprintf("Caching %v", system.LocalUrl))
+			zap.L().Info(fmt.Sprintf("Caching %v", localUrl))
 			if err = config.UpdateConfTyped(
 				config.WithGracefulExit(false),
-				config.WithLastKnownMDNS(system.LocalUrl),
+				config.WithLastKnownMDNS(localUrl),
 			); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't update mdns cache: %v", err))
 			}

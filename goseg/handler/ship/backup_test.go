@@ -1,6 +1,7 @@
 package ship
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -18,7 +19,10 @@ func resetBackupServiceSeams() {
 	backupDirForBackupService = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
 	runTransitionedOperationForBackupService = shipworkflow.RunTransitionedOperation
 	persistShipBackupConfigForBackupService = config.UpdateUrbitBackupConfig
-	publishUrbitTransitionForBackupService = events.PublishUrbitTransition
+	publishUrbitTransitionForBackupService = func(_ context.Context, transition structs.UrbitTransition) error {
+		_ = events.DefaultEventRuntime().PublishUrbitTransition(context.Background(), transition)
+		return nil
+	}
 	sleepForBackupService = time.Sleep
 	createLocalBackupForBackupService = backupsvc.CreateLocalBackup
 	restoreBackupWithRequestForBackupService = startram.RestoreBackupWithRequest
@@ -66,10 +70,11 @@ func TestHandleLocalBackupSuccessAndFailure(t *testing.T) {
 	backupDirForBackupService = func() string { return backupRoot }
 	sleepForBackupService = func(time.Duration) {}
 	var events []string
-	publishUrbitTransitionForBackupService = func(t structs.UrbitTransition) {
+	publishUrbitTransitionForBackupService = func(_ context.Context, t structs.UrbitTransition) error {
 		if t.Type == "localTlonBackup" {
 			events = append(events, t.Event)
 		}
+		return nil
 	}
 	created := false
 	createLocalBackupForBackupService = func(patp, backupRoot string) error {
@@ -107,7 +112,7 @@ func TestHandleLocalBackupSuccessAndFailure(t *testing.T) {
 func TestHandleScheduleLocalBackupValidationAndPersist(t *testing.T) {
 	t.Cleanup(resetBackupServiceSeams)
 	sleepForBackupService = func(time.Duration) {}
-	publishUrbitTransitionForBackupService = func(structs.UrbitTransition) {}
+	publishUrbitTransitionForBackupService = func(_ context.Context, _ structs.UrbitTransition) error { return nil }
 
 	payload := structs.WsUrbitPayload{Payload: structs.WsUrbitAction{BackupTime: "12"}}
 	if err := handleScheduleLocalBackup("~zod", payload); err == nil {
@@ -135,7 +140,7 @@ func TestHandleScheduleLocalBackupValidationAndPersist(t *testing.T) {
 func TestHandleRestoreTlonBackupBuildsRequest(t *testing.T) {
 	t.Cleanup(resetBackupServiceSeams)
 	sleepForBackupService = func(time.Duration) {}
-	publishUrbitTransitionForBackupService = func(structs.UrbitTransition) {}
+	publishUrbitTransitionForBackupService = func(_ context.Context, _ structs.UrbitTransition) error { return nil }
 
 	var got startram.RestoreBackupRequest
 	restoreBackupWithRequestForBackupService = func(req startram.RestoreBackupRequest) error {

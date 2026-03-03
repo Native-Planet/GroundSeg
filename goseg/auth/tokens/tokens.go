@@ -249,7 +249,7 @@ func CreateToken(r *http.Request, authed bool) (map[string]string, error) {
 	key := settings.KeyFile
 	encryptedText, err := KeyfileEncrypt(contents, key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encrypt token: %v", err)
+		return nil, fmt.Errorf("failed to encrypt token: %w", err)
 	}
 	token := map[string]string{
 		"id": id,

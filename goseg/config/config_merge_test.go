@@ -6,22 +6,21 @@ import (
 )
 
 func TestConfigMergeConfigMergeFileIsDirectlyTested(t *testing.T) {
-	defaultCfg := structs.SysConfig{
-		Setup:        "complete",
-		GracefulExit: false,
-		EndpointUrl:  "https://default.endpoint",
-		ApiVersion:   "v1",
-		SwapVal:      64,
-		C2cInterval:  1200,
-		PenpaiCores:  2,
-		PenpaiModels: []structs.Penpai{{ModelName: "groundseg"}},
-		PenpaiActive: "groundseg",
-	}
-	customCfg := structs.SysConfig{
-		PwHash:       "existing-hash",
-		SwapVal:      0,
-		GracefulExit: false,
-	}
+	defaultCfg := structs.SysConfig{}
+	defaultCfg.Setup = "complete"
+	defaultCfg.GracefulExit = false
+	defaultCfg.EndpointUrl = "https://default.endpoint"
+	defaultCfg.ApiVersion = "v1"
+	defaultCfg.SwapVal = 64
+	defaultCfg.C2cInterval = 1200
+	defaultCfg.PenpaiCores = 2
+	defaultCfg.PenpaiModels = []structs.Penpai{{ModelName: "groundseg"}}
+	defaultCfg.PenpaiActive = "groundseg"
+
+	customCfg := structs.SysConfig{}
+	customCfg.PwHash = "existing-hash"
+	customCfg.SwapVal = 0
+	customCfg.GracefulExit = false
 
 	merged := MergeConfigs(defaultCfg, customCfg)
 	if merged.Setup != "complete" {
@@ -36,15 +35,14 @@ func TestConfigMergeConfigMergeFileIsDirectlyTested(t *testing.T) {
 }
 
 func TestMergeConfigsFallsBackToDefaultsWhenCustomMissing(t *testing.T) {
-	defaultCfg := structs.SysConfig{
-		EndpointUrl:  "https://default.endpoint",
-		ApiVersion:   "1.0",
-		WgOn:         true,
-		Piers:        []string{"alpha"},
-		PenpaiCores:  8,
-		PenpaiModels: []structs.Penpai{{ModelName: "model-a"}},
-		PenpaiActive: "model-a",
-	}
+	defaultCfg := structs.SysConfig{}
+	defaultCfg.EndpointUrl = "https://default.endpoint"
+	defaultCfg.ApiVersion = "1.0"
+	defaultCfg.WgOn = true
+	defaultCfg.Piers = []string{"alpha"}
+	defaultCfg.PenpaiCores = 8
+	defaultCfg.PenpaiModels = []structs.Penpai{{ModelName: "model-a"}}
+	defaultCfg.PenpaiActive = "model-a"
 	customCfg := structs.SysConfig{}
 
 	merged := MergeConfigs(defaultCfg, customCfg)

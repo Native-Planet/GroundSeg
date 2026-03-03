@@ -1,6 +1,13 @@
 package orchestration
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"groundseg/internal/seams"
+	"groundseg/structs"
+)
 
 import "groundseg/docker/orchestration/container"
 
@@ -18,25 +25,23 @@ type dockerContainerRuntimeInputs struct {
 	getLatestContainerInfoFn    func(string) (map[string]string, error)
 	getLatestContainerImageFn   func(string) (string, error)
 	getContainerRunningStatusFn func(string) (string, error)
-	addOrGetNetworkFn          func(string) (string, error)
-	copyFileToVolumeFn         func(string, string, string, string, volumeWriterImageSelector) error
-	volumeExistsFn             func(string) (bool, error)
-	createVolumeFn             func(string) error
-	sleepFn                    func(time.Duration)
-	pollIntervalFn             func() time.Duration
+	addOrGetNetworkFn           func(string) (string, error)
+	copyFileToVolumeFn          func(string, string, string, string, volumeWriterImageSelector) error
+	volumeExistsFn              func(string) (bool, error)
+	createVolumeFn              func(string) error
+	sleepFn                     func(time.Duration)
+	pollIntervalFn              func() time.Duration
 	createDefaultNetdataFn      func() error
-	writeNDConfFn              func() error
-	getUrbitConfAllFn          func() map[string]structs.UrbitDocker
-	loadUrbitConfigFn          func(string) error
-	urbitConfFn                func(string) structs.UrbitDocker
-	randReadFn                 func([]byte) (int, error)
-	execDockerCommandFn        func(string, []string) (string, error)
-	execDockerCommandExitFn    func(string, []string) (string, int, error)
-	setMinIOPasswordFn         func(string, string) error
-	getMinIOPasswordFn         func(string) (string, error)
+	writeNDConfFn               func() error
+	getUrbitConfAllFn           func() map[string]structs.UrbitDocker
+	loadUrbitConfigFn           func(string) error
+	urbitConfFn                 func(string) structs.UrbitDocker
+	randReadFn                  func([]byte) (int, error)
+	execDockerCommandFn         func(string, []string) (string, error)
+	execDockerCommandExitFn     func(string, []string) (string, int, error)
+	setMinIOPasswordFn          func(string, string) error
+	getMinIOPasswordFn          func(string) (string, error)
 	createDefaultMcConfFn       func() error
-	getWgConfBlobFn            func() (string, error)
-	createDefaultWGConfFn       func() error
 }
 
 func collectDockerContainerRuntimeInputs(rt dockerRuntime) dockerContainerRuntimeInputs {
@@ -54,27 +59,31 @@ func collectDockerContainerRuntimeInputs(rt dockerRuntime) dockerContainerRuntim
 		getLatestContainerInfoFn:    rt.imageOps.GetLatestContainerInfoFn,
 		getLatestContainerImageFn:   rt.imageOps.GetLatestContainerImageFn,
 		getContainerRunningStatusFn: rt.containerOps.GetContainerRunningStatusFn,
-		addOrGetNetworkFn:          rt.containerOps.AddOrGetNetworkFn,
-		copyFileToVolumeFn:         rt.commandOps.CopyFileToVolumeFn,
-		volumeExistsFn:             rt.volumeOps.VolumeExistsFn,
-		createVolumeFn:             rt.volumeOps.CreateVolumeFn,
-		sleepFn:                    rt.timerOps.SleepFn,
-		pollIntervalFn:             rt.timerOps.PollIntervalFn,
+		addOrGetNetworkFn:           rt.containerOps.AddOrGetNetworkFn,
+		copyFileToVolumeFn:          rt.commandOps.CopyFileToVolumeFn,
+		volumeExistsFn:              rt.volumeOps.VolumeExistsFn,
+		createVolumeFn:              rt.volumeOps.CreateVolumeFn,
+		sleepFn:                     rt.timerOps.SleepFn,
+		pollIntervalFn:              rt.timerOps.PollIntervalFn,
 		createDefaultNetdataFn:      rt.netdataOps.CreateDefaultNetdataConfFn,
-		writeNDConfFn:              rt.netdataOps.WriteNDConfFn,
-		getUrbitConfAllFn:          rt.urbitOps.UrbitConfAllFn,
-		loadUrbitConfigFn:          rt.urbitOps.LoadUrbitConfigFn,
-		urbitConfFn:                rt.urbitOps.UrbitConfFn,
-		randReadFn:                 rt.commandOps.RandReadFn,
-		execDockerCommandFn:        rt.commandOps.ExecDockerCommandFn,
-		execDockerCommandExitFn:    rt.commandOps.ExecDockerCommandExitFn,
-		setMinIOPasswordFn:         rt.minioOps.SetMinIOPasswordFn,
-		getMinIOPasswordFn:         rt.minioOps.GetMinIOPasswordFn,
+		writeNDConfFn:               rt.netdataOps.WriteNDConfFn,
+		getUrbitConfAllFn:           rt.urbitOps.UrbitConfAllFn,
+		loadUrbitConfigFn:           rt.urbitOps.LoadUrbitConfigFn,
+		urbitConfFn:                 rt.urbitOps.UrbitConfFn,
+		randReadFn:                  rt.commandOps.RandReadFn,
+		execDockerCommandFn:         rt.commandOps.ExecDockerCommandFn,
+		execDockerCommandExitFn:     rt.commandOps.ExecDockerCommandExitFn,
+		setMinIOPasswordFn:          rt.minioOps.SetMinIOPasswordFn,
+		getMinIOPasswordFn:          rt.minioOps.GetMinIOPasswordFn,
 		createDefaultMcConfFn:       rt.minioOps.CreateDefaultMcConfFn,
 	}
 }
 
 func (inputs dockerContainerRuntimeInputs) applyLlamaRuntime(rt container.LlamaRuntime) container.LlamaRuntime {
+	return seams.Merge(inputs.llamaRuntimeTemplate(), rt)
+}
+
+func (inputs dockerContainerRuntimeInputs) llamaRuntimeTemplate() container.LlamaRuntime {
 	return container.LlamaRuntime{
 		ConfFn:                    inputs.confFn,
 		StopContainerByNameFn:     inputs.stopContainerByNameFn,
@@ -91,53 +100,65 @@ func (inputs dockerContainerRuntimeInputs) applyLlamaRuntime(rt container.LlamaR
 	}
 }
 
+func (inputs dockerContainerRuntimeInputs) netdataRuntimeTemplate() container.NetdataRuntime {
+	return container.NetdataRuntime{
+		OpenFn:                      inputs.openFn,
+		ReadFileFn:                  inputs.readFileFn,
+		WriteFileFn:                 inputs.writeFileFn,
+		MkdirAllFn:                  inputs.mkdirAllFn,
+		StartContainerFn:            inputs.startContainerFn,
+		UpdateContainerState:        inputs.updateContainerStateFn,
+		CreateDefaultFn:             inputs.createDefaultNetdataFn,
+		WriteNDConfFn:               inputs.writeNDConfFn,
+		GetLatestContainerInfoFn:    inputs.getLatestContainerInfoFn,
+		GetLatestContainerImageFn:   inputs.getLatestContainerImageFn,
+		CopyFileToVolumeFn:          inputs.copyFileToVolumeFn,
+		VolumeExistsFn:              inputs.volumeExistsFn,
+		CreateVolumeFn:              inputs.createVolumeFn,
+		DockerDirFn:                 inputs.dockerDirFn,
+		BasePathFn:                  inputs.basePathFn,
+		GetContainerRunningStatusFn: inputs.getContainerRunningStatusFn,
+		SleepFn:                     inputs.sleepFn,
+		PollIntervalFn:              inputs.pollIntervalFn,
+	}
+}
+
 func (inputs dockerContainerRuntimeInputs) applyNetdataRuntime(rt container.NetdataRuntime) container.NetdataRuntime {
-	rt.OpenFn = inputs.openFn
-	rt.ReadFileFn = inputs.readFileFn
-	rt.WriteFileFn = inputs.writeFileFn
-	rt.MkdirAllFn = inputs.mkdirAllFn
-	rt.StartContainerFn = inputs.startContainerFn
-	rt.UpdateContainerState = inputs.updateContainerStateFn
-	rt.CreateDefaultFn = inputs.createDefaultNetdataFn
-	rt.GetLatestContainerInfoFn = inputs.getLatestContainerInfoFn
-	rt.GetLatestContainerImageFn = inputs.getLatestContainerImageFn
-	rt.CopyFileToVolumeFn = inputs.copyFileToVolumeFn
-	rt.VolumeExistsFn = inputs.volumeExistsFn
-	rt.CreateVolumeFn = inputs.createVolumeFn
-	rt.DockerDirFn = inputs.dockerDirFn
-	rt.BasePathFn = inputs.basePathFn
-	rt.GetContainerRunningStatusFn = inputs.getContainerRunningStatusFn
-	rt.SleepFn = inputs.sleepFn
-	rt.PollIntervalFn = inputs.pollIntervalFn
-	return rt
+	return seams.Merge(inputs.netdataRuntimeTemplate(), rt)
+}
+
+func (inputs dockerContainerRuntimeInputs) minioRuntimeTemplate() container.MinioRuntime {
+	return container.MinioRuntime{
+		ConfFn:                      inputs.confFn,
+		BasePathFn:                  inputs.basePathFn,
+		DockerDirFn:                 inputs.dockerDirFn,
+		OpenFn:                      inputs.openFn,
+		ReadFileFn:                  inputs.readFileFn,
+		WriteFileFn:                 inputs.writeFileFn,
+		MkdirAllFn:                  inputs.mkdirAllFn,
+		StartContainerFn:            inputs.startContainerFn,
+		UpdateContainerStateFn:      inputs.updateContainerStateFn,
+		GetContainerRunningStatusFn: inputs.getContainerRunningStatusFn,
+		GetLatestContainerInfoFn:    inputs.getLatestContainerInfoFn,
+		GetLatestContainerImageFn:   inputs.getLatestContainerImageFn,
+		LoadUrbitConfigFn:           inputs.loadUrbitConfigFn,
+		UrbitConfFn:                 inputs.urbitConfFn,
+		SetMinIOPasswordFn:          inputs.setMinIOPasswordFn,
+		GetMinIOPasswordFn:          inputs.getMinIOPasswordFn,
+		RandReadFn:                  inputs.randReadFn,
+		ExecCommandFn:               inputs.execDockerCommandFn,
+		ExecCommandExitFn:           inputs.execDockerCommandExitFn,
+		CopyFileToVolumeFn:          inputs.copyFileToVolumeFn,
+		VolumeExistsFn:              inputs.volumeExistsFn,
+		CreateVolumeFn:              inputs.createVolumeFn,
+		SleepFn:                     inputs.sleepFn,
+		PollIntervalFn:              inputs.pollIntervalFn,
+		CreateDefaultMCConfFn:       inputs.createDefaultMcConfFn,
+	}
 }
 
 func (inputs dockerContainerRuntimeInputs) applyMinioRuntime(rt container.MinioRuntime) container.MinioRuntime {
-	rt.ConfFn = inputs.confFn
-	rt.BasePathFn = inputs.basePathFn
-	rt.DockerDirFn = inputs.dockerDirFn
-	rt.ReadFileFn = inputs.readFileFn
-	rt.WriteFileFn = inputs.writeFileFn
-	rt.MkdirAllFn = inputs.mkdirAllFn
-	rt.StartContainerFn = inputs.startContainerFn
-	rt.UpdateContainerStateFn = inputs.updateContainerStateFn
-	rt.GetContainerRunningStatusFn = inputs.getContainerRunningStatusFn
-	rt.GetLatestContainerInfoFn = inputs.getLatestContainerInfoFn
-	rt.GetLatestContainerImageFn = inputs.getLatestContainerImageFn
-	rt.LoadUrbitConfigFn = inputs.loadUrbitConfigFn
-	rt.UrbitConfFn = inputs.urbitConfFn
-	rt.SetMinIOPasswordFn = inputs.setMinIOPasswordFn
-	rt.GetMinIOPasswordFn = inputs.getMinIOPasswordFn
-	rt.RandReadFn = inputs.randReadFn
-	rt.ExecCommandFn = inputs.execDockerCommandFn
-	rt.ExecCommandExitFn = inputs.execDockerCommandExitFn
-	rt.CopyFileToVolumeFn = inputs.copyFileToVolumeFn
-	rt.VolumeExistsFn = inputs.volumeExistsFn
-	rt.CreateVolumeFn = inputs.createVolumeFn
-	rt.SleepFn = inputs.sleepFn
-	rt.PollIntervalFn = inputs.pollIntervalFn
-	rt.CreateDefaultMCConfFn = inputs.createDefaultMcConfFn
-	return rt
+	return seams.Merge(inputs.minioRuntimeTemplate(), rt)
 }
 
 func llamaRuntimeFromDocker(rt dockerRuntime) container.LlamaRuntime {
@@ -145,13 +166,7 @@ func llamaRuntimeFromDocker(rt dockerRuntime) container.LlamaRuntime {
 }
 
 func netdataRuntimeFromDocker(rt dockerRuntime) container.NetdataRuntime {
-	runtime := collectDockerContainerRuntimeInputs(rt).applyNetdataRuntime(container.NetdataRuntime{})
-	if rt.netdataOps.WriteNDConfFn != nil {
-		runtime.WriteNDConfFn = func() error {
-			return rt.netdataOps.WriteNDConfFn()
-		}
-	}
-	return runtime
+	return collectDockerContainerRuntimeInputs(rt).applyNetdataRuntime(container.NetdataRuntime{})
 }
 
 func minioRuntimeFromDocker(rt dockerRuntime) container.MinioRuntime {

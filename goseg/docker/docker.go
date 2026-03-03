@@ -1,13 +1,15 @@
 package docker
 
 import (
+	"context"
+
 	"groundseg/docker/events"
 	"groundseg/docker/orchestration"
 	"groundseg/structs"
 )
 
-func PublishUrbitTransition(event structs.UrbitTransition) {
-	events.PublishUrbitTransition(event)
+func PublishUrbitTransition(ctx context.Context, event structs.UrbitTransition) error {
+	return events.DefaultEventRuntime().PublishUrbitTransition(ctx, event)
 }
 
 func GetShipStatus(piers []string) (map[string]string, error) {

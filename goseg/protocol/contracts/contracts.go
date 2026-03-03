@@ -3,6 +3,9 @@ package contracts
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,26 +30,17 @@ type ContractMetadata struct {
 // ContractID identifies a contract in the shared governance catalog.
 type ContractID string
 
-const (
-	UploadActionOpenEndpoint ContractID = "protocol.actions.upload.open-endpoint"
-	UploadActionReset        ContractID = "protocol.actions.upload.reset"
-	C2CConnectAction         ContractID = "protocol.actions.c2c.connect"
-	APIConnectionError       ContractID = "startram.errors.api-connection"
-)
+// ActionToken identifies the wire-level action string for each action binding.
+type ActionToken string
 
 // ActionNamespace identifies the protocol namespace for action contracts.
 type ActionNamespace string
-
-const (
-	ActionNamespaceUpload ActionNamespace = "upload"
-	ActionNamespaceC2C    ActionNamespace = "c2c"
-)
 
 // ActionContractBinding joins an action identifier with its contract descriptor ID
 // and namespace, allowing runtime validation and single-source discovery.
 type ActionContractBinding struct {
 	Namespace ActionNamespace
-	Action    string
+	Action    ActionToken
 	Contract  ContractID
 }
 
@@ -66,107 +60,249 @@ func (contract ContractDescriptor) IsActive(version string) bool {
 	return IsContractActive(version, contract.ContractMetadata)
 }
 
-var contractCatalog = map[ContractID]ContractDescriptor{
-	UploadActionOpenEndpoint: {
-		Name:        "UploadActionOpenEndpoint",
-		Description: "open upload endpoint",
-		ContractMetadata: ContractMetadata{
-			IntroducedIn:  CurrentContractVersion,
-			Compatibility: CompatibilityBackwardSafe,
-		},
-	},
-	UploadActionReset: {
-		Name:        "UploadActionReset",
-		Description: "reset upload session",
-		ContractMetadata: ContractMetadata{
-			IntroducedIn:  CurrentContractVersion,
-			Compatibility: CompatibilityBackwardSafe,
-		},
-	},
-	C2CConnectAction: {
-		Name:        "C2CActionConnect",
-		Description: "connect c2c client",
-		ContractMetadata: ContractMetadata{
-			IntroducedIn:  CurrentContractVersion,
-			Compatibility: CompatibilityBackwardSafe,
-		},
-	},
-	APIConnectionError: {
-		Name:        "APIConnectionError",
-		Description: "Masks transport detail when the StarTram API is unavailable or unreachable.",
-		ContractMetadata: ContractMetadata{
-			IntroducedIn:  CurrentContractVersion,
-			Compatibility: CompatibilityBackwardSafe,
-		},
-		Message: "Unable to connect to API server",
-	},
+type contractCatalogEntry struct {
+	ID         ContractID
+	Namespace  ActionNamespace
+	Action     ActionToken
+	Descriptor ContractDescriptor
 }
 
-func ContractDescriptorFor(name ContractID) (ContractDescriptor, bool) {
-	contract, ok := contractCatalog[name]
-	return contract, ok
+type ContractCatalogEntry = contractCatalogEntry
+
+type actionContractBindingKey struct {
+	Namespace ActionNamespace
+	Action    ActionToken
 }
 
-var errMissingContractDescriptor = errors.New("contract descriptor lookup failed")
+// ContractCatalog owns all contract descriptors and action-to-contract bindings.
+type ContractCatalog struct {
+	contractCatalog             map[ContractID]ContractDescriptor
+	actionContractBindings      []ActionContractBinding
+	actionContractBindingsByKey map[actionContractBindingKey]ContractID
+}
 
-func MustContractDescriptor(name ContractID) ContractDescriptor {
-	contract, ok := ContractDescriptorFor(name)
-	if !ok {
-		panic(fmt.Sprintf("missing contract descriptor for %s", name))
+var contractCatalogFragments = []func() []contractCatalogEntry{
+	protocolContractCatalogEntries,
+	startramContractCatalogEntries,
+}
+
+// ContractCatalogEntries returns the canonical catalog source list used by LoadRegistry.
+func ContractCatalogEntries() []ContractCatalogEntry {
+	entries := make([]ContractCatalogEntry, 0, 16)
+	for _, fragment := range contractCatalogFragments {
+		entries = append(entries, fragment()...)
 	}
-	return contract
+	return entries
 }
 
-// ActionContractBindings defines the canonical action-to-contract registry.
-var ActionContractBindings = []ActionContractBinding{
-	{
-		Namespace: ActionNamespaceUpload,
-		Action:    "open-endpoint",
-		Contract:  UploadActionOpenEndpoint,
-	},
-	{
-		Namespace: ActionNamespaceUpload,
-		Action:    "reset",
-		Contract:  UploadActionReset,
-	},
-	{
-		Namespace: ActionNamespaceC2C,
-		Action:    "connect",
-		Contract:  C2CConnectAction,
-	},
-}
+// NewCatalogFromEntries validates and builds a contract catalog from supplied entries.
+func NewCatalogFromEntries(entries []contractCatalogEntry) (*ContractCatalog, error) {
+	nextCatalog := make(map[ContractID]ContractDescriptor, len(entries))
+	nextBindings := make([]ActionContractBinding, 0, len(entries))
+	nextBindingByKey := make(map[actionContractBindingKey]ContractID, len(entries))
+	seenContracts := make(map[ContractID]struct{})
+	seenBindings := make(map[actionContractBindingKey]struct{})
 
-func ActionContractDescriptor(namespace, action string) (ContractDescriptor, bool) {
-	for _, binding := range ActionContractBindings {
-		if string(binding.Namespace) != namespace || binding.Action != action {
+	for _, entry := range entries {
+		if err := validateContractCatalogIdentity(entry); err != nil {
+			return nil, fmt.Errorf("%w: contract %s catalog integrity: %w", errMissingContractDescriptor, entry.ID, err)
+		}
+		if entry.ID == "" {
+			return nil, fmt.Errorf("%w: missing contract id", errMissingContractDescriptor)
+		}
+		if _, ok := seenContracts[entry.ID]; ok {
+			return nil, fmt.Errorf("%w: duplicate contract id %q", errMissingContractDescriptor, entry.ID)
+		}
+		seenContracts[entry.ID] = struct{}{}
+
+		if err := validateContractMetadata(entry.ID, entry.Descriptor.ContractMetadata); err != nil {
+			return nil, fmt.Errorf("%w: contract %s metadata: %w", errMissingContractDescriptor, entry.ID, err)
+		}
+		if entry.Descriptor.Name == "" {
+			return nil, fmt.Errorf("%w: contract %s missing name", errMissingContractDescriptor, entry.ID)
+		}
+		if entry.Descriptor.Description == "" {
+			return nil, fmt.Errorf("%w: contract %s missing description", errMissingContractDescriptor, entry.ID)
+		}
+
+		nextCatalog[entry.ID] = entry.Descriptor
+
+		if (entry.Namespace == "") != (entry.Action == "") {
+			return nil, fmt.Errorf("%w: contract %s binding missing namespace or action", errMissingContractDescriptor, entry.ID)
+		}
+		if entry.Namespace == "" {
 			continue
 		}
-		contract, ok := ContractDescriptorFor(binding.Contract)
-		return contract, ok
+
+		binding := ActionContractBinding{
+			Namespace: entry.Namespace,
+			Action:    entry.Action,
+			Contract:  entry.ID,
+		}
+		bindingKey := actionContractBindingKey{
+			Namespace: binding.Namespace,
+			Action:    binding.Action,
+		}
+		if _, ok := seenBindings[bindingKey]; ok {
+			return nil, fmt.Errorf("%w: duplicate action binding %s:%s", errMissingContractDescriptor, binding.Namespace, binding.Action)
+		}
+		nextBindings = append(nextBindings, binding)
+		nextBindingByKey[bindingKey] = binding.Contract
+		seenBindings[bindingKey] = struct{}{}
 	}
-	return ContractDescriptor{}, false
+
+	sort.Slice(nextBindings, func(i, j int) bool {
+		if nextBindings[i].Namespace == nextBindings[j].Namespace {
+			return nextBindings[i].Action < nextBindings[j].Action
+		}
+		return nextBindings[i].Namespace < nextBindings[j].Namespace
+	})
+
+	return &ContractCatalog{
+		contractCatalog:             nextCatalog,
+		actionContractBindings:      nextBindings,
+		actionContractBindingsByKey: nextBindingByKey,
+	}, nil
 }
 
-func ActionContractBindingsForNamespace(namespace string) []ActionContractBinding {
-	out := make([]ActionContractBinding, 0, len(ActionContractBindings))
-	for _, binding := range ActionContractBindings {
-		if string(binding.Namespace) == namespace {
+func validateContractCatalogIdentity(entry contractCatalogEntry) error {
+	if entry.Namespace == "" && entry.Action != "" {
+		return fmt.Errorf("binding has action %q without namespace", entry.Action)
+	}
+	if entry.Namespace != "" {
+		if entry.Action == "" {
+			return fmt.Errorf("binding has namespace %q without action", entry.Namespace)
+		}
+		if !strings.HasPrefix(string(entry.ID), "protocol.actions.") {
+			return fmt.Errorf("protocol action namespace %q requires protocol.actions prefix", entry.Namespace)
+		}
+		namespacePrefix := fmt.Sprintf("protocol.actions.%s.", entry.Namespace)
+		if !strings.HasPrefix(string(entry.ID), namespacePrefix) {
+			return fmt.Errorf("protocol action binding namespace mismatch: expected %q prefix in %q", namespacePrefix, entry.ID)
+		}
+		if !strings.HasSuffix(string(entry.ID), "."+string(entry.Action)) {
+			return fmt.Errorf("protocol action %s should be reflected in contract id %q", entry.Action, entry.ID)
+		}
+	}
+	if entry.ID == "" {
+		return fmt.Errorf("missing contract id")
+	}
+	return nil
+}
+
+func (catalog *ContractCatalog) copy() *ContractCatalog {
+	if catalog == nil {
+		return nil
+	}
+	nextCatalog := make(map[ContractID]ContractDescriptor, len(catalog.contractCatalog))
+	for id, descriptor := range catalog.contractCatalog {
+		nextCatalog[id] = descriptor
+	}
+	nextBindings := make([]ActionContractBinding, len(catalog.actionContractBindings))
+	copy(nextBindings, catalog.actionContractBindings)
+	nextBindingByKey := make(map[actionContractBindingKey]ContractID, len(catalog.actionContractBindingsByKey))
+	for key, value := range catalog.actionContractBindingsByKey {
+		nextBindingByKey[key] = value
+	}
+	return &ContractCatalog{
+		contractCatalog:             nextCatalog,
+		actionContractBindings:      nextBindings,
+		actionContractBindingsByKey: nextBindingByKey,
+	}
+}
+
+// ContractDescriptorFor looks up a contract descriptor by ID in this catalog.
+func (catalog *ContractCatalog) ContractDescriptorFor(id ContractID) (ContractDescriptor, bool) {
+	if catalog == nil {
+		return ContractDescriptor{}, false
+	}
+	descriptor, ok := catalog.contractCatalog[id]
+	return descriptor, ok
+}
+
+// ContractDescriptorsForDebug returns a copy of the contract map for deterministic test
+// inspection without exposing internal mutation.
+func (catalog *ContractCatalog) ContractDescriptorsForDebug() map[ContractID]ContractDescriptor {
+	if catalog == nil {
+		return map[ContractID]ContractDescriptor{}
+	}
+	return catalog.contractCatalog
+}
+
+// ActionContractFor returns the action contract descriptor for a namespaced action.
+func (catalog *ContractCatalog) ActionContractFor(namespace ActionNamespace, action ActionToken) (ContractDescriptor, bool) {
+	binding, ok := catalog.ActionContractBindingFor(namespace, action)
+	if !ok {
+		return ContractDescriptor{}, false
+	}
+	return catalog.ContractDescriptorFor(binding.Contract)
+}
+
+// ActionContractBindingFor returns the binding for a namespaced action.
+func (catalog *ContractCatalog) ActionContractBindingFor(namespace ActionNamespace, action ActionToken) (ActionContractBinding, bool) {
+	if catalog == nil {
+		return ActionContractBinding{}, false
+	}
+	key := actionContractBindingKey{
+		Namespace: namespace,
+		Action:    action,
+	}
+	contractID, ok := catalog.actionContractBindingsByKey[key]
+	if !ok {
+		return ActionContractBinding{}, false
+	}
+	for _, binding := range catalog.actionContractBindings {
+		if binding.Namespace == namespace && binding.Action == action && binding.Contract == contractID {
+			return binding, true
+		}
+	}
+	return ActionContractBinding{}, false
+}
+
+// ActionContractBindings exposes canonical action-to-contract bindings as an immutable copy.
+func (catalog *ContractCatalog) ActionContractBindings() []ActionContractBinding {
+	if catalog == nil {
+		return nil
+	}
+	out := make([]ActionContractBinding, len(catalog.actionContractBindings))
+	copy(out, catalog.actionContractBindings)
+	return out
+}
+
+// ActionContractBindingsForNamespace returns canonical action-to-contract bindings in a namespace.
+func (catalog *ContractCatalog) ActionContractBindingsForNamespace(namespace ActionNamespace) []ActionContractBinding {
+	if catalog == nil {
+		return nil
+	}
+	out := make([]ActionContractBinding, 0, len(catalog.actionContractBindings))
+	for _, binding := range catalog.actionContractBindings {
+		if binding.Namespace == namespace {
 			out = append(out, binding)
 		}
 	}
 	return out
 }
 
-func ValidateActionContractBindings() error {
-	seen := map[string]struct{}{}
-	for _, binding := range ActionContractBindings {
+// ValidateActionContractBindings validates bindings against the registry.
+func (catalog *ContractCatalog) ValidateActionContractBindings() error {
+	if catalog == nil {
+		return fmt.Errorf("%w: registry not initialized", errMissingContractDescriptor)
+	}
+	seenBindingKeys := map[actionContractBindingKey]struct{}{}
+	for _, binding := range catalog.actionContractBindings {
 		if binding.Namespace == "" {
 			return fmt.Errorf("%w: missing namespace for action %s", errMissingContractDescriptor, binding.Action)
 		}
 		if binding.Action == "" {
 			return fmt.Errorf("%w: missing action in namespace %s", errMissingContractDescriptor, binding.Namespace)
 		}
-		descriptor, ok := ContractDescriptorFor(binding.Contract)
+		key := actionContractBindingKey{Namespace: binding.Namespace, Action: binding.Action}
+		if _, seenBefore := seenBindingKeys[key]; seenBefore {
+			return fmt.Errorf("%w: duplicate action binding %s:%s", errMissingContractDescriptor, binding.Namespace, binding.Action)
+		}
+		seenBindingKeys[key] = struct{}{}
+
+		descriptor, ok := catalog.ContractDescriptorFor(binding.Contract)
 		if !ok {
 			return fmt.Errorf("%w: missing contract %s for action %s:%s", errMissingContractDescriptor, binding.Contract, binding.Namespace, binding.Action)
 		}
@@ -176,18 +312,171 @@ func ValidateActionContractBindings() error {
 		if descriptor.Description == "" {
 			return fmt.Errorf("%w: contract %s has missing description", errMissingContractDescriptor, binding.Contract)
 		}
-		if _, seenBefore := seen[string(binding.Namespace)+":"+binding.Action]; seenBefore {
-			return fmt.Errorf("%w: duplicate action binding %s:%s", errMissingContractDescriptor, binding.Namespace, binding.Action)
-		}
-		seen[string(binding.Namespace)+":"+binding.Action] = struct{}{}
 	}
 	return nil
 }
 
-func init() {
-	if err := ValidateActionContractBindings(); err != nil {
-		panic(err)
+var (
+	errMissingContractDescriptor = errors.New("contract descriptor lookup failed")
+
+	defaultRegistry     *ContractCatalog
+	defaultRegistryErr  error
+	defaultRegistryOnce sync.Once
+)
+
+// LoadRegistry composes protocol and startram contract entries into a validated catalog.
+func LoadRegistry() (*ContractCatalog, error) {
+	return NewCatalogFromEntries(ContractCatalogEntries())
+}
+
+func defaultRegistrySnapshot() (*ContractCatalog, error) {
+	defaultRegistryOnce.Do(func() {
+		defaultRegistry, defaultRegistryErr = LoadRegistry()
+	})
+	if defaultRegistryErr != nil {
+		return nil, defaultRegistryErr
 	}
+	return defaultRegistry.copy(), nil
+}
+
+// ContractDescriptorFor looks up a contract descriptor by ID from the default catalog.
+func ContractDescriptorFor(name ContractID) (ContractDescriptor, bool) {
+	registry, err := defaultRegistrySnapshot()
+	if err != nil {
+		return ContractDescriptor{}, false
+	}
+	contract, ok := registry.ContractDescriptorFor(name)
+	return contract, ok
+}
+
+// ContractDescriptorForWithError looks up a contract descriptor and surfaces catalog errors.
+func ContractDescriptorForWithError(name ContractID) (ContractDescriptor, bool, error) {
+	registry, err := defaultRegistrySnapshot()
+	if err != nil {
+		return ContractDescriptor{}, false, err
+	}
+	contract, ok := registry.ContractDescriptorFor(name)
+	return contract, ok, nil
+}
+
+// MustContractDescriptor panics if the contract ID is missing or the registry cannot initialize.
+func MustContractDescriptor(name ContractID) ContractDescriptor {
+	contract, ok, err := ContractDescriptorForWithError(name)
+	if err != nil {
+		panic(fmt.Sprintf("failed to initialize protocol contracts: %v", err))
+	}
+	if !ok {
+		panic(fmt.Sprintf("missing contract descriptor for %s", name))
+	}
+	return contract
+}
+
+// ActionContractFor returns the action contract descriptor for a namespaced action.
+func ActionContractFor(namespace ActionNamespace, action ActionToken) (ContractDescriptor, bool) {
+	registry, err := defaultRegistrySnapshot()
+	if err != nil {
+		return ContractDescriptor{}, false
+	}
+	return registry.ActionContractFor(namespace, action)
+}
+
+// ActionContractForBinding returns the action contract descriptor for a binding.
+func ActionContractForBinding(binding ActionContractBinding) (ContractDescriptor, bool) {
+	return ActionContractFor(binding.Namespace, binding.Action)
+}
+
+// ActionContractBindings exposes canonical action-to-contract bindings as an immutable copy.
+func ActionContractBindings() []ActionContractBinding {
+	registry, err := defaultRegistrySnapshot()
+	if err != nil {
+		return nil
+	}
+	return registry.ActionContractBindings()
+}
+
+// ActionContractBindingsForNamespace returns action bindings in a namespace.
+func ActionContractBindingsForNamespace(namespace ActionNamespace) []ActionContractBinding {
+	registry, err := defaultRegistrySnapshot()
+	if err != nil {
+		return nil
+	}
+	return registry.ActionContractBindingsForNamespace(namespace)
+}
+
+// ValidateActionContractBindings validates the loaded action-to-contract bindings.
+func ValidateActionContractBindings() error {
+	registry, err := defaultRegistrySnapshot()
+	if err != nil {
+		return err
+	}
+	return registry.ValidateActionContractBindings()
+}
+
+func validateContractMetadata(contractID ContractID, metadata ContractMetadata) error {
+	if metadata.IntroducedIn == "" {
+		return fmt.Errorf("%s has no introduced version", contractID)
+	}
+	introduced, err := time.Parse(contractVersionLayout, metadata.IntroducedIn)
+	if err != nil {
+		return fmt.Errorf("%s has invalid introduced version %q: %w", contractID, metadata.IntroducedIn, err)
+	}
+
+	if !isKnownCompatibility(metadata.Compatibility) {
+		return fmt.Errorf("%s has unknown compatibility %q", contractID, metadata.Compatibility)
+	}
+
+	switch metadata.Compatibility {
+	case CompatibilityDeprecated:
+		if metadata.DeprecatedIn == "" {
+			return fmt.Errorf("%s has deprecated compatibility without deprecated version", contractID)
+		}
+	case CompatibilityRemoved:
+		if metadata.RemovedIn == "" {
+			return fmt.Errorf("%s has removed compatibility without removed version", contractID)
+		}
+	case CompatibilityStable, CompatibilityBackwardSafe:
+		if metadata.DeprecatedIn != "" || metadata.RemovedIn != "" {
+			return fmt.Errorf("%s has compatibility %q with lifecycle versions set", contractID, metadata.Compatibility)
+		}
+	}
+
+	if metadata.DeprecatedIn != "" {
+		deprecated, err := time.Parse(contractVersionLayout, metadata.DeprecatedIn)
+		if err != nil {
+			return fmt.Errorf("%s has invalid deprecated version %q: %w", contractID, metadata.DeprecatedIn, err)
+		}
+		if deprecated.Before(introduced) {
+			return fmt.Errorf("%s has deprecated before introduced date", contractID)
+		}
+	}
+
+	if metadata.RemovedIn != "" {
+		removed, err := time.Parse(contractVersionLayout, metadata.RemovedIn)
+		if err != nil {
+			return fmt.Errorf("%s has invalid removed version %q: %w", contractID, metadata.RemovedIn, err)
+		}
+		if removed.Before(introduced) {
+			return fmt.Errorf("%s has removed before introduced date", contractID)
+		}
+		if metadata.DeprecatedIn != "" && removed.Before(timeMustParse("2006.01.02", metadata.DeprecatedIn)) {
+			return fmt.Errorf("%s has removed-before-deprecated date", contractID)
+		}
+	}
+	return nil
+}
+
+func isKnownCompatibility(value ContractCompatibility) bool {
+	switch value {
+	case CompatibilityStable, CompatibilityDeprecated, CompatibilityRemoved, CompatibilityBackwardSafe:
+		return true
+	default:
+		return false
+	}
+}
+
+func timeMustParse(layout, value string) time.Time {
+	parsed, _ := time.Parse(layout, value)
+	return parsed
 }
 
 const contractVersionLayout = "2006.01.02"

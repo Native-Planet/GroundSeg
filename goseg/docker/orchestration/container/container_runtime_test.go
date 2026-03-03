@@ -65,9 +65,11 @@ func TestLlamaContainerConfWithRuntimeRejectsMissingRuntimeConfig(t *testing.T) 
 	_, _, err := LlamaContainerConfWithRuntime(LlamaRuntime{
 		ConfFn: func() structs.SysConfig {
 			return structs.SysConfig{
-				PenpaiActive: "phi.gguf",
-				PenpaiModels: []structs.Penpai{
-					{ModelName: "phi.gguf", ModelUrl: "https://example.invalid/model.gguf"},
+				PenpaiConfig: structs.PenpaiConfig{
+					PenpaiActive: "phi.gguf",
+					PenpaiModels: []structs.Penpai{
+						{ModelName: "phi.gguf", ModelUrl: "https://example.invalid/model.gguf"},
+					},
 				},
 			}
 		},

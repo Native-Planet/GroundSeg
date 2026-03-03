@@ -98,12 +98,14 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 			},
 		}),
 		orchestration.WithUrbitOps(orchestration.RuntimeUrbitOps{
-			UrbitConfFn: func(patp string) structs.UrbitDocker {
-				return structs.UrbitDocker{
-					UrbitNetworkConfig: structs.UrbitNetworkConfig{
-						Network: "wireguard",
-					},
-				}
+			RuntimeUrbitConfigOps: orchestration.RuntimeUrbitConfigOps{
+				UrbitConfFn: func(patp string) structs.UrbitDocker {
+					return structs.UrbitDocker{
+						UrbitNetworkConfig: structs.UrbitNetworkConfig{
+							Network: "wireguard",
+						},
+					}
+				},
 			},
 		}),
 		orchestration.WithConfigOps(orchestration.RuntimeConfigOps{
@@ -113,8 +115,10 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 			},
 		}),
 		orchestration.WithContainerOps(orchestration.RuntimeContainerOps{
-			StopContainerByNameFn: func(string) error { return nil },
-			DeleteContainerFn:     func(string) error { return nil },
+			RuntimeContainerLifecycleOps: orchestration.RuntimeContainerLifecycleOps{
+				StopContainerByNameFn: func(string) error { return nil },
+				DeleteContainerFn:      func(string) error { return nil },
+			},
 		}),
 		orchestration.WithLoadOps(orchestration.RuntimeLoadOps{
 			LoadMCFn:     func() error { return nil },

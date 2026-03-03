@@ -22,6 +22,36 @@ const (
 	urbitBackupConfigSubConfig   urbitConfigSubConfig = "backup"
 )
 
+type UrbitConfigSection int
+
+const (
+	UrbitConfigSectionRuntime UrbitConfigSection = iota
+	UrbitConfigSectionNetwork
+	UrbitConfigSectionSchedule
+	UrbitConfigSectionFeature
+	UrbitConfigSectionWeb
+	UrbitConfigSectionBackup
+)
+
+func (section UrbitConfigSection) String() string {
+	switch section {
+	case UrbitConfigSectionRuntime:
+		return "runtime"
+	case UrbitConfigSectionNetwork:
+		return "network"
+	case UrbitConfigSectionSchedule:
+		return "schedule"
+	case UrbitConfigSectionFeature:
+		return "feature"
+	case UrbitConfigSectionWeb:
+		return "web"
+	case UrbitConfigSectionBackup:
+		return "backup"
+	default:
+		return "unknown"
+	}
+}
+
 var (
 	UrbitsConfig = make(map[string]structs.UrbitDocker)
 	urbitMutex   sync.RWMutex
@@ -109,70 +139,116 @@ func UpdateUrbit(pier string, mutateFn func(*structs.UrbitDocker) error) error {
 }
 
 func UpdateUrbitRuntimeConfig(pier string, mutateFn func(*structs.UrbitRuntimeConfig) error) error {
-	return updateUrbitSubConfig(pier, urbitRuntimeConfigSubConfig, func(conf *structs.UrbitDocker) error {
-		if mutateFn == nil {
-			return fmt.Errorf("mutate function is required")
-		}
-		return mutateFn(&conf.UrbitRuntimeConfig)
-	})
+	return UpdateUrbitSectionConfig(pier, UrbitConfigSectionRuntime, mutateFn)
 }
 
 func UpdateUrbitNetworkConfig(pier string, mutateFn func(*structs.UrbitNetworkConfig) error) error {
-	return updateUrbitSubConfig(pier, urbitNetworkConfigSubConfig, func(conf *structs.UrbitDocker) error {
-		if mutateFn == nil {
-			return fmt.Errorf("mutate function is required")
-		}
-		return mutateFn(&conf.UrbitNetworkConfig)
-	})
+	return UpdateUrbitSectionConfig(pier, UrbitConfigSectionNetwork, mutateFn)
 }
 
 func UpdateUrbitScheduleConfig(pier string, mutateFn func(*structs.UrbitScheduleConfig) error) error {
-	return updateUrbitSubConfig(pier, urbitScheduleConfigSubConfig, func(conf *structs.UrbitDocker) error {
-		if mutateFn == nil {
-			return fmt.Errorf("mutate function is required")
-		}
-		return mutateFn(&conf.UrbitScheduleConfig)
-	})
+	return UpdateUrbitSectionConfig(pier, UrbitConfigSectionSchedule, mutateFn)
 }
 
 func UpdateUrbitFeatureConfig(pier string, mutateFn func(*structs.UrbitFeatureConfig) error) error {
-	return updateUrbitSubConfig(pier, urbitFeatureConfigSubConfig, func(conf *structs.UrbitDocker) error {
-		if mutateFn == nil {
-			return fmt.Errorf("mutate function is required")
-		}
-		return mutateFn(&conf.UrbitFeatureConfig)
-	})
+	return UpdateUrbitSectionConfig(pier, UrbitConfigSectionFeature, mutateFn)
 }
 
 func UpdateUrbitWebConfig(pier string, mutateFn func(*structs.UrbitWebConfig) error) error {
-	return updateUrbitSubConfig(pier, urbitWebConfigSubConfig, func(conf *structs.UrbitDocker) error {
-		if mutateFn == nil {
-			return fmt.Errorf("mutate function is required")
-		}
-		return mutateFn(&conf.UrbitWebConfig)
-	})
+	return UpdateUrbitSectionConfig(pier, UrbitConfigSectionWeb, mutateFn)
 }
 
 func UpdateUrbitBackupConfig(pier string, mutateFn func(*structs.UrbitBackupConfig) error) error {
-	return updateUrbitSubConfig(pier, urbitBackupConfigSubConfig, func(conf *structs.UrbitDocker) error {
-		if mutateFn == nil {
-			return fmt.Errorf("mutate function is required")
+	return UpdateUrbitSectionConfig(pier, UrbitConfigSectionBackup, mutateFn)
+}
+
+func UpdateUrbitSectionConfig(pier string, section UrbitConfigSection, mutateFn any) error {
+	if mutateFn == nil {
+		return fmt.Errorf("mutate function is required")
+	}
+	if !isAllowedUrbitConfigSubConfig(section) {
+		return fmt.Errorf("unsupported urbit config scope: %s", section)
+	}
+	switch section {
+	case UrbitConfigSectionRuntime:
+		runtimeMutate, ok := mutateFn.(func(*structs.UrbitRuntimeConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitRuntimeConfig)", section)
 		}
-		return mutateFn(&conf.UrbitBackupConfig)
-	})
+		return updateUrbitSubConfig(pier, urbitRuntimeConfigSubConfig, func(conf *structs.UrbitDocker) error {
+			return runtimeMutate(&conf.UrbitRuntimeConfig)
+		})
+	case UrbitConfigSectionNetwork:
+		networkMutate, ok := mutateFn.(func(*structs.UrbitNetworkConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitNetworkConfig)", section)
+		}
+		return updateUrbitSubConfig(pier, urbitNetworkConfigSubConfig, func(conf *structs.UrbitDocker) error {
+			return networkMutate(&conf.UrbitNetworkConfig)
+		})
+	case UrbitConfigSectionSchedule:
+		scheduleMutate, ok := mutateFn.(func(*structs.UrbitScheduleConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitScheduleConfig)", section)
+		}
+		return updateUrbitSubConfig(pier, urbitScheduleConfigSubConfig, func(conf *structs.UrbitDocker) error {
+			return scheduleMutate(&conf.UrbitScheduleConfig)
+		})
+	case UrbitConfigSectionFeature:
+		featureMutate, ok := mutateFn.(func(*structs.UrbitFeatureConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitFeatureConfig)", section)
+		}
+		return updateUrbitSubConfig(pier, urbitFeatureConfigSubConfig, func(conf *structs.UrbitDocker) error {
+			return featureMutate(&conf.UrbitFeatureConfig)
+		})
+	case UrbitConfigSectionWeb:
+		webMutate, ok := mutateFn.(func(*structs.UrbitWebConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitWebConfig)", section)
+		}
+		return updateUrbitSubConfig(pier, urbitWebConfigSubConfig, func(conf *structs.UrbitDocker) error {
+			return webMutate(&conf.UrbitWebConfig)
+		})
+	case UrbitConfigSectionBackup:
+		backupMutate, ok := mutateFn.(func(*structs.UrbitBackupConfig) error)
+		if !ok {
+			return fmt.Errorf("section %s expects mutate func(*structs.UrbitBackupConfig)", section)
+		}
+		return updateUrbitSubConfig(pier, urbitBackupConfigSubConfig, func(conf *structs.UrbitDocker) error {
+			return backupMutate(&conf.UrbitBackupConfig)
+		})
+	default:
+		return fmt.Errorf("unsupported urbit config scope: %s", section)
+	}
+	return nil
+}
+
+func isAllowedUrbitConfigSubConfig(section UrbitConfigSection) bool {
+	switch section {
+	case UrbitConfigSectionRuntime,
+		UrbitConfigSectionNetwork,
+		UrbitConfigSectionSchedule,
+		UrbitConfigSectionFeature,
+		UrbitConfigSectionWeb,
+		UrbitConfigSectionBackup:
+		return true
+	default:
+		return false
+	}
 }
 
 func updateUrbitSubConfig(pier string, scope urbitConfigSubConfig, mutateFn func(*structs.UrbitDocker) error) error {
 	if mutateFn == nil {
 		return fmt.Errorf("mutate function is required")
 	}
-	if !isAllowedUrbitConfigSubConfig(scope) {
+	if !isLegacyUrbitConfigSubConfig(scope) {
 		return fmt.Errorf("unsupported urbit config scope: %s", scope)
 	}
 	return UpdateUrbit(pier, mutateFn)
 }
 
-func isAllowedUrbitConfigSubConfig(scope urbitConfigSubConfig) bool {
+func isLegacyUrbitConfigSubConfig(scope urbitConfigSubConfig) bool {
 	switch scope {
 	case urbitRuntimeConfigSubConfig,
 		urbitNetworkConfigSubConfig,

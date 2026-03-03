@@ -1,0 +1,124 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules implement large runtime seam structs made of function-pointer fields plus default constructors and nil-guard wrappers (`importerRuntime`, `collectorRuntime`, `RectifyRuntime`, `workflowRuntime`, `startBackgroundServicesRuntime`), creating repeated adapter code instead of stable behavioral abstractions.",
+        "`goseg/docker/orchestration/runtime_ops.go` defines many fragmented ops structs (`RuntimeContainerLifecycleOps`, `RuntimeUrbitConfigOps`, `RuntimeWireguardOps`, etc.) that are mostly direct references to package functions, increasing indirection depth without adding policy/translation.",
+        "Wrapper-heavy call paths repeatedly instantiate defaults (`defaultCollectorRuntime()`, `defaultWorkflowRuntime()`) from helper functions, so abstraction seams are spread across many entry points rather than composed once and injected where needed.",
+        "Event abstractions are split: `goseg/docker/events/events.go` exposes an `EventBroker` interface with global broker setters/getters, while `goseg/docker/orchestration/subsystem/subsystem_events.go` uses a separate package-level `eventBus` channel and bypasses the broker abstraction."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 70.0,
+        "indirection_cost": 64.0,
+        "interface_honesty": 74.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_overfragmentation",
+      "summary": "Runtime seam structs are over-fragmented into pass-through function bags, adding indirection without clear behavioral boundaries.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`importerRuntime` contains many `...Fn` fields plus `ensureForWorkflow` and small wrappers (`waitForBootCode`, `waitForRemoteReady`, `switchToWireguard`) that primarily nil-check then forward.",
+        "`collectorRuntime` follows the same pattern (many callback fields, `ensureConfigured`, and thin getters like `startramSettings`, `penpaiSettings`, `swapSettings`).",
+        "`RectifyRuntime` composes multiple nested runtime structs merged by `seams.Merge`, mostly to forward to `config.*` update/getters.",
+        "`runtime_ops.go` introduces many tiny ops structs and embeds them into larger structs, but defaults mostly map directly to existing functions (`config.*`, `networkRuntime.*`, orchestration functions)."
+      ],
+      "suggestion": "Collapse callback bags into fewer cohesive service interfaces aligned to domain operations (for example, config-store, container-runtime, transition-publisher), and remove wrappers that only nil-check/forward by centralizing validation at construction time.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_first_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "default_runtime_recreation_churn",
+      "summary": "Default runtime factories are called from many helper functions, causing abstraction churn and inconsistent dependency flow.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`collectors.go` repeatedly calls `defaultCollectorRuntime()` in many public helpers (`Construct*`, `backupSnapshotForPiers`, `runtimeSnapshotForPiers`, `collectUrbit*` helpers), even when those helpers are part of the same logical workflow.",
+        "`operations_runtime.go` repeatedly creates `defaultWorkflowRuntime()` in helpers like `runUrbitTransition`, `DispatchUploadImportWithCoordinator`, `WaitComplete`, and `persistShip*` wrappers.",
+        "`wifi.go` top-level helpers (`ListSSIDs`, `ConnectToWifi`, `DisconnectWifi`, `ToggleDevice`, `IsWifiEnabled`, `ApplyCaptiveRules`) each call `defaultWiFiRuntime()` then forward."
+      ],
+      "suggestion": "Introduce long-lived runtime/service instances per subsystem and pass them through call chains; keep one construction point per workflow and convert helper APIs to methods on that runtime to reduce repeated seam setup.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_first_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "event_abstraction_split_brain",
+      "summary": "Two parallel event abstractions (broker interface vs raw channel bus) create inconsistent contracts for transition events.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`events.go` defines `EventBroker` and package-level `Publish*`/`*Transitions` wrappers around a mutable global broker.",
+        "`subsystem_events.go` independently defines a package-global `eventBus` channel and listener/handler loops for Docker events, not routed through `EventBroker`.",
+        "Rectify transition handlers subscribe through `events.*Transitions()`, while Docker subsystem eventing follows a separate channel path, so event flow abstractions are not unified."
+      ],
+      "suggestion": "Converge on a single transition event boundary (either broker-driven or typed internal bus) and route Docker subsystem events through that boundary to keep publication/subscription semantics consistent across subsystems.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_event_models"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "startup_callback_param_bag",
+      "summary": "Startup orchestration uses an oversized callback parameter bag that obscures real subsystem contracts.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`startBackgroundServicesRuntime` declares many function fields and `withDefaults` manually copies each one, creating a large generic callback bag.",
+        "`defaultBackgroundServiceDescriptors` separately maps service names to callback lookups, duplicating mapping logic already implicit in struct fields.",
+        "Tests require string-keyed switching (`backgroundServiceRuntimeForTest`) to patch callbacks, indicating weakly-typed service boundaries.",
+        "`main.go` adds another runtime bag layer for bootstrap/c2c/server orchestration, extending the same pattern."
+      ],
+      "suggestion": "Replace generic callback bags with typed service groups (for example, transition services, logging services, maintenance services) and drive startup from a strongly-typed registry to avoid string-keyed and field-by-field mapping drift.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_first_indirection"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams are implemented as broad function-pointer bags rather than cohesive domain interfaces.",
+      "Dependency injection is applied per-function instead of per-workflow, creating repeated runtime construction and wrapper layers.",
+      "Eventing evolved through parallel models (broker and local channels) without consolidation."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_overfragmentation",
+      "default_runtime_recreation_churn",
+      "startup_callback_param_bag"
+    ],
+    "possible_false_positives": []
+  }
+}

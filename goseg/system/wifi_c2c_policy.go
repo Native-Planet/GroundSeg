@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type c2cModeOrchestrator interface {
+type C2CModeOrchestrator interface {
 	EnterC2CMode() error
 	ConnectToNetwork(ssid, password string) error
 	ExitC2CMode() error
@@ -37,14 +37,14 @@ var (
 
 func defaultC2CModeDependencies() c2cModeDependencies {
 	return c2cModeDependencies{
-		radio:           defaultWiFiRadio,
+		radio:           newWiFiRadioService(DefaultWiFiRuntime()),
 		accessPoint:     defaultAccessPointLifecycle,
 		getStoredSSIDs:  func(ssids []string) { C2CStoredSSIDs = ssids },
-		startResolved:   func() error { return runSystemdResolved("start") },
-		stopResolved:    func() error { return runSystemdResolved("stop") },
-		rebootSystem:    runRebootCommand,
+		startResolved:   func() error { return runSystemdResolvedForRuntime(DefaultWiFiRuntime(), "start") },
+		stopResolved:    func() error { return runSystemdResolvedForRuntime(DefaultWiFiRuntime(), "stop") },
+		rebootSystem:    func() error { return runRebootCommandForRuntime(DefaultWiFiRuntime()) },
 		pause:           func(d time.Duration) { time.Sleep(d) },
-		publishInterval: func(event string) { ConfChannel <- event },
+		publishInterval: func(event string) { ConfChannel() <- event },
 	}
 }
 
@@ -77,13 +77,17 @@ func sanitizeC2CModeDependencies(overrides c2cModeDependencies) c2cModeDependenc
 	return dependencies
 }
 
-func newC2CModeFlow() c2cModeOrchestrator {
+func NewC2CModeFlow() C2CModeOrchestrator {
+	return newC2CModeFlow()
+}
+
+func newC2CModeFlow() C2CModeOrchestrator {
 	return c2cModeFlow{
 		deps: defaultC2CModeDependencies(),
 	}
 }
 
-func newC2CModeFlowWithDependencies(dependencies c2cModeDependencies) c2cModeOrchestrator {
+func newC2CModeFlowWithDependencies(dependencies c2cModeDependencies) C2CModeOrchestrator {
 	return c2cModeFlow{
 		deps: sanitizeC2CModeDependencies(dependencies),
 	}
@@ -170,32 +174,25 @@ func (flow c2cModeFlow) ExitC2CMode() error {
 	return flow.deps.startResolved()
 }
 
-func C2CMode() error {
-	return newC2CModeFlow().EnterC2CMode()
-}
-
-func UnaliveC2C() error {
-	return newC2CModeFlow().ExitC2CMode()
-}
-
-func C2CConnect(ssid, password string) error {
-	return newC2CModeFlow().ConnectToNetwork(ssid, password)
-}
-
-func runSystemdResolved(mode string) error {
-	_, err := defaultWiFiService.runtime.runCommand("systemctl", mode, "systemd-resolved")
+func runSystemdResolvedForRuntime(runtime wifiRuntime, mode string) error {
+	_, err := runtime.runCommand("systemctl", mode, "systemd-resolved")
 	if err != nil {
 		return fmt.Errorf("failed to %s systemd-resolved: %w", mode, err)
 	}
 	return nil
 }
 
+// EnableResolved starts the systemd-resolved service for default runtime operations.
 func EnableResolved() error {
-	return runSystemdResolved("start")
+	_, err := DefaultWiFiRuntime().runCommand("systemctl", "start", "systemd-resolved")
+	if err != nil {
+		return fmt.Errorf("failed to start systemd-resolved: %w", err)
+	}
+	return nil
 }
 
-func runRebootCommand() error {
-	cmd := defaultWiFiService.runtime.execCommand("reboot")
+func runRebootCommandForRuntime(runtime wifiRuntime) error {
+	cmd := runtime.execCommand("reboot")
 	_, err := cmd.CombinedOutput()
 	return err
 }

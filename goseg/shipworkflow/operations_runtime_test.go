@@ -19,7 +19,7 @@ func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 		SleepFn: func(time.Duration) {},
 	}
 
-	err := runTransitionedOperation(runtime, "~zod", "backup", "loading", "success", time.Second, func() error { return nil })
+	err := runTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", time.Second, func() error { return nil })
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -28,7 +28,7 @@ func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 	}
 
 	events = nil
-	err = runTransitionedOperation(runtime, "~zod", "backup", "loading", "success", 0, func() error {
+	err = runTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", 0, func() error {
 		return errors.New("boom")
 	})
 	if err == nil {

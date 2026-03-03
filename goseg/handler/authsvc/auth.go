@@ -174,7 +174,7 @@ func C2CHandler(msg []byte) ([]byte, error) {
 	var resp []byte
 	switch c2cPayload.Payload.Type {
 	case "c2c":
-		if err := system.C2CConnect(c2cPayload.Payload.SSID, c2cPayload.Payload.Password); err != nil {
+		if err := system.NewC2CModeFlow().ConnectToNetwork(c2cPayload.Payload.SSID, c2cPayload.Payload.Password); err != nil {
 			return nil, fmt.Errorf("c2c connect failed: %w", err)
 		}
 	case "wifi":

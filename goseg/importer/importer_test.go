@@ -24,10 +24,18 @@ import (
 	"github.com/gorilla/mux"
 )
 
+func importerRuntimeWith(overrides func(*importerRuntime)) importerRuntime {
+	runtime := defaultImporterRuntime()
+	if overrides != nil {
+		overrides(&runtime)
+	}
+	return runtime
+}
+
 func drainImportTransitions() {
 	for {
 		select {
-		case <-events.ImportShipTransitions():
+		case <-events.DefaultEventRuntime().ImportShipTransitions():
 		default:
 			return
 		}
@@ -39,7 +47,7 @@ func readImportTransitions(t *testing.T, count int) []structs.UploadTransition {
 	capturedEvents := make([]structs.UploadTransition, 0, count)
 	for i := 0; i < count; i++ {
 		select {
-		case evt := <-events.ImportShipTransitions():
+		case evt := <-events.DefaultEventRuntime().ImportShipTransitions():
 			capturedEvents = append(capturedEvents, evt)
 		case <-time.After(2 * time.Second):
 			t.Fatalf("timed out waiting for import transition %d", i+1)
@@ -69,14 +77,14 @@ func resetUploadSessionsForTest(t *testing.T) {
 	})
 }
 
-func authorizeTokenIDsForTest(t *testing.T, tokenIDs ...string) {
+func authorizeTokenIDsForTest(t *testing.T, tokenIDs ...string) importerRuntime {
 	t.Helper()
-	originalValidateUploadSessionTokenFn := validateUploadSessionTokenFn
+	runtime := defaultImporterRuntime()
 	authorizedTokens := make(map[string]struct{}, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
 		authorizedTokens[tokenID] = struct{}{}
 	}
-	validateUploadSessionTokenFn = func(sessionToken structs.WsTokenStruct, providedToken structs.WsTokenStruct, _ *http.Request, _ auth.UploadTokenAuthorizationPolicy) auth.UploadTokenAuthorizationResult {
+	runtime.validateUploadSessionTokenFn = func(sessionToken structs.WsTokenStruct, providedToken structs.WsTokenStruct, _ *http.Request, _ auth.UploadTokenAuthorizationPolicy) auth.UploadTokenAuthorizationResult {
 		if sessionToken != (structs.WsTokenStruct{}) {
 			if sessionToken.ID != providedToken.ID || sessionToken.Token != providedToken.Token {
 				return auth.UploadTokenAuthorizationResult{
@@ -100,9 +108,7 @@ func authorizeTokenIDsForTest(t *testing.T, tokenIDs ...string) {
 			AuthorizedToken: providedToken.Token,
 		}
 	}
-	t.Cleanup(func() {
-		validateUploadSessionTokenFn = originalValidateUploadSessionTokenFn
-	})
+	return runtime
 }
 
 func setUploadDirsForTest(t *testing.T) {
@@ -318,7 +324,7 @@ func TestInitializeReturnsErrorForStoragePathFailures(t *testing.T) {
 		return "", errors.New("storage unavailable")
 	}
 
-	if err := initialize(runtime); err == nil {
+	if err := Initialize(runtime); err == nil {
 		t.Fatal("expected Initialize to fail when storage path cannot be resolved")
 	}
 }
@@ -333,7 +339,7 @@ func TestInitializeSetsUploadAndTempDirectories(t *testing.T) {
 		return filepath.Join(base, "temp"), nil
 	}
 
-	if err := initialize(runtime); err != nil {
+	if err := Initialize(runtime); err != nil {
 		t.Fatalf("Initialize returned error: %v", err)
 	}
 	if uploadDir != filepath.Join(base, "uploads") {
@@ -363,7 +369,7 @@ func TestOpenUploadEndpointRejectsInvalidSessionKey(t *testing.T) {
 
 func TestOpenUploadEndpointCreatesAndUpdatesSystemDriveSession(t *testing.T) {
 	resetUploadSessionsForTest(t)
-	authorizeTokenIDsForTest(t, "token-id")
+	runtime := authorizeTokenIDsForTest(t, "token-id")
 
 	endpoint := "0123456789abcdef0123456789abcdef"
 	createCmd := OpenUploadEndpointCmd{
@@ -376,7 +382,7 @@ func TestOpenUploadEndpointCreatesAndUpdatesSystemDriveSession(t *testing.T) {
 		Fix:           false,
 		SelectedDrive: "system-drive",
 	}
-	if err := OpenUploadEndpoint(createCmd); err != nil {
+	if err := OpenUploadEndpoint(createCmd, runtime); err != nil {
 		t.Fatalf("OpenUploadEndpoint(create) returned error: %v", err)
 	}
 
@@ -396,7 +402,7 @@ func TestOpenUploadEndpointCreatesAndUpdatesSystemDriveSession(t *testing.T) {
 	updateCmd := createCmd
 	updateCmd.Remote = true
 	updateCmd.Fix = true
-	if err := OpenUploadEndpoint(updateCmd); err != nil {
+	if err := OpenUploadEndpoint(updateCmd, runtime); err != nil {
 		t.Fatalf("OpenUploadEndpoint(update) returned error: %v", err)
 	}
 
@@ -410,7 +416,7 @@ func TestOpenUploadEndpointCreatesAndUpdatesSystemDriveSession(t *testing.T) {
 
 func TestOpenUploadEndpointRejectsTokenMismatchOnExistingSession(t *testing.T) {
 	resetUploadSessionsForTest(t)
-	authorizeTokenIDsForTest(t, "token-id", "other-token-id")
+	runtime := authorizeTokenIDsForTest(t, "token-id", "other-token-id")
 
 	endpoint := "0123456789abcdef0123456789abcdef"
 	if err := OpenUploadEndpoint(OpenUploadEndpointCmd{
@@ -420,7 +426,7 @@ func TestOpenUploadEndpointRejectsTokenMismatchOnExistingSession(t *testing.T) {
 			Token: "token-value",
 		},
 		SelectedDrive: "system-drive",
-	}); err != nil {
+	}, runtime); err != nil {
 		t.Fatalf("OpenUploadEndpoint(create) returned error: %v", err)
 	}
 
@@ -431,7 +437,7 @@ func TestOpenUploadEndpointRejectsTokenMismatchOnExistingSession(t *testing.T) {
 			Token: "other-token-value",
 		},
 		SelectedDrive: "system-drive",
-	})
+	}, runtime)
 	if err == nil {
 		t.Fatal("expected token mismatch error")
 	}
@@ -442,7 +448,7 @@ func TestOpenUploadEndpointRejectsTokenMismatchOnExistingSession(t *testing.T) {
 
 func TestSetUploadSessionWrapsOpenUploadEndpoint(t *testing.T) {
 	resetUploadSessionsForTest(t)
-	authorizeTokenIDsForTest(t, "token-id")
+	runtime := authorizeTokenIDsForTest(t, "token-id")
 
 	endpoint := "0123456789abcdef0123456789abcdef"
 	payload := structs.WsUploadPayload{
@@ -457,7 +463,7 @@ func TestSetUploadSessionWrapsOpenUploadEndpoint(t *testing.T) {
 			SelectedDrive: "system-drive",
 		},
 	}
-	if err := SetUploadSession(payload); err != nil {
+	if err := SetUploadSession(payload, runtime); err != nil {
 		t.Fatalf("SetUploadSession returned error: %v", err)
 	}
 
@@ -527,17 +533,14 @@ func TestPersistChunkAndCombineChunks(t *testing.T) {
 
 func TestPersistChunkToTempPropagatesCloseError(t *testing.T) {
 	setUploadDirsForTest(t)
-
 	closeErr := errors.New("close failed")
-	originalClose := closeTempFileFn
-	closeTempFileFn = func(*os.File) error {
-		return closeErr
-	}
-	t.Cleanup(func() {
-		closeTempFileFn = originalClose
+	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
+		runtime.closeTempFileFn = func(*os.File) error {
+			return closeErr
+		}
 	})
 
-	err := persistChunkToTemp(strings.NewReader("payload"), "ship.tgz", 0)
+	err := persistChunkToTemp(strings.NewReader("payload"), "ship.tgz", 0, runtime)
 	if err == nil || !errors.Is(err, closeErr) {
 		t.Fatalf("expected close error wrapped, got: %v", err)
 	}
@@ -548,17 +551,14 @@ func TestPersistChunkToTempPropagatesCloseError(t *testing.T) {
 
 func TestAllChunksReceivedPropagatesFilesystemError(t *testing.T) {
 	setUploadDirsForTest(t)
-
-	originalStat := statFn
 	statErr := errors.New("stat access denied")
-	statFn = func(string) (os.FileInfo, error) {
-		return nil, statErr
-	}
-	t.Cleanup(func() {
-		statFn = originalStat
+	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
+		runtime.statFn = func(string) (os.FileInfo, error) {
+			return nil, statErr
+		}
 	})
 
-	if _, err := allChunksReceived("ship.tgz", 1); err == nil || !errors.Is(err, statErr) {
+	if _, err := allChunksReceived("ship.tgz", 1, runtime); err == nil || !errors.Is(err, statErr) {
 		t.Fatalf("expected stat error to propagate, got %v", err)
 	}
 }
@@ -613,7 +613,7 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 	}
 	runtime.cleanupMultipartFn = func(string) error { return nil }
 
-	if err := configureUploadedPierForRuntime(context.Background(), shipworkflow.UploadImportCommand{
+	if err := configureUploadedPier(context.Background(), shipworkflow.UploadImportCommand{
 		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
 		Filename:    "ship.tgz",
 		Patp:        "~zod",
@@ -634,7 +634,7 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 		postCalled = false
 		return nil
 	}
-	if err := configureUploadedPierForRuntime(context.Background(), shipworkflow.UploadImportCommand{
+	if err := configureUploadedPier(context.Background(), shipworkflow.UploadImportCommand{
 		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
 		Filename:    "ship.tgz",
 		Patp:        "~zod",
@@ -655,7 +655,7 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 		postCalled = true
 		return postErr
 	}
-	if err := configureUploadedPierForRuntime(context.Background(), shipworkflow.UploadImportCommand{
+	if err := configureUploadedPier(context.Background(), shipworkflow.UploadImportCommand{
 		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
 		Filename:    "ship.tgz",
 		Patp:        "~zod",
@@ -686,7 +686,7 @@ func TestFinalizeUploadOnCompletionDispatchesUploadImportCommand(t *testing.T) {
 		t.Fatalf("persistChunkToTemp returned error: %v", err)
 	}
 
-	completed, err := finalizeUploadOnCompletionForRuntime(
+	completed, err := finalizeUploadOnCompletion(
 		uploadChunkProgress{
 			Filename:  "ship.tgz",
 			Total:     1,
@@ -735,7 +735,7 @@ func TestFinalizeUploadOnCompletionWrapsDispatchFailureAndImportError(t *testing
 	if err := persistChunkToTemp(strings.NewReader("payload"), "ship.tgz", 0); err != nil {
 		t.Fatalf("persistChunkToTemp returned error: %v", err)
 	}
-	completed, err := finalizeUploadOnCompletionForRuntime(
+	completed, err := finalizeUploadOnCompletion(
 		uploadChunkProgress{
 			Filename:  "ship.tgz",
 			Total:     1,
@@ -761,32 +761,22 @@ func TestFinalizeUploadOnCompletionWrapsDispatchFailureAndImportError(t *testing
 }
 
 func TestFinalizeImportedPierReadinessReturnsAcmeFixErrorWhenFixIsEnabled(t *testing.T) {
-	origAcmeFix := acmeFixFn
-	origWaitBoot := shipworkflowWaitForBootCodeFn
-	origWaitRemote := shipworkflowWaitForRemoteReadyFn
-	origSwitchWireguard := shipworkflowSwitchToWireguardFn
-	defer func() {
-		acmeFixFn = origAcmeFix
-		shipworkflowWaitForBootCodeFn = origWaitBoot
-		shipworkflowWaitForRemoteReadyFn = origWaitRemote
-		shipworkflowSwitchToWireguardFn = origSwitchWireguard
-	}()
-
-	shipworkflowWaitForBootCodeFn = func(string, time.Duration) {}
-	shipworkflowWaitForRemoteReadyFn = func(string, time.Duration) {}
-	shipworkflowSwitchToWireguardFn = func(string, bool) error {
-		return nil
-	}
-
+	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
+		runtime.shipworkflowWaitForBootCodeFn = func(string, time.Duration) {}
+		runtime.shipworkflowWaitForRemoteReadyFn = func(string, time.Duration) {}
+		runtime.shipworkflowSwitchToWireguardFn = func(string, bool) error {
+			return nil
+		}
+	})
 	expectedErr := errors.New("acme fix failed")
-	acmeFixFn = func(string) error {
+	runtime.acmeFixFn = func(string) error {
 		return expectedErr
 	}
 
 	err := finalizeImportedPierReadiness(importedPierContext{
 		Patp: "~zod",
 		Fix:  true,
-	})
+	}, runtime)
 	if err == nil {
 		t.Fatal("expected finalizeImportedPierReadiness to return acme fix error")
 	}
@@ -796,71 +786,46 @@ func TestFinalizeImportedPierReadinessReturnsAcmeFixErrorWhenFixIsEnabled(t *tes
 }
 
 func TestPrepareImportedPierEnvironmentPropagatesRealCleanupErrors(t *testing.T) {
-	origCreateUrbitConfig := shipcreatorCreateUrbitConfigFn
-	origAppendSysConfigPier := shipcreatorAppendSysConfigPierFn
-	origDeleteContainer := dockerDeleteContainerFn
-	origDeleteVolume := dockerDeleteVolumeFn
-	origCreateVolume := dockerCreateVolumeFn
-	origMkdirAll := mkdirAllFn
-	defer func() {
-		shipcreatorCreateUrbitConfigFn = origCreateUrbitConfig
-		shipcreatorAppendSysConfigPierFn = origAppendSysConfigPier
-		dockerDeleteContainerFn = origDeleteContainer
-		dockerDeleteVolumeFn = origDeleteVolume
-		dockerCreateVolumeFn = origCreateVolume
-		mkdirAllFn = origMkdirAll
-	}()
-	shipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
-	shipcreatorAppendSysConfigPierFn = func(string) error { return nil }
-	dockerDeleteContainerFn = func(string) error {
-		return errors.New("failed to delete container: permission denied")
-	}
-	dockerDeleteVolumeFn = func(string) error {
-		return errors.New("volume cleanup should be ignored when container cleanup fails")
-	}
-	dockerCreateVolumeFn = func(string) error { return nil }
-	mkdirAllFn = func(string, os.FileMode) error { return nil }
+	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
+		runtime.shipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
+		runtime.shipcreatorAppendSysConfigPierFn = func(string) error { return nil }
+		runtime.deleteContainerFn = func(string) error {
+			return errors.New("failed to delete container: permission denied")
+		}
+		runtime.dockerDeleteVolumeFn = func(string) error {
+			return errors.New("volume cleanup should be ignored when container cleanup fails")
+		}
+		runtime.dockerCreateVolumeFn = func(string) error { return nil }
+		runtime.mkdirAllFn = func(string, os.FileMode) error { return nil }
+	})
 
 	err := prepareImportedPierEnvironment(importedPierContext{
 		Patp:        "~zod",
 		CustomDrive: "",
-	})
+	}, runtime)
 	if err == nil {
 		t.Fatal("expected prepareImportedPierEnvironment to fail for non-ignorable container delete error")
 	}
 }
 
 func TestPrepareImportedPierEnvironmentIgnoresNotFoundCleanupErrors(t *testing.T) {
-	origCreateUrbitConfig := shipcreatorCreateUrbitConfigFn
-	origAppendSysConfigPier := shipcreatorAppendSysConfigPierFn
-	origDeleteContainer := dockerDeleteContainerFn
-	origDeleteVolume := dockerDeleteVolumeFn
-	origCreateVolume := dockerCreateVolumeFn
-	origMkdirAll := mkdirAllFn
-	defer func() {
-		shipcreatorCreateUrbitConfigFn = origCreateUrbitConfig
-		shipcreatorAppendSysConfigPierFn = origAppendSysConfigPier
-		dockerDeleteContainerFn = origDeleteContainer
-		dockerDeleteVolumeFn = origDeleteVolume
-		dockerCreateVolumeFn = origCreateVolume
-		mkdirAllFn = origMkdirAll
-	}()
-
-	shipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
-	shipcreatorAppendSysConfigPierFn = func(string) error { return nil }
-	dockerDeleteContainerFn = func(string) error {
-		return errdefs.NotFound(errors.New("container not found"))
-	}
-	dockerDeleteVolumeFn = func(string) error {
-		return errors.New("no such volume")
-	}
-	dockerCreateVolumeFn = func(string) error { return nil }
-	mkdirAllFn = func(string, os.FileMode) error { return nil }
+	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
+		runtime.shipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
+		runtime.shipcreatorAppendSysConfigPierFn = func(string) error { return nil }
+		runtime.deleteContainerFn = func(string) error {
+			return errdefs.NotFound(errors.New("container not found"))
+		}
+		runtime.dockerDeleteVolumeFn = func(string) error {
+			return errors.New("no such volume")
+		}
+		runtime.dockerCreateVolumeFn = func(string) error { return nil }
+		runtime.mkdirAllFn = func(string, os.FileMode) error { return nil }
+	})
 
 	if err := prepareImportedPierEnvironment(importedPierContext{
 		Patp:        "~zod",
 		CustomDrive: "",
-	}); err != nil {
+	}, runtime); err != nil {
 		t.Fatalf("expected prepareImportedPierEnvironment to ignore cleanup not found errors: %v", err)
 	}
 }

@@ -51,7 +51,7 @@ func (m *mockConfigService) SavePiers(piers []string) error {
 
 func TestCreateUrbitConfigAssignsPortsAndCustomDrive(t *testing.T) {
 	mock := &mockConfigService{
-		conf: structs.SysConfig{Piers: []string{"~bus", "~nec"}},
+		conf: structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~bus", "~nec"}}},
 		urbits: map[string]structs.UrbitDocker{
 			"~bus": {
 				UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
@@ -92,7 +92,7 @@ func TestCreateUrbitConfigAssignsPortsAndCustomDrive(t *testing.T) {
 }
 
 func TestGetOpenUrbitPortsDefaultsWhenNoPiers(t *testing.T) {
-	mock := &mockConfigService{conf: structs.SysConfig{Piers: []string{}}, urbits: map[string]structs.UrbitDocker{}}
+	mock := &mockConfigService{conf: structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{}}}, urbits: map[string]structs.UrbitDocker{}}
 	svc := NewService(mock)
 
 	httpPort, amesPort := svc.getOpenUrbitPorts()
@@ -102,7 +102,7 @@ func TestGetOpenUrbitPortsDefaultsWhenNoPiers(t *testing.T) {
 }
 
 func TestAppendSysConfigPierAddsOnlyWhenMissing(t *testing.T) {
-	mock := &mockConfigService{conf: structs.SysConfig{Piers: []string{"~bus"}}}
+	mock := &mockConfigService{conf: structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~bus"}}}}
 	svc := NewService(mock)
 
 	if err := svc.AppendSysConfigPier("~zod"); err != nil {
@@ -112,7 +112,7 @@ func TestAppendSysConfigPierAddsOnlyWhenMissing(t *testing.T) {
 		t.Fatalf("unexpected piers after append: %+v", mock.updatedPiers)
 	}
 
-	mock2 := &mockConfigService{conf: structs.SysConfig{Piers: []string{"~bus"}}}
+	mock2 := &mockConfigService{conf: structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~bus"}}}}
 	svc2 := NewService(mock2)
 	if err := svc2.AppendSysConfigPier("~bus"); err != nil {
 		t.Fatalf("AppendSysConfigPier(existing) returned error: %v", err)
@@ -123,7 +123,7 @@ func TestAppendSysConfigPierAddsOnlyWhenMissing(t *testing.T) {
 }
 
 func TestRemoveSysConfigPierRemovesAllInstances(t *testing.T) {
-	mock := &mockConfigService{conf: structs.SysConfig{Piers: []string{"~zod", "~bus", "~zod"}}}
+	mock := &mockConfigService{conf: structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~zod", "~bus", "~zod"}}}}
 	svc := NewService(mock)
 
 	if err := svc.RemoveSysConfigPier("~zod"); err != nil {

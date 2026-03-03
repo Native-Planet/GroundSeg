@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/docker/client"
 	"groundseg/dockerclient"
+	"groundseg/internal/seams"
 )
 
 type NetworkRuntime struct {
@@ -34,14 +35,7 @@ func NewNetworkRuntime() NetworkRuntime {
 }
 
 func NewNetworkRuntimeWith(overrides NetworkRuntime) NetworkRuntime {
-	runtime := defaultNetworkRuntime
-	if overrides.DockerClientNewFn != nil {
-		runtime.DockerClientNewFn = overrides.DockerClientNewFn
-	}
-	if overrides.OperationTimeout > 0 {
-		runtime.OperationTimeout = overrides.OperationTimeout
-	}
-	return runtime
+	return seams.Merge(defaultNetworkRuntime, overrides)
 }
 
 func (runtime NetworkRuntime) KillContainerUsingPort(port uint16) error {

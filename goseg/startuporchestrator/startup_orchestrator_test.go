@@ -17,10 +17,14 @@ import (
 func TestRunStartupSubsystemsSkipsOptionalFailures(t *testing.T) {
 	called := false
 	err := runStartupSubsystems([]startupSubsystemStep{
-		startupSubsystemOptionalStep("optional failure", func() error {
-			called = true
-			return errors.New("optional failure")
-		}),
+		{
+			name:   "optional failure",
+			policy: startupSubsystemOptional,
+			initFn: func() error {
+				called = true
+				return errors.New("optional failure")
+			},
+		},
 	})
 	if err != nil {
 		t.Fatalf("optional failures should not fail startup: %v", err)
@@ -32,9 +36,13 @@ func TestRunStartupSubsystemsSkipsOptionalFailures(t *testing.T) {
 
 func TestRunStartupSubsystemsReturnsRequiredFailure(t *testing.T) {
 	err := runStartupSubsystems([]startupSubsystemStep{
-		startupSubsystemRequiredStep("required failure", func() error {
+		{
+			name:   "required failure",
+			policy: startupSubsystemRequired,
+			initFn: func() error {
 			return errors.New("required failure")
-		}),
+			},
+		},
 	})
 	if err == nil {
 		t.Fatal("expected required startup subsystem failure")
@@ -46,10 +54,14 @@ func TestRunStartupSubsystemsReturnsRequiredFailure(t *testing.T) {
 
 func TestRunStartupSubsystemSkipsDisabledSubsystem(t *testing.T) {
 	called := false
-	err := runStartupSubsystem(startupSubsystemAction("disabled subsystem", startupSubsystemDisabled, func() error {
+	err := runStartupSubsystem(startupSubsystemStep{
+		name:   "disabled subsystem",
+		policy: startupSubsystemDisabled,
+		initFn: func() error {
 		called = true
 		return nil
-	}))
+		},
+	})
 	if err != nil {
 		t.Fatalf("disabled startup subsystem should not fail: %v", err)
 	}

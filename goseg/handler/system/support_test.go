@@ -152,13 +152,13 @@ func TestSendBugReportIncludesServerBodyOnFailure(t *testing.T) {
 }
 
 func TestLastTwoLogsReturnsNewestByDateAndPart(t *testing.T) {
-	originalLogPath := logger.LogPath
+	originalLogPath := logger.LogPath()
 	t.Cleanup(func() {
-		logger.LogPath = originalLogPath
+		logger.SetLogPath(originalLogPath)
 	})
 
 	logDir := t.TempDir()
-	logger.LogPath = logDir
+	logger.SetLogPath(logDir)
 	files := []string{
 		"2026-01-part-2.log",
 		"2026-02-part-1.log",

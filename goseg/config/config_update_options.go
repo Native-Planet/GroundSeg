@@ -115,7 +115,7 @@ func WithSalt(salt string) ConfUpdateOption {
 
 func WithKeyfile(path string) ConfUpdateOption {
 	return func(patch *ConfPatch) {
-		patch.KeyFile = &path
+		patch.AuthSessionPatch.KeyFile = &path
 	}
 }
 

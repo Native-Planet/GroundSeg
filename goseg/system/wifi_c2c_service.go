@@ -45,7 +45,7 @@ func processC2CMessageForAdapterWithDeps(msg []byte, deps c2cServiceDeps) error 
 
 func defaultC2CServiceDeps() c2cServiceDeps {
 	return c2cServiceDeps{
-		connectToWiFi:    ConnectToWifi,
+		connectToWiFi:    func(ssid, password string) error { return DefaultWiFiRuntimeService().ConnectToWifi(ssid, password) },
 		restartGroundSeg: restartGroundSegService,
 	}
 }

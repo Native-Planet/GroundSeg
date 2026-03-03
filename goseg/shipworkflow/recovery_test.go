@@ -22,33 +22,41 @@ type testRecoveryRuntimeContainer struct {
 
 func (runtime testRecoveryRuntimeContainer) runtimeOps() orchestration.RuntimeContainerOps {
 	return orchestration.RuntimeContainerOps{
-		StartContainerFn:      func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
-		StopContainerByNameFn: func(string) error { return nil },
-		RestartContainerFn: func(patp string) error {
-			if runtime.restartContainerFn == nil {
-				return nil
-			}
-			return runtime.restartContainerFn(patp)
+		RuntimeContainerLifecycleOps: orchestration.RuntimeContainerLifecycleOps{
+			StartContainerFn: func(string, string) (structs.ContainerState, error) {
+				return structs.ContainerState{}, nil
+			},
+			StopContainerByNameFn: func(string) error { return nil },
+			RestartContainerFn: func(patp string) error {
+				if runtime.restartContainerFn == nil {
+					return nil
+				}
+				return runtime.restartContainerFn(patp)
+			},
+			DeleteContainerFn: func(patp string) error {
+				if runtime.deleteContainerFn == nil {
+					return nil
+				}
+				return runtime.deleteContainerFn(patp)
+			},
 		},
-		DeleteContainerFn: func(patp string) error {
-			if runtime.deleteContainerFn == nil {
-				return nil
-			}
-			return runtime.deleteContainerFn(patp)
+		RuntimeContainerStateOps: orchestration.RuntimeContainerStateOps{
+			GetContainerStateFn:    func() map[string]structs.ContainerState { return nil },
+			UpdateContainerStateFn: func(string, structs.ContainerState) {},
 		},
-		GetContainerStateFn:    func() map[string]structs.ContainerState { return nil },
-		UpdateContainerStateFn: func(string, structs.ContainerState) {},
-		GetShipStatusFn: func(piers []string) (map[string]string, error) {
-			if runtime.getShipStatusFn == nil {
-				return nil, nil
-			}
-			return runtime.getShipStatusFn(piers)
-		},
-		WaitForShipExitFn: func(patp string, timeout time.Duration) error {
-			if runtime.waitForShipExitFn == nil {
-				return nil
-			}
-			return runtime.waitForShipExitFn(patp, timeout)
+		RuntimeContainerLifecycleStatusOps: orchestration.RuntimeContainerLifecycleStatusOps{
+			GetShipStatusFn: func(piers []string) (map[string]string, error) {
+				if runtime.getShipStatusFn == nil {
+					return nil, nil
+				}
+				return runtime.getShipStatusFn(piers)
+			},
+			WaitForShipExitFn: func(patp string, timeout time.Duration) error {
+				if runtime.waitForShipExitFn == nil {
+					return nil
+				}
+				return runtime.waitForShipExitFn(patp, timeout)
+			},
 		},
 	}
 }
@@ -59,17 +67,21 @@ type testRecoveryRuntimeUrbit struct {
 
 func (runtime testRecoveryRuntimeUrbit) runtimeOps() orchestration.RuntimeUrbitOps {
 	return orchestration.RuntimeUrbitOps{
-		LoadUrbitConfigFn: func(string) error { return nil },
-		UrbitConfFn: func(patp string) structs.UrbitDocker {
-			if runtime.urbitConfFn == nil {
-				return structs.UrbitDocker{}
-			}
-			return runtime.urbitConfFn(patp)
+		RuntimeUrbitConfigOps: orchestration.RuntimeUrbitConfigOps{
+			LoadUrbitConfigFn: func(string) error { return nil },
+			UrbitConfFn: func(patp string) structs.UrbitDocker {
+				if runtime.urbitConfFn == nil {
+					return structs.UrbitDocker{}
+				}
+				return runtime.urbitConfFn(patp)
+			},
+			UpdateUrbitFn: func(string, func(*structs.UrbitDocker) error) error { return nil },
 		},
-		UpdateUrbitFn:         func(string, func(*structs.UrbitDocker) error) error { return nil },
-		GetContainerNetworkFn: func(string) (string, error) { return "", nil },
-		GetLusCodeFn:          func(string) (string, error) { return "", nil },
-		ClearLusCodeFn:        func(string) {},
+		RuntimeUrbitWorkflowOps: orchestration.RuntimeUrbitWorkflowOps{
+			GetContainerNetworkFn: func(string) (string, error) { return "", nil },
+			GetLusCodeFn:          func(string) (string, error) { return "", nil },
+			ClearLusCodeFn:        func(string) {},
+		},
 	}
 }
 

@@ -26,7 +26,7 @@ func BarExit(patp string) error {
 		fmt.Sprintf("Click |exit for %v", patp),
 		clearLusCode,
 	); err != nil {
-		return fmt.Errorf("Click |exit for %v failed to get exec: %v", patp, err)
+		return fmt.Errorf("click |exit for %s failed to execute: %w", patp, err)
 	}
 	return nil
 }

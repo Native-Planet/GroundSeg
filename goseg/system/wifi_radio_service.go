@@ -16,37 +16,47 @@ type wifiRadioService interface {
 	ListSSIDs(device string) ([]string, error)
 }
 
-type nmcliWiFiRadioService struct{}
-
-func (nmcliWiFiRadioService) PrimaryDevice() (string, error) {
-	return defaultWiFiService.primaryWifiDevice()
+type nmcliWiFiRadioService struct {
+	runtime wifiRuntime
+	state   *wifiRuntimeState
 }
 
-func (nmcliWiFiRadioService) RefreshInfo(device string) {
+func newWiFiRadioService(overrides wifiRuntime, state ...*wifiRuntimeState) wifiRadioService {
+	return nmcliWiFiRadioService{
+		runtime: resolveWiFiRuntime(overrides),
+		state:   resolveWiFiRuntimeState(state...),
+	}
+}
+
+func (service nmcliWiFiRadioService) PrimaryDevice() (string, error) {
+	return service.runtime.primaryWifiDevice()
+}
+
+func (service nmcliWiFiRadioService) RefreshInfo(device string) {
 	info := structs.SystemWifi{Status: false}
-	wifiEnabled, err := defaultWiFiService.ifCheck()
+	wifiEnabled, err := service.runtime.ifCheck()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("couldn't read wifi radio state: %v", err))
-		setWifiInfo(info)
+		setWifiInfo(info, service.state)
 		return
 	}
 
 	info.Status = wifiEnabled
 	if !info.Status {
-		setWifiInfo(info)
+		setWifiInfo(info, service.state)
 		return
 	}
 
-	client, err := defaultWiFiService.runtime.newWifiClient()
+	client, err := service.runtime.newWifiClient()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't create wifi client with device %v: %v", device, err))
 		info.Status = false
-		setWifiInfo(info)
+		setWifiInfo(info, service.state)
 		return
 	}
 	defer client.Close()
 
-	active, err := defaultWiFiService.connectedSSID(client, device)
+	active, err := service.runtime.connectedSSID(client, device)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("couldn't get active SSID for %s: %v", device, err))
 		info.Active = ""
@@ -54,7 +64,7 @@ func (nmcliWiFiRadioService) RefreshInfo(device string) {
 		info.Active = active
 	}
 
-	ssids, err := defaultWiFiService.listSSIDs(device)
+	ssids, err := service.runtime.listSSIDs(device)
 	if err != nil {
 		zap.L().Error(err.Error())
 		info.Networks = []string{}
@@ -62,27 +72,27 @@ func (nmcliWiFiRadioService) RefreshInfo(device string) {
 		info.Networks = ssids
 	}
 
-	setWifiInfo(info)
+	setWifiInfo(info, service.state)
 }
 
-func (nmcliWiFiRadioService) Enable() error {
-	if _, err := defaultWiFiService.runtime.runCommand("nmcli", "radio", "wifi", "on"); err != nil {
+func (service nmcliWiFiRadioService) Enable() error {
+	if _, err := service.runtime.runCommand("nmcli", "radio", "wifi", "on"); err != nil {
 		return fmt.Errorf("enable wifi radio: %w", err)
 	}
 	return nil
 }
 
-func (nmcliWiFiRadioService) SetLinkUp(device string) error {
-	if _, err := defaultWiFiService.runtime.runCommand("sudo", "ip", "link", "set", device, "up"); err != nil {
+func (service nmcliWiFiRadioService) SetLinkUp(device string) error {
+	if _, err := service.runtime.runCommand("sudo", "ip", "link", "set", device, "up"); err != nil {
 		return fmt.Errorf("set ip link for device %s: %w", device, err)
 	}
 	return nil
 }
 
-func (nmcliWiFiRadioService) ListSSIDs(device string) ([]string, error) {
-	return defaultWiFiService.listSSIDs(device)
+func (service nmcliWiFiRadioService) ListSSIDs(device string) ([]string, error) {
+	return service.runtime.listSSIDs(device)
 }
 
-func (nmcliWiFiRadioService) Connect(ssid, password string) error {
-	return defaultWiFiService.connect(ssid, password)
+func (service nmcliWiFiRadioService) Connect(ssid, password string) error {
+	return service.runtime.connect(ssid, password)
 }

@@ -26,6 +26,7 @@ type logstreamSessionStore struct {
 	sysLogMu           sync.RWMutex
 	sysLogSessions     []*websocket.Conn
 	sysSessionsToClear []*websocket.Conn
+	sysLogMessages     chan []byte
 
 	dockerLogMu       sync.RWMutex
 	dockerLogSessions map[string]map[*websocket.Conn]bool
@@ -34,6 +35,7 @@ type logstreamSessionStore struct {
 func newLogstreamSessionStore() *logstreamSessionStore {
 	return &logstreamSessionStore{
 		dockerLogSessions: make(map[string]map[*websocket.Conn]bool),
+		sysLogMessages:    make(chan []byte, 100),
 	}
 }
 
@@ -200,133 +202,23 @@ func (store *logstreamSessionStore) RemoveDockerLogSession(container string, con
 	}
 }
 
-type logstreamRuntime struct {
-	state          *sessionState
-	sysLogMessages chan []byte
-}
-
-func (runtime *logstreamRuntime) stateForWrite() *sessionState {
-	if runtime == nil || runtime.state == nil {
+func (store *logstreamSessionStore) SystemLogMessages() <-chan []byte {
+	if store == nil {
 		return nil
 	}
-	return runtime.state
+	store.sysLogMu.RLock()
+	defer store.sysLogMu.RUnlock()
+	return store.sysLogMessages
 }
 
-func (runtime *logstreamRuntime) stateForRead() *sessionState {
-	if runtime == nil || runtime.state == nil {
-		return nil
-	}
-	return runtime.state
-}
-
-func (runtime *logstreamRuntime) SysLogSessions() []*websocket.Conn {
-	state := runtime.stateForRead()
-	if state == nil || state.logstream == nil {
-		return nil
-	}
-	return state.logstream.SysLogSessions()
-}
-
-func (runtime *logstreamRuntime) SetSysLogSessions(sessions []*websocket.Conn) {
-	state := runtime.stateForWrite()
-	if state == nil || state.logstream == nil {
+func (store *logstreamSessionStore) PublishSystemLog(logData []byte) {
+	if store == nil || store.sysLogMessages == nil {
 		return
 	}
-	state.logstream.SetSysLogSessions(sessions)
-}
-
-func (runtime *logstreamRuntime) SysSessionsToRemove() []*websocket.Conn {
-	state := runtime.stateForRead()
-	if state == nil || state.logstream == nil {
-		return nil
-	}
-	return state.logstream.SysSessionsToRemove()
-}
-
-func (runtime *logstreamRuntime) SetSysSessionsToRemove(sessions []*websocket.Conn) {
-	state := runtime.stateForWrite()
-	if state == nil || state.logstream == nil {
-		return
-	}
-	state.logstream.SetSysSessionsToRemove(sessions)
-}
-
-func (runtime *logstreamRuntime) AddSysLogSession(conn *websocket.Conn) {
-	state := runtime.stateForWrite()
-	if state == nil || state.logstream == nil {
-		return
-	}
-	state.logstream.AddSysLogSession(conn)
-}
-
-func (runtime *logstreamRuntime) RemoveSysLogSessions() {
-	state := runtime.stateForWrite()
-	if state == nil || state.logstream == nil {
-		return
-	}
-	state.logstream.RemoveSysLogSessions()
-}
-
-func (runtime *logstreamRuntime) AddSysSessionToRemove(conn *websocket.Conn) {
-	state := runtime.stateForWrite()
-	if state == nil || state.logstream == nil {
-		return
-	}
-	state.logstream.AddSysSessionToRemove(conn)
-}
-
-func (runtime *logstreamRuntime) DockerLogSessions() map[string]map[*websocket.Conn]bool {
-	state := runtime.stateForRead()
-	if state == nil || state.logstream == nil {
-		return nil
-	}
-	return state.logstream.DockerLogSessions()
-}
-
-func (runtime *logstreamRuntime) SetDockerLogSessions(sessions map[string]map[*websocket.Conn]bool) {
-	state := runtime.stateForWrite()
-	if state == nil || state.logstream == nil {
-		return
-	}
-	state.logstream.SetDockerLogSessions(sessions)
-}
-
-func (runtime *logstreamRuntime) SetDockerLogSession(container string, conn *websocket.Conn, live bool) {
-	state := runtime.stateForWrite()
-	if state == nil || state.logstream == nil {
-		return
-	}
-	state.logstream.SetDockerLogSession(container, conn, live)
-}
-
-func (runtime *logstreamRuntime) SetDockerLogSessionLive(container string, conn *websocket.Conn, live bool) {
-	state := runtime.stateForWrite()
-	if state == nil || state.logstream == nil {
-		return
-	}
-	state.logstream.SetDockerLogSessionLive(container, conn, live)
-}
-
-func (runtime *logstreamRuntime) RemoveDockerLogSession(container string, conn *websocket.Conn) {
-	state := runtime.stateForWrite()
-	if state == nil || state.logstream == nil {
-		return
-	}
-	state.logstream.RemoveDockerLogSession(container, conn)
-}
-
-func (runtime *logstreamRuntime) SystemLogMessages() <-chan []byte {
-	if runtime == nil {
-		return nil
-	}
-	return runtime.sysLogMessages
-}
-
-func (runtime *logstreamRuntime) PublishSystemLog(logData []byte) {
-	if runtime == nil || runtime.sysLogMessages == nil {
-		return
-	}
-	runtime.sysLogMessages <- logData
+	store.sysLogMu.Lock()
+	messageBus := store.sysLogMessages
+	store.sysLogMu.Unlock()
+	messageBus <- logData
 }
 
 var logstreamRuntimeState struct {
@@ -340,53 +232,42 @@ func init() {
 	logstreamRuntimeState.Unlock()
 }
 
-func NewLogstreamRuntime() LogstreamRuntime {
-	state := snapshot()
-	return &logstreamRuntime{
-		state:          state,
-		sysLogMessages: make(chan []byte, 100),
+type sessionRuntime struct {
+	mu             sync.RWMutex
+	clientManager  *ClientManager
+	logstreamState LogstreamRuntime
+}
+
+func newSessionRuntime() *sessionRuntime {
+	return &sessionRuntime{
+		clientManager:  NewClientManager(),
+		logstreamState: newLogstreamSessionStore(),
 	}
 }
 
+var defaultSessionRuntime = newSessionRuntime()
+
+func NewLogstreamRuntime() LogstreamRuntime {
+	return snapshotLogstreamRuntime()
+}
+
+func snapshotLogstreamRuntime() LogstreamRuntime {
+	defaultSessionRuntime.mu.RLock()
+	defer defaultSessionRuntime.mu.RUnlock()
+	return defaultSessionRuntime.logstreamState
+}
+
 func LogstreamRuntimeState() LogstreamRuntime {
-	logstreamRuntimeState.RLock()
-	defer logstreamRuntimeState.RUnlock()
-	return logstreamRuntimeState.active
+	return snapshotLogstreamRuntime()
 }
 
 func SetLogstreamRuntime(rt LogstreamRuntime) {
 	if rt == nil {
 		rt = NewLogstreamRuntime()
 	}
-	logstreamRuntimeState.Lock()
-	defer logstreamRuntimeState.Unlock()
-	logstreamRuntimeState.active = rt
-}
-
-type sessionState struct {
-	authMu        sync.RWMutex
-	clientManager *ClientManager
-
-	logstream *logstreamSessionStore
-}
-
-var (
-	stateMu  sync.Mutex
-	activeMu = &stateMu
-	active   = newSessionState()
-)
-
-func newSessionState() *sessionState {
-	return &sessionState{
-		clientManager: NewClientManager(),
-		logstream:     newLogstreamSessionStore(),
-	}
-}
-
-func snapshot() *sessionState {
-	activeMu.Lock()
-	defer activeMu.Unlock()
-	return active
+	defaultSessionRuntime.mu.Lock()
+	defer defaultSessionRuntime.mu.Unlock()
+	defaultSessionRuntime.logstreamState = rt
 }
 
 func NewClientManager() *ClientManager {
@@ -396,19 +277,20 @@ func NewClientManager() *ClientManager {
 }
 
 func GetClientManager() *ClientManager {
-	s := snapshot()
-	s.authMu.Lock()
-	defer s.authMu.Unlock()
-	return s.clientManager
+	defaultSessionRuntime.mu.Lock()
+	defer defaultSessionRuntime.mu.Unlock()
+	if defaultSessionRuntime.clientManager == nil {
+		defaultSessionRuntime.clientManager = NewClientManager()
+	}
+	return defaultSessionRuntime.clientManager
 }
 
 func SetClientManager(cm *ClientManager) {
-	s := snapshot()
-	s.authMu.Lock()
-	defer s.authMu.Unlock()
+	defaultSessionRuntime.mu.Lock()
+	defer defaultSessionRuntime.mu.Unlock()
 	if cm == nil {
-		s.clientManager = NewClientManager()
+		defaultSessionRuntime.clientManager = NewClientManager()
 		return
 	}
-	s.clientManager = cm
+	defaultSessionRuntime.clientManager = cm
 }

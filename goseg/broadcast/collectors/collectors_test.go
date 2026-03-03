@@ -20,8 +20,8 @@ func collectorRuntimeWith(overrides func(*collectorRuntime)) collectorRuntime {
 
 func TestCollectUrbitDeploymentInputsBuildsDeploymentState(t *testing.T) {
 	runtime := collectorRuntimeWith(func(runtime *collectorRuntime) {
-		runtime.loadUrbitConfigFn = func(string) error { return nil }
-		runtime.urbitConfFn = func(string) structs.UrbitDocker {
+		runtime.LoadUrbitConfigFn = func(string) error { return nil }
+		runtime.UrbitConfFn = func(string) structs.UrbitDocker {
 			return structs.UrbitDocker{
 				UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
 					HTTPPort:      8080,
@@ -55,14 +55,13 @@ func TestCollectUrbitDeploymentInputsBuildsDeploymentState(t *testing.T) {
 				},
 			}
 		}
-		runtime.getMinIOPasswordFn = func(string) (string, error) {
+		runtime.GetMinIOPasswordFn = func(string) (string, error) {
 			return "remote-minio", nil
 		}
-		runtime.getMinIOLinkedStatusFn = func(string) bool { return true }
+		runtime.GetMinIOLinkedStatusFn = func(string) bool { return true }
 	})
 
-	inputs, ok := collectUrbitDeploymentInputsForRuntime(
-		runtime,
+	inputs, ok := collectUrbitDeploymentInputs(
 		"~zod",
 		"host.internal",
 		wireguardContext{
@@ -74,6 +73,7 @@ func TestCollectUrbitDeploymentInputsBuildsDeploymentState(t *testing.T) {
 				"ship.wg.example": true,
 			},
 		},
+		runtime,
 	)
 	if !ok {
 		t.Fatal("expected config resolution to succeed")
@@ -97,16 +97,16 @@ func TestCollectUrbitDeploymentInputsBuildsDeploymentState(t *testing.T) {
 
 func TestCollectUrbitRuntimeInputsCollectsRuntimeState(t *testing.T) {
 	runtime := collectorRuntimeWith(func(runtime *collectorRuntime) {
-		runtime.getContainerStatsFn = func(string) structs.ContainerStats {
+		runtime.GetContainerStatsFn = func(string) structs.ContainerStats {
 			return structs.ContainerStats{
 				MemoryUsage: 128,
 				DiskUsage:   1024,
 			}
 		}
-		runtime.lusCodeFn = func(string) (string, error) {
+		runtime.LusCodeFn = func(string) (string, error) {
 			return "0v2", nil
 		}
-		runtime.getDeskFn = func(_ string, desk string, _ bool) (string, error) {
+		runtime.GetDeskFn = func(_ string, desk string, _ bool) (string, error) {
 			if desk == "penpai" {
 				return string(transition.ContainerStatusRunning), nil
 			}
@@ -136,7 +136,7 @@ func TestCollectUrbitRuntimeInputsCollectsRuntimeState(t *testing.T) {
 		return t
 	}
 
-	inputs := collectUrbitRuntimeInputsForRuntime(runtime, "~zod", "Up 1 minute", rtContext, scheduled)
+	inputs := collectUrbitRuntimeInputs("~zod", "Up 1 minute", rtContext, scheduled, runtime)
 	if inputs.network != "bridge" {
 		t.Fatalf("expected network bridge, got %q", inputs.network)
 	}
@@ -238,13 +238,13 @@ func TestComposeUrbitViewInputsCombinesRuntimeAndDeploymentInputs(t *testing.T) 
 
 func TestCollectUrbitDeploymentInputsForPiersSkipsInvalidConfig(t *testing.T) {
 	runtime := collectorRuntimeWith(func(runtime *collectorRuntime) {
-		runtime.loadUrbitConfigFn = func(pier string) error {
+		runtime.LoadUrbitConfigFn = func(pier string) error {
 			if pier == "~sam" {
 				return errors.New("missing")
 			}
 			return nil
 		}
-		runtime.urbitConfFn = func(string) structs.UrbitDocker {
+		runtime.UrbitConfFn = func(string) structs.UrbitDocker {
 			return structs.UrbitDocker{
 				UrbitNetworkConfig: structs.UrbitNetworkConfig{
 					WgURL:   "ship.wg",
@@ -255,15 +255,15 @@ func TestCollectUrbitDeploymentInputsForPiersSkipsInvalidConfig(t *testing.T) {
 				},
 			}
 		}
-		runtime.getMinIOLinkedStatusFn = func(string) bool { return false }
+		runtime.GetMinIOLinkedStatusFn = func(string) bool { return false }
 	})
 
-	inputs := collectUrbitDeploymentInputsForPiersForRuntime(
-		runtime,
+	inputs := collectUrbitDeploymentInputsForPiers(
 		[]string{"~zod", "~sam"},
 		"localhost",
 		wireguardContext{},
 		pierStartramSnapshot{remoteReadyByURL: map[string]bool{}},
+		runtime,
 	)
 	if _, exists := inputs["~zod"]; !exists {
 		t.Fatal("expected valid pier deployment inputs")
@@ -275,13 +275,13 @@ func TestCollectUrbitDeploymentInputsForPiersSkipsInvalidConfig(t *testing.T) {
 
 func TestCollectUrbitRuntimeInputsForPiersCollectsAllShips(t *testing.T) {
 	runtime := collectorRuntimeWith(func(runtime *collectorRuntime) {
-		runtime.getContainerStatsFn = func(ship string) structs.ContainerStats {
+		runtime.GetContainerStatsFn = func(ship string) structs.ContainerStats {
 			return structs.ContainerStats{MemoryUsage: uint64(len(ship))}
 		}
-		runtime.lusCodeFn = func(ship string) (string, error) {
+		runtime.LusCodeFn = func(ship string) (string, error) {
 			return ship + "-code", nil
 		}
-		runtime.getDeskFn = func(_ string, desk string, _ bool) (string, error) {
+		runtime.GetDeskFn = func(_ string, desk string, _ bool) (string, error) {
 			if desk == "groundseg" || desk == "penpai" {
 				return string(transition.ContainerStatusRunning), nil
 			}
@@ -296,8 +296,7 @@ func TestCollectUrbitRuntimeInputsForPiersCollectsAllShips(t *testing.T) {
 			"~sam": "net2",
 		},
 	}
-	inputs := collectUrbitRuntimeInputsForPiersForRuntime(
-		runtime,
+	inputs := collectUrbitRuntimeInputsForPiers(
 		map[string]string{"~zod": "Up 1 second", "~sam": "Exited"},
 		rtContext,
 		func(patp string) time.Time {
@@ -306,6 +305,7 @@ func TestCollectUrbitRuntimeInputsForPiersCollectsAllShips(t *testing.T) {
 			}
 			return time.Time{}
 		},
+		runtime,
 	)
 	if got := len(inputs); got != 2 {
 		t.Fatalf("expected two runtime inputs, got %d", got)
@@ -373,7 +373,7 @@ func TestConstructPierInfoWrapsRuntimeSnapshotError(t *testing.T) {
 	snapshotErr := errors.New("ship status unavailable")
 	_, err := constructPierInfo(
 		collectorRuntimeWith(func(runtime *collectorRuntime) {
-			runtime.getContainerShipStatusFn = func([]string) (map[string]string, error) {
+			runtime.GetContainerShipStatusFn = func([]string) (map[string]string, error) {
 				return nil, snapshotErr
 			}
 		}),
@@ -392,15 +392,15 @@ func TestConstructPierInfoWrapsRuntimeSnapshotError(t *testing.T) {
 }
 
 func TestGetStartramServicesWrapsRetrieveFailure(t *testing.T) {
-	original := startramServicesRetriever
 	retrieveErr := errors.New("service unavailable")
-	startramServicesRetriever = func() (structs.StartramRetrieve, error) {
-		return structs.StartramRetrieve{}, retrieveErr
-	}
-	t.Cleanup(func() {
-		startramServicesRetriever = original
-	})
-	err := GetStartramServices()
+	err := getStartramServices(
+		collectorRuntimeWith(func(runtime *collectorRuntime) {
+			runtime.StartramServicesRetrieverFn = func() (structs.StartramRetrieve, error) {
+				return structs.StartramRetrieve{}, retrieveErr
+			}
+		},
+		),
+	)
 	if err == nil {
 		t.Fatal("expected error from startram service retrieval")
 	}

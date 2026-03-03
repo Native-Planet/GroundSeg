@@ -1,0 +1,241 @@
+{
+  "assessments": {
+    "design_coherence": 50.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Runtime dependency wiring is spread across large function-pointer bags and repeated merge logic (`goseg/docker/orchestration/runtime_ops.go`, `goseg/docker/orchestration/runtime_core.go`, `goseg/broadcast/collectors/collectors_runtime.go`, `goseg/docker/orchestration/container/netdata.go`).",
+        "System concerns are mixed in broad modules that combine state management, shell/process orchestration, filesystem mutation, and metrics collection (`goseg/system/system.go`, `goseg/system/disk.go`, `goseg/system/wifi.go`).",
+        "Multiple packages rely on mutable singleton-like globals for runtime behavior (`goseg/logger/logger.go`, `goseg/session/session.go`, `goseg/config/version.go`), increasing hidden coupling and lifecycle sensitivity."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_sprawl",
+      "summary": "Runtime composition relies on oversized function-field bags and manual field copying, creating structural drift risk.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/broadcast/collectors/collectors_runtime.go",
+        "goseg/docker/orchestration/container/netdata.go"
+      ],
+      "evidence": [
+        "`Runtime*Ops` in `runtime_ops.go` defines many nested structs of function pointers and default builders, then `runtime_core.go` manually reprojects selected fields into narrower runtimes.",
+        "`collectorRuntime` and `NetdataRuntime` repeat the same pattern: large callback structs plus custom merge/require helpers.",
+        "Adding/changing one dependency requires synchronized edits in multiple runtime bundles and wrappers, indicating weak abstraction leverage."
+      ],
+      "suggestion": "Refactor to bounded interfaces per workflow (e.g., lifecycle, image metadata, config persistence) and inject cohesive service objects instead of broad callback bags; generate or centralize wiring to remove manual field projection.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_runtime_composition"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "manual_merge_pattern_duplication",
+      "summary": "Default/override merge and dependency-guard logic is duplicated across modules with inconsistent shape.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/docker/network/network.go",
+        "goseg/broadcast/collectors/collectors_runtime.go",
+        "goseg/docker/orchestration/container/netdata.go"
+      ],
+      "evidence": [
+        "`withWiFiRuntime`, `NewNetworkRuntimeWith`, and `mergeCollector*Runtime` each implement ad-hoc nil/zero override merging.",
+        "`NetdataRuntime` has multiple overlapping `require*` methods (`requireConfigWriter`, `requireCopyDependency`) that repeat the same dependency checks and error semantics.",
+        "The repeated hand-rolled merge/guard style increases maintenance overhead and inconsistency when dependencies evolve."
+      ],
+      "suggestion": "Adopt a single option-validation pattern (constructor + validate) reused across runtime structs, and collapse duplicate dependency checks into one canonical validator per runtime.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_runtime_composition"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "system_package_boundary_blur",
+      "summary": "The `system` layer mixes unrelated operational domains, reducing clear ownership boundaries.",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/system/disk.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`system.go` combines host metrics, NP box provisioning behavior, and cron job mutation.",
+        "`disk.go` combines SMART health evaluation, filesystem formatting/fstab mutation, and tmp symlink relocation logic.",
+        "`wifi.go` combines command execution adapters, radio/network control, long-running state loops, and global runtime state management."
+      ],
+      "suggestion": "Split `system` into focused submodules/services (e.g., host_metrics, storage_provisioning, wifi_runtime, maintenance_tasks) and expose a thin orchestrator API to reduce multi-responsibility files.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "blurred_domain_boundaries"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "global_state_lifecycle_coupling",
+      "summary": "Mutable process-wide state is used as a primary design mechanism, creating hidden coupling and order-dependent behavior.",
+      "related_files": [
+        "goseg/logger/logger.go",
+        "goseg/session/session.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`logger.go` keeps global mutable initialization state (`LogPath`, `loggerInitState`, `loggerInitErr`, sink globals) and mutates global zap logger in `InitializeWithRuntime`.",
+        "`session.go` stores active runtime/session state in package globals with mutable replacement APIs (`active`, `SetLogstreamRuntime`, `SetClientManager`).",
+        "`version.go` uses mutable package globals (`versionStore`, HTTP client, retry policy) altered via setters, making behavior context-dependent across callers/tests."
+      ],
+      "suggestion": "Move mutable runtime state into explicit service instances created in composition root; pass those services via constructors/interfaces rather than package globals.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_state"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_registry_split_brain",
+      "summary": "Transition handling logic is fragmented across parallel maps/builders, increasing drift risk between event routing and state reduction.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`rectify.go` defines multiple reducer maps (`urbitTransitionReducers`, `newShipTransitionReducers`, `systemTransitionReducers`, `startramTransitionReducers`) plus routing maps.",
+        "`urbit_operations_runtime.go` defines a separate transition runner map and many per-transition step builders for related transition types.",
+        "Transition additions require changes in multiple registries/locations, so coherence depends on manual synchronization."
+      ],
+      "suggestion": "Define a single declarative transition registry (type -> command handler -> reducer metadata) used by both workflow execution and broadcast reduction, with invariant tests that verify registry completeness.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_transition_metadata"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 1,
+    "dimension_coverage": 1.0,
+    "evidence_density": 0.6,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 13.51,
+    "dimensions_with_findings": 1
+  },
+  "review_scope": {
+    "reviewed_files_count": 37,
+    "successful_batch_count": 1,
+    "full_sweep_included": false,
+    "total_files": 371,
+    "imported_dimensions": [
+      "design_coherence"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/auth/token_service.go",
+    "goseg/click/backup/service.go",
+    "goseg/docker/orchestration/container/netdata.go",
+    "goseg/docker/orchestration/runtime_core.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/leak/handler_protocol.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/backupsvc/service_test.go",
+    "goseg/broadcast/collectors/collectors_runtime.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/config/version.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger.go",
+    "goseg/logger/logger_test.go",
+    "goseg/main_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/rectify/rectify.go",
+    "goseg/session/session.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/system/disk.go",
+    "goseg/system/disk_test.go",
+    "goseg/system/system.go",
+    "goseg/system/wifi.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260302_235803",
+    "created_at": "2026-03-02T23:59:18+00:00",
+    "batch_count": 1,
+    "batch_indexes": [
+      1
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "333ff432d2890c7812fe7c5f769dcac4da26b302e0f410edff2a65c8dbf81fe7"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "design_coherence"
+    ],
+    "imported_dimensions": [
+      "design_coherence"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

@@ -123,9 +123,9 @@ func OldLogsCleanerWithContext(ctx context.Context) error {
 }
 
 func runLogCleanupCycle() error {
-	files, err := ioutil.ReadDir(logger.LogPath)
+	files, err := ioutil.ReadDir(logger.LogPath())
 	if err != nil {
-		return fmt.Errorf("read logs directory %q: %w", logger.LogPath, err)
+		return fmt.Errorf("read logs directory %q: %w", logger.LogPath(), err)
 	}
 	var splitErrs []error
 	for _, file := range files {
@@ -137,7 +137,7 @@ func runLogCleanupCycle() error {
 		if !matched {
 			continue
 		}
-		fullName := fmt.Sprintf("%s%s", logger.LogPath, fn)
+		fullName := fmt.Sprintf("%s%s", logger.LogPath(), fn)
 		if err := splitLogFile(fullName); err != nil {
 			splitErrs = append(splitErrs, fmt.Errorf("split legacy logfile %s: %w", fn, err))
 			continue
@@ -146,7 +146,7 @@ func runLogCleanupCycle() error {
 			splitErrs = append(splitErrs, fmt.Errorf("remove legacy logfile %s: %w", fn, err))
 		}
 	}
-	if err := keepMostRecentFiles(logger.LogPath); err != nil {
+	if err := keepMostRecentFiles(logger.LogPath()); err != nil {
 		splitErrs = append(splitErrs, fmt.Errorf("clear old logs: %w", err))
 	}
 	return errors.Join(splitErrs...)
@@ -384,7 +384,7 @@ func splitLogFile(inputFile string) error {
 				}
 			}
 
-			outputFileName := fmt.Sprintf("%s%s-part-%d.log", logger.LogPath, baseName, partNumber)
+			outputFileName := fmt.Sprintf("%s%s-part-%d.log", logger.LogPath(), baseName, partNumber)
 			chunkFile, err = os.Create(outputFileName)
 			if err != nil {
 				return fmt.Errorf("create split log file %s: %w", outputFileName, err)

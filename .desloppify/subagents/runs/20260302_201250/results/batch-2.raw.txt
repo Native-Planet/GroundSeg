@@ -1,0 +1,97 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.6
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "goseg/docker/orchestration/runtime_ops.go defines many embedded function-bag structs (`Runtime*Ops`) and default builders, while goseg/docker/orchestration/runtime_docker.go re-declares overlapping wiring logic in `newDockerRuntime`, `urbitRuntimeFromConfig`, and `wireguardRuntimeFromConfig` instead of using one composition path.",
+        "goseg/startuporchestrator/startup_orchestrator.go and goseg/docker/orchestration/runtime_ops.go both use large nil-checked callback bags with manual merge/override flows (`withDefaults` and `defaultRuntime*`) that add orchestration layers without reducing behavior branching.",
+        "goseg/importer/importer.go mixes package-level mutable callback vars with an `importerRuntime` callback bag, and goseg/broadcast/collectors/collectors.go adds another callback-bag runtime with panic-on-missing behavior; seams are inconsistent and increase indirection for the same dependency-injection goal."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 71.0,
+        "indirection_cost": 63.0,
+        "interface_honesty": 69.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicated_runtime_seam_wiring",
+      "summary": "Runtime dependency seams are duplicated across orchestration layers, increasing indirection without new policy value.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_docker.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines a broad `Runtime*Ops` abstraction tree and default constructors (`defaultRuntimeContainerOps`, `defaultRuntimeUrbit`, `defaultRuntimeSnapshot`).",
+        "`runtime_docker.go` repeats overlapping dependency wiring in `newDockerRuntime`, `urbitRuntimeFromConfig`, and `wireguardRuntimeFromConfig` instead of composing directly from the same defaults.",
+        "Methods like `WireguardRuntime.WriteWgConf` still perform repeated nil-guard checks at call time, indicating the abstraction does not guarantee required capabilities once constructed."
+      ],
+      "suggestion": "Unify orchestration runtime construction behind one builder path that materializes validated capability groups once (e.g., container, config, filesystem, wireguard), and remove duplicate per-runtime wiring in `runtime_docker.go` by composing from that builder.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fragmented_dependency_injection_model"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "mixed_injection_styles_hide_dependencies",
+      "summary": "Modules mix global mutable seams and runtime structs, obscuring true dependency boundaries.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`importer.go` uses package-level function variables (`shipworkflowWaitForBootCodeFn`, `dockerDeleteContainerFn`, etc.) alongside `importerRuntime` callback fields for the same unit.",
+        "`collectors.go` uses a separate runtime bag plus package globals (`startramServicesRetriever`) and panics for missing callbacks, creating a different contract style from importer.",
+        "`wifi.go` has singleton-style globals (`defaultWiFiService`, `defaultWiFiRadio`) while also exposing `wifiRuntime` overrides, introducing another seam strategy in the same codebase."
+      ],
+      "suggestion": "Standardize on one DI style per subsystem (prefer explicit runtime structs passed into constructors) and remove package-level mutable callback globals; keep globals only for immutable constants/state and inject behavior via typed runtime dependencies.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_dependency_injection_model"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_contracts_are_optional_at_callsite",
+      "summary": "Function-bag abstractions expose optional callbacks that fail late, weakening interface honesty.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`startup_orchestrator.go` builds startup steps from descriptors and handles missing callbacks dynamically (`requiredInitCallback`, `runStartupSubsystem`), so contract validity is deferred to execution time.",
+        "`wireguard.go` checks for missing runtime callbacks (`BasePathFn`, `GetLatestContainerInfoFn`, `ReadFileFn`, `CopyFileToVolumeFn`) inside operational methods, producing runtime errors rather than constructor-time validation.",
+        "`importer.go` has `ensureInitializedForInit`/`ensureForWorkflow` guards and panic wrappers (`swapSettings`, `startramSettings`), which indicates the runtime type itself does not encode required vs optional capabilities."
+      ],
+      "suggestion": "Split runtime bags into smaller role-specific interfaces/structs with constructor-time validation and explicit required fields, so operation methods can assume valid contracts and remove repeated nil checks and panic fallbacks.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_dependency_injection_model"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Dependency injection evolved independently per subsystem (globals, function bags, and descriptor-driven callbacks), creating parallel abstraction styles.",
+      "Construction-time validation is inconsistent, so operational code compensates with repeated nil checks and fallback logic."
+    ],
+    "likely_symptoms": [
+      "duplicated_runtime_seam_wiring",
+      "runtime_contracts_are_optional_at_callsite"
+    ],
+    "possible_false_positives": []
+  }
+}

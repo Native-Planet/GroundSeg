@@ -65,15 +65,15 @@ func RemoveFromAuthMap(tokenID string, fromAuthorized bool) {
 
 func (store *sessionStore) AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) error {
 	if token == nil {
-		return fmt.Errorf("Can't add nil token to authmap")
+		return fmt.Errorf("add token to authmap: token is nil")
 	}
 	if conn == nil {
-		return fmt.Errorf("Can't add nil session to authmap")
+		return fmt.Errorf("add token to authmap: session is nil")
 	}
 	tokenStr := token["token"]
 	tokenID := token["id"]
 	if tokenStr == "" || tokenID == "" {
-		return fmt.Errorf("Can't add token with empty id or token value to authmap")
+		return fmt.Errorf("add token to authmap: token id or value is empty")
 	}
 
 	hashed := store.hashToken(tokenStr)
@@ -130,7 +130,7 @@ func persistAuthorizedSession(tokenID, hash, created string) error {
 		Created: created,
 	}
 	if err := config.UpdateConfTyped(config.WithAuthorizedSession(tokenID, sessionRecord)); err != nil {
-		return fmt.Errorf("Error adding session: %w", err)
+		return fmt.Errorf("adding authorized session %s: %w", tokenID, err)
 	}
 	return nil
 }
@@ -141,7 +141,7 @@ func persistUnauthorizedSession(tokenID, hash, created string) error {
 		Created: created,
 	}
 	if err := config.UpdateConfTyped(config.WithUnauthorizedSession(tokenID, sessionRecord)); err != nil {
-		return fmt.Errorf("Error adding session: %w", err)
+		return fmt.Errorf("adding unauthorized session %s: %w", tokenID, err)
 	}
 	return nil
 }

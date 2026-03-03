@@ -23,8 +23,8 @@ func TestConfPatchRegistryMatchesPatchStructFields(t *testing.T) {
 	}
 
 	missing := []string{}
-	for i := 0; i < fields.NumField(); i++ {
-		name := fields.Field(i).Name
+	observed := collectConfPatchFieldNames(fields)
+	for name := range observed {
 		if _, ok := registered[name]; !ok {
 			missing = append(missing, name)
 		}
@@ -33,6 +33,21 @@ func TestConfPatchRegistryMatchesPatchStructFields(t *testing.T) {
 		sort.Strings(missing)
 		t.Fatalf("confPatchRegistry missing %d fields: %s", len(missing), strings.Join(missing, ", "))
 	}
+}
+
+func collectConfPatchFieldNames(typ reflect.Type) map[string]struct{} {
+	fields := make(map[string]struct{})
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if field.Anonymous && field.Type.Kind() == reflect.Struct {
+			for name := range collectConfPatchFieldNames(field.Type) {
+				fields[name] = struct{}{}
+			}
+			continue
+		}
+		fields[field.Name] = struct{}{}
+	}
+	return fields
 }
 
 func TestBuildConfPatchByKeyRejectsDuplicateKeys(t *testing.T) {
@@ -57,20 +72,18 @@ func TestBuildConfigPatchSupportsKnownAndUnsupportedKeys(t *testing.T) {
 }
 
 func TestApplyConfPatchMergesAuthorizedSessions(t *testing.T) {
-	initial := structs.SysConfig{
-		Sessions: struct {
-			Authorized   map[string]structs.SessionInfo `json:"authorized"`
-			Unauthorized map[string]structs.SessionInfo `json:"unauthorized"`
-		}{
-			Authorized: map[string]structs.SessionInfo{
-				"existing": {Hash: "existing"},
-			},
-			Unauthorized: nil,
+	initial := structs.SysConfig{}
+	initial.Sessions = structs.AuthSessionBag{
+		Authorized: map[string]structs.SessionInfo{
+			"existing": {Hash: "existing"},
 		},
+		Unauthorized: nil,
 	}
 	patch := &ConfPatch{
-		AuthorizedSessions: map[string]structs.SessionInfo{
-			"added": {Hash: "added"},
+		AuthSessionPatch: AuthSessionPatch{
+			AuthorizedSessions: map[string]structs.SessionInfo{
+				"added": {Hash: "added"},
+			},
 		},
 	}
 	applyConfPatch(&initial, patch)

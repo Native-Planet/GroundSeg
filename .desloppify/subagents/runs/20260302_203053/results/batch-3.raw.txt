@@ -1,0 +1,109 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action identifiers are duplicated across modules (`actions.Action*` constants in `goseg/protocol/actions/actions.go` and string literals in `contracts.ActionContractBindings` in `goseg/protocol/contracts/contracts.go`), creating parallel boundary definitions.",
+        "`buildUploadActionContracts` in `goseg/protocol/actions/actions.go` indexes a map by expected action constants without presence checks, so registry drift yields zero-value contracts instead of an explicit contract-validation failure.",
+        "`contracts.ValidateActionContractBindings()` exists but is not invoked by the action-contract initialization path; `ensureActionContractsInitialized` instead panics on first access if initialization fails.",
+        "README quality-gate text marks `goseg/protocol/actions/actions.go` and `goseg/protocol/contracts/contracts.go` as governed by `Runtime Contract Gate`, but the documented targeted checks are upload/startram-specific and do not describe C2C contract-compatibility checks despite C2C being in the shared registry."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_action_source_of_truth",
+      "summary": "Action contract boundary is split across duplicated literals in actions and contracts packages.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`actions.go` defines `ActionUploadOpenEndpoint`, `ActionUploadReset`, and `ActionC2CConnect` constants while `contracts.go` separately defines `ActionContractBindings` with raw string actions (`open-endpoint`, `reset`, `connect`).",
+        "No compile-time linkage enforces that action constants and binding strings remain synchronized."
+      ],
+      "suggestion": "Make `contracts.ActionContractBindings` the only source of action tokens and generate/derive action enums and namespace-specific accessors from it (or invert ownership so `contracts` imports strongly typed action constants), eliminating duplicated string definitions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_registry_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_contract_assembly_missing_guardrails",
+      "summary": "Upload contract assembly silently accepts missing bindings via zero-value map lookups.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`buildUploadActionContracts` builds `byAction` and then reads `byAction[ActionUploadOpenEndpoint]` and `byAction[ActionUploadReset]` without checking key existence.",
+        "If `ActionContractBindings` drifts (rename/remove action), `UploadActionContract` entries can contain empty `ActionContract` data rather than failing contract initialization explicitly."
+      ],
+      "suggestion": "Change `buildUploadActionContracts` to return `([]UploadActionContract, error)` and validate required actions exist before construction; fail initialization with explicit errors tied to missing namespace/action bindings.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_registry_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_validation_not_enforced_at_boundary",
+      "summary": "Contract registry validation is defined but not enforced in the runtime initialization path.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go",
+        "goseg/protocol/actions/actions.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`contracts.ValidateActionContractBindings()` performs structural checks (missing descriptors, duplicates) but is never called by `initializeActionContracts`.",
+        "`ensureActionContractsInitialized` panics on init error, so invalid contract state is discovered lazily at first use instead of at a deterministic startup/validation boundary.",
+        "README describes governance and CI policy around contract surfaces, but runtime code does not enforce this validation contract directly."
+      ],
+      "suggestion": "Call `ValidateActionContractBindings()` as part of action-contract initialization (or startup boot checks) and return typed validation errors instead of panic-based discovery, so governance contracts are enforced before serving traffic.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_registry_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "governance_scope_mismatch_for_c2c_contracts",
+      "summary": "Documented quality-gate scope emphasizes upload/startram while shared contract registry also governs C2C.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/contracts.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "README backend gate references targeted checks for upload branch matrix, upload dispatch parity, and startram masked-error semantics.",
+        "Both `contracts.go` and `actions.go` include C2C action contracts (`ActionNamespaceC2C`, `C2CConnectAction`, `C2CActionContract*` APIs), but no C2C-specific compatibility check is documented in the same governance section."
+      ],
+      "suggestion": "Either narrow the documented contract-governance claim to explicitly exclude C2C, or extend the contract gate/tests to include C2C action contract compatibility checks so docs and enforced boundary policy match.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_registry_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance is split between documentation claims and partially enforced runtime/registry mechanics.",
+      "Action contract ownership is fragmented across packages, producing drift-prone parallel declarations."
+    ],
+    "likely_symptoms": [
+      "upload_contract_assembly_missing_guardrails",
+      "contract_validation_not_enforced_at_boundary",
+      "governance_scope_mismatch_for_c2c_contracts"
+    ],
+    "possible_false_positives": []
+  }
+}

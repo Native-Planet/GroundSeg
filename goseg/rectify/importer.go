@@ -25,7 +25,7 @@ func ImportShipTransitionHandlerWithContext(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case event := <-events.ImportShipTransitions():
+		case event := <-events.DefaultEventRuntime().ImportShipTransitions():
 			if err := broadcast.ApplyBroadcastMutation(true, func(current *structs.AuthBroadcast) {
 				uploadStruct := current.Upload
 				switch transition.UploadTransitionType(event.Type) {

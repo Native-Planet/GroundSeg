@@ -20,16 +20,25 @@ func testLlamaRuntime(dockerDir string) dockerRuntime {
 			WriteFileFn: func(string, []byte, os.FileMode) error { return nil },
 		},
 		containerOps: RuntimeContainerOps{
-			StopContainerByNameFn:  func(string) error { return nil },
-			StartContainerFn:       func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
-			UpdateContainerStateFn: func(string, structs.ContainerState) {},
-			AddOrGetNetworkFn:      func(string) (string, error) { return "default", nil },
+			RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
+				StopContainerByNameFn: func(string) error { return nil },
+				StartContainerFn:      func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+				CreateContainerFn:     nil,
+			},
+			RuntimeContainerStateOps: RuntimeContainerStateOps{
+				UpdateContainerStateFn: func(string, structs.ContainerState) {},
+			},
+			RuntimeContainerNetworkOps: RuntimeContainerNetworkOps{
+				AddOrGetNetworkFn: func(string) (string, error) { return "default", nil },
+			},
 		},
 		configOps: RuntimeSnapshotOps{
 			ConfFn: func() structs.SysConfig { return structs.SysConfig{} },
 		},
 		urbitOps: RuntimeUrbitOps{
-			UrbitConfAllFn: func() map[string]structs.UrbitDocker { return map[string]structs.UrbitDocker{} },
+			RuntimeUrbitConfigOps: RuntimeUrbitConfigOps{
+				UrbitConfAllFn: func() map[string]structs.UrbitDocker { return map[string]structs.UrbitDocker{} },
+			},
 		},
 		volumeOps: RuntimeVolumeOps{
 			VolumeExistsFn: func(string) (bool, error) { return false, nil },
@@ -43,7 +52,7 @@ func TestLoadLlamaDisabledNoop(t *testing.T) {
 
 	rt := testLlamaRuntime(t.TempDir())
 	rt.configOps.ConfFn = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiAllow: false}
+		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: false}}
 	}
 	rt.containerOps.StopContainerByNameFn = func(string) error {
 		stopped = true
@@ -73,7 +82,12 @@ func TestLoadLlamaStartsAndUpdatesState(t *testing.T) {
 
 	rt := testLlamaRuntime(t.TempDir())
 	rt.configOps.ConfFn = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiAllow: true, PenpaiRunning: false}
+		return structs.SysConfig{
+			PenpaiConfig: structs.PenpaiConfig{
+				PenpaiAllow:   true,
+				PenpaiRunning: false,
+			},
+		}
 	}
 	rt.containerOps.StopContainerByNameFn = func(name string) error {
 		stoppedName = name
@@ -105,7 +119,12 @@ func TestLoadLlamaStartsAndUpdatesState(t *testing.T) {
 func TestLoadLlamaStartError(t *testing.T) {
 	rt := testLlamaRuntime(t.TempDir())
 	rt.configOps.ConfFn = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiAllow: true, PenpaiRunning: true}
+		return structs.SysConfig{
+			PenpaiConfig: structs.PenpaiConfig{
+				PenpaiAllow:   true,
+				PenpaiRunning: true,
+			},
+		}
 	}
 	rt.containerOps.StartContainerFn = func(string, string) (structs.ContainerState, error) {
 		return structs.ContainerState{}, errors.New("start failed")
@@ -157,10 +176,14 @@ func TestLlamaApiContainerConfBuildsExpectedConfig(t *testing.T) {
 
 	rt.configOps.ConfFn = func() structs.SysConfig {
 		return structs.SysConfig{
-			Piers:        []string{"~zod", "~bus"},
-			PenpaiActive: "phi.gguf",
-			PenpaiModels: []structs.Penpai{
-				{ModelName: "phi.gguf", ModelUrl: "https://models.example/phi.gguf"},
+			ConnectivityConfig: structs.ConnectivityConfig{
+				Piers: []string{"~zod", "~bus"},
+			},
+			PenpaiConfig: structs.PenpaiConfig{
+				PenpaiActive: "phi.gguf",
+				PenpaiModels: []structs.Penpai{
+					{ModelName: "phi.gguf", ModelUrl: "https://models.example/phi.gguf"},
+				},
 			},
 		}
 	}
@@ -201,8 +224,10 @@ func TestLlamaApiContainerConfErrorsWhenActiveModelMissing(t *testing.T) {
 	rt.fileOps.WriteFileFn = func(string, []byte, os.FileMode) error { return nil }
 	rt.configOps.ConfFn = func() structs.SysConfig {
 		return structs.SysConfig{
-			PenpaiActive: "missing-model",
-			PenpaiModels: []structs.Penpai{{ModelName: "other-model", ModelUrl: "url"}},
+			PenpaiConfig: structs.PenpaiConfig{
+				PenpaiActive: "missing-model",
+				PenpaiModels: []structs.Penpai{{ModelName: "other-model", ModelUrl: "url"}},
+			},
 		}
 	}
 

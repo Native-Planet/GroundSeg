@@ -19,7 +19,7 @@ func collectImportTransitions(timeout time.Duration) []structs.UploadTransition 
 	defer timer.Stop()
 	for {
 		select {
-		case evt := <-events.ImportShipTransitions():
+		case evt := <-events.DefaultEventRuntime().ImportShipTransitions():
 			capturedEvents = append(capturedEvents, evt)
 		case <-timer.C:
 			return capturedEvents

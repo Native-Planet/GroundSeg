@@ -33,6 +33,8 @@ upload_handler_changed=0
 upload_service_changed=0
 startram_errors_changed=0
 protocol_actions_changed=0
+protocol_contracts_changed=0
+startram_contracts_changed=0
 if changed "goseg/handler/ws/upload.go"; then
   upload_handler_changed=1
 fi
@@ -45,8 +47,13 @@ fi
 if changed "goseg/protocol/actions/actions.go"; then
   protocol_actions_changed=1
 fi
-
-if [[ ${upload_handler_changed} -eq 0 && ${upload_service_changed} -eq 0 && ${startram_errors_changed} -eq 0 && ${protocol_actions_changed} -eq 0 ]]; then
+if changed "goseg/protocol/contracts/protocol_contracts.go"; then
+  protocol_contracts_changed=1
+fi
+if changed "goseg/protocol/contracts/startram_contracts.go"; then
+  startram_contracts_changed=1
+fi
+if [[ ${upload_handler_changed} -eq 0 && ${upload_service_changed} -eq 0 && ${startram_errors_changed} -eq 0 && ${protocol_actions_changed} -eq 0 && ${protocol_contracts_changed} -eq 0 && ${startram_contracts_changed} -eq 0 ]]; then
   echo "Runtime contract surfaces unchanged; contract gate passed."
   exit 0
 fi
@@ -79,6 +86,13 @@ if [[ ${protocol_actions_changed} -eq 1 ]] && ! changed "goseg/protocol/actions/
   exit 1
 fi
 
+if [[ (${protocol_contracts_changed} -eq 1 || ${startram_contracts_changed} -eq 1) ]] && ! changed "goseg/protocol/contracts/contracts_test.go"; then
+  echo "Protocol contract catalog contract violation:"
+  echo "  protocol contract descriptors changed without goseg/protocol/contracts/contracts_test.go update."
+  echo "Required coverage: registry health and descriptor invariants."
+  exit 1
+fi
+
 echo "Runtime contract files changed with matching tests. Running targeted contract suites."
 cd goseg
 
@@ -86,3 +100,6 @@ go test ./handler/ws -run 'TestUploadHandlerBranchMatrix|TestUploadHandlerDispat
 go test ./uploadsvc -run 'TestExecutorDispatchTableParityAcrossSupportedActions|TestExecutorSupportedActionsMatchesContract|TestExecutorReturnsUnsupportedActionError' -count=1
 go test ./startram -run 'TestWrapAPIConnectionErrorRedactsUpstreamDetailsAndPreservesCause|TestWrapAPIConnectionErrorRetainsStableMessageWithoutPubkey' -count=1
 go test ./protocol/actions -run 'TestParseUploadActionRejectsUnknown|TestSupportedUploadActionsMatchesContract|TestSupportedC2CActionsMatchesContract' -count=1
+  if [[ ${protocol_contracts_changed} -eq 1 || ${startram_contracts_changed} -eq 1 ]]; then
+  go test ./protocol/contracts -run 'TestContractCatalogHasLifecycleMetadata|TestContractLifecyclePolicyDeclaredPerContract|TestActionContractBindingsHaveActiveDescriptors|TestActionContractBindingsAreDeterministicallyOrdered' -count=1
+fi

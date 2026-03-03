@@ -47,7 +47,9 @@ func TestUpdateNetdataConfWritesChannelData(t *testing.T) {
 	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
 	confForNetdata = func() structs.SysConfig {
-		return structs.SysConfig{UpdateBranch: "beta"}
+		conf := structs.SysConfig{}
+		conf.UpdateBranch = "beta"
+		return conf
 	}
 	getVersionChannelForNetdata = func() structs.Channel {
 		return structs.Channel{

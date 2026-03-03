@@ -1,0 +1,86 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 76.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/contracts.go initializes global registries at import time (`contractRegistryInitErr = initContractRegistry()` and `init()` panic on error), so contract metadata mistakes can crash all importing modules before runtime wiring.",
+        "The same registry file mixes protocol action contracts (`protocol.actions.upload.*`, `protocol.actions.c2c.*`) with StarTram error contracts (`startram.errors.api-connection`), creating one cross-subsystem hub for unrelated boundaries.",
+        "README.md states governance across multiple files/packages (`contracts.go`, `actions.go`, `startram/errors.go`) but contracts.go still exports raw wire tokens (`ActionUploadOpenEndpoint`, `ActionC2CConnect`) and string-based lookup (`ActionContractDescriptor(namespace, action string)`), allowing bypass of descriptor-ID based governance."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "import_time_registry_panic_coupling",
+      "summary": "Contract catalog validation runs at import time and can panic the process across modules.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "contracts.go computes `contractRegistryInitErr = initContractRegistry()` as a package-global side effect and `init()` panics if non-nil.",
+        "README documents contract governance as a quality gate concern, but this implementation enforces correctness via boot-time crash instead of explicit startup validation boundaries."
+      ],
+      "suggestion": "Replace import-time registry construction with explicit startup initialization (or lazy once-init returning errors) and require callers to handle a returned contract-registry error at composition boundaries.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_contract_governance_enforcement"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "cross_subsystem_contract_hub",
+      "summary": "A single contract registry file owns both protocol-action and StarTram error contracts.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "contracts.go defines IDs for upload/C2C actions and StarTram API connection error in one `entries` catalog.",
+        "README describes separate governance surfaces across `goseg/protocol/actions/actions.go` and `goseg/startram/errors.go`, indicating distinct module boundaries that are currently centralized in one shared hub."
+      ],
+      "suggestion": "Split registry ownership by subsystem (e.g., per-package contract declarations with shared schema types only in `contracts`), then compose a federated catalog through explicit registration APIs to reduce hub-module blast radius.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_ownership_blur"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "descriptor_governance_is_bypassable",
+      "summary": "Runtime APIs still accept raw namespace/action strings, weakening documented contract governance.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "contracts.go exports raw action token constants and a stringly API `ActionContractDescriptor(namespace, action string)`.",
+        "README requires descriptor-centric compatibility governance across modules, but raw string entry points let callers avoid descriptor IDs and type-safe bindings."
+      ],
+      "suggestion": "Promote `ContractID`/`ActionContractBinding` as the only public lookup path (typed namespace/action or ID-only APIs), and deprecate raw string lookup to enforce cross-module contract compatibility policy consistently.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_contract_governance_enforcement"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance policy is documented as cross-module contract discipline, but runtime enforcement relies on implicit globals and string-based access rather than explicit boundary APIs.",
+      "Ownership of contract declarations is centralized beyond schema concerns, turning `contracts` into a subsystem hub."
+    ],
+    "likely_symptoms": [
+      "cross_subsystem_contract_hub",
+      "descriptor_governance_is_bypassable"
+    ],
+    "possible_false_positives": []
+  }
+}

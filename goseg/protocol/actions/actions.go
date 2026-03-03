@@ -2,25 +2,26 @@ package actions
 
 import (
 	"fmt"
+	"sync"
 
 	"groundseg/protocol/contracts"
 )
 
 // Namespace groups action enums by transport domain.
-type Namespace string
+type Namespace = contracts.ActionNamespace
 
 const (
-	NamespaceUpload Namespace = "upload"
-	NamespaceC2C    Namespace = "c2c"
+	NamespaceUpload Namespace = contracts.ActionNamespaceUpload
+	NamespaceC2C    Namespace = contracts.ActionNamespaceC2C
 )
 
 // Action is a transport action contract token.
 type Action string
 
 const (
-	ActionUploadOpenEndpoint Action = "open-endpoint"
-	ActionUploadReset        Action = "reset"
-	ActionC2CConnect         Action = "connect"
+	ActionUploadOpenEndpoint Action = Action(contracts.ActionUploadOpenEndpoint)
+	ActionUploadReset        Action = Action(contracts.ActionUploadReset)
+	ActionC2CConnect         Action = Action(contracts.ActionC2CConnect)
 )
 
 // UploadPayload indicates which upload payload fragment an action expects.
@@ -32,13 +33,44 @@ const (
 )
 
 var (
-	uploadActionContracts = buildUploadActionContracts()
-	c2cActionContracts    = buildActionContractSlice(contracts.ActionNamespaceC2C)
+	actionContractsByNamespace map[Namespace][]ActionContract
+	uploadActionContracts      []UploadActionContract
+	c2cActionContracts         []ActionContract
+	actionsInitOnce            sync.Once
+	actionContractsInitErr     error
 )
 
-var actionContractsByNamespace = map[Namespace][]ActionContract{
-	NamespaceUpload: actionContractsFromUpload(uploadActionContracts),
-	NamespaceC2C:    c2cActionContracts,
+func ensureActionContractsInitialized() {
+	actionsInitOnce.Do(func() {
+		actionContractsInitErr = initializeActionContracts()
+	})
+	if actionContractsInitErr != nil {
+		panic(actionContractsInitErr)
+	}
+}
+
+func initializeActionContracts() error {
+	if err := contracts.ValidateActionContractBindings(); err != nil {
+		return fmt.Errorf("validate action contract bindings: %w", err)
+	}
+	uploadActions, err := buildActionContractSlice(contracts.ActionNamespaceUpload)
+	if err != nil {
+		return fmt.Errorf("initialize upload action contracts: %w", err)
+	}
+	c2cActions, err := buildActionContractSlice(contracts.ActionNamespaceC2C)
+	if err != nil {
+		return fmt.Errorf("initialize c2c action contracts: %w", err)
+	}
+	uploadActionContracts, err = buildUploadActionContracts(uploadActions)
+	if err != nil {
+		return fmt.Errorf("initialize upload action payload matrix: %w", err)
+	}
+	c2cActionContracts = c2cActions
+	actionContractsByNamespace = map[Namespace][]ActionContract{
+		NamespaceUpload: actionContractsFromUpload(uploadActionContracts),
+		NamespaceC2C:    c2cActionContracts,
+	}
+	return nil
 }
 
 // ActionMeta captures protocol action metadata used by protocol-aware dispatchers.
@@ -53,13 +85,13 @@ type ActionContract struct {
 	Contract    contracts.ContractDescriptor
 }
 
-func buildActionContractSlice(namespace contracts.ActionNamespace) []ActionContract {
-	contractBindings := contracts.ActionContractBindingsForNamespace(string(namespace))
+func buildActionContractSlice(namespace contracts.ActionNamespace) ([]ActionContract, error) {
+	contractBindings := contracts.ActionContractBindingsForNamespace(namespace)
 	contractInfos := make([]ActionContract, 0, len(contractBindings))
 	for _, binding := range contractBindings {
-		descriptor, ok := contracts.ActionContractDescriptor(string(binding.Namespace), binding.Action)
+		descriptor, ok := contracts.ActionContractFor(namespace, binding.Action)
 		if !ok {
-			panic(fmt.Sprintf("missing contract descriptor for %s:%s", binding.Namespace, binding.Action))
+			return nil, fmt.Errorf("missing contract descriptor for %s:%s", binding.Namespace, binding.Action)
 		}
 		contractInfos = append(contractInfos, ActionContract{
 			Action:      Action(binding.Action),
@@ -67,27 +99,34 @@ func buildActionContractSlice(namespace contracts.ActionNamespace) []ActionContr
 			Contract:    descriptor,
 		})
 	}
-	return contractInfos
+	return contractInfos, nil
 }
 
-func buildUploadActionContracts() []UploadActionContract {
-	uploadActions := buildActionContractSlice(contracts.ActionNamespaceUpload)
+func buildUploadActionContracts(uploadActions []ActionContract) ([]UploadActionContract, error) {
 	byAction := make(map[Action]ActionContract)
 	for _, contract := range uploadActions {
 		byAction[contract.Action] = contract
 	}
+	openEndpointContract, hasOpenEndpoint := byAction[ActionUploadOpenEndpoint]
+	if !hasOpenEndpoint {
+		return nil, fmt.Errorf("missing action contract binding for %q", ActionUploadOpenEndpoint)
+	}
+	resetContract, hasReset := byAction[ActionUploadReset]
+	if !hasReset {
+		return nil, fmt.Errorf("missing action contract binding for %q", ActionUploadReset)
+	}
 	return []UploadActionContract{
 		{
-			ActionContract:    byAction[ActionUploadOpenEndpoint],
+			ActionContract:    openEndpointContract,
 			RequiredPayloads:  UploadPayloadOpenEndpoint,
 			ForbiddenPayloads: UploadPayloadReset,
 		},
 		{
-			ActionContract:    byAction[ActionUploadReset],
+			ActionContract:    resetContract,
 			RequiredPayloads:  UploadPayloadReset,
 			ForbiddenPayloads: UploadPayloadOpenEndpoint,
 		},
-	}
+	}, nil
 }
 
 // UploadActionContract defines protocol-level upload action metadata and payload requirements.
@@ -163,12 +202,14 @@ func ActionMetas(namespace Namespace) []ActionMeta {
 }
 
 func UploadActionContracts() []UploadActionContract {
+	ensureActionContractsInitialized()
 	out := make([]UploadActionContract, len(uploadActionContracts))
 	copy(out, uploadActionContracts)
 	return out
 }
 
 func actionContractForAction(namespace Namespace, action Action) (ActionContract, bool) {
+	ensureActionContractsInitialized()
 	for _, contract := range actionContractsForNamespace(namespace) {
 		if contract.Action == action {
 			return contract, true
@@ -202,6 +243,7 @@ func isActionContractActive(namespace Namespace, version string, action Action) 
 }
 
 func UploadActionContractForAction(action Action) (UploadActionContract, bool) {
+	ensureActionContractsInitialized()
 	for _, contract := range uploadActionContracts {
 		if contract.Action == action {
 			return contract, true
@@ -241,6 +283,7 @@ func actionMetasForNamespace(namespace Namespace) []ActionMeta {
 }
 
 func actionContractsForNamespace(namespace Namespace) []ActionContract {
+	ensureActionContractsInitialized()
 	contractsForNamespace, ok := actionContractsByNamespace[namespace]
 	if !ok {
 		return nil
@@ -251,6 +294,7 @@ func actionContractsForNamespace(namespace Namespace) []ActionContract {
 }
 
 func C2CActionContracts() []ActionContract {
+	ensureActionContractsInitialized()
 	out := make([]ActionContract, len(c2cActionContracts))
 	copy(out, c2cActionContracts)
 	return out

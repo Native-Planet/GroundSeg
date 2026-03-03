@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
@@ -37,7 +38,9 @@ var (
 	walkForExporter                   = filepath.Walk
 	dockerDataForExporter             = defaults.DockerData
 	urbitConfForExporter              = config.UrbitConf
-	publishUrbitTransitionForExporter = events.PublishUrbitTransition
+	publishUrbitTransitionForExporter = func(ctx context.Context, transition structs.UrbitTransition) error {
+		return events.DefaultEventRuntime().PublishUrbitTransition(ctx, transition)
+	}
 	getShipStatusForExporter          = orchestration.GetShipStatus
 )
 
@@ -110,8 +113,8 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 	cleanup := func() {
 		RemoveContainerFromWhitelist(container)
-		publishUrbitTransitionForExporter(structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""})
-		publishUrbitTransitionForExporter(structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0})
+		publishUrbitTransitionForExporter(context.Background(), structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""})
+		publishUrbitTransitionForExporter(context.Background(), structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0})
 	}
 
 	var tokenData structs.WsTokenStruct
@@ -230,7 +233,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 		completedFiles++
 		progress := int(float64(completedFiles) / float64(totalFiles) * 100)
-		publishUrbitTransitionForExporter(structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: progress})
+		publishUrbitTransitionForExporter(context.Background(), structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: progress})
 		return nil
 	})
 	if err != nil {

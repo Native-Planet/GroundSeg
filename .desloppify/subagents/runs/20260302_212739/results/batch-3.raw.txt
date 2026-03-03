@@ -1,0 +1,72 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md defines contract-governance touchpoints and CI gate scope around `goseg/protocol/contracts/contracts.go`, `goseg/protocol/actions/actions.go`, and `goseg/startram/errors.go`.",
+        "`goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/contracts/startram_contracts.go` now contain concrete compatibility metadata (`IntroducedIn`, `Compatibility`, contract message payload) that are part of the same contract boundary.",
+        "README.md CI policy section lists path-aware gating targets that do not include either `protocol_contracts.go` or `startram_contracts.go`, creating a governance/runtime split for contract evolution."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_governance_path_drift",
+      "summary": "Governance docs point to legacy contract files while active contract descriptors live in sibling files",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README.md contract guidance says to define compatibility descriptors in `goseg/protocol/contracts/contracts.go` and startram masking in `goseg/startram/errors.go`.",
+        "Active descriptor entries with `ContractMetadata` are defined in `protocol_contracts.go` and `startram_contracts.go`, including IDs, versions, compatibility, and message shape.",
+        "This creates a split source of truth where contributors following README can miss the actual files that now carry contract boundary behavior."
+      ],
+      "suggestion": "Update README governance text to name the full contract catalog surface (`contracts.go` registry plus per-domain descriptor files like `protocol_contracts.go` and `startram_contracts.go`) and define a single canonical rule for where new descriptors must be added.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_boundary_source_of_truth_split"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "quality_gate_scope_excludes_active_contract_files",
+      "summary": "Declared CI contract gate scope omits files that now hold contract compatibility metadata",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README.md CI section documents Runtime Contract Gate path checks for a fixed set of files, including `goseg/protocol/contracts/contracts.go` but not `protocol_contracts.go` or `startram_contracts.go`.",
+        "Both omitted files contain contract IDs and compatibility/version metadata (`IntroducedIn`, `Compatibility`, and message contract fields), which are part of external contract behavior.",
+        "A contributor can change compatibility descriptors in these files without triggering the documented path-aware quality gate."
+      ],
+      "suggestion": "Expand the contract gate file matrix to include `goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/contracts/startram_contracts.go` (or switch to directory-level matching for `goseg/protocol/contracts/*.go`) so governance checks follow the real contract boundary.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_boundary_source_of_truth_split"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance and CI policy are anchored to an older, centralized contract-file model while runtime contract descriptors are now distributed across domain-specific files.",
+      "Quality-gate ownership is file-list based instead of boundary based, so architectural drift appears when contracts are decomposed."
+    ],
+    "likely_symptoms": [
+      "contract_governance_path_drift",
+      "quality_gate_scope_excludes_active_contract_files"
+    ],
+    "possible_false_positives": []
+  }
+}

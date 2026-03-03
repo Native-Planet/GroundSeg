@@ -17,13 +17,61 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	LogPath       string
-	sysLogSinkMu  sync.RWMutex
-	sysLogSink    logStreamSink = logStreamNoopSink{}
-	loggerInitMu  sync.Mutex
+type loggerRuntimeState struct {
+	initMu        sync.Mutex
 	loggerInitErr error
-)
+	loggerInitState loggerInitLifecycle
+
+	sysLogPath   string
+	pathMu       sync.RWMutex
+	sysLogSinkMu sync.RWMutex
+	sysLogSink   logStreamSink
+}
+
+var runtimeState = &loggerRuntimeState{
+	loggerInitState: loggerInitNotInitialized,
+	sysLogSink:      logStreamNoopSink{},
+}
+
+func getLoggerState() *loggerRuntimeState {
+	return runtimeState
+}
+
+func setLoggerPath(path string) {
+	state := getLoggerState()
+	state.pathMu.Lock()
+	defer state.pathMu.Unlock()
+	state.sysLogPath = path
+}
+
+func loggerPath() string {
+	state := getLoggerState()
+	state.pathMu.RLock()
+	defer state.pathMu.RUnlock()
+	return state.sysLogPath
+}
+
+func setLogstreamSink(runtime logStreamSink) {
+	state := getLoggerState()
+	state.sysLogSinkMu.Lock()
+	defer state.sysLogSinkMu.Unlock()
+	if runtime == nil {
+		state.sysLogSink = logStreamNoopSink{}
+		return
+	}
+	state.sysLogSink = runtime
+}
+
+func getLogstreamSink() logStreamSink {
+	state := getLoggerState()
+	state.sysLogSinkMu.RLock()
+	defer state.sysLogSinkMu.RUnlock()
+	sink := state.sysLogSink
+	if sink == nil {
+		return logStreamNoopSink{}
+	}
+	return sink
+}
 
 type loggerRuntime struct {
 	mkdirAllFn     func(string, os.FileMode) error
@@ -64,9 +112,46 @@ const (
 	loggerInitInitialized
 )
 
-var loggerInitState = loggerInitNotInitialized
-
 const loggerFallbackLogPath = "/tmp/groundseg-logs/"
+
+func LogPath() string {
+	return loggerPath()
+}
+
+func SetLogPath(path string) {
+	if path == "" {
+		path = loggerFallbackLogPath
+	}
+	setLoggerPath(path)
+}
+
+func loggerInitErrState() error {
+	state := getLoggerState()
+	state.initMu.Lock()
+	defer state.initMu.Unlock()
+	return state.loggerInitErr
+}
+
+func setLoggerInitErr(err error) {
+	state := getLoggerState()
+	state.initMu.Lock()
+	defer state.initMu.Unlock()
+	state.loggerInitErr = err
+}
+
+func loggerInitStateValue() loggerInitLifecycle {
+	state := getLoggerState()
+	state.initMu.Lock()
+	defer state.initMu.Unlock()
+	return state.loggerInitState
+}
+
+func setLoggerInitState(stateValue loggerInitLifecycle) {
+	state := getLoggerState()
+	state.initMu.Lock()
+	defer state.initMu.Unlock()
+	state.loggerInitState = stateValue
+}
 
 func printStartupBanner() {
 	fmt.Println("                                       !G#:\n                                   " +
@@ -123,13 +208,7 @@ func makeLoggerCore(level zapcore.Level) zapcore.Core {
 }
 
 func ConfigureLogstreamRuntime(runtime logStreamSink) {
-	sysLogSinkMu.Lock()
-	defer sysLogSinkMu.Unlock()
-	if runtime == nil {
-		sysLogSink = logStreamNoopSink{}
-		return
-	}
-	sysLogSink = runtime
+	setLogstreamSink(runtime)
 }
 
 func buildLogger(level zapcore.Level) *zap.Logger {
@@ -195,21 +274,9 @@ func (fw FileWriter) Sync() error {
 type ChanWriter struct{}
 
 func (cw ChanWriter) Write(p []byte) (n int, err error) {
-	sysLogSinkMu.RLock()
-	sink := sysLogSink
-	sysLogSinkMu.RUnlock()
+	sink := getLogstreamSink()
 	sink.PublishSystemLog(p)
 	return len(p), nil
-}
-
-func configureSystemLogSink(sink logStreamSink) {
-	sysLogSinkMu.Lock()
-	defer sysLogSinkMu.Unlock()
-	if sink == nil {
-		sysLogSink = logStreamNoopSink{}
-		return
-	}
-	sysLogSink = sink
 }
 
 func (cw ChanWriter) Sync() error {
@@ -223,27 +290,28 @@ func Initialize() error {
 
 func InitializeWithRuntime(runtime loggerRuntime) error {
 	runtime = sanitizeLoggerRuntime(runtime)
-	loggerInitMu.Lock()
-	defer loggerInitMu.Unlock()
-	switch loggerInitState {
+	state := getLoggerState()
+	state.initMu.Lock()
+	defer state.initMu.Unlock()
+	switch state.loggerInitState {
 	case loggerInitInitializing:
-		return loggerInitErr
+		return state.loggerInitErr
 	case loggerInitInitialized:
 		return nil
 	}
 
-	loggerInitState = loggerInitInitializing
-	loggerInitErr = nil
+	state.loggerInitState = loggerInitInitializing
+	state.loggerInitErr = nil
 	storagePath, err := resolveLoggerPath(runtime)
 	if err != nil {
-		loggerInitErr = err
+		state.loggerInitErr = err
 	} else {
-		LogPath = storagePath
+		setLoggerPath(storagePath)
 	}
-	if LogPath == "" {
-		LogPath = loggerFallbackLogPath
+	if LogPath() == "" {
+		SetLogPath(loggerFallbackLogPath)
 	}
-	err = runtime.mkdirAllFn(LogPath, 0755)
+	err = runtime.mkdirAllFn(LogPath(), 0755)
 	zap.ReplaceGlobals(buildLogger(loggerLevelFromArgs(os.Args[1:])))
 	printStartupBanner()
 	if err != nil {
@@ -252,22 +320,22 @@ func InitializeWithRuntime(runtime loggerRuntime) error {
 		fmt.Print("Please run GroundSeg as root!  \n    /) /)\n   ( . . )" +
 			"\n   (  >< )\n Love, Native Planet\n")
 		fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
-		LogPath = loggerFallbackLogPath
-		if mkErr := runtime.mkdirAllFn(LogPath, 0755); mkErr != nil {
+		SetLogPath(loggerFallbackLogPath)
+		if mkErr := runtime.mkdirAllFn(LogPath(), 0755); mkErr != nil {
 			fmt.Printf("Failed to create fallback log directory: %v\n", mkErr)
-			loggerInitErr = fmt.Errorf("log path fallback failed: %w", mkErr)
+			state.loggerInitErr = fmt.Errorf("log path fallback failed: %w", mkErr)
 		} else {
-			loggerInitErr = fmt.Errorf("configured log path unavailable, using fallback: %w", err)
+			state.loggerInitErr = fmt.Errorf("configured log path unavailable, using fallback: %w", err)
 		}
 	}
 	zap.L().Info("Starting GroundSeg")
 	zap.L().Info("Urbit is love <3")
-	if loggerInitErr == nil {
-		loggerInitState = loggerInitInitialized
+	if state.loggerInitErr == nil {
+		state.loggerInitState = loggerInitInitialized
 	} else {
-		loggerInitState = loggerInitNotInitialized
+		state.loggerInitState = loggerInitNotInitialized
 	}
-	return loggerInitErr
+	return state.loggerInitErr
 }
 
 func SysLogfile() string {
@@ -276,7 +344,7 @@ func SysLogfile() string {
 	count := 0
 	for {
 		// check if y-m-part-n.log exists
-		fn := fmt.Sprintf("%s%s-part-%v.log", LogPath, curMonthYear, count)
+		fn := fmt.Sprintf("%s%s-part-%v.log", LogPath(), curMonthYear, count)
 		// file doesn't exist, use this
 		file, err := os.Stat(fn)
 		if err != nil {
@@ -302,7 +370,7 @@ func PrevSysLogfile() string {
 	} else {
 		month = month - 1
 	}
-	return fmt.Sprintf("%s%d-%02d.log", LogPath, year, month)
+	return fmt.Sprintf("%s%d-%02d.log", LogPath(), year, month)
 }
 
 func makeLogPath() (string, error) {

@@ -1,0 +1,86 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 81.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract metadata is authored separately per contract constant set in both files (e.g., multiple `*IntroducedIn` constants), creating many distributed boundary-version touchpoints for one protocol surface.",
+        "`startram_contracts.go` defines `APIConnectionErrorMessage` but the catalog entry hardcodes a second literal (`\"Unable to connect to API server\"`) instead of using the constant, introducing parallel truth sources for the exported contract message.",
+        "Contract identity naming is inconsistent across files and fields: ID/action uses `C2CConnectAction` while descriptor `Name` is `C2CActionConnect`, which weakens boundary predictability for cross-module consumers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "distributed_contract_version_sources",
+      "summary": "Contract versioning is fragmented across per-entry constants, increasing boundary drift risk.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines separate `*IntroducedIn` constants for each action and embeds them directly in catalog entries.",
+        "`startram_contracts.go` repeats the same pattern with its own `APIConnectionErrorIntroducedIn`, so version policy for one protocol surface is split across files."
+      ],
+      "suggestion": "Centralize contract lifecycle metadata behind a single registry or shared version policy helper in the contracts package, then reference that source from per-domain entry builders to avoid cross-file drift.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_metadata_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "duplicated_contract_message_source",
+      "summary": "StarTram error contract keeps duplicate message literals instead of one boundary source.",
+      "related_files": [
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "`startram_contracts.go` declares `APIConnectionErrorMessage` but does not use it in `ContractDescriptor.Message`.",
+        "The descriptor uses a hardcoded duplicate string, allowing exported message behavior to diverge from the declared constant without compile-time signal."
+      ],
+      "suggestion": "Use `APIConnectionErrorMessage` directly in the descriptor and apply the same single-source convention to message-bearing contracts package-wide.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_metadata_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_identity_naming_drift",
+      "summary": "Contract identity labels are not canonically aligned across ID/action/name fields.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "In `protocol_contracts.go`, the C2C entry uses `C2CConnectAction`/`ActionC2CConnect` but descriptor name `C2CActionConnect` (order differs).",
+        "`startram_contracts.go` uses consistent `APIConnectionError` naming, highlighting inconsistent identity conventions inside the same contracts subsystem."
+      ],
+      "suggestion": "Define and enforce a canonical naming rule for contract ID/token/descriptor fields (including ordering), then normalize existing entries and add a small test that validates naming coherence across catalog entries.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_metadata_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol contract definitions are authored as ad-hoc local literals/constants without a single canonical governance layer.",
+      "No package-level invariant checks enforce consistent identity and metadata encoding across contract catalogs."
+    ],
+    "likely_symptoms": [
+      "duplicated_contract_message_source",
+      "contract_identity_naming_drift"
+    ],
+    "possible_false_positives": []
+  }
+}

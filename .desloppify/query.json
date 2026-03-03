@@ -1,79 +1,105 @@
 {
   "command": "issues",
   "action": "show",
-  "number": 1,
+  "number": 2,
   "finding": {
-    "id": "review::.::holistic::abstraction_fitness::pass_through_facades_and_wide_function_bags::dedd268a",
-    "summary": "Multiple layers add indirection without policy, while very wide function-bag runtimes leak internal detail instead of defining crisp contracts.",
+    "id": "review::.::holistic::design_coherence::transition_registry_split_brain::de5a42a8",
+    "summary": "Transition handling logic is fragmented across parallel maps/builders, increasing drift risk between event routing and state reduction.",
     "detail": {
       "holistic": true,
-      "dimension": "abstraction_fitness",
+      "dimension": "design_coherence",
       "related_files": [
-        "goseg/auth/auth.go",
-        "goseg/docker/orchestration/orchestration.go",
-        "goseg/docker/orchestration/runtime_ops.go",
-        "goseg/docker/orchestration/container_bridge.go"
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
       ],
       "evidence": [
-        "`auth/auth.go` primarily forwards calls directly to other packages with minimal added behavior.",
-        "`orchestration/orchestration.go` mirrors lifecycle and registry methods through thin wrappers.",
-        "`runtime_ops.go` exposes broad dependency bags with many function fields, and `container_bridge.go` performs repetitive field-by-field adaptation."
+        "`rectify.go` defines multiple reducer maps (`urbitTransitionReducers`, `newShipTransitionReducers`, `systemTransitionReducers`, `startramTransitionReducers`) plus routing maps.",
+        "`urbit_operations_runtime.go` defines a separate transition runner map and many per-transition step builders for related transition types.",
+        "Transition additions require changes in multiple registries/locations, so coherence depends on manual synchronization."
       ],
-      "suggestion": "Collapse pure pass-through APIs, split runtime contracts by bounded workflow, and keep adapters at module edges where they enforce policy/translation rather than mirroring internals.",
+      "suggestion": "Define a single declarative transition registry (type -> command handler -> reducer metadata) used by both workflow execution and broadcast reduction, with invariant tests that verify registry completeness.",
       "reasoning": ""
     }
   },
-  "next_command": "desloppify resolve fixed \"review::.::holistic::abstraction_fitness::pass_through_facades_and_wide_function_bags::dedd268a\" --note \"<what you fixed>\"",
+  "next_command": "desloppify resolve fixed \"review::.::holistic::design_coherence::transition_registry_split_brain::de5a42a8\" --note \"<what you fixed>\"",
   "narrative": {
     "phase": "stagnation",
-    "headline": "Score plateaued at 76.9 for 5 scans. Abstraction fit (39.7%) is where the breakthrough is. (16 review findings \u2014 run `desloppify issues`)",
+    "headline": "Score plateaued at 77.1 for 5 scans. Abstraction fit (42.6%) is where the breakthrough is. (2 review findings \u2014 run `desloppify issues`)",
     "dimensions": {
       "lowest_dimensions": [
         {
           "name": "Abstraction fit",
-          "strict": 39.7,
-          "issues": 3,
+          "strict": 42.6,
+          "issues": 1,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
         },
         {
           "name": "Design coherence",
-          "strict": 42.0,
-          "issues": 5,
+          "strict": 50.0,
+          "issues": 1,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
         },
         {
-          "name": "Cross-module arch",
-          "strict": 43.6,
-          "issues": 6,
-          "impact": 0.0,
-          "subjective": true,
-          "impact_description": "re-review to improve"
+          "name": "Test health",
+          "strict": 55.0,
+          "issues": 256,
+          "impact": 0.0
         }
       ],
       "biggest_gap_dimensions": [],
       "stagnant_dimensions": [
         {
           "name": "File health",
-          "strict": 94.9,
+          "strict": 95.7,
           "stuck_scans": 5
         },
         {
           "name": "Code quality",
-          "strict": 90.7,
+          "strict": 93.5,
           "stuck_scans": 5
         },
         {
           "name": "Duplication",
-          "strict": 99.9,
+          "strict": 99.8,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Test health",
+          "strict": 55.0,
           "stuck_scans": 5
         },
         {
           "name": "Security",
           "strict": 100.0,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Error consistency",
+          "strict": 60.5,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Abstraction fit",
+          "strict": 42.6,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Cross-module arch",
+          "strict": 62.1,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Test strategy",
+          "strict": 59.0,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Design coherence",
+          "strict": 50.0,
           "stuck_scans": 5
         },
         {
@@ -157,8 +183,8 @@
       {
         "type": "issue_queue",
         "detector": "review",
-        "count": 16,
-        "description": "16 review findings need investigation \u2014 run `desloppify issues` to see the work queue",
+        "count": 2,
+        "description": "2 review findings need investigation \u2014 run `desloppify issues` to see the work queue",
         "command": "desloppify issues",
         "impact": 0.0,
         "dimension": "Unknown",
@@ -168,8 +194,8 @@
       {
         "type": "auto_fix",
         "detector": "unused",
-        "count": 190,
-        "description": "190 unused findings \u2014 run `desloppify fix unused-imports --dry-run` to preview, then apply",
+        "count": 210,
+        "description": "210 unused findings \u2014 run `desloppify fix unused-imports --dry-run` to preview, then apply",
         "command": "desloppify fix unused-imports --dry-run",
         "impact": 0.0,
         "dimension": "Code quality",
@@ -179,8 +205,8 @@
       {
         "type": "reorganize",
         "detector": "flat_dirs",
-        "count": 3,
-        "description": "3 flat_dirs findings \u2014 create subdirectories and use `desloppify move`",
+        "count": 4,
+        "description": "4 flat_dirs findings \u2014 create subdirectories and use `desloppify move`",
         "command": "desloppify show flat_dirs --status open",
         "impact": 0.0,
         "dimension": "Code quality",
@@ -190,8 +216,8 @@
       {
         "type": "refactor",
         "detector": "structural",
-        "count": 23,
-        "description": "23 structural findings \u2014 decompose large files \u2014 extract logic into focused modules",
+        "count": 22,
+        "description": "22 structural findings \u2014 decompose large files \u2014 extract logic into focused modules",
         "command": "desloppify show structural --status open",
         "impact": 0.0,
         "dimension": "File health",
@@ -212,8 +238,8 @@
       {
         "type": "refactor",
         "detector": "test_coverage",
-        "count": 92,
-        "description": "92 test_coverage findings \u2014 add tests for untested production modules \u2014 prioritize by import count",
+        "count": 118,
+        "description": "118 test_coverage findings \u2014 add tests for untested production modules \u2014 prioritize by import count",
         "command": "desloppify show test_coverage --status open",
         "impact": 0.0,
         "dimension": "Test health",
@@ -223,8 +249,8 @@
       {
         "type": "refactor",
         "detector": "signature",
-        "count": 17,
-        "description": "17 signature findings \u2014 consolidate inconsistent function signatures",
+        "count": 16,
+        "description": "16 signature findings \u2014 consolidate inconsistent function signatures",
         "command": "desloppify show signature --status open",
         "impact": 0.0,
         "dimension": "Unknown",
@@ -234,8 +260,8 @@
       {
         "type": "refactor",
         "detector": "responsibility_cohesion",
-        "count": 32,
-        "description": "32 responsibility_cohesion findings \u2014 split modules with too many responsibilities \u2014 extract focused sub-modules",
+        "count": 27,
+        "description": "27 responsibility_cohesion findings \u2014 split modules with too many responsibilities \u2014 extract focused sub-modules",
         "command": "desloppify show responsibility_cohesion --status open",
         "impact": 0.0,
         "dimension": "Code quality",
@@ -245,19 +271,19 @@
       {
         "type": "refactor",
         "detector": "boilerplate_duplication",
-        "count": 5,
-        "description": "5 boilerplate_duplication findings \u2014 extract shared boilerplate into reusable helpers or base classes",
+        "count": 7,
+        "description": "7 boilerplate_duplication findings \u2014 extract shared boilerplate into reusable helpers or base classes",
         "command": "desloppify show boilerplate_duplication --status open",
         "impact": 0.0,
         "dimension": "Duplication",
         "priority": 9,
-        "lane": "refactor_2"
+        "lane": "refactor_1"
       },
       {
         "type": "manual_fix",
         "detector": "subjective_review",
-        "count": 40,
-        "description": "40 files need design review \u2014 run design review with dimension templates",
+        "count": 138,
+        "description": "138 files need design review \u2014 run design review with dimension templates",
         "command": "desloppify fix review",
         "impact": 0.0,
         "dimension": "Test health",
@@ -267,9 +293,9 @@
     ],
     "strategy": {
       "fixer_leverage": {
-        "auto_fixable_count": 190,
-        "total_count": 455,
-        "coverage": 0.418,
+        "auto_fixable_count": 210,
+        "total_count": 553,
+        "coverage": 0.38,
         "impact_ratio": 0.0,
         "recommendation": "strong"
       },
@@ -278,7 +304,7 @@
           "actions": [
             2
           ],
-          "file_count": 123,
+          "file_count": 134,
           "total_impact": 0.0,
           "automation": "full",
           "run_first": true
@@ -287,7 +313,7 @@
           "actions": [
             3
           ],
-          "file_count": 3,
+          "file_count": 4,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
@@ -307,18 +333,10 @@
             5,
             7,
             8,
+            9,
             10
           ],
-          "file_count": 87,
-          "total_impact": 0.0,
-          "automation": "manual",
-          "run_first": false
-        },
-        "refactor_2": {
-          "actions": [
-            9
-          ],
-          "file_count": 5,
+          "file_count": 175,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
@@ -327,40 +345,40 @@
           "actions": [
             6
           ],
-          "file_count": 92,
+          "file_count": 118,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
         }
       },
       "can_parallelize": true,
-      "hint": "Run fixers first \u2014 they cover 42% of findings. Then 5 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 16 finding(s) \u2014 `desloppify issues`."
+      "hint": "Run fixers first \u2014 they cover 38% of findings. Then 4 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 2 finding(s) \u2014 `desloppify issues`."
     },
     "tools": {
       "fixers": [
         {
           "name": "unused-imports",
           "detector": "unused",
-          "open_count": 190,
+          "open_count": 210,
           "command": "desloppify fix unused-imports --dry-run"
         },
         {
           "name": "unused-vars",
           "detector": "unused",
-          "open_count": 190,
+          "open_count": 210,
           "command": "desloppify fix unused-vars --dry-run"
         },
         {
           "name": "unused-params",
           "detector": "unused",
-          "open_count": 190,
+          "open_count": 210,
           "command": "desloppify fix unused-params --dry-run"
         }
       ],
       "move": {
         "available": true,
         "relevant": true,
-        "reason": "3 flat directories",
+        "reason": "4 flat directories",
         "usage": "desloppify move <source> <dest> [--dry-run]"
       },
       "plan": {
@@ -384,9 +402,9 @@
     "milestone": null,
     "primary_action": {
       "command": "desloppify issues",
-      "description": "16 review findings need investigation \u2014 run `desloppify issues` to see the work queue"
+      "description": "2 review findings need investigation \u2014 run `desloppify issues` to see the work queue"
     },
-    "why_now": "Run fixers first \u2014 they cover 42% of findings. Then 5 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 16 finding(s) \u2014 `desloppify issues`.",
+    "why_now": "Run fixers first \u2014 they cover 38% of findings. Then 4 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 2 finding(s) \u2014 `desloppify issues`.",
     "verification_step": {
       "command": "desloppify scan",
       "reason": "revalidate after changes"
@@ -394,22 +412,22 @@
     "risk_flags": [],
     "strict_target": {
       "target": 95.0,
-      "current": 76.9,
-      "gap": 18.1,
+      "current": 77.1,
+      "gap": 17.9,
       "state": "below",
       "warning": null
     },
     "reminders": [
       {
         "type": "auto_fixers_available",
-        "message": "190 findings are auto-fixable. Run `desloppify fix unused-imports --dry-run`.",
+        "message": "210 findings are auto-fixable. Run `desloppify fix unused-imports --dry-run`.",
         "command": "desloppify fix unused-imports --dry-run",
         "priority": 2,
         "severity": "medium"
       }
     ],
     "reminder_history": {
-      "report_scores": 212,
+      "report_scores": 243,
       "feedback_nudge": 3,
       "stagnant_nudge": 8,
       "zone_classification": 3,

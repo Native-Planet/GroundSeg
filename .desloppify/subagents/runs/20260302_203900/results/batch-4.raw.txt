@@ -1,0 +1,133 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Runtime wiring is repeated in multiple places: `defaultRuntimeContainerOps` builds container/network/status seams in `goseg/docker/orchestration/runtime_ops.go:277-301`, while `newDockerRuntime` rebuilds near-identical lifecycle/state/network wiring in `goseg/docker/orchestration/runtime_docker.go:96-114`.",
+        "Facade layering is duplicated across APIs: `goseg/docker/orchestration/orchestration.go:83-238` repeatedly defines public validation wrappers plus runtime method pass-throughs; `goseg/session/session.go:222-316` repeats read/write guard + delegation methods for nearly every operation.",
+        "Single files carry multiple concern families: `goseg/system/wifi.go:17-368` combines global mutable state, process command orchestration, wifi device operations, and background-loop lifecycle; `goseg/rectify/rectify.go:112-480` combines four transition domains, reducer registries, event loops, and publish orchestration in one unit."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_runtime_wiring",
+      "summary": "Docker runtime seam composition is duplicated across constructors, creating parallel structures that must evolve in lockstep.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_docker.go",
+        "goseg/docker/orchestration/runtime_core.go"
+      ],
+      "evidence": [
+        "`defaultRuntimeContainerOps` in `runtime_ops.go:277-301` wires Start/Stop/Create/Restart/Delete, state accessors, AddOrGetNetwork, and status callbacks.",
+        "`newDockerRuntime` in `runtime_docker.go:96-114` independently rebuilds the same lifecycle/state/network wiring instead of reusing a shared composition point.",
+        "`runtime_core.go:133-149` already centralizes runtime assembly (`NewRuntimeWithDependencies`), but `newDockerRuntime` bypasses that path, leaving two runtime-shape sources."
+      ],
+      "suggestion": "Converge runtime construction on one composition pipeline (for example, build from `NewRuntimeWithDependencies` and adapt only truly extra ops), then delete duplicate wiring blocks.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "pass_through_facade_sprawl",
+      "summary": "Large pass-through facade layers add structural noise without adding distinct policy boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/orchestration.go",
+        "goseg/session/session.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`orchestration.go:83-238` repeats a pattern of tiny exported wrappers plus matching runtime methods that mostly forward to `lifecycleRuntime`.",
+        "`session.go:222-316` repeats near-identical `state := runtime.stateForX(); nil checks; delegate` methods for each store action.",
+        "`wifi.go:322-368` adds another forwarding layer (`ListWifiSSIDs` -> `listSSIDsForRuntime` -> `newWiFiService(runtime).listSSIDs`) across many operations."
+      ],
+      "suggestion": "Collapse trivial forwarding layers by exposing one coherent boundary per subsystem (either direct runtime object methods or package-level functions), and keep wrappers only where they enforce real policy/translation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "data_mapping_copy_paste_structures",
+      "summary": "Repeated hand-written mapping/update structures indicate missing data-driven primitives.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`config_update_schema.go` defines a very large `confPatchRegistry` of repetitive parse/has/apply closures (e.g., `:102+`), with many entries differing only by field/key bindings.",
+        "`urbit_operations_runtime.go:292-479` contains many similarly shaped step builders that repeat load/update/restart control flow with small field-level differences.",
+        "`rectify.go` repeats transition-router registrations with identical constructor shape for several startram events (`:348-372`)."
+      ],
+      "suggestion": "Introduce declarative descriptors (field metadata + generic update/apply templates) and table-driven transition step templates to remove repeated control skeletons and centralize variation in data.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_data_driven_transition_model"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "god_file_event_orchestration",
+      "summary": "Event-processing files combine parsing, auth/state mutation, routing, and transport concerns in single units.",
+      "related_files": [
+        "goseg/leak/handler.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`leak/handler.go` bundles protocol decode (`decodePacketPayload`), error taxonomy/reporting, auth/session mutation (`urbitLogin`/`urbitLogout`), and queue transport send logic (`sendToLeakChannel`) in one file.",
+        "`rectify/rectify.go` mixes runtime dependency setup, reducer maps, event-loop infrastructure, and transition publishing for urbit/new-ship/system/startram domains.",
+        "Both files require understanding multiple lifecycle concerns to safely modify any one path, increasing blast radius for change."
+      ],
+      "suggestion": "Split by responsibility: isolate protocol decode/validation, state transition reducers, and transport/publish adapters into separate modules with explicit interfaces; keep orchestration files as thin coordinators.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "event_pipeline_concern_mixing"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "system_module_concern_mixing",
+      "summary": "System utilities mix low-level shell/filesystem side effects with stateful service lifecycle logic in broad files.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/system/disk.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "`wifi.go` includes package-global state (`WifiInfo`, `Device`, loop cancellation), shell command execution (`nmcli`, `sysctl`), and long-running loop management.",
+        "`disk.go` combines fstab parsing/reconciliation, filesystem provisioning, tmp symlink migration, SMART health heuristics, and command seam globals in one file.",
+        "`system.go` mixes telemetry reads, cron management, script deployment, and generic command execution helper."
+      ],
+      "suggestion": "Refactor `system` into focused packages/modules (state store, command adapter, provisioning, telemetry, scheduler) so each file owns one operational concern and exposes narrower APIs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "event_pipeline_concern_mixing"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime/test seam evolution favored additive wrappers over consolidation, producing parallel composition paths.",
+      "Transition-heavy domains lack shared declarative primitives, so behavior is copied as bespoke closures/builders.",
+      "Subsystem files grew around operational workflows without clear boundaries between protocol, state, and infrastructure concerns."
+    ],
+    "likely_symptoms": [
+      "duplicated_runtime_wiring",
+      "pass_through_facade_sprawl",
+      "data_mapping_copy_paste_structures"
+    ],
+    "possible_false_positives": []
+  }
+}

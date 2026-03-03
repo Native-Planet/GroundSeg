@@ -30,7 +30,9 @@ func TestHandleSystemTogglePenpaiFeature(t *testing.T) {
 	var patch *config.ConfPatch
 
 	deps := SystemDependencies{
-		Conf: func() structs.SysConfig { return structs.SysConfig{PenpaiAllow: true} },
+		Conf: func() structs.SysConfig {
+			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: true}}
+		},
 		StopContainerByName: func(name string) error {
 			stopped = append(stopped, name)
 			return nil
@@ -58,7 +60,9 @@ func TestHandleSystemTogglePenpaiFeature(t *testing.T) {
 	}
 
 	deps = SystemDependencies{
-		Conf: func() structs.SysConfig { return structs.SysConfig{PenpaiAllow: false} },
+		Conf: func() structs.SysConfig {
+			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: false}}
+		},
 		UpdateConfTyped: func(opts ...config.ConfUpdateOption) error {
 			p := &config.ConfPatch{}
 			for _, opt := range opts {
@@ -140,7 +144,9 @@ func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
 	toggleArg := ""
 	upgradeCount := 0
 	deps := SystemDependencies{
-		Conf:          func() structs.SysConfig { return structs.SysConfig{SwapFile: "/tmp/swapfile"} },
+		Conf: func() structs.SysConfig {
+			return structs.SysConfig{RuntimeConfig: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
+		},
 		ConfigureSwap: func(_ string, value int) error { configureCalls = append(configureCalls, value); return nil },
 		UpdateConfTyped: func(opts ...config.ConfUpdateOption) error {
 			p := &config.ConfPatch{}
@@ -190,8 +196,8 @@ func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
 	if err := HandleSystem([]byte(`{"payload":{"action":"wifi-toggle"}}`), deps); err != nil {
 		t.Fatalf("expected wifi-toggle to succeed: %v", err)
 	}
-	if toggleArg != system.Device {
-		t.Fatalf("expected toggle to use system.Device (%s), got %s", system.Device, toggleArg)
+	if toggleArg != system.WiFiDevice() {
+		t.Fatalf("expected toggle to use system.WiFiDevice (%s), got %s", system.WiFiDevice(), toggleArg)
 	}
 
 	if err := HandleSystem([]byte(`{"payload":{"action":"wifi-connect","ssid":"net","password":"pw"}}`), deps); err != nil {
@@ -250,7 +256,9 @@ func TestHandlePenpaiToggle(t *testing.T) {
 
 	deps := PenpaiDependencies{
 		Unmarshal: json.Unmarshal,
-		Conf:      func() structs.SysConfig { return structs.SysConfig{PenpaiRunning: true} },
+		Conf: func() structs.SysConfig {
+			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+		},
 		StopContainerByName: func(name string) error {
 			stopCalls++
 			return nil
@@ -286,7 +294,9 @@ func TestHandlePenpaiToggle(t *testing.T) {
 		t.Fatalf("expected running=false after first toggle, got %v", updatedRunning)
 	}
 
-	deps.Conf = func() structs.SysConfig { return structs.SysConfig{PenpaiRunning: false} }
+	deps.Conf = func() structs.SysConfig {
+		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: false}}
+	}
 	if err := HandlePenpai([]byte(`{"payload":{"action":"toggle"}}`), deps); err != nil {
 		t.Fatalf("expected second toggle to start container: %v", err)
 	}
@@ -302,8 +312,10 @@ func TestHandlePenpaiSetModel(t *testing.T) {
 	deleteCalls := 0
 	restarts := 0
 	deps := PenpaiDependencies{
-		Unmarshal:           json.Unmarshal,
-		Conf:                func() structs.SysConfig { return structs.SysConfig{PenpaiRunning: true} },
+		Unmarshal: json.Unmarshal,
+		Conf: func() structs.SysConfig {
+			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+		},
 		StopContainerByName: func(string) error { return nil },
 		StartContainerByName: func(_ string, _ string) (structs.ContainerState, error) {
 			restarts++
@@ -334,7 +346,9 @@ func TestHandlePenpaiSetModel(t *testing.T) {
 		t.Fatalf("expected restart when model set and running, got %d", restarts)
 	}
 
-	deps.Conf = func() structs.SysConfig { return structs.SysConfig{PenpaiRunning: false} }
+	deps.Conf = func() structs.SysConfig {
+		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: false}}
+	}
 	restarts = 0
 	if err := HandlePenpai([]byte(`{"payload":{"action":"set-model","model":"mistral"}}`), deps); err != nil {
 		t.Fatalf("expected set-model to succeed when not running: %v", err)
@@ -346,8 +360,10 @@ func TestHandlePenpaiSetModel(t *testing.T) {
 
 func TestHandlePenpaiSetCoresValidation(t *testing.T) {
 	deps := PenpaiDependencies{
-		Unmarshal:            json.Unmarshal,
-		Conf:                 func() structs.SysConfig { return structs.SysConfig{PenpaiRunning: true} },
+		Unmarshal: json.Unmarshal,
+		Conf: func() structs.SysConfig {
+			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+		},
 		StopContainerByName:  func(string) error { return nil },
 		StartContainerByName: func(_ string, _ string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
 		UpdateContainerState: func(string, structs.ContainerState) {},

@@ -8,7 +8,8 @@ import (
 )
 
 func TestBuildConfigUsesDefaultsAndVersionOverrides(t *testing.T) {
-	conf := structs.SysConfig{UpdateBranch: "canary"}
+	conf := structs.SysConfig{}
+	conf.UpdateBranch = "canary"
 	version := structs.Channel{
 		Wireguard: structs.VersionDetails{
 			Repo:        "wireguard.repo/example",
@@ -37,7 +38,8 @@ func TestBuildConfigUsesDefaultsAndVersionOverrides(t *testing.T) {
 }
 
 func TestBuildConfigCopiesDefaultSlices(t *testing.T) {
-	conf := structs.SysConfig{UpdateBranch: "stable"}
+	conf := structs.SysConfig{}
+	conf.UpdateBranch = "stable"
 	version := structs.Channel{
 		Wireguard: structs.VersionDetails{
 			Repo:        "wireguard.repo/example",

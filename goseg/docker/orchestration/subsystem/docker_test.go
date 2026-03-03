@@ -23,7 +23,7 @@ func testDockerRoutineRuntime() dockerRoutineRuntime {
 	rt := newDockerRoutineRuntime()
 	transitionOps := rt.transitionOps
 	transitionOps.GetContainerStateFn = func() map[string]structs.ContainerState { return map[string]structs.ContainerState{} }
-	transitionOps.UpdateContainerFn = func(string, structs.ContainerState) {}
+	transitionOps.UpdateContainerStateFn = func(string, structs.ContainerState) {}
 	transitionOps.StartContainerFn = func(string, string) (structs.ContainerState, error) {
 		return structs.ContainerState{}, nil
 	}
@@ -72,7 +72,7 @@ func TestMakeBroadcastWireguardStartTransitionUsesBroadcastTransition(t *testing
 			},
 		}
 	}
-	transitionOps.UpdateContainerFn = func(string, structs.ContainerState) {}
+	transitionOps.UpdateContainerStateFn = func(string, structs.ContainerState) {}
 	rt.transitionOps = transitionOps
 	rt.broadcastOps = dockerBroadcastOpsStub{
 		getBroadcastStateFn: func() structs.AuthBroadcast {
@@ -133,7 +133,7 @@ func TestMakeBroadcastNonWireguardOnlyBroadcasts(t *testing.T) {
 			},
 		}
 	}
-	transitionOps.UpdateContainerFn = func(string, structs.ContainerState) {}
+	transitionOps.UpdateContainerStateFn = func(string, structs.ContainerState) {}
 	rt.transitionOps = transitionOps
 	rt.broadcastOps = dockerBroadcastOpsStub{
 		getBroadcastStateFn: func() structs.AuthBroadcast { return structs.AuthBroadcast{} },

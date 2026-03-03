@@ -40,13 +40,11 @@ func TestGetSHA256(t *testing.T) {
 }
 
 func TestMergeConfigsNewInstallSetupAndSalt(t *testing.T) {
-	defaultCfg := structs.SysConfig{
-		Setup:       "complete",
-		EndpointUrl: "default.endpoint",
-	}
-	customCfg := structs.SysConfig{
-		PwHash: "",
-	}
+	defaultCfg := structs.SysConfig{}
+	defaultCfg.Setup = "complete"
+	defaultCfg.EndpointUrl = "default.endpoint"
+	customCfg := structs.SysConfig{}
+	customCfg.PwHash = ""
 
 	merged := mergeConfigs(defaultCfg, customCfg)
 	if merged.Setup != "start" {
@@ -58,8 +56,11 @@ func TestMergeConfigsNewInstallSetupAndSalt(t *testing.T) {
 }
 
 func TestMergeConfigsPrefersCustomEndpoint(t *testing.T) {
-	defaultCfg := structs.SysConfig{EndpointUrl: "default.endpoint"}
-	customCfg := structs.SysConfig{EndpointUrl: "custom.endpoint", PwHash: "hash"}
+	defaultCfg := structs.SysConfig{}
+	defaultCfg.EndpointUrl = "default.endpoint"
+	customCfg := structs.SysConfig{}
+	customCfg.EndpointUrl = "custom.endpoint"
+	customCfg.PwHash = "hash"
 
 	merged := mergeConfigs(defaultCfg, customCfg)
 	if merged.EndpointUrl != "custom.endpoint" {
@@ -68,44 +69,43 @@ func TestMergeConfigsPrefersCustomEndpoint(t *testing.T) {
 }
 
 func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing.T) {
-	defaultCfg := structs.SysConfig{
-		GracefulExit:   true,
-		Setup:          "complete",
-		LastKnownMDNS:  "default-mdns",
-		EndpointUrl:    "https://default.endpoint",
-		ApiVersion:     "v2",
-		NetCheck:       "default-netcheck",
-		UpdateMode:     "default-mode",
-		UpdateUrl:      "https://default-update",
-		UpdateBranch:   "main",
-		SwapVal:        99,
-		SwapFile:       "/default/swap",
-		KeyFile:        "/default/key",
-		DockerData:     "/default/docker-data",
-		WgOn:           true,
-		WgRegistered:   true,
-		UpdateInterval: 15,
-		C2cInterval:    2000,
-		GsVersion:      "v2.0",
-		CfgDir:         "/default/cfg",
-		BinHash:        "bin-default",
-		Pubkey:         "default-pub",
-		Privkey:        "default-priv",
-		PwHash:         "old-hash",
-		DiskWarning: map[string]structs.DiskWarning{
-			"data": {Eighty: true},
-		},
-		PenpaiModels: []structs.Penpai{
-			{ModelName: "default-a"},
-			{ModelName: "default-b"},
-		},
-		PenpaiActive:  "default-a",
-		Disable502:    true,
-		SnapTime:      14,
-		PenpaiAllow:   true,
-		PenpaiRunning: true,
-		PenpaiCores:   8,
+	defaultCfg := structs.SysConfig{}
+	defaultCfg.GracefulExit = true
+	defaultCfg.Setup = "complete"
+	defaultCfg.LastKnownMDNS = "default-mdns"
+	defaultCfg.EndpointUrl = "https://default.endpoint"
+	defaultCfg.ApiVersion = "v2"
+	defaultCfg.NetCheck = "default-netcheck"
+	defaultCfg.UpdateMode = "default-mode"
+	defaultCfg.UpdateUrl = "https://default-update"
+	defaultCfg.UpdateBranch = "main"
+	defaultCfg.SwapVal = 99
+	defaultCfg.SwapFile = "/default/swap"
+	defaultCfg.KeyFile = "/default/key"
+	defaultCfg.DockerData = "/default/docker-data"
+	defaultCfg.WgOn = true
+	defaultCfg.WgRegistered = true
+	defaultCfg.UpdateInterval = 15
+	defaultCfg.C2cInterval = 2000
+	defaultCfg.GsVersion = "v2.0"
+	defaultCfg.CfgDir = "/default/cfg"
+	defaultCfg.BinHash = "bin-default"
+	defaultCfg.Pubkey = "default-pub"
+	defaultCfg.Privkey = "default-priv"
+	defaultCfg.PwHash = "old-hash"
+	defaultCfg.DiskWarning = map[string]structs.DiskWarning{
+		"data": {Eighty: true},
 	}
+	defaultCfg.PenpaiModels = []structs.Penpai{
+		{ModelName: "default-a"},
+		{ModelName: "default-b"},
+	}
+	defaultCfg.PenpaiActive = "default-a"
+	defaultCfg.Disable502 = true
+	defaultCfg.SnapTime = 14
+	defaultCfg.PenpaiAllow = true
+	defaultCfg.PenpaiRunning = true
+	defaultCfg.PenpaiCores = 8
 	defaultCfg.StartramSetReminder = struct {
 		One   bool `json:"one"`
 		Three bool `json:"three"`
@@ -131,10 +131,9 @@ func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing
 	}
 
 	// Ensure migration path is exercised and defaults are selected for empty custom fields.
-	customCfg := structs.SysConfig{
-		PwHash: "legacy-pwhash",
-		Salt:   "custom-salt",
-	}
+	customCfg := structs.SysConfig{}
+	customCfg.PwHash = "legacy-pwhash"
+	customCfg.Salt = "custom-salt"
 
 	merged := MergeConfigs(defaultCfg, customCfg)
 	if merged.Setup != "complete" {
@@ -185,39 +184,38 @@ func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing
 }
 
 func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
-	defaultCfg := structs.SysConfig{
-		GracefulExit:   true,
-		LastKnownMDNS:  "default-mdns",
-		Setup:          "default-setup",
-		EndpointUrl:    "https://default.endpoint",
-		ApiVersion:     "v2",
-		Piers:          []string{"default"},
-		NetCheck:       "default-netcheck",
-		UpdateMode:     "default-mode",
-		UpdateUrl:      "https://default-update",
-		UpdateBranch:   "default",
-		SwapVal:        10,
-		SwapFile:       "/default/swap",
-		KeyFile:        "/default/key",
-		DockerData:     "/default/docker",
-		WgOn:           true,
-		WgRegistered:   true,
-		C2cInterval:    1200,
-		GsVersion:      "default-gs",
-		CfgDir:         "/default/cfg",
-		UpdateInterval: 30,
-		BinHash:        "default-bin",
-		Pubkey:         "default-pub",
-		Privkey:        "default-priv",
-		PenpaiModels: []structs.Penpai{
-			{ModelName: "alpha"},
-			{ModelName: "beta"},
-		},
-		PenpaiActive: "alpha",
-		Disable502:   false,
-		SnapTime:     7,
-		PenpaiAllow:  true,
+	defaultCfg := structs.SysConfig{}
+	defaultCfg.GracefulExit = true
+	defaultCfg.LastKnownMDNS = "default-mdns"
+	defaultCfg.Setup = "default-setup"
+	defaultCfg.EndpointUrl = "https://default.endpoint"
+	defaultCfg.ApiVersion = "v2"
+	defaultCfg.Piers = []string{"default"}
+	defaultCfg.NetCheck = "default-netcheck"
+	defaultCfg.UpdateMode = "default-mode"
+	defaultCfg.UpdateUrl = "https://default-update"
+	defaultCfg.UpdateBranch = "default"
+	defaultCfg.SwapVal = 10
+	defaultCfg.SwapFile = "/default/swap"
+	defaultCfg.KeyFile = "/default/key"
+	defaultCfg.DockerData = "/default/docker"
+	defaultCfg.WgOn = true
+	defaultCfg.WgRegistered = true
+	defaultCfg.C2cInterval = 1200
+	defaultCfg.GsVersion = "default-gs"
+	defaultCfg.CfgDir = "/default/cfg"
+	defaultCfg.UpdateInterval = 30
+	defaultCfg.BinHash = "default-bin"
+	defaultCfg.Pubkey = "default-pub"
+	defaultCfg.Privkey = "default-priv"
+	defaultCfg.PenpaiModels = []structs.Penpai{
+		{ModelName: "alpha"},
+		{ModelName: "beta"},
 	}
+	defaultCfg.PenpaiActive = "alpha"
+	defaultCfg.Disable502 = false
+	defaultCfg.SnapTime = 7
+	defaultCfg.PenpaiAllow = true
 	defaultCfg.StartramSetReminder = struct {
 		One   bool `json:"one"`
 		Three bool `json:"three"`
@@ -245,51 +243,50 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 		Interval: "1m",
 	}
 
-	customCfg := structs.SysConfig{
-		GracefulExit:  false,
-		LastKnownMDNS: "custom-mdns",
-		Setup:         "custom-setup",
-		PwHash:        "present",
-		EndpointUrl:   "https://custom.endpoint",
-		ApiVersion:    "v10",
-		Piers:         []string{"a", "b", "c"},
-		NetCheck:      "custom-netcheck",
-		UpdateMode:    "poll",
-		UpdateUrl:     "https://custom-update",
-		UpdateBranch:  "stable",
-		SwapVal:       20,
-		SwapFile:      "/custom/swap",
-		KeyFile:       "/custom/key",
-		DockerData:    "/custom/docker",
-		WgOn:          false,
-		WgRegistered:  false,
-		Sessions: struct {
-			Authorized   map[string]structs.SessionInfo `json:"authorized"`
-			Unauthorized map[string]structs.SessionInfo `json:"unauthorized"`
-		}{
-			Authorized:   map[string]structs.SessionInfo{"custom": {Hash: "auth"}},
-			Unauthorized: map[string]structs.SessionInfo{"custom": {Hash: "unauth"}},
-		},
-		LinuxUpdates: struct {
-			Value    int    `json:"value"`
-			Interval string `json:"interval"`
-		}{Value: 2, Interval: "3m"},
-		C2cInterval:          3000,
-		GsVersion:            "v10",
-		CfgDir:               "/custom/cfg",
-		UpdateInterval:       60,
-		BinHash:              "custom-bin",
-		Pubkey:               "custom-pub",
-		Privkey:              "custom-priv",
-		PenpaiRunning:        true,
-		PenpaiCores:          4,
-		Salt:                 "custom-salt",
-		PenpaiAllow:          true,
-		PenpaiActive:         "beta",
-		Disable502:           true,
-		SnapTime:             42,
-		RemoteBackupPassword: "rpw",
+	customCfg := structs.SysConfig{}
+	customCfg.GracefulExit = false
+	customCfg.LastKnownMDNS = "custom-mdns"
+	customCfg.Setup = "custom-setup"
+	customCfg.PwHash = "present"
+	customCfg.EndpointUrl = "https://custom.endpoint"
+	customCfg.ApiVersion = "v10"
+	customCfg.Piers = []string{"a", "b", "c"}
+	customCfg.NetCheck = "custom-netcheck"
+	customCfg.UpdateMode = "poll"
+	customCfg.UpdateUrl = "https://custom-update"
+	customCfg.UpdateBranch = "stable"
+	customCfg.SwapVal = 20
+	customCfg.SwapFile = "/custom/swap"
+	customCfg.KeyFile = "/custom/key"
+	customCfg.DockerData = "/custom/docker"
+	customCfg.WgOn = false
+	customCfg.WgRegistered = false
+	customCfg.Sessions = structs.AuthSessionBag{
+		Authorized:   map[string]structs.SessionInfo{"custom": {Hash: "auth"}},
+		Unauthorized: map[string]structs.SessionInfo{"custom": {Hash: "unauth"}},
 	}
+	customCfg.LinuxUpdates = struct {
+		Value    int    `json:"value"`
+		Interval string `json:"interval"`
+	}{
+		Value:    2,
+		Interval: "3m",
+	}
+	customCfg.C2cInterval = 3000
+	customCfg.GsVersion = "v10"
+	customCfg.CfgDir = "/custom/cfg"
+	customCfg.UpdateInterval = 60
+	customCfg.BinHash = "custom-bin"
+	customCfg.Pubkey = "custom-pub"
+	customCfg.Privkey = "custom-priv"
+	customCfg.PenpaiRunning = true
+	customCfg.PenpaiCores = 4
+	customCfg.Salt = "custom-salt"
+	customCfg.PenpaiAllow = true
+	customCfg.PenpaiActive = "beta"
+	customCfg.Disable502 = true
+	customCfg.SnapTime = 42
+	customCfg.RemoteBackupPassword = "rpw"
 
 	merged := MergeConfigs(defaultCfg, customCfg)
 
@@ -393,7 +390,9 @@ type countingMerger struct {
 
 func (m *countingMerger) Merge(_ structs.SysConfig, _ structs.SysConfig) structs.SysConfig {
 	m.configMerged = true
-	return structs.SysConfig{Setup: "counted"}
+	cfg := structs.SysConfig{}
+	cfg.Setup = "counted"
+	return cfg
 }
 
 func TestMergeConfigsDelegatesToConfiguredMerger(t *testing.T) {
@@ -433,24 +432,22 @@ func TestMergeConfigsFallbackWhenMergerNilUsesDefaultMerger(t *testing.T) {
 
 	configMerger = nil
 
-	defaultConfig := structs.SysConfig{
-		GracefulExit:  true,
-		LastKnownMDNS: "default.mdns",
-		Setup:         "complete",
-		PwHash:        "default-hash",
-		EndpointUrl:   "https://default",
-		UpdateMode:    "poll",
-		PenpaiModels:  []structs.Penpai{{ModelName: "default-a"}},
-		PenpaiActive:  "default-a",
-	}
+	defaultConfig := structs.SysConfig{}
+	defaultConfig.GracefulExit = true
+	defaultConfig.LastKnownMDNS = "default.mdns"
+	defaultConfig.Setup = "complete"
+	defaultConfig.PwHash = "default-hash"
+	defaultConfig.EndpointUrl = "https://default"
+	defaultConfig.UpdateMode = "poll"
+	defaultConfig.PenpaiModels = []structs.Penpai{{ModelName: "default-a"}}
+	defaultConfig.PenpaiActive = "default-a"
 	defaultConfig.Sessions.Authorized = map[string]structs.SessionInfo{"default": {Hash: "hash"}}
 	defaultConfig.Sessions.Unauthorized = map[string]structs.SessionInfo{"default-unauth": {Hash: "hash"}}
 
-	customConfig := structs.SysConfig{
-		GracefulExit: false,
-		UpdateMode:   "",
-		PwHash:       "",
-	}
+	customConfig := structs.SysConfig{}
+	customConfig.GracefulExit = false
+	customConfig.UpdateMode = ""
+	customConfig.PwHash = ""
 
 	merged := MergeConfigs(defaultConfig, customConfig)
 	if merged.GracefulExit != true {
@@ -468,42 +465,41 @@ func TestMergeConfigsFallbackWhenMergerNilUsesDefaultMerger(t *testing.T) {
 }
 
 func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
-	defaultConfig := structs.SysConfig{
-		GracefulExit:   false,
-		LastKnownMDNS:  "default-mdns",
-		Setup:          "migrated",
-		PwHash:         "default-hash",
-		EndpointUrl:    "https://default-endpoint",
-		ApiVersion:     "1.0",
-		Piers:          []string{"default-pier"},
-		NetCheck:       "default-netcheck",
-		UpdateMode:     "default",
-		UpdateUrl:      "https://updates.example.com",
-		UpdateBranch:   "main",
-		SwapVal:        1,
-		SwapFile:       "/tmp/default-swap",
-		KeyFile:        "/tmp/default-key",
-		DockerData:     "default-docker",
-		WgOn:           false,
-		WgRegistered:   false,
-		DiskWarning:    map[string]structs.DiskWarning{"default": {Eighty: true}},
-		C2cInterval:    1000,
-		GsVersion:      "v1",
-		CfgDir:         "/default/cfg",
-		UpdateInterval: 20,
-		BinHash:        "default-bin",
-		Pubkey:         "default-pub",
-		Privkey:        "default-priv",
-		Salt:           "default-salt",
-		PenpaiAllow:    true,
-		PenpaiRunning:  false,
-		PenpaiCores:    4,
-		PenpaiModels:   []structs.Penpai{{ModelName: "mymodel"}},
-		PenpaiActive:   "mymodel",
-		DisableSlsa:    true,
-		Disable502:     true,
-		SnapTime:       12,
-	}
+	defaultConfig := structs.SysConfig{}
+	defaultConfig.GracefulExit = false
+	defaultConfig.LastKnownMDNS = "default-mdns"
+	defaultConfig.Setup = "migrated"
+	defaultConfig.PwHash = "default-hash"
+	defaultConfig.EndpointUrl = "https://default-endpoint"
+	defaultConfig.ApiVersion = "1.0"
+	defaultConfig.Piers = []string{"default-pier"}
+	defaultConfig.NetCheck = "default-netcheck"
+	defaultConfig.UpdateMode = "default"
+	defaultConfig.UpdateUrl = "https://updates.example.com"
+	defaultConfig.UpdateBranch = "main"
+	defaultConfig.SwapVal = 1
+	defaultConfig.SwapFile = "/tmp/default-swap"
+	defaultConfig.KeyFile = "/tmp/default-key"
+	defaultConfig.DockerData = "default-docker"
+	defaultConfig.WgOn = false
+	defaultConfig.WgRegistered = false
+	defaultConfig.DiskWarning = map[string]structs.DiskWarning{"default": {Eighty: true}}
+	defaultConfig.C2cInterval = 1000
+	defaultConfig.GsVersion = "v1"
+	defaultConfig.CfgDir = "/default/cfg"
+	defaultConfig.UpdateInterval = 20
+	defaultConfig.BinHash = "default-bin"
+	defaultConfig.Pubkey = "default-pub"
+	defaultConfig.Privkey = "default-priv"
+	defaultConfig.Salt = "default-salt"
+	defaultConfig.PenpaiAllow = true
+	defaultConfig.PenpaiRunning = false
+	defaultConfig.PenpaiCores = 4
+	defaultConfig.PenpaiModels = []structs.Penpai{{ModelName: "mymodel"}}
+	defaultConfig.PenpaiActive = "mymodel"
+	defaultConfig.DisableSlsa = true
+	defaultConfig.Disable502 = true
+	defaultConfig.SnapTime = 12
 	defaultConfig.Sessions.Authorized = map[string]structs.SessionInfo{"user": {Hash: "old"}}
 	defaultConfig.Sessions.Unauthorized = map[string]structs.SessionInfo{"anon": {Hash: "anon-old"}}
 	defaultConfig.LinuxUpdates = struct {
@@ -523,22 +519,21 @@ func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 		Seven: false,
 	}
 
-	customConfig := structs.SysConfig{
-		GracefulExit:  true,
-		LastKnownMDNS: "", // force default
-		EndpointUrl:   "https://custom-endpoint",
-		PwHash:        "", // triggers new install logic
-		SwapVal:       0,  // fallback to default
-		WgOn:          true,
-		WgRegistered:  true,
-		DiskWarning:   map[string]structs.DiskWarning{"custom": {}},
-		PenpaiAllow:   true,
-		PenpaiRunning: true,
-		PenpaiCores:   0,         // fallback
-		PenpaiModels:  nil,       // ignored
-		PenpaiActive:  "invalid", // should fallback
-		Disable502:    false,     // default should stay true
-	}
+	customConfig := structs.SysConfig{}
+	customConfig.GracefulExit = true
+	customConfig.LastKnownMDNS = "" // force default
+	customConfig.EndpointUrl = "https://custom-endpoint"
+	customConfig.PwHash = "" // triggers new install logic
+	customConfig.SwapVal = 0 // fallback to default
+	customConfig.WgOn = true
+	customConfig.WgRegistered = true
+	customConfig.DiskWarning = map[string]structs.DiskWarning{"custom": {}}
+	customConfig.PenpaiAllow = true
+	customConfig.PenpaiRunning = true
+	customConfig.PenpaiCores = 0          // fallback
+	customConfig.PenpaiModels = nil       // ignored
+	customConfig.PenpaiActive = "invalid" // should fallback
+	customConfig.Disable502 = false       // default should stay true
 	customConfig.StartramSetReminder = struct {
 		One   bool `json:"one"`
 		Three bool `json:"three"`

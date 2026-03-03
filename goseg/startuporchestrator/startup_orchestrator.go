@@ -43,85 +43,77 @@ type startupInitCallbackDescriptor struct {
 	name        string
 	callbackKey string
 	policy      startupSubsystemPolicy
-	builder     func(startupInitRuntime) startupInitCallbackFn
+}
+
+const (
+	callbackKeyInitializeConfig        = "initializeConfig"
+	callbackKeyInitializeAuth         = "initializeAuth"
+	callbackKeyInitializeRouter       = "initializeRouter"
+	callbackKeyInitializeSystemSupport = "initializeSystemSupport"
+	callbackKeyInitializeExporter     = "initializeExporter"
+	callbackKeyInitializeImporter     = "initializeImporter"
+	callbackKeyInitializeWiFi          = "initializeWiFi"
+	callbackKeyStartMDNSServer         = "startMDNSServer"
+	callbackKeyInitializeResolved      = "initializeResolved"
+	callbackKeyInitializeBroadcast     = "initializeBroadcast"
+	callbackKeyInitializeDocker        = "initializeDocker"
+	callbackKeyNetworkReachability     = "isNetworkReachable"
+	callbackKeyPrimeRekorKey          = "primeRekorKey"
+)
+
+func (runtime startupInitRuntime) callback(key string) startupInitCallbackFn {
+	switch key {
+	case callbackKeyInitializeConfig:
+		return runtime.initializeConfigFn
+	case callbackKeyInitializeAuth:
+		return runtime.initializeAuthFn
+	case callbackKeyInitializeRouter:
+		return runtime.initializeRouterFn
+	case callbackKeyInitializeSystemSupport:
+		return runtime.initializeSystemSupportFn
+	case callbackKeyInitializeExporter:
+		return runtime.initializeExporterFn
+	case callbackKeyInitializeImporter:
+		return runtime.initializeImporterFn
+	case callbackKeyInitializeWiFi:
+		return runtime.initializeWiFiFn
+	case callbackKeyStartMDNSServer:
+		return runtime.startMDNSServerFn
+	case callbackKeyInitializeResolved:
+		return runtime.initializeResolvedFn
+	case callbackKeyInitializeBroadcast:
+		return runtime.initializeBroadcastFn
+	case callbackKeyInitializeDocker:
+		return runtime.initializeDockerFn
+	case callbackKeyNetworkReachability:
+		return networkReachabilityCallback(runtime.networkReachabilityFn)
+	case callbackKeyPrimeRekorKey:
+		return runtime.primeRekorKeyFn
+	default:
+		return nil
+	}
 }
 
 var startupInitSubsystemDescriptors = []startupInitCallbackDescriptor{
-	{name: "initialize config subsystem", callbackKey: "initializeConfig", policy: startupSubsystemRequired, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeConfigFn
-	}},
-	{name: "initialize auth subsystem", callbackKey: "initializeAuth", policy: startupSubsystemRequired, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeAuthFn
-	}},
-	{name: "initialize router subsystem", callbackKey: "initializeRouter", policy: startupSubsystemRequired, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeRouterFn
-	}},
-	{name: "initialize system support subsystem", callbackKey: "initializeSystemSupport", policy: startupSubsystemRequired, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeSystemSupportFn
-	}},
-	{name: "initialize exporter subsystem", callbackKey: "initializeExporter", policy: startupSubsystemRequired, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeExporterFn
-	}},
-	{name: "initialize importer subsystem", callbackKey: "initializeImporter", policy: startupSubsystemRequired, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeImporterFn
-	}},
-	{name: "initialize wifi subsystem", callbackKey: "initializeWiFi", policy: startupSubsystemOptional, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeWiFiFn
-	}},
-	{name: "start mDNS server", callbackKey: "startMDNSServer", policy: startupSubsystemOptional, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.startMDNSServerFn
-	}},
-	{name: "enable systemd-resolved", callbackKey: "initializeResolved", policy: startupSubsystemOptional, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeResolvedFn
-	}},
-	{name: "initialize broadcast subsystem", callbackKey: "initializeBroadcast", policy: startupSubsystemRequired, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeBroadcastFn
-	}},
-	{name: "initialize docker subsystem", callbackKey: "initializeDocker", policy: startupSubsystemRequired, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.initializeDockerFn
-	}},
-	{name: "network reachability", callbackKey: "isNetworkReachable", policy: startupSubsystemOptional, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return networkReachabilityCallback(runtime.networkReachabilityFn)
-	}},
-	{name: "prime rekor key", callbackKey: "primeRekorKey", policy: startupSubsystemOptional, builder: func(runtime startupInitRuntime) startupInitCallbackFn {
-		return runtime.primeRekorKeyFn
-	}},
+	{name: "initialize config subsystem", callbackKey: callbackKeyInitializeConfig, policy: startupSubsystemRequired},
+	{name: "initialize auth subsystem", callbackKey: callbackKeyInitializeAuth, policy: startupSubsystemRequired},
+	{name: "initialize router subsystem", callbackKey: callbackKeyInitializeRouter, policy: startupSubsystemRequired},
+	{name: "initialize system support subsystem", callbackKey: callbackKeyInitializeSystemSupport, policy: startupSubsystemRequired},
+	{name: "initialize exporter subsystem", callbackKey: callbackKeyInitializeExporter, policy: startupSubsystemRequired},
+	{name: "initialize importer subsystem", callbackKey: callbackKeyInitializeImporter, policy: startupSubsystemRequired},
+	{name: "initialize wifi subsystem", callbackKey: callbackKeyInitializeWiFi, policy: startupSubsystemOptional},
+	{name: "start mDNS server", callbackKey: callbackKeyStartMDNSServer, policy: startupSubsystemOptional},
+	{name: "enable systemd-resolved", callbackKey: callbackKeyInitializeResolved, policy: startupSubsystemOptional},
+	{name: "initialize broadcast subsystem", callbackKey: callbackKeyInitializeBroadcast, policy: startupSubsystemRequired},
+	{name: "initialize docker subsystem", callbackKey: callbackKeyInitializeDocker, policy: startupSubsystemRequired},
+	{name: "network reachability", callbackKey: callbackKeyNetworkReachability, policy: startupSubsystemOptional},
+	{name: "prime rekor key", callbackKey: callbackKeyPrimeRekorKey, policy: startupSubsystemOptional},
 }
 
 type startupSubsystemStep struct {
 	name   string
 	policy startupSubsystemPolicy
 	initFn func() error
-}
-
-func startupSubsystemRequiredStep(name string, initFn func() error) startupSubsystemStep {
-	return startupSubsystemStep{
-		name:   name,
-		policy: startupSubsystemRequired,
-		initFn: initFn,
-	}
-}
-
-func startupSubsystemOptionalStep(name string, initFn func() error) startupSubsystemStep {
-	return startupSubsystemStep{
-		name:   name,
-		policy: startupSubsystemOptional,
-		initFn: initFn,
-	}
-}
-
-func startupSubsystemAction(name string, policy startupSubsystemPolicy, action func() error) startupSubsystemStep {
-	if action == nil {
-		return startupSubsystemStep{
-			name:   name,
-			policy: policy,
-		}
-	}
-	return startupSubsystemStep{
-		name:   name,
-		policy: policy,
-		initFn: action,
-	}
 }
 
 func runStartupSubsystem(step startupSubsystemStep) error {
@@ -171,17 +163,8 @@ type startupInitRuntime struct {
 	initializeResolvedFn      startupInitCallbackFn
 	networkReachabilityFn     func(string) bool
 	primeRekorKeyFn           startupInitCallbackFn
-	ConfigureSwapFn func(string, int) error
-	SetupTmpDirFn   func() error
-}
-
-func requiredInitCallback(name string, fn func() error) func() error {
-	return func() error {
-		if fn == nil {
-			return fmt.Errorf("%s callback is not configured", name)
-		}
-		return fn()
-	}
+	ConfigureSwapFn           func(string, int) error
+	SetupTmpDirFn             func() error
 }
 
 func networkReachabilityCallback(checkFn func(string) bool) startupInitCallbackFn {
@@ -218,7 +201,7 @@ func startupInitDefaultRuntime() startupInitRuntime {
 		},
 		initializeResolvedFn:  func() error { return system.EnableResolved() },
 		networkReachabilityFn: config.NetCheck,
-		primeRekorKeyFn: func() error { routines.PrimeRekorKey(); return nil },
+		primeRekorKeyFn:       func() error { routines.PrimeRekorKey(); return nil },
 		ConfigureSwapFn: func(swapFile string, swapVal int) error {
 			return system.ConfigureSwap(swapFile, swapVal)
 		},
@@ -278,16 +261,19 @@ func (runtime startupInitRuntime) withDefaults(opts startupInitRuntime) startupI
 func (runtime startupInitRuntime) initSubsystems() []startupSubsystemStep {
 	subsystemSteps := make([]startupSubsystemStep, 0, len(startupInitSubsystemDescriptors))
 	for _, descriptor := range startupInitSubsystemDescriptors {
-		var stepFn func() error
-		switch descriptor.policy {
-		case startupSubsystemRequired:
-			stepFn = requiredInitCallback(descriptor.name, descriptor.builder(runtime))
-		default:
-			stepFn = descriptor.builder(runtime)
-		}
-		subsystemSteps = append(subsystemSteps, startupSubsystemAction(descriptor.name, descriptor.policy, stepFn))
+		subsystemSteps = append(subsystemSteps, startupSubsystemStep{
+			name:   descriptor.name,
+			policy: descriptor.policy,
+			initFn: runtime.callback(descriptor.callbackKey),
+		})
 	}
-	subsystemSteps = append(subsystemSteps, startupSubsystemOptionalStep("swap configuration", runtime.swapInitializationStep()))
+	if runtime.swapInitializationStep() != nil {
+		subsystemSteps = append(subsystemSteps, startupSubsystemStep{
+			name:   "swap configuration",
+			policy: startupSubsystemOptional,
+			initFn: runtime.swapInitializationStep(),
+		})
+	}
 	return subsystemSteps
 }
 
@@ -297,7 +283,7 @@ func (runtime startupInitRuntime) validate() []string {
 		if descriptor.policy != startupSubsystemRequired {
 			continue
 		}
-		if descriptor.builder(runtime) == nil {
+		if runtime.callback(descriptor.callbackKey) == nil {
 			missing = append(missing, descriptor.callbackKey)
 		}
 	}
@@ -331,7 +317,7 @@ func defaultStartupRuntime() StartupRuntime {
 	return StartupRuntime{
 		startupInitRuntime: startupInitDefaultRuntime(),
 		startupBootstrapRuntime: startupBootstrapRuntime{
-			StartConfigEventLoopFn:   func(ctx context.Context) error { return config.StartConfEventLoop(ctx, system.ConfChannel) },
+			StartConfigEventLoopFn:   func(ctx context.Context) error { return config.StartConfEventLoop(ctx, system.ConfChannel()) },
 			StartStartupContainersFn: func(bool) {},
 		},
 	}
@@ -344,14 +330,14 @@ func (runtime StartupRuntime) withDefaults(opts StartupRuntime) StartupRuntime {
 }
 
 type startBackgroundServicesRuntime struct {
-	startVersionSubsystemFn     func(context.Context) error
-	startDockerSubsystemFn      func(context.Context) error
-	startUrbitTransitionFn      func(context.Context) error
-	startSystemTransitionFn     func(context.Context) error
-	startNewShipTransitionFn    func(context.Context) error
-	startImportShipTransitionFn func(context.Context) error
-	startRectifyUrbitFn         func(context.Context) error
-	syncRetrieveFn              func(context.Context) error
+	startVersionSubsystemFn        func(context.Context) error
+	startDockerSubsystemFn         func(context.Context) error
+	startUrbitTransitionFn         func(context.Context) error
+	startSystemTransitionFn        func(context.Context) error
+	startNewShipTransitionFn       func(context.Context) error
+	startImportShipTransitionFn    func(context.Context) error
+	startRectifyUrbitFn            func(context.Context) error
+	syncRetrieveFn                 func(context.Context) error
 	startLeakFn                    func(context.Context) error
 	startSysLogStreamerFn          func(context.Context) error
 	startDockerLogStreamerFn       func(context.Context) error
@@ -426,13 +412,54 @@ func (runtime startBackgroundServicesRuntime) withDefaults(opts startBackgroundS
 	return runtime
 }
 
-func (runtime startBackgroundServicesRuntime) callback(lookup callbackLookupFunc) func(context.Context) error {
-	return lookup(runtime)
+func (runtime startBackgroundServicesRuntime) callback(key string) func(context.Context) error {
+	switch key {
+	case "version":
+		return runtime.startVersionSubsystemFn
+	case "docker":
+		return runtime.startDockerSubsystemFn
+	case "urbit-transition":
+		return runtime.startUrbitTransitionFn
+	case "system-transition":
+		return runtime.startSystemTransitionFn
+	case "new-ship-transition":
+		return runtime.startNewShipTransitionFn
+	case "import-ship-transition":
+		return runtime.startImportShipTransitionFn
+	case "rectify":
+		return runtime.startRectifyUrbitFn
+	case "startram-sync":
+		return runtime.syncRetrieveFn
+	case "leak":
+		return runtime.startLeakFn
+	case "sys-log-streamer":
+		return runtime.startSysLogStreamerFn
+	case "docker-log-streamer":
+		return runtime.startDockerLogStreamerFn
+	case "docker-log-conn-remover":
+		return runtime.startDockerLogConnRemoverFn
+	case "old-logs-cleaner":
+		return runtime.startOldLogsCleanerFn
+	case "disk-usage-warning":
+		return runtime.startDiskUsageWarningFn
+	case "smart-disk-check":
+		return runtime.startSmartDiskCheckFn
+	case "startram-renewal":
+		return runtime.startStartramRenewalReminderFn
+	case "pack-schedule":
+		return runtime.startPackScheduleLoopFn
+	case "chop-routines":
+		return runtime.startChopRoutinesFn
+	case "backup-routines":
+		return runtime.startBackupRoutinesFn
+	default:
+		return nil
+	}
 }
 
 type backgroundServiceDescriptor struct {
 	name             string
-	callbackLookup   callbackLookupFunc
+	callbackKey      string
 	requiresCallback bool
 	requiresStartram bool
 	failFast         bool
@@ -445,66 +472,26 @@ func syncRetrieveWithStartram() error {
 
 type startupTaskID string
 
-type callbackLookupFunc func(startBackgroundServicesRuntime) func(context.Context) error
-
 var defaultBackgroundServiceDescriptors = []backgroundServiceDescriptor{
-	{name: "version", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startVersionSubsystemFn
-	}, requiresCallback: true},
-	{name: "docker", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startDockerSubsystemFn
-	}, requiresCallback: true},
-	{name: "urbit-transition", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startUrbitTransitionFn
-	}, requiresCallback: true},
-	{name: "system-transition", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startSystemTransitionFn
-	}, requiresCallback: true},
-	{name: "new-ship-transition", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startNewShipTransitionFn
-	}, requiresCallback: true},
-	{name: "import-ship-transition", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startImportShipTransitionFn
-	}, requiresCallback: true},
-	{name: "rectify", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startRectifyUrbitFn
-	}, requiresCallback: true},
-	{name: "startram-sync", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.syncRetrieveFn
-	}, requiresCallback: true, requiresStartram: true, failFast: true},
-	{name: "leak", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startLeakFn
-	}, requiresCallback: true},
-	{name: "sys-log-streamer", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startSysLogStreamerFn
-	}, requiresCallback: true},
-	{name: "docker-log-streamer", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startDockerLogStreamerFn
-	}, requiresCallback: true},
-	{name: "docker-log-conn-remover", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startDockerLogConnRemoverFn
-	}, requiresCallback: true},
-	{name: "old-logs-cleaner", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startOldLogsCleanerFn
-	}, requiresCallback: true},
-	{name: "disk-usage-warning", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startDiskUsageWarningFn
-	}, requiresCallback: true},
-	{name: "smart-disk-check", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startSmartDiskCheckFn
-	}, requiresCallback: true},
-	{name: "startram-renewal", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startStartramRenewalReminderFn
-	}, requiresCallback: true, requiresStartram: true},
-	{name: "pack-schedule", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startPackScheduleLoopFn
-	}, requiresCallback: true},
-	{name: "chop-routines", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startChopRoutinesFn
-	}, requiresCallback: true},
-	{name: "backup-routines", callbackLookup: func(runtime startBackgroundServicesRuntime) func(context.Context) error {
-		return runtime.startBackupRoutinesFn
-	}, requiresCallback: true},
+	{name: "version", callbackKey: "version", requiresCallback: true},
+	{name: "docker", callbackKey: "docker", requiresCallback: true},
+	{name: "urbit-transition", callbackKey: "urbit-transition", requiresCallback: true},
+	{name: "system-transition", callbackKey: "system-transition", requiresCallback: true},
+	{name: "new-ship-transition", callbackKey: "new-ship-transition", requiresCallback: true},
+	{name: "import-ship-transition", callbackKey: "import-ship-transition", requiresCallback: true},
+	{name: "rectify", callbackKey: "rectify", requiresCallback: true},
+	{name: "startram-sync", callbackKey: "startram-sync", requiresCallback: true, requiresStartram: true, failFast: true},
+	{name: "leak", callbackKey: "leak", requiresCallback: true},
+	{name: "sys-log-streamer", callbackKey: "sys-log-streamer", requiresCallback: true},
+	{name: "docker-log-streamer", callbackKey: "docker-log-streamer", requiresCallback: true},
+	{name: "docker-log-conn-remover", callbackKey: "docker-log-conn-remover", requiresCallback: true},
+	{name: "old-logs-cleaner", callbackKey: "old-logs-cleaner", requiresCallback: true},
+	{name: "disk-usage-warning", callbackKey: "disk-usage-warning", requiresCallback: true},
+	{name: "smart-disk-check", callbackKey: "smart-disk-check", requiresCallback: true},
+	{name: "startram-renewal", callbackKey: "startram-renewal", requiresCallback: true, requiresStartram: true},
+	{name: "pack-schedule", callbackKey: "pack-schedule", requiresCallback: true},
+	{name: "chop-routines", callbackKey: "chop-routines", requiresCallback: true},
+	{name: "backup-routines", callbackKey: "backup-routines", requiresCallback: true},
 }
 
 func (runtime startupBootstrapRuntime) validate() []string {
@@ -532,7 +519,7 @@ func (runtime startBackgroundServicesRuntime) validate(startramWgRegistered bool
 		if !service.requiresCallback {
 			continue
 		}
-		if runtime.callback(service.callbackLookup) == nil {
+		if runtime.callback(service.callbackKey) == nil {
 			missing = append(missing, service.name)
 		}
 	}
@@ -921,7 +908,7 @@ func startBackgroundServicesWithRuntime(ctx context.Context, startramWgRegistere
 		if descriptor.requiresStartram && !startramWgRegistered {
 			continue
 		}
-		startFn := runtime.callback(descriptor.callbackLookup)
+		startFn := runtime.callback(descriptor.callbackKey)
 		if startFn == nil {
 			missing := descriptor.name
 			return nil, fmt.Errorf("start background services runtime missing required callback: %s", missing)
@@ -945,7 +932,7 @@ func startBackgroundServicesWithRuntime(ctx context.Context, startramWgRegistere
 func defaultStartBackgroundServicesRuntime() startBackgroundServicesRuntime {
 	return startBackgroundServicesRuntime{
 		startVersionSubsystemFn:     routines.StartVersionSubsystemWithContext,
-		startDockerSubsystemFn:      subsystem.StartDockerSubsystemWithContext,
+		startDockerSubsystemFn:      subsystem.StartDockerSubsystem,
 		startUrbitTransitionFn:      rectify.UrbitTransitionHandlerWithContext,
 		startSystemTransitionFn:     rectify.SystemTransitionHandlerWithContext,
 		startNewShipTransitionFn:    rectify.NewShipTransitionHandlerWithContext,

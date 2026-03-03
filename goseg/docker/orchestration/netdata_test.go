@@ -18,8 +18,10 @@ func testNetdataRuntime() dockerRuntime {
 		MkdirAllFn:  func(string, os.FileMode) error { return nil },
 	}
 	rt.containerOps = RuntimeContainerOps{
-		StartContainerFn: func(string, string) (structs.ContainerState, error) {
-			return structs.ContainerState{ActualStatus: "running"}, nil
+		RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
+			StartContainerFn: func(string, string) (structs.ContainerState, error) {
+				return structs.ContainerState{ActualStatus: "running"}, nil
+			},
 		},
 	}
 	rt.imageOps = RuntimeImageOps{
@@ -135,13 +137,17 @@ func TestLoadNetdataFlowAndStartError(t *testing.T) {
 	}
 	updated := false
 	rt.containerOps = RuntimeContainerOps{
-		StartContainerFn: func(string, string) (structs.ContainerState, error) {
-			return structs.ContainerState{ActualStatus: "running"}, nil
+		RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
+			StartContainerFn: func(string, string) (structs.ContainerState, error) {
+				return structs.ContainerState{ActualStatus: "running"}, nil
+			},
 		},
-		UpdateContainerStateFn: func(name string, _ structs.ContainerState) {
-			if name == "netdata" {
-				updated = true
-			}
+		RuntimeContainerStateOps: RuntimeContainerStateOps{
+			UpdateContainerStateFn: func(name string, _ structs.ContainerState) {
+				if name == "netdata" {
+					updated = true
+				}
+			},
 		},
 	}
 
@@ -153,8 +159,10 @@ func TestLoadNetdataFlowAndStartError(t *testing.T) {
 	}
 
 	rt.containerOps = RuntimeContainerOps{
-		StartContainerFn: func(string, string) (structs.ContainerState, error) {
-			return structs.ContainerState{}, errors.New("start failed")
+		RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
+			StartContainerFn: func(string, string) (structs.ContainerState, error) {
+				return structs.ContainerState{}, errors.New("start failed")
+			},
 		},
 	}
 	if err := loadNetdataWithRuntime(netdataRuntimeFromDocker(rt)); err == nil {

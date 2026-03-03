@@ -1,0 +1,119 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 62.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules define very large callback-bag runtimes whose defaults mostly bind package-level functions and whose methods just nil-check then forward (e.g. goseg/importer/importer.go importerRuntime, goseg/docker/orchestration/runtime_ops.go Runtime*Ops families, goseg/shipworkflow/operations_runtime.go workflowRuntime).",
+        "Startup and main bootstrap layers add additional runtime shells and wrapper constructors over direct calls (goseg/startuporchestrator/startup_orchestrator.go startupInitRuntime/startBackgroundServicesRuntime, goseg/main.go bootstrapRuntime/c2cRuntime variants), increasing indirection depth across startup paths.",
+        "Config patching has parallel abstraction paths that encode the same field updates twice: typed patch methods (applyConnectivityUpdates/applyRuntimeUpdates/etc.) and confPatchRegistry apply closures (goseg/config/config_update_schema.go), creating duplicate mapping logic over the same SysConfig model (goseg/structs/configs.go).",
+        "Event publishing uses a package-global broker plus one concrete implementation, while package-level publish helpers and context wrappers add little behavior beyond forwarding (goseg/docker/events/events.go), and call sites consume these wrappers rather than an explicit dependency (e.g. goseg/shipworkflow/operations_runtime.go, goseg/rectify/rectify.go)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 42.0,
+        "interface_honesty": 64.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_runtime_overuse",
+      "summary": "Callback-bag runtimes are over-expanded into pass-through seam layers that add indirection without clear domain boundaries.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "importerRuntime contains many function fields and paired wrapper methods (swapSettings, startramSettings, updateContainerState, waitForBootCode, etc.) that mostly nil-check then forward.",
+        "Runtime ops in orchestration split into many tiny Runtime*Ops structs and default builders that primarily bind existing package functions, creating broad seam surfaces with low behavioral encapsulation.",
+        "main/startuporchestrator introduce additional runtime wrapper structs and default constructors around already abstracted operations, stacking wrapper-on-wrapper indirection in bootstrap paths."
+      ],
+      "suggestion": "Collapse callback bags into smaller domain ports (e.g. ConfigStore, ContainerControl, TransitionPublisher) with cohesive methods; inject only the ports each workflow uses and remove pure forwarding helper methods that do not enforce policy.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_granularity_drift"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicated_config_patch_abstraction",
+      "summary": "Config mutation is modeled twice (typed patch methods and registry-driven apply closures), creating competing abstractions for the same updates.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "config_update_schema defines applyConnectivityUpdates/applyRuntimeUpdates/etc. on typed patch structs and also defines confPatchRegistry entries with per-key applyUpdates closures writing the same SysConfig fields.",
+        "Both paths encode field-level mapping and update semantics, increasing the risk of drift when fields are added/changed in SysConfig."
+      ],
+      "suggestion": "Keep a single authoritative patch abstraction: either consolidate around typed patch apply methods with generated key mapping metadata, or make the registry the single source and delete redundant typed apply logic.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_granularity_drift"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "event_broker_interface_low_honesty",
+      "summary": "The event broker interface currently wraps a single in-memory implementation plus global accessors, reducing interface honesty and explicit dependency flow.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "events.go defines EventBroker but only transitionBus is provided here; package-level globals (defaultBroker, SetEventBroker/getEventBroker) are used as indirection rather than injecting broker instances into consumers.",
+        "Publish* and Publish*WithContext pairs mainly forward through getEventBroker/publishWithFallback, where publishWithFallback only normalizes nil context.",
+        "Consumers such as workflow runtime emitters and rectify handlers depend on package wrappers instead of a passed broker contract."
+      ],
+      "suggestion": "Inject a broker dependency into runtimes that publish/consume transitions and narrow the interface to required operations per consumer; remove redundant global publish wrappers that only forward.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_granularity_drift"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "context_wrapper_chain_bloat",
+      "summary": "Repeated no-context/with-context wrapper pairs create broad wrapper chains with minimal behavioral differentiation.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/rectify/rectify.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "subsystem_events exposes StartDockerHealthLoops -> StartDockerHealthLoopsWithContext and StartDockerSubsystem -> StartDockerSubsystemWithContext wrappers that mostly substitute context.Background.",
+        "rectify adds runTransitionEventLoopWithoutContext around runTransitionEventLoop with the same pattern.",
+        "events has PublishX and PublishXWithContext pairs with similarly thin forwarding."
+      ],
+      "suggestion": "Standardize on context-first APIs as the primary abstraction and keep only high-value convenience wrappers at module boundaries where they add policy (timeouts/retries/logging), not simple forwarding.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wrapper_chain_without_policy"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams were introduced as per-function callback injection, but evolved into broad generic runtime bags without clear bounded contexts.",
+      "Incremental feature additions duplicated abstraction layers instead of consolidating existing mutation and event contracts."
+    ],
+    "likely_symptoms": [
+      "callback_bag_runtime_overuse",
+      "context_wrapper_chain_bloat"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,6 +1,7 @@
 package shipworkflow
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,7 +71,7 @@ func ProvisionShip(patp string, shipPayload structs.WsNewShipPayload, customDriv
 	}
 
 	zap.L().Info(fmt.Sprintf("Creating Pier: %v", patp))
-	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "creating"})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "creating"})
 	info, err := orchestration.StartContainer(patp, "vere")
 	if err != nil {
 		errmsg := fmt.Sprintf("start container error: %v", err)
@@ -101,13 +102,13 @@ func waitForNewShipReady(shipPayload structs.WsNewShipPayload, customDrive strin
 	patp := shipPayload.Payload.Patp
 	remote := shipPayload.Payload.Remote
 
-	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "booting"})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "booting"})
 	zap.L().Info(fmt.Sprintf("Booting ship: %v", patp))
 	WaitForBootCode(patp, 1*time.Second)
 
 	conf := config.Conf()
 	if conf.WgRegistered && conf.WgOn && remote {
-		events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "remote"})
+		events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "remote"})
 		WaitForRemoteReady(patp, 1*time.Second)
 		if err := SwitchShipToWireguard(patp, false); err != nil {
 			errmsg := fmt.Sprintf("%v", err)
@@ -118,7 +119,7 @@ func waitForNewShipReady(shipPayload structs.WsNewShipPayload, customDrive strin
 	}
 
 	startram.SyncRetrieve()
-	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "completed"})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "completed"})
 	if conf.PenpaiAllow {
 		orchestration.StartContainer("llama-gpt-api", "llama-api")
 	}
@@ -131,8 +132,8 @@ func RegisterNewShipServices(patp string) {
 }
 
 func handleNewShipErrorCleanup(patp, errmsg, customDrive string) error {
-	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "aborted"})
-	events.PublishNewShipTransition(structs.NewShipTransition{Type: "error", Event: fmt.Sprintf("%v", errmsg)})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "aborted"})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "error", Event: fmt.Sprintf("%v", errmsg)})
 	zap.L().Info(fmt.Sprintf("New ship creation failed: %s: %s", patp, errmsg))
 	zap.L().Info(fmt.Sprintf("Running cleanup routine"))
 	customPierPath := ""

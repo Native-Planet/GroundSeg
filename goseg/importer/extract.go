@@ -137,7 +137,7 @@ func extractWithStrategy(src, dest string, strategy archiveExtractionStrategy) e
 
 		entry, err := iterator.Next()
 		if err == io.EOF {
-			events.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: 100})
+			events.DefaultEventRuntime().PublishImportShipTransition(context.Background(), structs.UploadTransition{Type: "extracted", Value: 100})
 			return nil
 		}
 		if err != nil {
@@ -430,7 +430,7 @@ func (p *extractionProgressTracker) tryPublish(processedEntries, processedBytes 
 	if percentExtracted > 99 {
 		percentExtracted = 99
 	}
-	events.PublishImportShipTransition(structs.UploadTransition{
+	events.DefaultEventRuntime().PublishImportShipTransition(context.Background(), structs.UploadTransition{
 		Type:  "extracted",
 		Value: percentExtracted,
 	})

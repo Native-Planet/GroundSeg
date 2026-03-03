@@ -46,7 +46,9 @@ func TestUpdateMcConfWritesVersionChannelData(t *testing.T) {
 	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
 	confForMc = func() structs.SysConfig {
-		return structs.SysConfig{UpdateBranch: "edge"}
+		conf := structs.SysConfig{}
+		conf.UpdateBranch = "edge"
+		return conf
 	}
 	getVersionChannelForMc = func() structs.Channel {
 		return structs.Channel{

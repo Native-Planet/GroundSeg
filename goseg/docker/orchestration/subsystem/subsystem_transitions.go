@@ -159,6 +159,6 @@ func updateContainerTransition(rt dockerRoutineRuntime, contName string, mutate 
 	if err := mutate(&containerState); err != nil {
 		return nil, err
 	}
-	rt.transitionOps.UpdateContainerFn(contName, containerState)
+	rt.transitionOps.UpdateContainerStateFn(contName, containerState)
 	return &containerState, nil
 }

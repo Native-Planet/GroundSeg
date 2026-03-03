@@ -40,13 +40,13 @@ func newBroadcastLoopRuntime() *broadcastLoopRuntime {
 		getClientManagerFn:     auth.GetClientManager,
 		getLickStatusesFn:      leak.GetLickStatuses,
 		constructSystemInfoFn:  constructSystemInfo,
-		constructPierInfoFn:    ConstructPierInfo,
+		constructPierInfoFn:    func() (map[string]structs.Urbit, error) { return ConstructPierInfo() },
 		constructAppsInfoFn:    constructAppsInfo,
 		constructProfileInfoFn: constructProfileInfo,
 		preserveSystemFn:       PreserveSystemTransitions,
 		preserveUrbitsFn:       PreserveUrbitsTransitions,
 		preserveProfileFn:      PreserveProfileTransitions,
-		updateBroadcastFn:      UpdateBroadcast,
+		updateBroadcastFn:      func(next structs.AuthBroadcast) { UpdateBroadcast(next) },
 		broadcastToClientsFn:   BroadcastToClients,
 		tickErrorFn:            func(err error) { zap.L().Error(fmt.Sprintf("broadcast tick failed: %v", err)) },
 		tickInterval:           broadcastInterval,
@@ -147,9 +147,7 @@ func runBroadcastTickWithRuntime(rt *broadcastLoopRuntime) error {
 		pierInfo, err := rt.constructPierInfoFn()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to build pier info: %v", err))
-			mu.RLock()
-			pierInfo = broadcastState.Urbits
-			mu.RUnlock()
+			pierInfo = GetState().Urbits
 		}
 		if pierInfo == nil {
 			pierInfo = make(map[string]structs.Urbit)
@@ -162,9 +160,7 @@ func runBroadcastTickWithRuntime(rt *broadcastLoopRuntime) error {
 		profileInfo := rt.constructProfileInfoFn()
 
 		// Retrieve broadcastState
-		mu.RLock()
-		newState := broadcastState
-		mu.RUnlock()
+		newState := GetState()
 
 		// Preserve transitions
 		systemInfo = rt.preserveSystemFn(newState, systemInfo)

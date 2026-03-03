@@ -1,0 +1,114 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 73.6
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Large function-pointer dependency bags are repeated across modules: `importerRuntime` defines 24 callback fields plus extensive nil-guard plumbing and pass-through methods (`goseg/importer/importer.go:79-327`), while orchestration defines many Fn-suffixed seam structs and bundle builders (`goseg/docker/orchestration/runtime_ops.go:15-365`).",
+        "Public API pairs repeatedly wrap `default*Runtime()` and immediately forward to `*ForRuntime` variants without adding policy (for example `ListWifiSSIDs`/`listSSIDsForRuntime`, `ConnectToWifi`/`connectToWifiForRuntime` in `goseg/system/wifi.go:328-373`, and `OpenUploadEndpoint`/`openUploadEndpointForRuntime`, `validateUploadRequest`/`validateUploadRequestForRuntime` in `goseg/importer/importer.go:381-550`).",
+        "Ship config persistence is implemented as six near-identical adapters with per-type copy/mutate/write logic (`goseg/shipworkflow/operations_runtime.go:289-402`), while orchestration runtime seams expose separate per-type updater callbacks (`goseg/docker/orchestration/runtime_ops.go:64-75`), reinforcing duplication instead of a single sub-config mutation abstraction.",
+        "Version/container defaults are maintained in two independent representations: structured literals in `goseg/defaults/defaults.go:67-110` and a large JSON blob in `goseg/defaults/version.go:15-187`, duplicating repo/tag/hash sources."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 68.9,
+        "indirection_cost": 71.2,
+        "interface_honesty": 80.7
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_overengineering",
+      "summary": "Callback-bag seam pattern adds heavy indirection with little behavioral leverage",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`importerRuntime` holds many callbacks and then re-wraps them in one-line methods plus nil checks (`goseg/importer/importer.go:79-327`).",
+        "`runtime_ops` defines many Fn-based seam structs and default bundle assembly that mostly wires globals into fields (`goseg/docker/orchestration/runtime_ops.go:15-365`).",
+        "`RectifyRuntime` repeats the same seam-and-forward pattern (`goseg/rectify/rectify.go:29-109`)."
+      ],
+      "suggestion": "Replace broad callback bags with a small set of capability interfaces per workflow (for example import lifecycle, container state, startram sync), inject them only at orchestration boundaries, and remove one-line forwarding methods that only nil-check then delegate.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "default_runtime_wrapper_sprawl",
+      "summary": "Default-wrapper plus ForRuntime dual APIs create low-value call-depth across modules",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "WiFi exports mostly call `defaultWiFiRuntime()` and immediately delegate (`goseg/system/wifi.go:328-373`).",
+        "Importer repeatedly exposes entrypoints that only call `*ForRuntime(..., defaultImporterRuntime())` (`goseg/importer/importer.go:381-550`).",
+        "Ship workflow repeatedly constructs default runtime in thin wrappers before delegating (`goseg/shipworkflow/operations_runtime.go:266-389`)."
+      ],
+      "suggestion": "Standardize on one public API style: either explicit dependency injection at top-level constructors or package-level defaults internally. Remove mirrored `X`/`XForRuntime` pairs unless both variants carry distinct policy.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "urbit_subconfig_persistence_duplication",
+      "summary": "Per-subconfig persistence helpers are copy-pasted instead of using one generic abstraction",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`persistShipRuntimeConfigWith`, `persistShipNetworkConfigWith`, `persistShipFeatureConfigWith`, `persistShipWebConfigWith`, `persistShipScheduleConfigWith`, and `persistShipBackupConfigWith` all repeat the same fallback algorithm with only type/field substitutions (`goseg/shipworkflow/operations_runtime.go:289-402`).",
+        "Runtime seams expose one callback per subconfig type (`goseg/docker/orchestration/runtime_ops.go:64-75`), which encourages continued duplication at call sites."
+      ],
+      "suggestion": "Introduce a single typed helper (for example `persistSubconfig[T]`) parameterized by getter/setter closures and optional specialized persister, then map all subconfig updates through that one abstraction.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate_version_default_sources",
+      "summary": "Two independent default-version representations create abstraction drift risk",
+      "related_files": [
+        "goseg/defaults/defaults.go",
+        "goseg/defaults/version.go"
+      ],
+      "evidence": [
+        "`defaults.go` hardcodes repo/tag/hash defaults in typed structs (`goseg/defaults/defaults.go:67-110`).",
+        "`version.go` also hardcodes repo/tag/hash data in `DefaultVersionText` JSON and unmarshals it at init (`goseg/defaults/version.go:15-187`)."
+      ],
+      "suggestion": "Consolidate default version/container metadata into one canonical source (typed model or JSON asset), then generate/derive other forms from it to eliminate manual dual maintenance.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime seam design is fragmented into many function-pointer bags instead of cohesive capability abstractions.",
+      "Testing-oriented seam variants leaked into production-facing APIs as duplicate wrapper surfaces.",
+      "Configuration/version defaults lack a single source of truth."
+    ],
+    "likely_symptoms": [
+      "default_runtime_wrapper_sprawl",
+      "urbit_subconfig_persistence_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

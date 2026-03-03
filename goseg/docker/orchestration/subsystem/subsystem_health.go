@@ -13,11 +13,7 @@ import (
 
 // loop to make sure ships are reachable
 // if 502 2x in 2 min, restart wg container
-func Check502Loop() {
-	Check502LoopWithContext(context.Background())
-}
-
-func Check502LoopWithContext(ctx context.Context) {
+func Check502Loop(ctx context.Context) {
 	if ctx == nil {
 		ctx = context.Background()
 	}

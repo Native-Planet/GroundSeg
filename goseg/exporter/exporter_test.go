@@ -3,6 +3,7 @@ package exporter
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -15,7 +16,6 @@ import (
 
 	"groundseg/config"
 	"groundseg/defaults"
-	"groundseg/docker/events"
 	"groundseg/docker/orchestration"
 	"groundseg/structs"
 
@@ -65,7 +65,9 @@ func resetExporterState() {
 	walkForExporter = filepath.Walk
 	dockerDataForExporter = defaults.DockerData
 	urbitConfForExporter = config.UrbitConf
-	publishUrbitTransitionForExporter = events.PublishUrbitTransition
+	publishUrbitTransitionForExporter = func(_ context.Context, _ structs.UrbitTransition) error {
+		return nil
+	}
 	getShipStatusForExporter = orchestration.GetShipStatus
 }
 
@@ -123,8 +125,9 @@ func TestExportHandlerInvalidTokenCleansUpWhitelist(t *testing.T) {
 	}
 
 	transitionCalls := 0
-	publishUrbitTransitionForExporter = func(structs.UrbitTransition) {
+	publishUrbitTransitionForExporter = func(_ context.Context, _ structs.UrbitTransition) error {
 		transitionCalls++
+		return nil
 	}
 
 	badToken, _ := json.Marshal(structs.WsTokenStruct{ID: "bad", Token: "bad"})
@@ -153,7 +156,7 @@ func TestExportHandlerMinioSuccessStreamsZip(t *testing.T) {
 	volumesDir := t.TempDir()
 	dockerDataForExporter = func(string) string { return volumesDir }
 	urbitConfForExporter = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
-	publishUrbitTransitionForExporter = func(structs.UrbitTransition) {}
+	publishUrbitTransitionForExporter = func(_ context.Context, _ structs.UrbitTransition) error { return nil }
 
 	container := "minio_~zod"
 	dataDir := filepath.Join(volumesDir, container, "_data")
@@ -209,8 +212,9 @@ func TestExportHandlerPropagatesOpenErrorDuringArchiveAndCleansUp(t *testing.T) 
 	urbitConfForExporter = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
 
 	transitionCalls := 0
-	publishUrbitTransitionForExporter = func(transition structs.UrbitTransition) {
+	publishUrbitTransitionForExporter = func(_ context.Context, transition structs.UrbitTransition) error {
 		transitionCalls++
+		return nil
 	}
 
 	container := "minio_~zod"
@@ -294,8 +298,9 @@ func TestExportHandlerPropagatesReadErrorDuringArchiveAndCleansUp(t *testing.T) 
 	urbitConfForExporter = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
 
 	transitionCalls := 0
-	publishUrbitTransitionForExporter = func(transition structs.UrbitTransition) {
+	publishUrbitTransitionForExporter = func(_ context.Context, transition structs.UrbitTransition) error {
 		transitionCalls++
+		return nil
 	}
 
 	container := "minio_~zod"

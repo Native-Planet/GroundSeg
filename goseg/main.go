@@ -211,10 +211,10 @@ func defaultC2cRuntimeWithContext(runtimeContext c2cRuntimeContext) c2cRuntime {
 				return runtimeContext.isNPBoxFn(runtimeContext.basePath)
 			},
 			hasDevice: system.HasWifiDevice,
-			wifiInfo:  system.IsWifiEnabled,
+			wifiInfo:  system.DefaultWiFiRuntimeService().IsWifiEnabled,
 		},
 		mode: c2cModeRuntime{
-			isC2cMode:  system.C2CMode,
+			isC2cMode:  func() error { return system.NewC2CModeFlow().EnterC2CMode() },
 			setC2cMode: system.SetC2CMode,
 			startKillSwitch: func(ctx context.Context, connectivitySnapshot func() config.ConnectivitySettings) {
 				killSwitchWithMode(ctx, connectivitySnapshot, runtimeContext.isDebugModeFn)
@@ -489,10 +489,6 @@ func startDevMode(opts appStartupOptions) {
 	go http.ListenAndServe("0.0.0.0:6060", nil)
 }
 
-func startupRuntimeFromAppOptions(_ appStartupOptions) startuporchestrator.StartupRuntime {
-	return startuporchestrator.StartupRuntime{}
-}
-
 func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime bootstrapRuntime) error {
 	if runtime.Orchestrator.RunBootstrapFn == nil {
 		return fmt.Errorf("bootstrap runtime is not configured")
@@ -505,16 +501,9 @@ func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime
 		ValidateConfig: func() error {
 			return initWebErr
 		},
-		StartServer: func(ctx context.Context, httpPort int) error {
-			return runtime.Server.StartServerFn(ctx, httpPort)
-		},
-		StartC2cCheck: func(ctx context.Context) error {
-			if runtime.Connectivity.RunC2cCheckFn != nil {
-				return runtime.Connectivity.RunC2cCheckFn(ctx)
-			}
-			return nil
-		},
-		StartupRuntime: startupRuntimeFromAppOptions(opts),
+		StartServer:    runtime.Server.StartServerFn,
+		StartC2cCheck:  runtime.Connectivity.RunC2cCheckFn,
+		StartupRuntime: startuporchestrator.StartupRuntime{},
 	})
 }
 
