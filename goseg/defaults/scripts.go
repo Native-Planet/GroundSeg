@@ -475,7 +475,6 @@ var (
 		fi
 	fi
 	
-	urbit -Lx $ttyflag --loom $loom $dirname
 	urbit roll --loom $loom $dirname`
 
 	PackScript = `#!/bin/bash
@@ -571,7 +570,6 @@ var (
 		fi
 	fi
 	
-	urbit -Lx $ttyflag --loom $loom $dirname
 	urbit pack --loom $loom $dirname`
 
 	ChopScript = `#!/bin/bash
@@ -654,7 +652,6 @@ var (
 		fi
 	fi
 	
-	urbit -Lx $ttyflag --loom $loom $dirname
 	urbit chop --loom $loom $dirname`
 
 	MeldScript = `#!/bin/bash
