@@ -1,5 +1,11 @@
-package wireguardkeys
+package wireguardkeys_test
 
-import "testing"
+import (
+	"testing"
 
-func TestSmokeCoverage(t *testing.T) {}
+	pkg "groundseg/config/wireguardkeys"
+)
+
+func TestCoverageImportSmoke(t *testing.T) {
+	_ = pkg.GenerateKeyPair
+}

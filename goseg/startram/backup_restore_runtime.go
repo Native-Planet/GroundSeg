@@ -2,12 +2,12 @@ package startram
 
 import (
 	"fmt"
-	"os/exec"
 
 	"go.uber.org/zap"
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/startram/backup"
+	"groundseg/startram/backup/restore"
 )
 
 type RestoreBackupMode string
@@ -33,32 +33,6 @@ type RestoreBackupRequest struct {
 	Source          RestoreBackupSource
 }
 
-type restoreBackupRuntime struct {
-	fetchRemoteFn        func(ship string, timestamp int, md5hash string, settings config.StartramSettings) ([]byte, error)
-	persistRemoteFn      func(ship string, timestamp int, data []byte) error
-	fetchLocalFn         func(basePath string, ship string, bakType string, timestamp int) ([]byte, error)
-	mountBaseDeskFn      func(ship string) error
-	writeToVolumeFn      func(ship string, data []byte) error
-	commitDeskFn         func(ship string, desk string) error
-	restoreTlonFn        func(ship string) error
-	getLocalBackupPathFn func(basePath string, ship, bakType string, timestamp int) string
-	runtimeContextFn     func() config.RuntimeContext
-}
-
-var defaultRestoreBackupRuntime = restoreBackupRuntime{
-	fetchRemoteFn:        fetchRemoteBackupWithAPI,
-	persistRemoteFn:      backup.PersistRemoteBackup,
-	fetchLocalFn:         backup.ReadLocalBackup,
-	mountBaseDeskFn:      func(ship string) error { return click.MountDesk(ship, "base") },
-	writeToVolumeFn:      writeBackupToVolumeWithAdapter,
-	commitDeskFn:         click.CommitDesk,
-	restoreTlonFn:        click.RestoreTlon,
-	getLocalBackupPathFn: backup.ResolveLocalBackupPath,
-	runtimeContextFn: func() config.RuntimeContext {
-		return defaultConfigService.RuntimeContext()
-	},
-}
-
 func RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string) error {
 	req := RestoreBackupRequest{
 		Ship:            ship,
@@ -77,68 +51,52 @@ func RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev 
 	return RestoreBackupWithRequest(req)
 }
 
-func restoreBackupProdWithRuntime(runtime restoreBackupRuntime, req RestoreBackupRequest) error {
-	ship := req.Ship
-	zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
-
-	data, err := func() ([]byte, error) {
-		switch req.Source {
-		case RestoreBackupSourceRemote:
+func restoreBackupProd(req RestoreBackupRequest) error {
+	restoreRuntime := restore.RestoreRuntime{
+		FetchRemoteFn: func(ship string, timestamp int, md5hash string) ([]byte, error) {
 			settings := defaultConfigService.StartramSettingsSnapshot()
-			data, err := runtime.fetchRemoteFn(ship, req.Timestamp, req.MD5Hash, settings)
-			if err != nil {
-				return nil, fmt.Errorf("failed to retrieve remote backup: %w", err)
-			}
-			if err := runtime.persistRemoteFn(ship, req.Timestamp, data); err != nil {
-				return nil, fmt.Errorf("failed to write backup to file: %w", err)
-			}
-			return data, nil
-		case RestoreBackupSourceLocal:
-			basePath := runtime.runtimeContextFn().BasePath
-			data, err := runtime.fetchLocalFn(basePath, ship, req.LocalBackupType, req.Timestamp)
-			if err != nil {
-				return nil, fmt.Errorf("failed to retrieve local backup: %w", err)
-			}
-			if err := runtime.mountBaseDeskFn(ship); err != nil {
-				return nil, fmt.Errorf("failed to mount base desk: %w", err)
-			}
-			return data, nil
-		default:
-			return nil, fmt.Errorf("unsupported restore source: %s", req.Source)
-		}
-	}()
+			return backup.FetchRemoteBackup(ship, timestamp, md5hash, settings.RemoteBackupPassword, settings.Pubkey, settings.EndpointURL, defaultAPIClient)
+		},
+		PersistRemoteFn: backup.PersistRemoteBackup,
+		FetchLocalFn:    backup.ReadLocalBackup,
+		MountBaseDeskFn: func(ship string) error { return click.MountDesk(ship, "base") },
+		WriteToVolumeFn: restore.WriteBackupToVolumeWithAdapter,
+		CommitDeskFn:    click.CommitDesk,
+		RestoreTlonFn:   click.RestoreTlon,
+		GetBasePathFn: func() config.RuntimeContext {
+			return defaultConfigService.RuntimeContext()
+		},
+	}
+
+	zap.L().Info(fmt.Sprintf("Restoring backup for %s", req.Ship))
+	err := restore.RestoreBackupProd(restoreRuntime, restore.RestoreBackupRequest{
+		Ship:            req.Ship,
+		Timestamp:       req.Timestamp,
+		MD5Hash:         req.MD5Hash,
+		LocalBackupType: req.LocalBackupType,
+		Source:          string(req.Source),
+	})
 	if err != nil {
 		return err
 	}
-
-	if err := runtime.writeToVolumeFn(ship, data); err != nil {
-		return fmt.Errorf("failed to write backup to volume: %w", err)
-	}
-	if err := runtime.commitDeskFn(ship, "base"); err != nil {
-		return fmt.Errorf("failed to commit desk: %w", err)
-	}
-	if err := runtime.restoreTlonFn(ship); err != nil {
-		return fmt.Errorf("failed to restore tlon: %w", err)
-	}
-	zap.L().Info(fmt.Sprintf("Successfully restored backup for %s", ship))
+	zap.L().Info(fmt.Sprintf("Successfully restored backup for %s", req.Ship))
 	return nil
 }
 
-func restoreBackupProd(req RestoreBackupRequest) error {
-	return restoreBackupProdWithRuntime(defaultRestoreBackupRuntime, req)
+func restoreBackupDev(ship string) error {
+	zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
+	return restore.RestoreBackupDev(restore.RestoreDevRuntime{
+		FetchConfigFn: Retrieve,
+		FetchRemoteFn: func(s string, timestamp int, md5hash string) ([]byte, error) {
+			settings := defaultConfigService.StartramSettingsSnapshot()
+			return fetchRemoteBackupWithAPI(s, timestamp, md5hash, settings)
+		},
+		PersistRemoteFn: backup.PersistRemoteBackup,
+	}, ship)
 }
 
 func fetchRemoteBackupWithAPI(ship string, timestamp int, md5hash string, settings config.StartramSettings) ([]byte, error) {
 	return backup.FetchRemoteBackup(ship, timestamp, md5hash, settings.RemoteBackupPassword, settings.Pubkey, settings.EndpointURL, defaultAPIClient)
-}
-
-func writeBackupToVolumeWithAdapter(ship string, data []byte) error {
-	cmd := exec.Command("docker", "inspect", "-f", "{{ range .Mounts }}{{ if eq .Type \"volume\" }}{{ .Source }}{{ end }}{{ end }}", ship)
-	output, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to get Docker volume location: %w", err)
-	}
-	return backup.WriteBackupToVolume(string(output), ship, data)
 }
 
 func retrieveRemoteBackup(ship string, timestamp int, md5hash string) ([]byte, error) {
@@ -148,42 +106,7 @@ func retrieveRemoteBackup(ship string, timestamp int, md5hash string) ([]byte, e
 
 func retrieveLocalBackup(ship string, timestamp int, bakType string) ([]byte, error) {
 	basePath := defaultConfigService.RuntimeContext().BasePath
-	backupPath := defaultRestoreBackupRuntime.getLocalBackupPathFn(basePath, ship, bakType, timestamp)
+	backupPath := backup.ResolveLocalBackupPath(basePath, ship, bakType, timestamp)
 	zap.L().Info(fmt.Sprintf("Restoring local backup for %s at %d to %s", ship, timestamp, backupPath))
-	return defaultRestoreBackupRuntime.fetchLocalFn(basePath, ship, bakType, timestamp)
-}
-
-func restoreBackupDev(ship string) error {
-	zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
-	settings := defaultConfigService.StartramSettingsSnapshot()
-	res, err := Retrieve()
-	if err != nil {
-		return fmt.Errorf("failed to retrieve StarTram information: %w", err)
-	}
-	for _, backupData := range res.Backups {
-		item, exists := backupData[ship]
-		if !exists {
-			continue
-		}
-		var highestTimestamp int
-		var highestMD5 string
-		for _, backupInfo := range item {
-			if backupInfo.Timestamp > highestTimestamp {
-				highestTimestamp = backupInfo.Timestamp
-				highestMD5 = backupInfo.MD5
-			}
-		}
-		if highestTimestamp <= 0 {
-			continue
-		}
-		decrypted, err := fetchRemoteBackupWithAPI(ship, highestTimestamp, highestMD5, settings)
-		if err != nil {
-			return fmt.Errorf("failed to download and verify backup: %w", err)
-		}
-		if err := backup.PersistRemoteBackup(ship, highestTimestamp, decrypted); err != nil {
-			return fmt.Errorf("failed to write backup to file: %w", err)
-		}
-		return nil
-	}
-	return fmt.Errorf("no backup found for %s", ship)
+	return backup.ReadLocalBackup(basePath, ship, bakType, timestamp)
 }

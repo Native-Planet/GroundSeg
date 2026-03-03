@@ -10,6 +10,14 @@ func Merge[T any](base, overrides T) T {
 	return base
 }
 
+func MergeAll[T any](base T, overrides ...T) T {
+	merged := base
+	for _, override := range overrides {
+		merged = Merge(merged, override)
+	}
+	return merged
+}
+
 func WithDefaults[T any](runtime, defaults T) T {
 	return Merge(defaults, runtime)
 }
@@ -26,9 +34,13 @@ func mergeValue(base, overrides reflect.Value) {
 		return
 	}
 	for i := 0; i < overrides.NumField(); i++ {
-		baseField := settableValue(base.Field(i))
+		baseField := base.Field(i)
+		if !baseField.IsValid() {
+			continue
+		}
 		overrideField := overrides.Field(i)
-		if !baseField.IsValid() || !baseField.CanSet() {
+		baseField = settableValue(baseField)
+		if !baseField.CanSet() {
 			continue
 		}
 		if baseField.Kind() == reflect.Struct && overrideField.Kind() == reflect.Struct {

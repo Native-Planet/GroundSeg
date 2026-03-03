@@ -25,19 +25,18 @@ func (sink *testSystemLogSink) PublishSystemLog(payload []byte) {
 
 func resetSystemLogSinkForTest(t *testing.T, ch chan []byte) {
 	t.Helper()
-	originalSink := getLogstreamSink()
-	ConfigureLogstreamRuntime(&testSystemLogSink{ch: ch})
+	previous := getLogstreamSink()
+	setLogstreamSink(&testSystemLogSink{ch: ch})
 	t.Cleanup(func() {
-		ConfigureLogstreamRuntime(originalSink)
+		setLogstreamSink(previous)
 	})
 }
 
 func resetLoggerGlobalsForTest(t *testing.T) {
 	t.Helper()
-	originalLogPath := LogPath()
-
+	previous := loggerPath()
 	t.Cleanup(func() {
-		SetLogPath(originalLogPath)
+		setLoggerPath(previous)
 	})
 }
 
@@ -164,19 +163,14 @@ func TestMakeLogPathHandlesRelativeAndAbsoluteBasePath(t *testing.T) {
 
 func resetLoggerInitForTest(t *testing.T) {
 	t.Helper()
-	state := getLoggerState()
-	state.initMu.Lock()
-	originalErr := state.loggerInitErr
-	originalState := state.loggerInitState
+	prevErr := loggerInitErrState()
+	prevState := loggerInitStateValue()
 	t.Cleanup(func() {
-		state.initMu.Lock()
-		state.loggerInitErr = originalErr
-		state.loggerInitState = originalState
-		state.initMu.Unlock()
+		setLoggerInitErr(prevErr)
+		setLoggerInitState(prevState)
 	})
-	state.loggerInitState = loggerInitNotInitialized
-	state.loggerInitErr = nil
-	state.initMu.Unlock()
+	setLoggerInitState(loggerInitNotInitialized)
+	setLoggerInitErr(nil)
 }
 
 func loggerRuntimeForTest(overrides loggerRuntime) loggerRuntime {

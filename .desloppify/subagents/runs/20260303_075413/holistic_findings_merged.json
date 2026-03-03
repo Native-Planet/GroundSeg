@@ -1,0 +1,242 @@
+{
+  "assessments": {
+    "error_consistency": 55.7
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Event publish failures are handled inconsistently in the same workflow area: `shipworkflow/operations_runtime.go` default emitter logs publish errors, while `withDefaultsWorkflowRuntime` drops them via `_ = eventRuntime.PublishUrbitTransition(...)`.",
+        "`shipworkflow/newship.go` and `shipworkflow/newship_service.go` call `PublishNewShipTransition(...)` repeatedly without checking returned errors, despite `docker/events/events.go` defining explicit publish failure errors (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`).",
+        "Several operational paths only log critical failures and continue toward success-like returns: `shipworkflow/newship.go` logs delete/stop/restart failures but continues provisioning; `shipworkflow/operations_runtime.go` logs stop failures in `urbitCleanDelete` then proceeds."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_publish_error_contract_drift",
+      "summary": "Transition publish failures are ignored in some paths and surfaced in others",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "`docker/events/events.go` publish APIs return concrete errors for timeout/full bus/not defined.",
+        "`operations_runtime.go` has two contradictory strategies: one emitter logs `PublishUrbitTransition` failure, another path uses `_ = eventRuntime.PublishUrbitTransition(...)` and discards the error.",
+        "`newship.go` and `newship_service.go` publish multiple new-ship transitions without checking return values, making dropped transition events invisible to callers."
+      ],
+      "suggestion": "Define one explicit contract for transition publish failures (e.g., best-effort with throttled warning, or propagation for required transitions) and enforce it via a shared helper used by `operations_runtime.go`, `newship.go`, and `newship_service.go` so all publish calls handle errors consistently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_best_effort_error_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "async_task_errors_dropped_at_launch",
+      "summary": "Fire-and-forget goroutines discard errors from functions that can fail",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/config/config_events.go"
+      ],
+      "evidence": [
+        "`main.go` starts `http.ListenAndServe(\"0.0.0.0:6060\", nil)` in a goroutine without checking error.",
+        "`newship_service.go` starts `go ProvisionShip(...)` although `ProvisionShip` returns `error`; the result is never observed.",
+        "`config/config_events.go` legacy entrypoint `ConfChannel()` discards `StartConfEventLoop` error via `_ = ...`."
+      ],
+      "suggestion": "Use a consistent async error strategy: either route goroutine failures to an error channel/supervisor or explicitly wrap them in a helper that logs and classifies errors uniformly; avoid launching functions that return `error` without consuming their result.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_best_effort_error_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "critical_operation_failures_logged_not_returned",
+      "summary": "Critical cleanup/infra errors are logged and then treated as non-fatal inconsistently",
+      "related_files": [
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "In `ProvisionShip` (`newship.go`), container delete/volume delete/llama stop-start errors are logged but execution continues, mixing hard-fail and soft-fail behavior in one flow without a declared policy.",
+        "In `urbitCleanDelete` (`operations_runtime.go`), `BarExitFn` and fallback stop failures are logged, then the function proceeds to delete, so callers cannot distinguish fully clean shutdown from partial failure."
+      ],
+      "suggestion": "Classify operations into required vs best-effort steps and encode that in return behavior (e.g., aggregate soft failures with `errors.Join` and return alongside main result, or expose a structured result with warnings) so callers get predictable failure semantics.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_best_effort_error_policy"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 1,
+    "dimension_coverage": 1.0,
+    "evidence_density": 1.0,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 6.682,
+    "dimensions_with_findings": 1
+  },
+  "review_scope": {
+    "reviewed_files_count": 80,
+    "successful_batch_count": 1,
+    "full_sweep_included": false,
+    "total_files": 391,
+    "imported_dimensions": [
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/contracts/protocol_contracts.go",
+    "goseg/protocol/contracts/startram_contracts.go",
+    "goseg/system/metrics/metrics.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/importer/importer.go",
+    "goseg/defaults/version.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/main.go",
+    "goseg/system/wifi_c2c_policy.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/main_test.go",
+    "goseg/routines/version.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/rectify/rectify.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/network/network.go",
+    "goseg/handler/ship/backup.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/startram/doc.go",
+    "goseg/system/system.go",
+    "goseg/uploadsvc/doc.go",
+    "goseg/config/bootstrap.go",
+    "goseg/config/config.go",
+    "goseg/config/config_events.go",
+    "goseg/shipworkflow/lifecycle.go",
+    "goseg/shipworkflow/newship.go",
+    "goseg/shipworkflow/newship_service.go",
+    "goseg/docker/orchestration/container_bridge.go",
+    "goseg/docker/orchestration/container_config.go",
+    "goseg/docker/orchestration/container_config_test.go",
+    "README.md",
+    "goseg/auth/token_service.go",
+    "goseg/click/backup/service.go",
+    "goseg/docker/orchestration/container/netdata.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/leak/handler_protocol.go",
+    "goseg/session/client_manager.go",
+    "goseg/backupsvc/service_test.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/config/urbit.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/connection_registry.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/system/disk_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260303_075413",
+    "created_at": "2026-03-03T07:56:37+00:00",
+    "batch_count": 1,
+    "batch_indexes": [
+      1
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "df66bb06ec5febfd825b31bab07171b75411f3be6cd79a5c0e839c7e9bc82410"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "error_consistency"
+    ],
+    "imported_dimensions": [
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Error propagation is inconsistent in core runtime code: some boundaries wrap with operation context, while adjacent paths return raw errors directly.",
+        "Asynchronous/event-driven paths suppress failures (`_ = ...` or log-and-continue) instead of exposing a consistent failure contract.",
+        "Several code paths degrade behavior on error without returning a typed/sentinel error to callers, making failure handling unpredictable."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "inconsistent_error_wrapping_at_runtime_boundaries",
+      "summary": "Core runtime/orchestration paths mix contextual wrapping with raw passthrough errors, causing inconsistent diagnosability.",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/rectify/rectify_services.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`NetworkRuntime.KillContainerUsingPort` returns `DockerClientNewFn()` error directly, while sibling methods in the same file wrap client-creation failures with operation context.",
+        "`StartDockerSubsystem` returns raw errors from `startDockerHealthLoop` and child goroutines without adding subsystem/startup context.",
+        "`StartramRetrieveReconciler.Reconcile` returns raw errors from `startramSettings()` / `startramConfig()` although nearby paths wrap errors with descriptive context."
+      ],
+      "suggestion": "Adopt one boundary rule for this subsystem: every exported/runtime boundary wraps incoming errors with operation + subject context (and `%w`), using a shared helper to avoid drift.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "async_failures_are_suppressed_instead_of_reported",
+      "summary": "Asynchronous publish/stream failures are intentionally ignored in some paths, creating silent failure modes.",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`newWorkflowRuntime` default emitter discards transition publish errors via `_ = defaultEventRuntime.PublishUrbitTransition(...)`.",
+        "`streamToConn` discards `streamToConnWithContext` error (`_ = ...`), while the contextual variant returns rich wrapped errors."
+      ],
+      "suggestion": "Introduce a uniform async error policy (propagate, enqueue to shared error channel, or emit metric+structured log) and replace `_ = ...` suppression at these call sites.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "log_and_continue_paths_hide_degraded_state",
+      "summary": "Some operations only log errors and continue, leading to success-looking control flow despite failed side effects.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/system/metrics/metrics.go"
+      ],
+      "evidence": [
+        "In `applyTransitionCompletion`, `UpdateConfig(config.WithWgOn(...))` failure is logged but not returned, so caller receives success while persistence failed.",
+        "`getDiskLabel` returns empty values when reading `/dev/disk/by-label/` fails, suppressing the underlying error and silently degrading metric fidelity."
+      ],
+      "suggestion": "Standardize recoverable-vs-fatal handling: return typed degradation errors (or explicit status) when side effects fail, and reserve log-only handling for explicitly non-critical paths with documented rationale.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single, enforced error contract for async/background/runtime boundaries.",
+      "Error handling decisions appear localized per function, causing drift between adjacent modules."
+    ],
+    "likely_symptoms": [
+      "inconsistent_error_wrapping_at_runtime_boundaries",
+      "async_failures_are_suppressed_instead_of_reported",
+      "log_and_continue_paths_hide_degraded_state"
+    ],
+    "possible_false_positives": []
+  }
+}

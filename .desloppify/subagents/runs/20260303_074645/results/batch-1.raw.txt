@@ -1,0 +1,125 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 66.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime seam composition is highly fragmented: `goseg/docker/orchestration/runtime_ops.go` defines many narrow `*Ops` structs of function fields and then re-embeds them (`RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeStartupOps`) with thin forwarding helpers.",
+        "Multiple modules build additional runtime bags on top of those bags (`goseg/shipworkflow/operations_runtime.go`, `goseg/importer/importer.go`, `goseg/startuporchestrator/startup_orchestrator.go`), increasing call indirection and callback validation boilerplate.",
+        "Tests show abstraction overhead cost: `goseg/docker/orchestration/wireguard_test.go` and `goseg/startuporchestrator/startup_orchestrator_test.go` construct large callback matrices just to exercise narrow behavior.",
+        "Interface contract honesty issue: `goseg/system/wifi_runtime_api.go` resolves and passes a device name into `toggleDevice`, but `goseg/system/wifi_runtime_methods.go` ignores the parameter (`_ = dev`), so exposed API semantics do not match implementation behavior.",
+        "Event brokerage abstraction is too broad for typical consumers: `EventBroker` in `goseg/docker/events/events.go` requires all transition families while clients such as `goseg/shipworkflow/operations_runtime.go` and specific rectify handlers often consume only one stream."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 64.0,
+        "indirection_cost": 58.0,
+        "interface_honesty": 63.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_fragmentation",
+      "summary": "Nested function-bag runtimes create high indirection with limited behavioral leverage.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/wireguard_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many micro-ops structs and composite embeds, mostly as callback containers rather than domain abstractions.",
+        "`importer.go` and `operations_runtime.go` add additional nested runtime structs plus `ensure*`/default-merging layers before work functions execute.",
+        "Tests require large manual callback setup (for example `testWireguardRuntime` and startup runtime callback matrices), indicating abstraction overhead leaks into verification."
+      ],
+      "suggestion": "Replace callback-bag layering with fewer capability-oriented interfaces per workflow (for example, `ContainerLifecycle`, `UrbitConfigStore`, `TransitionPublisher`) and inject concrete implementations at module boundaries; keep seam points only where behavior is actually substituted in production or tests.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "over_fragmented_runtime_injection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_runtime_singletons",
+      "summary": "Package-level default runtime singletons hide dependency boundaries and couple subsystems through implicit globals.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "`events.go` uses mutable process-wide singleton state (`eventRuntimeInstance`, `eventRuntimeOnce`, `SetEventRuntimeFactory`).",
+        "`operations_runtime.go` uses `defaultWorkflowRuntimeValue` and many entrypoints call `defaultWorkflowRuntime()` directly.",
+        "`rectify.go` and wifi runtime files also keep default runtime singletons (`defaultRectifyRuntimeValue`, `defaultWiFiRuntimeValue`), reinforcing hidden dependencies instead of explicit wiring."
+      ],
+      "suggestion": "Move runtime assembly to a top-level composition root (startup/main), pass dependencies explicitly into long-lived services, and keep package globals for constants only; reserve singleton state for truly process-unique resources with strict lifecycle ownership.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "over_fragmented_runtime_injection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wifi_toggle_contract_mismatch",
+      "summary": "WiFi toggle API advertises per-device control but runtime implementation ignores device identity.",
+      "related_files": [
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_c2c_policy.go"
+      ],
+      "evidence": [
+        "`WiFiRuntimeService.ToggleDevice` resolves a target device and passes it to `runtime.toggleDevice(target)`.",
+        "`wifiRuntime.toggleDevice` discards the parameter (`_ = dev`) and executes global radio toggling via `nmcli radio wifi on/off`.",
+        "Elsewhere (`wifi_c2c_policy.go`) device-specific operations are modeled explicitly (`PrimaryDevice`, `SetLinkUp`), highlighting inconsistency in API semantics."
+      ],
+      "suggestion": "Make the contract honest: either rename and simplify to radio-level toggle with no device argument end-to-end, or implement true per-device behavior and propagate that semantics consistently across callers.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "interface_contract_drift"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "event_broker_interface_bloat",
+      "summary": "Event broker abstraction is too wide for consumers, forcing unnecessary coupling to unrelated transition channels.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`EventBroker` requires publish/subscription methods for four transition domains in one interface.",
+        "`workflowTransitionRuntime` and specific rectify handlers typically use a subset of those channels, but still depend on the entire broker contract.",
+        "`EventRuntime` duplicates near-identical publish/get methods per channel, indicating repeated type-specialized boilerplate instead of a narrower consumer-facing abstraction."
+      ],
+      "suggestion": "Split `EventBroker` into smaller topic-specific interfaces (or introduce a typed topic bus abstraction) so each subsystem depends only on the transition streams it actually uses.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "over_fragmented_runtime_injection"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams were introduced per function without consolidating around stable domain capabilities.",
+      "Global default runtime patterns accumulated across packages, reducing explicit dependency ownership.",
+      "Interface growth favored convenience aggregation over interface segregation."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_fragmentation",
+      "event_broker_interface_bloat",
+      "wifi_toggle_contract_mismatch"
+    ],
+    "possible_false_positives": []
+  }
+}

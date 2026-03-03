@@ -14,8 +14,8 @@ func TestDefaultDispatchUrbitPayloadRoutesToggleNetwork(t *testing.T) {
 
 	var gotPatp string
 	runtime := defaultStartramRuntime()
-	runtime.dispatchStartramToggleNetworkFn = func(patp string) error {
-		gotPatp = patp
+	runtime.DispatchUrbitPayloadFn = func(payload structs.WsUrbitPayload) error {
+		gotPatp = payload.Payload.Patp
 		return nil
 	}
 
@@ -88,7 +88,7 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 	var updateConfCalled bool
 	var dispatched []string
 
-	runtimeConfig := orchestration.NewRuntime(
+		runtimeConfig := orchestration.NewRuntime(
 		orchestration.WithSnapshotOps(orchestration.RuntimeSnapshotOps{
 			StartramSettingsSnapshotFn: func() config.StartramSettings {
 				return config.StartramSettings{
@@ -98,14 +98,12 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 			},
 		}),
 		orchestration.WithUrbitOps(orchestration.RuntimeUrbitOps{
-			RuntimeUrbitConfigOps: orchestration.RuntimeUrbitConfigOps{
-				UrbitConfFn: func(patp string) structs.UrbitDocker {
-					return structs.UrbitDocker{
-						UrbitNetworkConfig: structs.UrbitNetworkConfig{
-							Network: "wireguard",
-						},
-					}
-				},
+			UrbitConfFn: func(patp string) structs.UrbitDocker {
+				return structs.UrbitDocker{
+					UrbitNetworkConfig: structs.UrbitNetworkConfig{
+						Network: "wireguard",
+					},
+				}
 			},
 		}),
 		orchestration.WithConfigOps(orchestration.RuntimeConfigOps{
@@ -115,10 +113,8 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 			},
 		}),
 		orchestration.WithContainerOps(orchestration.RuntimeContainerOps{
-			RuntimeContainerLifecycleOps: orchestration.RuntimeContainerLifecycleOps{
-				StopContainerByNameFn: func(string) error { return nil },
-				DeleteContainerFn:      func(string) error { return nil },
-			},
+			StopContainerByNameFn: func(string) error { return nil },
+			DeleteContainerFn:     func(string) error { return nil },
 		}),
 		orchestration.WithLoadOps(orchestration.RuntimeLoadOps{
 			LoadMCFn:     func() error { return nil },
@@ -131,23 +127,17 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 		return nil
 	}
 
-	runtime := startramRuntime{
-		dispatchStartramToggleNetworkFn: toggleFn,
-		startramDispatchUrbitPayloadFn: func(payload structs.WsUrbitPayload) error {
-			return toggleFn(payload.Payload.Patp)
-		},
-		startramRuntimeFn: func() orchestration.StartramRuntime {
-			return orchestration.StartramRuntime{
-				StartramSettingsSnapshotFn: runtimeConfig.StartramSettingsSnapshotFn,
-				UrbitConfFn:                runtimeConfig.UrbitConfFn,
-				UpdateConfTypedFn:          runtimeConfig.UpdateConfTypedFn,
-				StopContainerByNameFn:      runtimeConfig.StopContainerByNameFn,
-				DeleteContainerFn:          runtimeConfig.DeleteContainerFn,
-				LoadMCFn:                   runtimeConfig.LoadMCFn,
-				LoadMinIOsFn:               runtimeConfig.LoadMinIOsFn,
-			}
-		},
+	runtime := defaultStartramRuntime()
+	runtime.DispatchUrbitPayloadFn = func(payload structs.WsUrbitPayload) error {
+		return toggleFn(payload.Payload.Patp)
 	}
+	runtime.StartramSettingsSnapshotFn = runtimeConfig.StartramSettingsSnapshotFn
+	runtime.UrbitConfFn = runtimeConfig.UrbitConfFn
+	runtime.UpdateConfTypedFn = runtimeConfig.UpdateConfTypedFn
+	runtime.StopContainerByNameFn = runtimeConfig.StopContainerByNameFn
+	runtime.DeleteContainerFn = runtimeConfig.DeleteContainerFn
+	runtime.LoadMCFn = runtimeConfig.LoadMCFn
+	runtime.LoadMinIOsFn = runtimeConfig.LoadMinIOsFn
 
 	if err := runStartramToggleWithRuntime(runtime); err != nil {
 		t.Fatalf("runStartramToggleWithRuntime() returned error: %v", err)

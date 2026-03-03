@@ -154,11 +154,15 @@ func TarArchiveForSingleFile(filePath string) (io.Reader, error) {
 		Size: info.Size(),
 	}
 	if err := tw.WriteHeader(header); err != nil {
-		_ = tw.Close()
+		if closeErr := tw.Close(); closeErr != nil {
+			return nil, fmt.Errorf("close tar archive after header write failure: %w", closeErr)
+		}
 		return nil, err
 	}
 	if _, err := io.Copy(tw, file); err != nil {
-		_ = tw.Close()
+		if closeErr := tw.Close(); closeErr != nil {
+			return nil, fmt.Errorf("close tar archive after copy failure: %w", closeErr)
+		}
 		return nil, err
 	}
 	if err := tw.Close(); err != nil {

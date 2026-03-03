@@ -40,11 +40,7 @@ func toBytes(num *big.Int) []byte {
 
 func makeBytes(num *big.Int) []byte {
 	byteSlice := num.Bytes()
-	// Reverse the slice for little-endian
-	for i, j := 0, len(byteSlice)-1; i < j; i, j = i+1, j-1 {
-		byteSlice[i], byteSlice[j] = byteSlice[j], byteSlice[i]
-	}
-	return byteSlice
+	return reverseLittleEndianBytes(byteSlice)
 }
 
 func int64ToLittleEndianBytes(num int64) ([]byte, error) {

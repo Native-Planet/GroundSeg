@@ -87,10 +87,9 @@ var protocolContractCatalogSpecs = []contractCatalogEntry{
 }
 
 func protocolContractCatalogEntries() []contractCatalogEntry {
-	return append([]contractCatalogEntry(nil), protocolContractCatalogSpecs...)
+	return catalogEntries(protocolContractCatalogSpecs)
 }
 
 func protocolContractCatalogEntriesSnapshot() []contractCatalogEntry {
-	entries := protocolContractCatalogEntries()
-	return append([]contractCatalogEntry(nil), entries...)
+	return catalogEntriesSnapshot(protocolContractCatalogSpecs)
 }

@@ -1,0 +1,97 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 74.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Broadcast runtime injection is inconsistent: `bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` resolves a runtime but still reads state through global `GetState()` in `goseg/broadcast/state.go:77`, and `ConstructPierInfo()` hardcodes default runtime via `resolveBroadcastStateRuntime()` in `goseg/broadcast/state.go:117`.",
+        "Runtime override abstractions are leaky in importer/workflow paths: importer pipeline emits through `events.DefaultEventRuntime()` (`goseg/importer/importer.go:913`) and persists chunks via `persistChunkToTemp` without threading runtime overrides (`goseg/importer/importer.go:940-942`), while shipworkflow alias logic still reaches global config via `config.GetStartramConfig()` (`goseg/shipworkflow/operations_runtime.go:290-291`).",
+        "High indirection with low behavior gain appears across startup/orchestration: large Fn-field bags and pass-through wrappers (`goseg/docker/orchestration/runtime_ops.go:24-229`, `goseg/startuporchestrator/startup_orchestrator.go:81-109`, `goseg/main.go:61-110`) mostly forward calls and defaults rather than enforcing policy."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 72.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 70.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "broadcast_runtime_injection_bypassed",
+      "summary": "Broadcast state APIs accept runtime overrides but core reads still bypass them through global state helpers.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/state_test.go",
+        "goseg/broadcast/loop_test.go"
+      ],
+      "evidence": [
+        "`bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` resolves an injected runtime but loads prior state through `GetState()` (`state.go:77`), which always reads default runtime (`state.go:200-204`).",
+        "`ConstructPierInfo()` calls `constructPierInfoWithRuntime(resolveBroadcastStateRuntime(), state.Urbits, GetScheduledPack)` (`state.go:117`), hardwiring default runtime and default scheduler lookup even when alternative runtime paths exist elsewhere.",
+        "Tests exercise default-state mutation paths (`UpdateBroadcast/GetState`) but do not verify multi-runtime isolation (`state_test.go`, `loop_test.go`), allowing the abstraction leak to persist."
+      ],
+      "suggestion": "Make runtime explicit and consistent across broadcast state operations: add runtime-aware `GetStateWithRuntime`/`GetScheduledPackWithRuntime`, thread the resolved runtime through `bootstrapBroadcastState` and `ConstructPierInfo`, and add tests that run two independent runtimes to prove isolation.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_sprawl"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_override_contract_is_partial",
+      "summary": "Importer and shipworkflow runtime seams are only partially honored, with hidden global fallbacks inside runtime-aware flows.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "Importer pipeline status emission bypasses injected dependencies and always uses singleton broker via `events.DefaultEventRuntime().PublishImportShipTransition(...)` (`importer.go:913`, also `549-555`).",
+        "Pipeline chunk persistence path (`persistUploadedChunk -> persistChunkToTemp`) does not carry runtime overrides (`importer.go:940-942`, `650-667`), so injected filesystem behavior is not consistently applied through the flow.",
+        "Shipworkflow alias check resolves DNS via runtime lookup but still reads global startram config directly (`operations_runtime.go:290-291`), mixing seam-driven and global sources in one abstraction."
+      ],
+      "suggestion": "Define a strict runtime boundary for these flows: include event publishing and config snapshot providers in runtime structs, thread runtime through pipeline helpers, and remove direct singleton/global calls from runtime-aware code paths.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_sprawl"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "fn_bag_indirection_overgrowth",
+      "summary": "Large nested Fn-field runtime bags add call-depth and maintenance overhead without clear policy encapsulation.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many narrowly-scoped Fn structs (`RuntimeContainer*`, `Runtime*Ops`, startup ops) plus assembly helpers (`defaultRuntime*`) that mostly map function references one-to-one (`runtime_ops.go:24-229`, `327-445`).",
+        "Startup orchestrator uses additional layered callback structs (`startupInitCoreSubsystems`, `startupInitHostSubsystems`, `startupInitRuntime`, `StartupRuntime`) and step synthesis wrappers with little cross-cutting policy in the abstraction itself (`startup_orchestrator.go:81-213`, `233-252`).",
+        "`main.go` repeats a similar pattern (`bootstrap*Runner` interfaces + `bootstrap*Runtime` wrappers + nil-fallback methods) for bootstrapping (`main.go:61-110`, `117-146`), duplicating seam architecture instead of sharing a stable boundary."
+      ],
+      "suggestion": "Consolidate seam design into a smaller number of cohesive interfaces per domain (startup, orchestration, workflow) and keep Fn-bag composition internal to tests; replace pass-through wrappers with explicit policy-bearing adapters where behavior diverges.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Seam/testability abstractions were introduced incrementally per package, creating multiple overlapping runtime patterns instead of one coherent dependency boundary.",
+      "Global singleton access remained in several runtime-aware flows, weakening interface honesty and making overrides partial."
+    ],
+    "likely_symptoms": [
+      "broadcast_runtime_injection_bypassed",
+      "runtime_override_contract_is_partial"
+    ],
+    "possible_false_positives": []
+  }
+}

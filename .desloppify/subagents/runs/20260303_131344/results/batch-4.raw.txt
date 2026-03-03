@@ -1,0 +1,130 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 68.7
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Config patch behavior is spread across three representations: embedded patch structs in `goseg/config/config_update_schema.go`, string-keyed field specs in `goseg/config/config_update_registry.go`, and a separate manual JSON key switch in `goseg/structs/configs.go` (`UrbitDocker.UnmarshalJSON`).",
+        "`goseg/config/config_update_registry.go` relies on string `patchField` names plus reflection (`FieldByName`) for get/set, introducing hidden coupling to `ConfPatch` layout rather than typed links.",
+        "`goseg/docker/orchestration/runtime_ops.go` centralizes many unrelated concerns (container lifecycle/state/network/observation, startup config, startram, urbit config, wireguard/netdata/minio seams) and exposes many function-bag structs that are manually recomposed.",
+        "Disk/storage behavior coverage is duplicated in parallel test suites (`goseg/system/disk_test.go` and `goseg/system/storage/storage_test.go`) with overlapping scenarios for listing disks, MMC detection, multipart cleanup, SMART dispatch, and fstab reconciliation."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_schema_registry_model_triplication",
+      "summary": "Config update behavior is defined in multiple parallel schemas, creating structural drift risk.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`ConfPatch` embeds domain patch structs in `config_update_schema.go`, but actual key parsing/apply logic is separately declared as long `confPatchField` lists in `config_update_registry.go`.",
+        "`UrbitDocker.UnmarshalJSON` in `structs/configs.go` maintains another manual key-to-field switch with defaults and conversions, independent of the patch registry path.",
+        "This requires synchronized edits across multiple files when fields evolve, increasing likelihood of partial updates or inconsistent defaults."
+      ],
+      "suggestion": "Adopt a single canonical field descriptor model (typed key, parser, defaulting, apply target) and generate or derive both patch parsing and struct hydration paths from it; remove manual duplicated key maps/switches.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "stringly_typed_config_metadata"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "reflective_patchfield_coupling",
+      "summary": "String+reflection patch field access hides invariants and makes config update wiring brittle.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`configPatchFieldFromSpec` takes `patchField` as string and `patchFieldRefByName` delegates to reflection helpers (`getConfigPatchValueByName`, `setConfigPatchValueByName`).",
+        "Missing/incorrect field names degrade into non-updates at runtime instead of compile-time failures because `FieldByName`/type assertions decide validity dynamically.",
+        "A large registry of string patch field names increases typo and refactor hazards as `ConfPatch` evolves."
+      ],
+      "suggestion": "Replace reflective field-name lookup with typed accessors (e.g., direct closure accessors per field, or generated strongly-typed refs) so rename/type drift is caught by the compiler.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_typed_config_metadata"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_ops_function_bag_aggregation",
+      "summary": "Orchestration runtime seams are aggregated into a large function-bag API that mixes composition, defaults, and domain wiring in one place.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many broad ops structs (container, urbit, startup, wireguard, netdata, minio, context, images, timers, commands) and default builders in the same file.",
+        "`defaultRuntimeStartupOps` manually projects fields from other ops structs, signaling repetitive adapter glue rather than clear bounded interfaces.",
+        "Assigned tests (`startup_orchestrator_test.go`, `main_test.go`) contain runtime validation/wiring assertions that mirror this broad dependency surface, indicating high coupling to a monolithic seam contract."
+      ],
+      "suggestion": "Split runtime seam definitions by bounded context (startup bootstrapping, container lifecycle, urbit config/workflow, platform IO) and expose smaller constructor interfaces per consumer to reduce cross-cutting wiring and dependency breadth.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "oversized_runtime_surface"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "disk_storage_test_overlap",
+      "summary": "Storage/disk tests duplicate behavior across packages, obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/system/disk_test.go",
+        "goseg/system/storage/storage_test.go"
+      ],
+      "evidence": [
+        "Both files test overlapping concerns: hard-disk listing parse/error cases, MMC mount detection, multipart cleanup, SMART drive handling, and fstab reconciliation behavior.",
+        "The overlap reflects split responsibility between legacy `system` and newer `system/storage` surfaces without a clear single owner for core disk behavior."
+      ],
+      "suggestion": "Define one canonical storage API boundary and migrate tests to that boundary; keep one authoritative test suite for shared behavior and convert remaining package tests to thin adapter/compatibility checks.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "storage_boundary_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_runtime_operations_mixed_concerns",
+      "summary": "Urbit runtime operations file combines command dispatch wrappers, transition building, persistence, and side-effect orchestration.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/handler/ship/urbit_test.go"
+      ],
+      "evidence": [
+        "`urbit_operations_runtime.go` includes thin command wrappers (`toggle*`/`set*`), transition-step factories, direct docker/click/startram side effects, and schedule mutation logic in one unit.",
+        "Many operations repeat a similar sequence (read config, mutate section, cleanup/restart, broadcast), but are encoded as separate bespoke functions.",
+        "Handler tests (`urbit_test.go`) exercise a broad action surface, reinforcing that this single file is a central behavior hub."
+      ],
+      "suggestion": "Extract a declarative transition table with reusable operation primitives (config mutation, container restart policy, side-effect hooks) and keep wrappers as minimal routing only.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "urbit_workflow_hub"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Stringly-typed metadata used where typed descriptors are needed",
+      "Boundary migration left parallel ownership paths (legacy vs new storage surfaces)",
+      "Function-bag seam pattern expanded without bounded-context partitioning"
+    ],
+    "likely_symptoms": [
+      "reflective_patchfield_coupling",
+      "disk_storage_test_overlap"
+    ],
+    "possible_false_positives": []
+  }
+}

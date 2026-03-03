@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/auth"
+	"groundseg/auth/tokens"
 	"groundseg/authsession"
 	"groundseg/broadcast"
 	"groundseg/config"
@@ -77,7 +78,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		"id":    payload.Token.ID,
 		"token": payload.Token.Token,
 	}
-	tokenContent, authed := auth.CheckToken(token, r)
+	tokenContent, authed := tokens.CheckToken(token, r)
 	token = map[string]string{
 		"id":    payload.Token.ID,
 		"token": tokenContent,
@@ -112,12 +113,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		MuCon.Write(respJSON)
 	} else if !authed {
 		var ack string
-		shouldTrackSession := true
-		token, err = auth.CreateToken(r, false)
+		token, err = tokens.CreateToken(r, conn, false)
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to create token: %v", err))
 			ack = "nack"
-			shouldTrackSession = false
 		}
 		result := map[string]interface{}{
 			"type":     "activity",
@@ -132,11 +131,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			zap.L().Error(errmsg)
 		}
 		MuCon.Write(respJson)
-		if shouldTrackSession {
-			if err := authsession.AddToAuthMap(conn, token, false); err != nil {
-				zap.L().Error(fmt.Sprintf("Unable to track auth session: %v", err))
-			}
-		}
 	} else if err := authsession.AddToAuthMap(conn, token, true); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to track auth session: %v", err))
 	}
@@ -163,7 +157,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"id":    payload.Token.ID,
 			"token": payload.Token.Token,
 		}
-		tokenContent, authed := auth.CheckToken(token, r)
+		tokenContent, authed := tokens.CheckToken(token, r)
 		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,
@@ -353,14 +347,14 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				broadcast.BroadcastToClients()
 			case "verify":
 				zap.L().Info("New client")
-				// auth.CreateToken also adds to unauth map
-				// newToken, err := auth.CreateToken(conn, r, false)
+				// tokens.CreateToken also adds to unauth map
+				// newToken, err := tokens.CreateToken(conn, r, false)
 				// if err != nil {
 				// 	zap.L().Error(fmt.Sprintf("Unable to create token: %v", err))
 				// 	ack = "nack"
 				// }
 				// token = newToken
-				tokenContent, authed := auth.CheckToken(token, r)
+				tokenContent, authed := tokens.CheckToken(token, r)
 				token = map[string]string{
 					"id":    payload.Token.ID,
 					"token": tokenContent,

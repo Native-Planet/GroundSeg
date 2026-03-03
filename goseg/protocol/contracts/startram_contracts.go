@@ -1,38 +1,39 @@
 package contracts
 
-var (
-	apiConnectionErrorMessage = "Unable to connect to API server"
+const (
+	startramApiConnectionErrorContractID                          = ContractID("startram.errors.api-connection")
+	startramApiConnectionErrorName                                = "APIConnectionError"
+	startramApiConnectionErrorDescription                         = "Masks transport detail when the StarTram API is unavailable or unreachable."
+	startramApiConnectionErrorMessage                             = "Unable to connect to API server"
+	startramApiConnectionErrorIntroducedIn                        = "2026.01.20"
+	startramApiConnectionErrorCompatibility ContractCompatibility = CompatibilityBackwardSafe
 )
 
 var (
 	startramApiConnectionErrorContract = contractCatalogEntry{
-		ID: ContractID("startram.errors.api-connection"),
+		ID: startramApiConnectionErrorContractID,
 		Descriptor: ContractDescriptor{
-			Name:        "APIConnectionError",
-			Description: "Masks transport detail when the StarTram API is unavailable or unreachable.",
+			Name:        startramApiConnectionErrorName,
+			Description: startramApiConnectionErrorDescription,
 			ContractMetadata: ContractMetadata{
-				IntroducedIn:  "2026.01.20",
-				Compatibility: CompatibilityBackwardSafe,
+				IntroducedIn:  startramApiConnectionErrorIntroducedIn,
+				Compatibility: startramApiConnectionErrorCompatibility,
 			},
-			Message: apiConnectionErrorMessage,
+			Message: startramApiConnectionErrorMessage,
 		},
 	}
 )
 
-var (
-	APIConnectionError                      ContractID            = startramApiConnectionErrorContract.ID
-	startramApiConnectionErrorIntroducedIn                        = startramApiConnectionErrorContract.Descriptor.IntroducedIn
-	startramApiConnectionErrorCompatibility ContractCompatibility = startramApiConnectionErrorContract.Descriptor.Compatibility
-)
+const APIConnectionError ContractID = startramApiConnectionErrorContractID
 
 var startramContractCatalogSpecs = []contractCatalogEntry{
 	startramApiConnectionErrorContract,
 }
 
 func startramContractCatalogEntries() []contractCatalogEntry {
-	return append([]contractCatalogEntry(nil), startramContractCatalogSpecs...)
+	return catalogEntries(startramContractCatalogSpecs)
 }
 
 func startramContractCatalogEntriesSnapshot() []contractCatalogEntry {
-	return append([]contractCatalogEntry(nil), startramContractCatalogEntries()...)
+	return catalogEntriesSnapshot(startramContractCatalogSpecs)
 }

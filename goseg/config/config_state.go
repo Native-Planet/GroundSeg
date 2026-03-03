@@ -3,8 +3,8 @@ package config
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -12,8 +12,8 @@ import (
 	"os"
 	"time"
 
-	"groundseg/structs"
 	"go.uber.org/zap"
+	"groundseg/structs"
 )
 
 // we keep map[string]structs.ContainerState in memory to keep track of the containers
@@ -60,7 +60,10 @@ func NetCheck(netCheck string) bool {
 		zap.L().Error(errmsg)
 	} else {
 		internet = true
-		_ = conn.Close()
+		if err := conn.Close(); err != nil {
+			errmsg := fmt.Sprintf("Check internet access: unable to close connection probe to %s: %v", netCheck, err)
+			zap.L().Warn(errmsg)
+		}
 	}
 	return internet
 }

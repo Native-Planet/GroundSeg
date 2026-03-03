@@ -18,11 +18,11 @@ func resetWifiSeamsForTest(t *testing.T) {
 
 func testWifiRuntime(overrides wifiRuntime) wifiRuntime {
 	runtime := wifiRuntime{}
-	runtime.execCommand = overrides.execCommand
-	runtime.runCommand = overrides.runCommand
-	runtime.newWifiClient = overrides.newWifiClient
-	runtime.clientInterfacesFn = overrides.clientInterfacesFn
-	runtime.clientBSSFn = overrides.clientBSSFn
+	runtime.ExecCommand = overrides.ExecCommand
+	runtime.RunCommand = overrides.RunCommand
+	runtime.NewWifiClient = overrides.NewWifiClient
+	runtime.ClientInterfacesFn = overrides.ClientInterfacesFn
+	runtime.ClientBSSFn = overrides.ClientBSSFn
 	return runtime
 }
 
@@ -30,7 +30,7 @@ func TestGetWifiDeviceParsesAndTrimsOutput(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
 	runtime := testWifiRuntime(wifiRuntime{
-		execCommand: func(name string, args ...string) *exec.Cmd {
+		ExecCommand: func(name string, args ...string) *exec.Cmd {
 			if name != "sh" {
 				t.Fatalf("unexpected command: %s", name)
 			}
@@ -54,12 +54,12 @@ func TestGetConnectedSSIDReturnsErrorForMissingInterface(t *testing.T) {
 	called := 0
 	bssCalled := 0
 	runtime := testWifiRuntime(wifiRuntime{
-		clientInterfacesFn: func(c *wifi.Client) ([]*wifi.Interface, error) {
+		ClientInterfacesFn: func(c *wifi.Client) ([]*wifi.Interface, error) {
 			_ = c
 			called++
 			return []*wifi.Interface{{Name: "wlan1", Type: wifi.InterfaceTypeStation}}, nil
 		},
-		clientBSSFn: func(c *wifi.Client, iface *wifi.Interface) (*wifi.BSS, error) {
+		ClientBSSFn: func(c *wifi.Client, iface *wifi.Interface) (*wifi.BSS, error) {
 			_ = c
 			_ = iface
 			bssCalled++
@@ -89,7 +89,7 @@ func TestGetWifiDeviceReturnsErrorForFailureOrEmptyResult(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
 	runtime := testWifiRuntime(wifiRuntime{
-		execCommand: func(name string, args ...string) *exec.Cmd {
+		ExecCommand: func(name string, args ...string) *exec.Cmd {
 			_ = args
 			return exec.Command("false")
 		},
@@ -99,7 +99,7 @@ func TestGetWifiDeviceReturnsErrorForFailureOrEmptyResult(t *testing.T) {
 	}
 
 	runtime = testWifiRuntime(wifiRuntime{
-		execCommand: func(name string, args ...string) *exec.Cmd {
+		ExecCommand: func(name string, args ...string) *exec.Cmd {
 			_ = name
 			_ = args
 			return exec.Command("sh", "-c", "printf '\\n'")
@@ -117,7 +117,7 @@ func TestPrimaryWifiDeviceReturnsFirstDevice(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
 	runtime := testWifiRuntime(wifiRuntime{
-		execCommand: func(name string, args ...string) *exec.Cmd {
+		ExecCommand: func(name string, args ...string) *exec.Cmd {
 			_ = name
 			_ = args
 			return exec.Command("sh", "-c", "printf 'wlan0\\nwlan1\\n'")
@@ -137,7 +137,7 @@ func TestListWifiSSIDsParsesValidEntriesAndSkipsMalformed(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
 	runtime := testWifiRuntime(wifiRuntime{
-		runCommand: func(command string, args ...string) (string, error) {
+		RunCommand: func(command string, args ...string) (string, error) {
 			_ = command
 			_ = args
 			return strings.Join([]string{
@@ -161,7 +161,7 @@ func TestListWifiSSIDsParsesValidEntriesAndSkipsMalformed(t *testing.T) {
 func TestListWifiSSIDsPropagatesScanFailures(t *testing.T) {
 	resetWifiSeamsForTest(t)
 	runtime := testWifiRuntime(wifiRuntime{
-		runCommand: func(string, ...string) (string, error) {
+		RunCommand: func(string, ...string) (string, error) {
 			return "", errors.New("nmcli down")
 		},
 	})
@@ -173,18 +173,20 @@ func TestListWifiSSIDsPropagatesScanFailures(t *testing.T) {
 func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
+	calls := []string{}
 	runtime := testWifiRuntime(wifiRuntime{
-		runCommand: func(command string, args ...string) (string, error) {
-			if command == "nmcli" && strings.Join(args, " ") == "radio wifi" {
+		RunCommand: func(command string, args ...string) (string, error) {
+			call := command + " " + strings.Join(args, " ")
+			calls = append(calls, strings.TrimSpace(call))
+			switch {
+			case command == "nmcli" && strings.Join(args, " ") == "radio wifi":
 				return "enabled\n", nil
-			}
-			if strings.Join(args, " ") == "radio wifi off" {
+			case command == "ip" && strings.Join(args, " ") == "link set wlan0 down":
+				return "", nil
+			case command == "ip" && strings.Join(args, " ") == "link set wlan0 up":
 				return "", nil
 			}
-			if strings.Join(args, " ") == "radio wifi on" {
-				return "", nil
-			}
-			return "", nil
+			return "", errors.New("unexpected command: " + call)
 		},
 	})
 	wifiEnabled, err := runtime.ifCheck()
@@ -200,19 +202,35 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 	}
 
 	runtime = testWifiRuntime(wifiRuntime{
-		runCommand: func(command string, args ...string) (string, error) {
-			if command == "nmcli" && strings.Join(args, " ") == "radio wifi" {
+		RunCommand: func(command string, args ...string) (string, error) {
+			call := command + " " + strings.Join(args, " ")
+			calls = append(calls, strings.TrimSpace(call))
+			switch {
+			case command == "nmcli" && strings.Join(args, " ") == "radio wifi":
 				return "disabled\n", nil
+			case command == "ip" && strings.Join(args, " ") == "link set wlan0 up":
+				return "", nil
 			}
-			return "", nil
+			return "", errors.New("unexpected command: " + call)
 		},
 	})
 	if err := runtime.toggleDevice("wlan0"); err != nil {
 		t.Fatalf("ToggleDevice(on) returned error: %v", err)
 	}
 
+	wantCalls := map[string]struct{}{
+		"nmcli radio wifi":       {},
+		"ip link set wlan0 down": {},
+		"ip link set wlan0 up":   {},
+	}
+	for _, call := range calls {
+		if _, ok := wantCalls[call]; !ok {
+			t.Fatalf("unexpected command in wifi seam test: %q", call)
+		}
+	}
+
 	runtime = testWifiRuntime(wifiRuntime{
-		runCommand: func(string, ...string) (string, error) { return "", errors.New("nmcli error") },
+		RunCommand: func(string, ...string) (string, error) { return "", errors.New("nmcli error") },
 	})
 	wifiEnabled, err = runtime.ifCheck()
 	if err == nil {
@@ -228,9 +246,14 @@ func TestConnectToWifiUsesNmcliAndPropagatesErrors(t *testing.T) {
 
 	calls := []string{}
 	runtime := testWifiRuntime(wifiRuntime{
-		execCommand: func(name string, args ...string) *exec.Cmd {
+		ExecCommand: func(name string, args ...string) *exec.Cmd {
 			calls = append(calls, name+" "+strings.Join(args, " "))
 			return exec.Command("true")
+		},
+		RunCommand: func(command string, args ...string) (string, error) {
+			call := command + " " + strings.Join(args, " ")
+			calls = append(calls, strings.TrimSpace(call))
+			return "", errors.New("unexpected command: " + call)
 		},
 	})
 	if err := runtime.connect("HomeWiFi", "secret"); err != nil {
@@ -241,10 +264,15 @@ func TestConnectToWifiUsesNmcliAndPropagatesErrors(t *testing.T) {
 	}
 
 	runtime = testWifiRuntime(wifiRuntime{
-		execCommand: func(name string, args ...string) *exec.Cmd {
-			_ = name
-			_ = args
+		ExecCommand: func(name string, args ...string) *exec.Cmd {
+			calls = []string{}
+			calls = append(calls, name+" "+strings.Join(args, " "))
 			return exec.Command("false")
+		},
+		RunCommand: func(command string, args ...string) (string, error) {
+			call := command + " " + strings.Join(args, " ")
+			calls = append(calls, strings.TrimSpace(call))
+			return "", errors.New("unexpected command: " + call)
 		},
 	})
 	if err := runtime.connect("HomeWiFi", "secret"); err == nil {
@@ -256,7 +284,7 @@ func TestDisconnectWifiUsesInjectedClientFactoryError(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
 	runtime := testWifiRuntime(wifiRuntime{
-		newWifiClient: func() (*wifi.Client, error) {
+		NewWifiClient: func() (*wifi.Client, error) {
 			return nil, errors.New("client unavailable")
 		},
 	})
@@ -474,24 +502,28 @@ func TestC2CConnectWrapsConnectAndRestoreErrors(t *testing.T) {
 	c2cRestoreErr := errors.New("restore failure")
 
 	flow := newC2CModeFlowWithDependencies(c2cModeDependencies{
-		radio: wifiRadioConnectErrorService{
-			connectedDevice: "wlan0",
-			connectErr:      connectErr,
+		c2cModeServiceDependencies: c2cModeServiceDependencies{
+			radio: wifiRadioConnectErrorService{
+				connectedDevice: "wlan0",
+				connectErr:      connectErr,
+			},
+			accessPoint: accessPointLifecycleNoop{},
+			getStoredSSIDs: func(_ []string) {
+			},
 		},
-		accessPoint: accessPointLifecycleNoop{},
-		getStoredSSIDs: func(_ []string) {
-		},
-		startResolved: func() error {
-			return nil
-		},
-		stopResolved: func() error {
-			return c2cRestoreErr
-		},
-		rebootSystem: func() error {
-			return nil
-		},
-		pause: func(_ time.Duration) {},
-		publishInterval: func(_ string) {
+		c2cModeLifecycleDependencies: c2cModeLifecycleDependencies{
+			startResolved: func() error {
+				return nil
+			},
+			stopResolved: func() error {
+				return c2cRestoreErr
+			},
+			rebootSystem: func() error {
+				return nil
+			},
+			pause: func(_ time.Duration) {},
+			publishInterval: func(_ string) {
+			},
 		},
 	})
 

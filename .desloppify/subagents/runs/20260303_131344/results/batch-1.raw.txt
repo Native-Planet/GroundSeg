@@ -1,0 +1,69 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files define near-identical catalog plumbing (`*ContractCatalogSpecs`, `*ContractCatalogEntries`, `*ContractCatalogEntriesSnapshot`) separately, rather than through a shared boundary API, which increases cross-module drift risk.",
+        "Contract-definition style is inconsistent across sibling modules: `protocol_contracts.go` uses mostly immutable typed constants for IDs/namespaces/actions, while `startram_contracts.go` relies on mutable package vars and derives exported symbols from struct fields at init time.",
+        "The same package-level catalog concept is implemented with different conventions (const-first vs var-first), indicating weak architectural contracts for how new modules should publish contracts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "catalog_boundary_duplication",
+      "summary": "Sibling contract modules duplicate catalog registration mechanics instead of sharing a single publication boundary.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Both files repeat the same pattern: module-specific `...ContractCatalogSpecs` slice plus paired `...ContractCatalogEntries()` and `...ContractCatalogEntriesSnapshot()` copy helpers.",
+        "This pattern is structural, not domain-specific; duplication across modules signals missing shared architecture for catalog publication."
+      ],
+      "suggestion": "Introduce one internal helper (or small registry builder) in `contracts` for immutable catalog exposure and snapshotting, then migrate module files to provide only domain entries while reusing the shared publication path.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_contract_catalog_publication_abstraction"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "inconsistent_contract_definition_convention",
+      "summary": "Contract declarations use inconsistent mutability and export conventions across modules, weakening boundary integrity.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` anchors IDs/actions/compatibility in typed constants and maps exports to those constants.",
+        "`startram_contracts.go` keeps key contract values in package vars (`apiConnectionErrorMessage`, `startramApiConnectionErrorContract`) and exports `APIConnectionError` as a mutable var derived from another var at init-time.",
+        "No shared rule enforces one declaration style, so future modules can diverge further and increase coupling to init-time state."
+      ],
+      "suggestion": "Define and enforce a single contract declaration convention (prefer immutable typed constants for IDs/metadata, with generated or helper-based entry construction), then normalize both files to that convention.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_contract_catalog_publication_abstraction"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No canonical internal API for contract-catalog publication.",
+      "No enforced style guide for immutable contract declarations across contract modules."
+    ],
+    "likely_symptoms": [
+      "catalog_boundary_duplication",
+      "inconsistent_contract_definition_convention"
+    ],
+    "possible_false_positives": []
+  }
+}

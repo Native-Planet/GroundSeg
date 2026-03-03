@@ -35,7 +35,7 @@ func TestRequestIdentityFromRequestReadsForwardedAddress(t *testing.T) {
 }
 
 func TestCreateTokenRequiresRequest(t *testing.T) {
-	token, err := CreateToken(nil, false)
+	token, err := CreateToken(nil, nil, false)
 	if err == nil {
 		t.Fatalf("expected CreateToken to error on nil request, got token=%v", token)
 	}

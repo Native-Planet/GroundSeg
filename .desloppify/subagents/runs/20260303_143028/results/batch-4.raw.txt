@@ -1,0 +1,131 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 68.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "The storage test surface is duplicated across two packages with near-parallel scenarios (`goseg/system/disk_test.go` and `goseg/system/storage/storage_test.go` both cover ListHardDisks/IsMountedMMC/RemoveMultipartFiles/fstab reconciliation behavior).",
+        "`goseg/docker/orchestration/runtime_ops.go` combines many unrelated seams (container lifecycle/state/network, urbit config/workflow, startup, health, service wiring) and also defines overlapping shapes (`RuntimeHealthOps` and `RuntimeSnapshotOps`) with identical fields.",
+        "`goseg/config/config_update_registry.go` uses reflection + string field names (`patchField` with `FieldByName`) for patch binding while separately maintaining large manual registries of per-domain fields, creating split sources of truth with weak compile-time guarantees.",
+        "`goseg/shipworkflow/urbit_operations_runtime.go` and `goseg/shipworkflow/startram_lifecycle_runtime.go` blend transition emission, config mutation, docker lifecycle actions, and external side effects in the same handlers/step builders, making behavior hard to reason about or change locally."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_storage_test_surface",
+      "summary": "Storage behavior is tested through two parallel test suites, creating duplicated design intent and drift risk.",
+      "related_files": [
+        "goseg/system/disk_test.go",
+        "goseg/system/storage/storage_test.go"
+      ],
+      "evidence": [
+        "Both files validate the same concerns (disk listing, mmc mount detection, multipart cleanup, fstab reconciliation) with separate fixtures and assertions.",
+        "Examples: `TestListHardDisks*`, `TestIsMountedMMC*`, and multipart/fstab tests appear in both suites with slightly different seam styles."
+      ],
+      "suggestion": "Choose one authoritative test layer (legacy wrapper package vs storage package), move shared behavior checks to that layer, and keep only thin adapter tests in the other package.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "migration_parallel_apis"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_ops_overaggregated_registry",
+      "summary": "A single runtime wiring file owns too many responsibilities and duplicates seam contracts.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines broad seam structs for container, urbit, health, startup, snapshot, wireguard, minio, netdata, timers, services, bootstrap, and image loading in one place.",
+        "`RuntimeHealthOps` and `RuntimeSnapshotOps` have the same fields, indicating concept duplication rather than clear ownership boundaries.",
+        "`rectify.go` then consumes a separate runtime shape with another merge/override path, reinforcing fragmentation of runtime composition patterns."
+      ],
+      "suggestion": "Split runtime seam composition by domain (container/urbit/config/startup), remove duplicated seam types, and expose a small set of focused constructors reused by downstream modules like rectify.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overaggregation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "reflective_patch_binding_brittle",
+      "summary": "Config patching relies on reflective string binding plus large manual field registries, which weakens coherence and change safety.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`getConfigPatchValueByName`/`setConfigPatchValueByName` use `reflect.FieldByName` with string keys from registry specs.",
+        "Patch definitions are manually repeated per domain (`connectivityPatchFields`, `runtimePatchFields`, `startramPatchFields`, etc.), while struct field definitions live separately in schema/config structs.",
+        "Field naming mismatch pressure is visible (JSON key `endpointUrl`, patch field `EndpointURL`, target struct field `EndpointUrl`), increasing cognitive load and accidental mismatch risk."
+      ],
+      "suggestion": "Replace reflection-based field lookup with typed accessors generated or declared alongside patch structs; co-locate patch metadata with owning config structs to keep a single source of truth.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "schema_registry_split_brain"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_transition_handlers_mixed_concerns",
+      "summary": "Urbit transition handlers combine orchestration, persistence, and external service calls in single builders.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/shipworkflow/startram_lifecycle_runtime.go"
+      ],
+      "evidence": [
+        "`buildToggleMinIOLinkSteps` manages config reads, endpoint derivation, click unlink/link calls, MinIO account creation, and config persistence in one step chain.",
+        "`buildRuntimeConfigIntSteps` both mutates runtime config and performs lifecycle restart decisions (`urbitCleanDelete`, conditional `StartContainer`).",
+        "Similar coupling exists in startram handlers (`runStartramToggleWithRuntime`, `runStartramEndpointWithRuntime`) where transition flow and infra mutation are tightly interleaved."
+      ],
+      "suggestion": "Introduce domain-level operations (e.g., `UpdateShipFeature`, `ReconcileShipRuntime`, `ApplyStartramTogglePlan`) and keep transition handlers as thin coordinators that call those operations.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "workflow_handlers_coupled_to_infra"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "monolithic_behavior_tests",
+      "summary": "Several tests package many behavioral branches into giant methods, obscuring scenario intent and ownership boundaries.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/handler/systemsvc/system_test.go"
+      ],
+      "evidence": [
+        "`accesspoint_test.go` and `importer_test.go` are ~900 lines each and contain broad stateful scenario stacks with repeated seam setup/teardown helpers.",
+        "`TestStartRouterWithRuntimeForwardsForwardingAndNATErrorPaths` encodes a long command-failure matrix in one test function instead of grouped behavior-focused submodules.",
+        "`TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors` executes three distinct behavioral phases in one function by mutating runtime stubs mid-test."
+      ],
+      "suggestion": "Split mega-tests by behavior slice (validation, lifecycle, error mapping), move repeated seam wiring into small builders, and keep each test to one assertion theme.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_harness_overaggregation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Ongoing seam/runtime migration left parallel abstractions active instead of converging on one composition model.",
+      "Large workflow handlers grew by accretion and absorbed both domain policy and infrastructure side effects.",
+      "Legacy/new package boundaries in storage were not accompanied by test-surface consolidation."
+    ],
+    "likely_symptoms": [
+      "runtime_ops_overaggregated_registry",
+      "reflective_patch_binding_brittle",
+      "duplicated_storage_test_surface"
+    ],
+    "possible_false_positives": []
+  }
+}

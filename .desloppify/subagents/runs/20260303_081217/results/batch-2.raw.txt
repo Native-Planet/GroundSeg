@@ -1,0 +1,94 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Urbit config mutation paths are duplicated across layers: `goseg/config/urbit.go` defines section-specific update wrappers and section mutator conversion, while `goseg/docker/orchestration/runtime_ops.go` re-implements per-section update fallbacks with repeated copy-mutate-assign closures.",
+        "Indirection-heavy pass-through APIs are repeated: `goseg/auth/token_service.go` mostly aliases/wraps `auth/tokens` behavior with shallow guards, and `goseg/docker/orchestration/runtime_ops.go` repeatedly reconstructs `RuntimeUrbitConfigOps` just to forward calls.",
+        "Session broadcasting/state ownership is split and partially duplicated: `goseg/session/client_manager.go` has active broadcaster logic, while `goseg/session/connection_registry.go` contains a separate broadcast loop and additional state operations, creating overlap in responsibilities."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_urbit_section_update_paths",
+      "summary": "Urbit section-update behavior is implemented in multiple layers with parallel logic.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`config/urbit.go` centralizes section typing via `UrbitSectionMutator` and exposes `UpdateUrbitSection` plus per-section wrappers.",
+        "`runtime_ops.go` repeats section-specific mutation behavior in `UpdateUrbitRuntimeConfig`, `UpdateUrbitNetworkConfig`, `UpdateUrbitScheduleConfig`, `UpdateUrbitFeatureConfig`, `UpdateUrbitWebConfig`, and `UpdateUrbitBackupConfig` with near-identical copy-mutate-assign blocks.",
+        "Callers like `shipworkflow/urbit_operations_runtime.go` depend on this split surface, so behavior changes require coordination across at least two modules."
+      ],
+      "suggestion": "Make one layer the canonical owner of section mutation (prefer `config/urbit.go`) and have orchestration delegate through a single typed section API. Remove duplicated per-section fallback implementations from runtime ops and keep only one adapter point.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "urbit_config_surface_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "low_leverage_pass_through_facades",
+      "summary": "Multiple facades add call depth without adding meaningful policy or behavior.",
+      "related_files": [
+        "goseg/auth/token_service.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "`auth/token_service.go` contains many wrappers that immediately delegate to `tokens.*` after simple nil/empty checks, while also re-exporting status constants/types.",
+        "`runtime_ops.go` methods on `RuntimeTransitionOps` repeatedly instantiate `RuntimeUrbitConfigOps{...}` and forward (`LoadUrbitConfig`, `UrbitConf`, `LoadAndReadUrbitConfig`, `UpdateUrbitSnapshot`, `UpdateUrbitSection`).",
+        "The same concept (config update/read) is exposed through several thin surfaces (`RuntimeTransitionOps`, `RuntimeUrbitConfigOps`, and direct config APIs), increasing navigation and maintenance overhead."
+      ],
+      "suggestion": "Collapse pass-through layers: keep one public seam per responsibility and move trivial validation into a shared helper. For orchestration, create one reusable `urbitConfigOps()` accessor instead of reconstructing structs per method, and remove wrappers that only mirror downstream APIs.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "facade_indirection_without_policy"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_broadcast_responsibility_overlap",
+      "summary": "Session broadcast and registry concerns overlap across two components.",
+      "related_files": [
+        "goseg/session/client_manager.go",
+        "goseg/session/connection_registry.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`client_manager.go` owns active broadcasting via `sessionBroadcaster.broadcast` and write-failure handling/removal.",
+        "`connection_registry.go` also defines a broadcast loop over client buckets with similar write/update behavior, indicating duplicated responsibility in the same subsystem.",
+        "`logstream_session_store.go` introduces a third session-state holder with its own locking/session lifecycle methods, reinforcing fragmented ownership boundaries for connection/session state."
+      ],
+      "suggestion": "Define a single owner for websocket broadcast and session mutation in the session subsystem. Remove duplicate broadcast implementations, make manager vs registry boundaries explicit (or merge them), and keep logstream store scoped strictly to logstream concerns.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "session_state_ownership_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Growth-by-wrapper pattern created multiple shallow API layers with overlapping ownership.",
+      "Section-specific behavior is encoded in parallel at config and orchestration layers instead of one canonical mutation path.",
+      "Session subsystem evolved into several state holders with partially duplicated lifecycle/broadcast behavior."
+    ],
+    "likely_symptoms": [
+      "duplicated_urbit_section_update_paths",
+      "low_leverage_pass_through_facades",
+      "session_broadcast_responsibility_overlap"
+    ],
+    "possible_false_positives": []
+  }
+}

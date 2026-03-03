@@ -93,7 +93,11 @@ func HandleNewShipBoot(shipPayload structs.WsNewShipPayload) error {
 		return handleError(fmt.Errorf("Invalid @p provided: %v", patp))
 	}
 
-	go ProvisionShip(patp, shipPayload, driveResolution.Mountpoint)
+	go func() {
+		if err := ProvisionShip(patp, shipPayload, driveResolution.Mountpoint); err != nil {
+			_ = handleError(err)
+		}
+	}()
 	return nil
 }
 

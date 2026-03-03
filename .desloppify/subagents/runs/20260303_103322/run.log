@@ -1,0 +1,15 @@
+2026-03-03T10:33:23+00:00 run-start runner=codex parallel=True max_parallel=3 timeout=1200s heartbeat=15.0s stall_warning=0s stall_kill=120s retries=1 retry_backoff=2.0s upper_bound=20m selected=[1, 2, 3]
+2026-03-03T10:33:23+00:00 run-path /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260303_103322
+2026-03-03T10:33:23+00:00 packet /Users/chuah/NP/GroundSeg/.desloppify/review_packets/holistic_packet_20260303_103322.json
+2026-03-03T10:33:23+00:00 blind-packet /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+2026-03-03T10:33:23+00:00 batch-queued batch=1 position=1/3
+2026-03-03T10:33:23+00:00 batch-start batch=1 position=1/3
+2026-03-03T10:33:23+00:00 batch-queued batch=2 position=2/3
+2026-03-03T10:33:23+00:00 batch-start batch=2 position=2/3
+2026-03-03T10:33:23+00:00 batch-queued batch=3 position=3/3
+2026-03-03T10:33:23+00:00 batch-start batch=3 position=3/3
+2026-03-03T10:33:24+00:00 batch-done batch=1 position=1/3 code=1 elapsed=1
+2026-03-03T10:33:24+00:00 batch-done batch=2 position=2/3 code=1 elapsed=1
+2026-03-03T10:33:24+00:00 batch-done batch=3 position=3/3 code=1 elapsed=1
+2026-03-03T10:33:24+00:00 run-summary /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260303_103322/run_summary.json
+2026-03-03T10:33:24+00:00 run-finished failures=[1, 2, 3] mode=exit

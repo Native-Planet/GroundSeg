@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go.uber.org/zap"
-	"groundseg/auth"
+	"groundseg/auth/tokens"
 	"groundseg/leakchannel"
 	"groundseg/structs"
 	"time"
@@ -43,7 +43,7 @@ func urbitLogin(patp string, loginPayload []byte) error {
 	if err != nil {
 		return leakProtocolError{reason: "Urbit Login failed to unmarshal", cause: err}
 	}
-	authed := auth.AuthenticateLogin(payload.Payload.Password)
+	authed := tokens.AuthenticateLogin(payload.Payload.Password)
 
 	lickMu.Lock()
 	status, exists := lickStatuses[patp]

@@ -1,0 +1,104 @@
+{
+  "created_at": "2026-03-03T11:31:01+00:00",
+  "run_stamp": "20260303_113100",
+  "runner": "codex",
+  "parallel": true,
+  "selected_batches": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "successful_batches": [],
+  "failed_batches": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "allow_partial": false,
+  "max_parallel_batches": 3,
+  "batch_timeout_seconds": 1200,
+  "batch_max_retries": 1,
+  "batch_retry_backoff_seconds": 2.0,
+  "batch_heartbeat_seconds": 15.0,
+  "batch_stall_warning_seconds": 0,
+  "batch_stall_kill_seconds": 120,
+  "immutable_packet": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/review_packets/holistic_packet_20260303_113100.json",
+  "blind_packet": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/review_packet_blind.json",
+  "run_dir": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100",
+  "logs_dir": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/logs",
+  "run_log": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/run.log",
+  "batches": {
+    "1": {
+      "position": 1,
+      "status": "failed",
+      "prompt_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/prompts/batch-1.md",
+      "result_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/results/batch-1.raw.txt",
+      "log_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/logs/batch-1.log",
+      "started_at": "2026-03-03T11:31:01+00:00",
+      "elapsed_seconds": 1,
+      "exit_code": 1,
+      "completed_at": "2026-03-03T11:31:02+00:00"
+    },
+    "2": {
+      "position": 2,
+      "status": "failed",
+      "prompt_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/prompts/batch-2.md",
+      "result_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/results/batch-2.raw.txt",
+      "log_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/logs/batch-2.log",
+      "started_at": "2026-03-03T11:31:01+00:00",
+      "elapsed_seconds": 1,
+      "exit_code": 1,
+      "completed_at": "2026-03-03T11:31:02+00:00"
+    },
+    "3": {
+      "position": 3,
+      "status": "failed",
+      "prompt_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/prompts/batch-3.md",
+      "result_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/results/batch-3.raw.txt",
+      "log_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/logs/batch-3.log",
+      "started_at": "2026-03-03T11:31:01+00:00",
+      "elapsed_seconds": 1,
+      "exit_code": 1,
+      "completed_at": "2026-03-03T11:31:02+00:00"
+    },
+    "4": {
+      "position": 4,
+      "status": "failed",
+      "prompt_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/prompts/batch-4.md",
+      "result_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/results/batch-4.raw.txt",
+      "log_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/logs/batch-4.log",
+      "started_at": "2026-03-03T11:31:02+00:00",
+      "elapsed_seconds": 1,
+      "exit_code": 1,
+      "completed_at": "2026-03-03T11:31:03+00:00"
+    },
+    "5": {
+      "position": 5,
+      "status": "failed",
+      "prompt_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/prompts/batch-5.md",
+      "result_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/results/batch-5.raw.txt",
+      "log_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/logs/batch-5.log",
+      "started_at": "2026-03-03T11:31:02+00:00",
+      "elapsed_seconds": 1,
+      "exit_code": 1,
+      "completed_at": "2026-03-03T11:31:03+00:00"
+    },
+    "6": {
+      "position": 6,
+      "status": "failed",
+      "prompt_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/prompts/batch-6.md",
+      "result_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/results/batch-6.raw.txt",
+      "log_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_113100/logs/batch-6.log",
+      "started_at": "2026-03-03T11:31:02+00:00",
+      "elapsed_seconds": 1,
+      "exit_code": 1,
+      "completed_at": "2026-03-03T11:31:03+00:00"
+    }
+  }
+}

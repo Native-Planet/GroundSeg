@@ -3,6 +3,7 @@ package container
 import (
 	"fmt"
 	"groundseg/docker/orchestration/internal/artifactwriter"
+	"groundseg/internal/seams"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
@@ -14,10 +15,7 @@ import (
 )
 
 type NetdataRuntime struct {
-	OpenFn                    func(string) (*os.File, error)
-	ReadFileFn                func(string) ([]byte, error)
-	WriteFileFn               func(string, []byte, os.FileMode) error
-	MkdirAllFn                func(string, os.FileMode) error
+	RuntimeFileOps
 	StartContainerFn          func(string, string) (structs.ContainerState, error)
 	UpdateContainerState      func(string, structs.ContainerState)
 	CreateDefaultFn           func() error
@@ -33,6 +31,13 @@ type NetdataRuntime struct {
 	GetContainerRunningStatusFn func(string) (string, error)
 	SleepFn                     func(time.Duration)
 	PollIntervalFn              func() time.Duration
+}
+
+type RuntimeFileOps struct {
+	OpenFn      func(string) (*os.File, error)
+	ReadFileFn  func(string) ([]byte, error)
+	WriteFileFn func(string, []byte, os.FileMode) error
+	MkdirAllFn  func(string, os.FileMode) error
 }
 
 type netdataRuntimeRequirement func(NetdataRuntime) error
@@ -52,7 +57,7 @@ func (rt NetdataRuntime) require(requirements ...netdataRuntimeRequirement) erro
 func (rt NetdataRuntime) requireBasePath() error {
 	return rt.require(func(rt NetdataRuntime) error {
 		if rt.BasePathFn == nil {
-			return fmt.Errorf("missing base path getter")
+			return seams.MissingRuntimeDependency("netdata base path getter", "")
 		}
 		return nil
 	})
@@ -61,7 +66,7 @@ func (rt NetdataRuntime) requireBasePath() error {
 func (rt NetdataRuntime) requireContainerMetadata() error {
 	return rt.require(func(rt NetdataRuntime) error {
 		if rt.GetLatestContainerInfoFn == nil {
-			return fmt.Errorf("missing latest netdata metadata runtime")
+			return seams.MissingRuntimeDependency("netdata container metadata runtime", "")
 		}
 		return nil
 	})
@@ -70,7 +75,7 @@ func (rt NetdataRuntime) requireContainerMetadata() error {
 func (rt NetdataRuntime) requireDockerDir() error {
 	return rt.require(func(rt NetdataRuntime) error {
 		if rt.DockerDirFn == nil {
-			return fmt.Errorf("missing docker dir getter")
+			return seams.MissingRuntimeDependency("netdata docker directory callback", "")
 		}
 		return nil
 	})
@@ -79,7 +84,7 @@ func (rt NetdataRuntime) requireDockerDir() error {
 func (rt NetdataRuntime) requireFileReader() error {
 	return rt.require(func(rt NetdataRuntime) error {
 		if rt.ReadFileFn == nil {
-			return fmt.Errorf("missing file reader")
+			return seams.MissingRuntimeDependency("netdata file reader", "")
 		}
 		return nil
 	})
@@ -89,16 +94,16 @@ func (rt NetdataRuntime) requireConfigWriter() error {
 	return rt.require(
 		func(rt NetdataRuntime) error {
 			if rt.WriteFileFn == nil {
-				return fmt.Errorf("missing file writer")
+				return seams.MissingRuntimeDependency("netdata file writer", "")
 			}
 			if rt.MkdirAllFn == nil {
-				return fmt.Errorf("missing mkdirall callback")
+				return seams.MissingRuntimeDependency("netdata mkdir callback", "")
 			}
 			if rt.VolumeExistsFn == nil {
-				return fmt.Errorf("missing volume exists callback")
+				return seams.MissingRuntimeDependency("netdata volume exists callback", "")
 			}
 			if rt.CreateVolumeFn == nil {
-				return fmt.Errorf("missing create volume callback")
+				return seams.MissingRuntimeDependency("netdata create volume callback", "")
 			}
 			return nil
 		},
@@ -109,10 +114,10 @@ func (rt NetdataRuntime) requireConfigWriter() error {
 func (rt NetdataRuntime) requireCopyDependency() error {
 	return rt.require(func(rt NetdataRuntime) error {
 		if rt.CopyFileToVolumeFn == nil {
-			return fmt.Errorf("missing copy-to-volume runtime")
+			return seams.MissingRuntimeDependency("missing copy-to-volume runtime", "netdata")
 		}
 		if rt.GetLatestContainerImageFn == nil {
-			return fmt.Errorf("missing image selector")
+			return seams.MissingRuntimeDependency("netdata image selector", "")
 		}
 		return nil
 	})
@@ -262,7 +267,7 @@ func CopyNDFileToVolumeWithRuntime(rt NetdataRuntime, filePath string, targetPat
 		"nd_writer",
 		func() (string, error) {
 			if rt.GetLatestContainerImageFn == nil {
-				return "", fmt.Errorf("missing image selector")
+				return "", seams.MissingRuntimeDependency("missing netdata image selector", "")
 			}
 			return rt.GetLatestContainerImageFn("netdata")
 		},

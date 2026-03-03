@@ -16,17 +16,15 @@ type WiFiRuntimeService struct {
 
 func resolveWiFiRuntime(overrides ...wifiRuntime) wifiRuntime {
 	if len(overrides) > 0 {
-		return withWiFiRuntime(overrides[0])
+		return NewWiFiRuntimeWith(overrides[0])
 	}
-	return defaultWiFiRuntime()
+	return DefaultWiFiRuntime()
 }
 
-var defaultWiFiRuntimeService = NewWiFiRuntimeService()
-
 func NewWiFiRuntimeService(runtime ...wifiRuntime) *WiFiRuntimeService {
-	runtimeInstance := defaultWiFiRuntime()
+	runtimeInstance := DefaultWiFiRuntime()
 	if len(runtime) > 0 {
-		runtimeInstance = withWiFiRuntime(runtime[0])
+		runtimeInstance = NewWiFiRuntimeWith(runtime[0])
 	}
 	return &WiFiRuntimeService{
 		runtime: runtimeInstance,
@@ -35,7 +33,7 @@ func NewWiFiRuntimeService(runtime ...wifiRuntime) *WiFiRuntimeService {
 }
 
 func DefaultWiFiRuntimeService() *WiFiRuntimeService {
-	return defaultWiFiRuntimeService
+	return NewWiFiRuntimeService()
 }
 
 func (service *WiFiRuntimeService) IsWifiEnabled() (bool, error) {
@@ -178,7 +176,7 @@ func startWiFiInfoLoopWithRadio(ctx context.Context, runtime wifiRuntime, radio 
 }
 
 func wifiInfoLoop(ctx context.Context, dev string, runtime wifiRuntime, radio wifiRadioService) {
-	ticker := runtime.wifiInfoTicker()
+	ticker := runtime.WifiInfoTicker()
 	defer ticker.Stop()
 	for {
 		select {

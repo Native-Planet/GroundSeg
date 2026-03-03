@@ -1,0 +1,69 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/startram_contracts.go defines API-facing contract identifier as a mutable exported package variable (`APIConnectionError`) instead of an immutable constant-like declaration.",
+        "Both files build contract catalogs via package-level mutable `var` state (`...Contract`, `...ContractCatalogSpecs`) initialized at import time, increasing hidden global coupling across files in the same package.",
+        "Contract declaration patterns diverge between files: protocol_contracts.go uses centralized const IDs/metadata aliases, while startram_contracts.go embeds literals and derives metadata through mutable struct fields."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_exported_contract_id",
+      "summary": "Exported contract ID is mutable package state, weakening module boundary integrity.",
+      "related_files": [
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "goseg/protocol/contracts/startram_contracts.go:23 declares `APIConnectionError` as `var`, so any package can reassign it at runtime.",
+        "In protocol_contracts.go, exported identifiers are const-backed aliases (`UploadActionOpenEndpoint`, `UploadActionReset`, `C2CConnectAction`), showing intended immutability for contract identity."
+      ],
+      "suggestion": "Make exported contract identifiers immutable by using const-backed declarations (or unexported immutable source + exported getter) consistently for all contracts; reserve `var` only for genuinely runtime-mutating state.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_catalog_governance"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "inconsistent_contract_catalog_pattern",
+      "summary": "Contract catalog definitions use inconsistent declaration models across files, creating drift-prone coupling inside the contracts boundary.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "protocol_contracts.go defines IDs/metadata as named constants, then composes entries from those constants.",
+        "startram_contracts.go hardcodes ID/version text in the catalog entry and then derives public metadata variables from that mutable entry (`startramApiConnectionErrorContract.Descriptor...`).",
+        "Both files maintain separate package-level mutable spec slices (`protocolContractCatalogSpecs`, `startramContractCatalogSpecs`), duplicating registry mechanics instead of enforcing one canonical pattern."
+      ],
+      "suggestion": "Adopt a single contract declaration architecture for the package (e.g., immutable spec constants + shared builder/registration helper), and migrate both files to it so metadata, IDs, and catalog assembly follow one invariant path.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_catalog_governance"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No enforced package-level convention for immutable contract identity and catalog assembly.",
+      "Contract registry relies on file-local mutable globals rather than a single canonical construction path."
+    ],
+    "likely_symptoms": [
+      "mutable_exported_contract_id",
+      "inconsistent_contract_catalog_pattern"
+    ],
+    "possible_false_positives": []
+  }
+}

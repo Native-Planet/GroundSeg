@@ -291,18 +291,13 @@ func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (conta
 }
 
 func persistUrbitRuntimeConfig(containerName string, rt UrbitRuntime, mutate func(*structs.UrbitRuntimeConfig) error) error {
-	if rt.UpdateUrbitRuntimeConfigFn != nil {
-		return rt.UpdateUrbitRuntimeConfigFn(containerName, mutate)
+	if rt.UpdateUrbitSectionFn != nil {
+		return rt.UpdateUrbitSectionFn(containerName, UrbitConfigSectionRuntime, mutate)
 	}
 	if rt.UpdateUrbitFn == nil {
-		return fmt.Errorf("Urbit runtime update dependency is not configured")
+		return fmt.Errorf("urbit runtime section update callback is not configured")
 	}
 	return rt.UpdateUrbitFn(containerName, func(conf *structs.UrbitDocker) error {
-		runtimeConfig := conf.UrbitRuntimeConfig
-		if err := mutate(&runtimeConfig); err != nil {
-			return err
-		}
-		conf.UrbitRuntimeConfig = runtimeConfig
-		return nil
+		return mutate(&conf.UrbitRuntimeConfig)
 	})
 }

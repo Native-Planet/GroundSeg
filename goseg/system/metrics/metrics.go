@@ -18,6 +18,20 @@ import (
 	"time"
 )
 
+var (
+	cpuPercentFn      = cpu.Percent
+	openFn            = os.Open
+	readDirFn         = ioutil.ReadDir
+	readlinkFn        = os.Readlink
+	readFileFn        = ioutil.ReadFile
+	globFn            = filepath.Glob
+	statfsFn          = syscall.Statfs
+	queryUnescapeFn   = url.QueryUnescape
+	mountsPath        = "/proc/mounts"
+	diskLabelBasePath = "/dev/disk/by-label/"
+	hwmonBasePath     = "/sys/class/hwmon/"
+)
+
 // GetMemory returns total and used memory in bytes.
 func GetMemory() (uint64, uint64, error) {
 	v, err := mem.VirtualMemory()
@@ -29,7 +43,7 @@ func GetMemory() (uint64, uint64, error) {
 
 // GetCPU returns the current CPU utilization percentage.
 func GetCPU() (int, error) {
-	percent, err := cpu.Percent(time.Second, false)
+	percent, err := cpuPercentFn(time.Second, false)
 	if err != nil {
 		return 0, fmt.Errorf("read CPU usage: %w", err)
 	}
@@ -42,7 +56,7 @@ func GetCPU() (int, error) {
 // GetDisk returns used/available bytes per mounted disk label.
 func GetDisk() (map[string][2]uint64, error) {
 	diskUsageMap := make(map[string][2]uint64)
-	file, err := os.Open("/proc/mounts")
+	file, err := openFn(mountsPath)
 	if err != nil {
 		return diskUsageMap, fmt.Errorf("open /proc/mounts: %w", err)
 	}
@@ -53,12 +67,16 @@ func GetDisk() (map[string][2]uint64, error) {
 		fields := strings.Fields(scanner.Text())
 		if len(fields) >= 2 {
 			device := fields[0]
-			mountPoint, _ := octalToAscii(fields[1])
+			mountPoint, err := octalToAscii(fields[1])
+			if err != nil {
+				zap.L().Warn(fmt.Sprintf("Skipping mount point %s: %v", fields[1], err))
+				continue
+			}
 			if !strings.HasPrefix(device, "/dev/") || strings.HasPrefix(device, "/dev/loop") {
 				continue
 			}
 			var stat syscall.Statfs_t
-			if err := syscall.Statfs(mountPoint, &stat); err != nil {
+			if err := statfsFn(mountPoint, &stat); err != nil {
 				return diskUsageMap, fmt.Errorf("%s: %w", mountPoint, err)
 			}
 			all := stat.Blocks * uint64(stat.Bsize)
@@ -79,20 +97,19 @@ func GetDisk() (map[string][2]uint64, error) {
 }
 
 func getDiskLabel(device string) (string, string) {
-	labelDir := "/dev/disk/by-label/"
-	files, err := ioutil.ReadDir(labelDir)
+	files, err := readDirFn(diskLabelBasePath)
 	if err != nil {
 		return "", ""
 	}
 	for _, f := range files {
-		fullPath := filepath.Join(labelDir, f.Name())
-		resolvedPath, err := os.Readlink(fullPath)
+		fullPath := filepath.Join(diskLabelBasePath, f.Name())
+		resolvedPath, err := readlinkFn(fullPath)
 		if err != nil {
 			zap.L().Warn(fmt.Sprintf("Unable to read disk label source for %s: %v", fullPath, err))
 			continue
 		}
 		if strings.HasSuffix(resolvedPath, device) {
-			label, err := url.QueryUnescape(f.Name())
+			label, err := queryUnescapeFn(f.Name())
 			if err != nil {
 				zap.L().Warn(fmt.Sprintf("Couldn't decode encoded disk label name %s: %v", f.Name(), err))
 				return device, ""
@@ -110,36 +127,41 @@ func getDiskLabel(device string) (string, string) {
 
 func octalToAscii(s string) (string, error) {
 	re := regexp.MustCompile(`\\[0-7]{3}`)
+	var parseErr error
 	replaceFunc := func(match string) string {
 		i, err := strconv.ParseInt(match[1:], 8, 64)
 		if err != nil {
+			parseErr = err
 			return match
 		}
 		return string(rune(i))
 	}
-	return re.ReplaceAllStringFunc(s, replaceFunc), nil
+	decoded := re.ReplaceAllStringFunc(s, replaceFunc)
+	if parseErr != nil {
+		return "", parseErr
+	}
+	return decoded, nil
 }
 
 // GetTemp returns average core temperature in degrees C when available.
 func GetTemp() (float64, error) {
-	basePath := "/sys/class/hwmon/"
-	hwmons, err := ioutil.ReadDir(basePath)
+	hwmons, err := readDirFn(hwmonBasePath)
 	if err != nil {
 		return 0, fmt.Errorf("Error reading the hwmon directory: %w", err)
 	}
 	var totalTemp float64
 	var tempCount int
 	for _, hwmon := range hwmons {
-		path := filepath.Join(basePath, hwmon.Name())
+		path := filepath.Join(hwmonBasePath, hwmon.Name())
 		devicePath := filepath.Join(path, "name")
-		device, err := ioutil.ReadFile(devicePath)
+		device, err := readFileFn(devicePath)
 		if err != nil {
 			continue
 		}
 		if strings.Contains(strings.ToLower(string(device)), "coretemp") {
-			tempInputs, _ := filepath.Glob(filepath.Join(path, "temp*_input"))
+			tempInputs, _ := globFn(filepath.Join(path, "temp*_input"))
 			for _, tempInput := range tempInputs {
-				temp, err := ioutil.ReadFile(tempInput)
+				temp, err := readFileFn(tempInput)
 				if err != nil {
 					zap.L().Warn(fmt.Sprintf("Error reading temperature from %s: %v\n", tempInput, err))
 					continue

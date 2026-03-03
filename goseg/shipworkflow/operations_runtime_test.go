@@ -11,12 +11,13 @@ import (
 func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 	var events []string
 	runtime := workflowRuntime{
-		EmitTransitionFn: func(patp, transitionType, event string) {
+		TransitionEmitter: workflowTransitionFn(func(patp, transitionType, event string) error {
 			_ = patp
 			_ = transitionType
 			events = append(events, event)
-		},
-		SleepFn: func(time.Duration) {},
+			return nil
+		}),
+		Sleeper: workflowSleeperFn(func(time.Duration) {}),
 	}
 
 	err := runTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", time.Second, func() error { return nil })
@@ -69,8 +70,8 @@ func TestPollWithTimeout(t *testing.T) {
 func TestPublishTransitionWithPolicy(t *testing.T) {
 	var events []int
 	runtime := workflowRuntime{
-		EmitTransitionFn: func(string, string, string) {},
-		SleepFn:         func(time.Duration) {},
+		TransitionEmitter: workflowTransitionFn(func(string, string, string) error { return nil }),
+		Sleeper:           workflowSleeperFn(func(time.Duration) {}),
 	}
 	publish := func(value int) {
 		events = append(events, value)

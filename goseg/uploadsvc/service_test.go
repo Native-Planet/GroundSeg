@@ -2,6 +2,7 @@ package uploadsvc
 
 import (
 	"errors"
+	"sort"
 	"testing"
 
 	"groundseg/protocol/actions"
@@ -15,8 +16,8 @@ func actionSet(values []actions.Action) map[actions.Action]struct{} {
 	return set
 }
 
-func uploadContracts() []actions.UploadActionContract {
-	return actions.UploadActionContracts()
+func uploadContracts() map[actions.Action]actions.UploadActionContract {
+	return actions.UploadActionContractByAction()
 }
 
 func expectedSupportedActions() []actions.Action {
@@ -25,6 +26,7 @@ func expectedSupportedActions() []actions.Action {
 	for _, contract := range contracts {
 		expected = append(expected, contract.Action)
 	}
+	sort.Slice(expected, func(i, j int) bool { return expected[i] < expected[j] })
 	return expected
 }
 
@@ -69,7 +71,7 @@ func TestNewExecutorRejectsNilService(t *testing.T) {
 }
 
 func TestCommandFromUploadInputsSkipsOpenEndpointForResetWithoutEndpointFields(t *testing.T) {
-	cmd, err := CommandFromUploadInputs(actions.ActionUploadReset, OpenEndpointRequest{}, &ResetRequest{})
+	cmd, err := CommandFromUploadInputs(ActionUploadReset, OpenEndpointRequest{}, &ResetRequest{})
 	if err != nil {
 		t.Fatalf("CommandFromUploadInputs returned error: %v", err)
 	}
@@ -79,7 +81,7 @@ func TestCommandFromUploadInputsSkipsOpenEndpointForResetWithoutEndpointFields(t
 }
 
 func TestCommandFromUploadInputsRejectsResetWithOpenEndpointFields(t *testing.T) {
-	_, err := CommandFromUploadInputs(actions.ActionUploadReset, OpenEndpointRequest{Endpoint: "session"}, &ResetRequest{})
+	_, err := CommandFromUploadInputs(ActionUploadReset, OpenEndpointRequest{Endpoint: "session"}, &ResetRequest{})
 	if err == nil {
 		t.Fatal("expected reset payload extras to be rejected")
 	}
@@ -87,7 +89,7 @@ func TestCommandFromUploadInputsRejectsResetWithOpenEndpointFields(t *testing.T)
 	if !errors.As(err, &validation) {
 		t.Fatalf("expected CommandValidationError, got %T: %v", err, err)
 	}
-	if validation.Action != actions.ActionUploadReset {
+	if validation.Action != ActionUploadReset {
 		t.Fatalf("expected reset action in validation error, got %q", validation.Action)
 	}
 }
@@ -99,7 +101,7 @@ func TestExecutorDispatchesOpenEndpoint(t *testing.T) {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
 	cmd := Command{
-		Action: actions.ActionUploadOpenEndpoint,
+		Action: ActionUploadOpenEndpoint,
 		OpenEndpointRequest: &OpenEndpointRequest{
 			Endpoint:      "session-a",
 			TokenID:       "tok-id",
@@ -126,7 +128,7 @@ func TestExecutorRejectsOpenEndpointWithoutPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
-	if err := executor.Execute(Command{Action: actions.ActionUploadOpenEndpoint}); err == nil {
+	if err := executor.Execute(Command{Action: ActionUploadOpenEndpoint}); err == nil {
 		t.Fatal("expected missing open-endpoint payload to return error")
 	}
 	if service.openCalls != 0 || service.resetCalls != 0 {
@@ -141,7 +143,7 @@ func TestExecutorRejectsOpenEndpointWithResetPayload(t *testing.T) {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
 	err = executor.Execute(Command{
-		Action: actions.ActionUploadOpenEndpoint,
+		Action: ActionUploadOpenEndpoint,
 		OpenEndpointRequest: &OpenEndpointRequest{
 			Endpoint:   "session-a",
 			TokenID:    "tok-id",
@@ -163,7 +165,7 @@ func TestExecutorDispatchesReset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
-	if err := executor.Execute(Command{Action: actions.ActionUploadReset, ResetRequest: &ResetRequest{}}); err != nil {
+	if err := executor.Execute(Command{Action: ActionUploadReset, ResetRequest: &ResetRequest{}}); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
 	if service.openCalls != 0 || service.resetCalls != 1 {
@@ -178,7 +180,7 @@ func TestExecutorRejectsResetWithOpenEndpointPayload(t *testing.T) {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
 	err = executor.Execute(Command{
-		Action:       actions.ActionUploadReset,
+		Action:       ActionUploadReset,
 		ResetRequest: &ResetRequest{},
 		OpenEndpointRequest: &OpenEndpointRequest{
 			Endpoint:   "session-a",
@@ -201,7 +203,7 @@ func TestExecutorPropagatesOpenEndpointError(t *testing.T) {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
 	cmd := Command{
-		Action: actions.ActionUploadOpenEndpoint,
+		Action: ActionUploadOpenEndpoint,
 		OpenEndpointRequest: &OpenEndpointRequest{
 			Endpoint:   "session-a",
 			TokenID:    "tok-id",
@@ -219,7 +221,7 @@ func TestExecutorPropagatesResetError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
-	if err := executor.Execute(Command{Action: actions.ActionUploadReset, ResetRequest: &ResetRequest{}}); err == nil || err.Error() != "reset failed" {
+	if err := executor.Execute(Command{Action: ActionUploadReset, ResetRequest: &ResetRequest{}}); err == nil || err.Error() != "reset failed" {
 		t.Fatalf("expected reset error to propagate, got %v", err)
 	}
 }
@@ -230,7 +232,7 @@ func TestExecutorRejectsResetWithoutPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
-	if err := executor.Execute(Command{Action: actions.ActionUploadReset}); err == nil {
+	if err := executor.Execute(Command{Action: ActionUploadReset}); err == nil {
 		t.Fatal("expected missing reset payload to return error")
 	}
 	if service.openCalls != 0 || service.resetCalls != 0 {
@@ -271,7 +273,7 @@ func TestSupportedActionsIncludesOpenEndpointAndReset(t *testing.T) {
 
 func TestParseActionMatchesSupportedActions(t *testing.T) {
 	for _, action := range actions.SupportedUploadActions() {
-		parsed, err := actions.ParseUploadAction(string(action))
+		parsed, err := ParseUploadAction(string(action))
 		if err != nil {
 			t.Fatalf("expected supported action %q to parse, got error: %v", action, err)
 		}
@@ -282,7 +284,7 @@ func TestParseActionMatchesSupportedActions(t *testing.T) {
 }
 
 func TestParseActionRejectsUnsupportedValue(t *testing.T) {
-	_, err := actions.ParseUploadAction("unsupported")
+	_, err := ParseUploadAction("unsupported")
 	if err == nil {
 		t.Fatal("expected ParseAction to reject unsupported value")
 	}
@@ -323,15 +325,7 @@ func TestExecutorDispatchTableParityAcrossSupportedActions(t *testing.T) {
 		beforeOpen := service.openCalls
 		beforeReset := service.resetCalls
 
-		var contract actions.UploadActionContract
-		found := false
-		for _, c := range uploadContracts() {
-			if c.Action == action {
-				contract = c
-				found = true
-				break
-			}
-		}
+		contract, found := uploadContracts()[action]
 		if !found {
 			t.Fatalf("supported action %q is missing contract metadata", action)
 		}
@@ -366,15 +360,7 @@ func TestDescribeActionCoversSupportedActions(t *testing.T) {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
 	for _, action := range actions.SupportedUploadActions() {
-		var contract actions.UploadActionContract
-		found := false
-		for _, c := range uploadContracts() {
-			if c.Action == action {
-				contract = c
-				found = true
-				break
-			}
-		}
+		contract, found := uploadContracts()[action]
 		if !found {
 			t.Fatalf("supported action %q is missing contract metadata", action)
 		}

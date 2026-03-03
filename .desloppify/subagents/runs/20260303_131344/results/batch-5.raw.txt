@@ -1,0 +1,90 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 78.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Event broker APIs explicitly return delivery errors (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`) in `goseg/docker/events/events.go`, but multiple call sites in `goseg/importer/importer.go` and `goseg/handler/ship/backup.go` call publish methods and discard returned errors.",
+        "Config decode path in `goseg/structs/configs.go` silently drops type assertion failures (`field, _ = v.(type)`), while `goseg/config/urbit.go` treats JSON unmarshal success as valid config and persists/uses resulting zero-values.",
+        "Scheduling event publication uses an unbuffered channel with a blocking send in `goseg/broadcast/state.go` (`schedulePackBus: make(chan string)` and `PublishSchedulePack`), and `goseg/shipworkflow/urbit_operations_runtime.go` publishes to it without any failure/timeout path."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_publish_errors_ignored",
+      "summary": "Transition publish failures are silently dropped in importer/backup flows despite error-returning broker API.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/importer/importer.go",
+        "goseg/handler/ship/backup.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`PublishImportShipTransition`/`PublishUrbitTransition` return errors and can fail with timeout/full bus (`events.go`).",
+        "`importer.go` calls publish methods without checking errors (e.g., `Reset`, `publishImportStatus`, `publishImportError`, `publishUploadStatus`).",
+        "`backup.go` repeatedly calls `publishUrbitTransitionForBackupService(...)` and ignores returned errors in loading/success/error status updates.",
+        "Contrast: `shipworkflow/operations_runtime.go` funnels publish errors through `transition.HandleTransitionPublishError`, showing a stricter strategy exists elsewhere."
+      ],
+      "suggestion": "Standardize transition publication behind one helper that enforces a policy (strict vs best-effort) and handles returned errors consistently. For best-effort paths, at least log and classify publish failures; for strict paths, propagate wrapped errors.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "event_publication_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "silent_config_type_coercion",
+      "summary": "Urbit config JSON decoding silently suppresses type errors, producing zero-values instead of explicit failures.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "`UrbitDocker.UnmarshalJSON` uses many unchecked assertions like `u.UrbitVersion, _ = v.(string)` and `u.MeldSchedule, _ = v.(bool)`, which silently convert bad input to zero-values.",
+        "`loadUrbitConfigFromDisk` in `config/urbit.go` relies on `json.Unmarshal` success; field-level type mismatches hidden by custom unmarshaler do not surface as errors and are accepted into runtime state."
+      ],
+      "suggestion": "Replace unchecked assertions with typed parse helpers that return field-specific errors (or collect validation errors) and fail config load on schema/type mismatch for critical fields.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_input_validation_failures"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "blocking_schedule_publish_without_error_contract",
+      "summary": "Schedule pack event publishing can block indefinitely with no error/timeout path.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`broadcast/state.go` creates `schedulePackBus` as an unbuffered channel and `PublishSchedulePack` performs a direct send (`resolved.schedulePackBus <- reason`) with no context, timeout, or returned error.",
+        "`shipworkflow/urbit_operations_runtime.go` calls `broadcast.PublishSchedulePack(\"schedule\")` after config update, so request/control flow can hang if no consumer is ready."
+      ],
+      "suggestion": "Give `PublishSchedulePack` an explicit failure contract (context + error return, or buffered/non-blocking send with drop policy and telemetry) and update callers to handle/report publish failures consistently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "event_publication_policy_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Event publication semantics are not centralized, so call sites choose inconsistent failure handling (strict, best-effort, or silent ignore).",
+      "Input decoding favors permissive assignment over explicit validation, causing silent degradation instead of explicit error signaling."
+    ],
+    "likely_symptoms": [
+      "transition_publish_errors_ignored",
+      "blocking_schedule_publish_without_error_contract"
+    ],
+    "possible_false_positives": []
+  }
+}

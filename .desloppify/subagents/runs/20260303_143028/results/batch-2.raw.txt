@@ -1,0 +1,120 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 71.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple runtime facades are mostly callback bags with nil-guard pass-through methods (e.g., `RuntimeConfigOps.UpdateConfig` in `goseg/docker/orchestration/runtime_ops.go`, `RectifyRuntime.UpdateConfig` in `goseg/rectify/rectify.go`, and `bootstrapRuntimeWith`/`defaultC2cRuntimeWithContext` in `goseg/main.go`).",
+        "`goseg/importer/importer.go` composes 7 runtime sub-structs with dozens of function fields and long `ensure*` validation methods, indicating orchestration logic depends on wiring shape rather than cohesive domain interfaces.",
+        "`goseg/config/config_update_registry.go` relies on reflection and string field names (`FieldByName`, `patchField`) to map patch keys into `ConfPatch`, which weakens type guarantees and creates runtime-only contract validation.",
+        "`RuntimeHealthOps` and `RuntimeSnapshotOps` in `goseg/docker/orchestration/runtime_ops.go` are effectively duplicated interfaces with identical method sets, showing abstraction drift instead of a single coherent contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 68.0,
+        "indirection_cost": 61.0,
+        "interface_honesty": 74.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_sprawl",
+      "summary": "Runtime dependency injection is implemented as large callback bags that add indirection without stable behavioral boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/main.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many `*Ops` structs composed of function fields; several are only used to forward calls (e.g., `RuntimeConfigOps.UpdateConfig`).",
+        "`importerRuntime` embeds `RuntimeTransitionOps` and adds pointer bags (`configOps`, `workflowOps`, `lifecycleOps`, etc.), then spends significant logic in `ensureInitializedForInit`/`ensureForWorkflow` checking missing callbacks.",
+        "`shipworkflow` and `rectify` recreate similar default-runtime + merge + validate patterns, each with custom callback lists rather than shared role-based interfaces."
+      ],
+      "suggestion": "Replace callback-bag runtimes with smaller domain interfaces (e.g., `ContainerLifecycle`, `UrbitConfigStore`, `TransitionPublisher`) and inject concrete adapters once at composition root; keep nil-validation centralized at construction time so business functions depend on honest interfaces.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_injection_pattern_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate_snapshot_contracts",
+      "summary": "Equivalent snapshot abstractions are duplicated, creating parallel contracts for the same behavior.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/rectify/rectify.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go"
+      ],
+      "evidence": [
+        "`RuntimeHealthOps` and `RuntimeSnapshotOps` in `runtime_ops.go` expose the same config/startram snapshot functions with different names.",
+        "`RectifyRuntime` repeats snapshot accessors (`StartramSettingsSnapshotFn`, `GetStartramConfigFn`) and wrapper methods (`startramSettings`, `startramConfig`) that overlap with orchestration runtime contracts.",
+        "`subsystem_health.go` consumes specific snapshot callbacks from another runtime abstraction (`check502SettingsSnapshot`), continuing the pattern of narrowly renamed snapshot seams."
+      ],
+      "suggestion": "Unify snapshot-read concerns into one shared read-model interface and reuse it across orchestration/rectify/subsystem packages; remove duplicate ops structs and adapter wrappers that only rename equivalent dependencies.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_injection_pattern_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "stringly_reflective_patch_mapping",
+      "summary": "Config patch application depends on reflection and string field names, weakening abstraction honesty and refactor safety.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`config_update_registry.go` maps patch specs through `patchField` strings and uses `reflect.Value.FieldByName` in `getConfigPatchValueByName`/`setConfigPatchValueByName`.",
+        "Because patch-field linkage is string-based, renames in `ConfPatch` fields are not compile-time checked and silently degrade behavior at runtime.",
+        "`structs.SysConfig` already exposes typed domain update methods (`UpdateConnectivityConfig`, `UpdateRuntimeConfig`, etc.), indicating typed mutation paths exist but are bypassed by reflective mapping."
+      ],
+      "suggestion": "Replace reflective field-name lookups with typed accessors per patch field (or generated mapping code) so patch registration is compile-time checked and aligned with the typed update API on `SysConfig`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_contract_stringly_typed"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_bag_boundary_leakage",
+      "summary": "System configuration concerns are spread through broad shared bags and snapshots instead of bounded domain contracts.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/defaults/defaults.go",
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`SysConfig` embeds multiple domains (`ConnectivityConfig`, `RuntimeConfig`, `StartramConfig`, `AuthSessionConfig`, `PenpaiConfig`) into one aggregate and is initialized monolithically in `defaults.SysConfig`.",
+        "`main.go` and startup orchestration rely on snapshot functions off global config state, while runtime structs pass these functions around rather than domain-scoped services.",
+        "This shape encourages broad read access and makes module behavior depend on large shared config state instead of explicit, narrow dependencies."
+      ],
+      "suggestion": "Introduce domain-specific config providers (connectivity, runtime, startram, auth, penpai) and inject only needed providers per subsystem; keep `SysConfig` as persistence schema, not as a ubiquitous runtime boundary.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_contract_stringly_typed"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Dependency injection is repeatedly implemented as ad-hoc function-field structs, causing abstraction proliferation and validation boilerplate.",
+      "Configuration access patterns prioritize generic patch/snapshot plumbing over bounded domain interfaces."
+    ],
+    "likely_symptoms": [
+      "duplicate_snapshot_contracts",
+      "config_bag_boundary_leakage"
+    ],
+    "possible_false_positives": []
+  }
+}

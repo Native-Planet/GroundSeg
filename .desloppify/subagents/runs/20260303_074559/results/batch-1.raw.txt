@@ -1,0 +1,119 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 71.5
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime seams are split into many function-field structs with deep embedding (e.g., RuntimeContainer* / RuntimeUrbit* / Runtime*Ops in goseg/docker/orchestration/runtime_ops.go), increasing call-depth and setup complexity.",
+        "Importer runtime duplicates that pattern and adds large nil-validation surfaces across embedded runtime groups (goseg/importer/importer.go:87-190, 233-287).",
+        "C2C policy defines an exported interface but only one concrete implementation is present and used via factory indirection (goseg/system/wifi_c2c_policy.go:10-14, 80-93; goseg/main.go:217).",
+        "Backup handler adds a forwarding layer of wrapper functions that mostly pass through to runtime fields without policy/value-add (goseg/handler/ship/backup.go:45-71)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 69.0,
+        "indirection_cost": 62.0,
+        "interface_honesty": 78.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_overfragmentation",
+      "summary": "Function-field seam structs are over-fragmented across orchestration/importer/workflow, creating high indirection with low reuse payoff.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "runtime_ops defines many small ops structs (RuntimeContainerLifecycleOps, RuntimeContainerStateOps, RuntimeContainerObservationOps, RuntimeWireguardOps, RuntimeConfigOps, etc.) and then re-embeds them into larger aggregates.",
+        "importerRuntime repeats the same decomposition (importerPathRuntime/importerConfigRuntime/importerWorkflowRuntime/importerContainerRuntime) and requires multiple ensure* passes to validate nil callbacks.",
+        "workflowRuntime embeds two runtime aggregates from orchestration plus additional callback bags, then repeatedly normalizes with withDefaultsWorkflowRuntime before simple dispatches."
+      ],
+      "suggestion": "Collapse seam groups into fewer capability-focused interfaces/services (e.g., ConfigStore, ContainerRuntime, TransitionBus), perform constructor-time validation once, and replace per-call `withDefaults`/`ensure*` chains with a validated immutable runtime object.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "over_injected_function_bags"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "single_impl_c2c_interface",
+      "summary": "C2C orchestration uses an exported interface and factory chain despite having only one implementation, adding indirection without polymorphic benefit.",
+      "related_files": [
+        "goseg/system/wifi_c2c_policy.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "C2CModeOrchestrator is declared with three methods, but only c2cModeFlow implements it in the reviewed scope.",
+        "NewC2CModeFlow -> newC2CModeFlow -> c2cModeFlow and newC2CModeFlowWithDependencies all return the same single implementation type through interface indirection.",
+        "main consumes only the concrete behavior path via `system.NewC2CModeFlow().EnterC2CMode()`."
+      ],
+      "suggestion": "Use concrete `c2cModeFlow` in internal call paths and keep an interface only at a true module boundary needing substitution; alternatively, keep interface but provide at least one distinct production adapter to justify contract indirection.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "over_injected_function_bags"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "passthrough_wrapper_layer_backup",
+      "summary": "Backup runtime wrapper functions introduce extra naming and call depth while mostly forwarding to stored function fields.",
+      "related_files": [
+        "goseg/handler/ship/backup.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "backup.go defines multiple `*ForBackupService` wrappers (publish/sleep/runTransitionedOperation/persist/create/backupDir/restore) that only call corresponding fields on `backupRuntime`.",
+        "The wrapper layer does not centralize policy (validation, retries, context handling); business logic still handles errors/events inline in each handler function.",
+        "The same function-field seam style appears in shipworkflow runtime setup, compounding indirection patterns across adjacent modules."
+      ],
+      "suggestion": "Replace pass-through wrappers with a small `BackupServiceRuntime` interface/object and call methods directly; keep only wrappers that enforce shared policy, and remove suffix-based forwarding methods that add no behavior.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "over_injected_function_bags"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_bag_boundary_blur",
+      "summary": "Large runtime/context bags blur domain boundaries by mixing unrelated concerns into single injectable structs.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/config/config_update_registry.go"
+      ],
+      "evidence": [
+        "main’s `c2cRuntimeContext` and `c2cRuntime` aggregate network checks, config snapshots, device probing, mode transitions, and kill-switch orchestration in one bag.",
+        "startup orchestrator runtime composes required init callbacks, host callbacks, swap callbacks, and bootstrap callbacks into nested runtime aggregates.",
+        "importer runtime combines docker transition runtime, path/config/workflow/container concerns into one injected object passed through many operations."
+      ],
+      "suggestion": "Split these runtime bags by bounded context (connectivity policy, startup bootstrapping, import workflow, config mutation), and pass focused domain services instead of omnibus runtime structs to make dependencies explicit and reduce accidental coupling.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "over_injected_function_bags"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Heavy reliance on function-field dependency bags as the default testing seam pattern.",
+      "Factory/default runtime layering applied uniformly even when no alternate production implementations exist.",
+      "Boundary services are modeled as forwarding helpers instead of policy-owning abstractions."
+    ],
+    "likely_symptoms": [
+      "single_impl_c2c_interface",
+      "passthrough_wrapper_layer_backup"
+    ],
+    "possible_false_positives": []
+  }
+}

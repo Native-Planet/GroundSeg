@@ -1,0 +1,70 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files define contract catalogs as mutable package-level vars (`protocolContractCatalogSpecs`, `startramContractCatalogSpecs`) plus mutable entry vars (`protocolUploadOpenEndpointContract`, `startramApiConnectionErrorContract`), so boundary definitions are not immutable by construction.",
+        "`protocol_contracts.go` uses a typed-constant-first declaration model (ContractID/ActionToken/namespace constants), while `startram_contracts.go` inlines contract IDs/metadata in mutable vars and exports `APIConnectionError` as a var, creating divergent contract-governance patterns inside the same contracts boundary.",
+        "In `startram_contracts.go`, exported and metadata aliases are derived from fields of mutable structs at init time (`APIConnectionError = startramApiConnectionErrorContract.ID` etc.), which couples public contract identity to package init ordering and internal mutable state."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_contract_catalog_globals",
+      "summary": "Contract catalogs are mutable package globals, creating hidden boundary coupling.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocolContractCatalogSpecs` and `startramContractCatalogSpecs` are package vars, not immutable const-backed declarations.",
+        "Both files also keep core contract entries as mutable vars (`protocol...Contract`, `startramApiConnectionErrorContract`), so definitions can drift in-package and tests over time.",
+        "Catalog accessors (`...CatalogEntries`, `...Snapshot`) read from these mutable vars, so module consumers depend on runtime state rather than compile-time contract declarations."
+      ],
+      "suggestion": "Move contract declarations to immutable constant-backed specs (IDs/tokens/metadata), generate catalog entries from pure constructor functions, and expose only read-only slices or copy-on-read data so contracts cannot be mutated after package initialization.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_drift"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "inconsistent_contract_definition_conventions",
+      "summary": "Protocol and StarTram contracts use incompatible declaration conventions in one boundary.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines typed constants for IDs/actions/namespaces and metadata constants before building catalog entries.",
+        "`startram_contracts.go` embeds literals directly in a mutable catalog entry and exports `APIConnectionError` as a var rather than constant aliasing, bypassing the typed-constant-first pattern.",
+        "StarTram metadata aliases (`startramApiConnectionErrorIntroducedIn`, `...Compatibility`) are derived from mutable descriptor fields, unlike protocol’s dedicated constant declarations."
+      ],
+      "suggestion": "Standardize all contract modules on one declaration template (typed constants for identity + explicit metadata constants + immutable catalog assembly). Refactor StarTram contracts to match protocol pattern and enforce the pattern with a small package-local constructor/helper or lint/test guard.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No enforced immutable contract-declaration model for the contracts package.",
+      "Missing single canonical pattern for defining and exporting contract identities across subdomains."
+    ],
+    "likely_symptoms": [
+      "mutable_contract_catalog_globals",
+      "inconsistent_contract_definition_conventions"
+    ],
+    "possible_false_positives": []
+  }
+}

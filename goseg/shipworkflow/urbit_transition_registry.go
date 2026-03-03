@@ -15,6 +15,8 @@ type urbitTransitionCommandDescriptor struct {
 	reducer  transitionlifecycle.Reducer[transition.UrbitTransitionType, structs.UrbitTransitionBroadcast, structs.UrbitTransition]
 }
 
+type urbitTransitionRunner func(string, structs.WsUrbitPayload) error
+
 var urbitTransitionCommandDescriptors = map[transition.UrbitTransitionType]urbitTransitionCommandDescriptor{
 	transition.UrbitTransitionUrbitDomain: {
 		template: urbitTransitionTemplate{
@@ -285,6 +287,17 @@ func runUrbitTransitionFromCommandRegistry(patp string, transitionType transitio
 		return fmt.Errorf("unrecognized urbit transition: %s", transitionType)
 	}
 	return runUrbitTransitionTemplateFn(patp, spec.template, spec.stepsFn(patp, payload)...)
+}
+
+func UrbitTransitionRunners() map[transition.UrbitTransitionType]urbitTransitionRunner {
+	runners := make(map[transition.UrbitTransitionType]urbitTransitionRunner, len(urbitTransitionCommandDescriptors))
+	for transitionType := range urbitTransitionCommandDescriptors {
+		transitionType := transitionType
+		runners[transitionType] = func(patp string, payload structs.WsUrbitPayload) error {
+			return runUrbitTransitionFromCommandRegistry(patp, transitionType, payload)
+		}
+	}
+	return runners
 }
 
 func UrbitTransitionReducerMap() map[transition.UrbitTransitionType]transitionlifecycle.Reducer[transition.UrbitTransitionType, structs.UrbitTransitionBroadcast, structs.UrbitTransition] {

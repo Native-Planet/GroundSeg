@@ -1,0 +1,227 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "error_consistency": 76.0,
+    "abstraction_fitness": 71.0,
+    "test_strategy": 82.0,
+    "design_coherence": 75.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`broadcast/collectors/collectors_runtime.go` wires one collector runtime to many subsystems (`backupsvc`, `click`, `config`, `docker/network`, `docker/orchestration`, `startram`), making broadcast a cross-domain dependency hub.",
+        "`broadcast/state.go` and `broadcast/collectors/collectors_urbit.go` combine default singleton runtime state with orchestration/config/system lookups, so read-model construction depends on global process state and runtime side effects."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "`broadcast/collectors/app_profile_system_collectors.go` logs and returns zero-value structs on collection failures, while other collector paths (for example `constructPierInfo`) return errors upstream.",
+        "`auth/tokens/tokens.go` mixes rich authorization results with boolean-only APIs (`CheckToken`, `LogTokenCheck`) that drop error context, and `auth/auth.go` logs lifecycle start failure in `InitializeWithContext` without propagating it."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`docker/orchestration/llama.go`, `docker/orchestration/minio.go`, and `docker/orchestration/netdata.go` are largely pass-through wrappers that add call depth but little policy/translation value.",
+        "`config/config_update_registry.go` uses reflection with string field names (`getConfigPatchValueByName`, `setConfigPatchValueByName`) and several silent early returns, which weakens compile-time contracts and hides patch drift."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 68.0,
+        "indirection_cost": 74.0,
+        "interface_honesty": 69.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "Multiple modules rely on import-smoke tests that only reference symbols (for example `broadcast/coverage_smoke_test.go`, `docker/events/coverage_smoke_test.go`, `click/lifecycle/coverage_smoke_test.go`) and do not verify behavior.",
+        "This leaves cross-module failure paths (error propagation and boundary contracts) less validated than unit-level seams."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "design_coherence": {
+      "evidence": [
+        "`click/internal/runtime/runtime.go` has near-duplicate command wrappers (`ExecuteCommand`, `ExecuteCommandWithLusInvalidation`, `ExecuteCommandWithSuccess`) that encode similar success-token semantics in parallel paths.",
+        "`defaults/scripts.go` embeds large, repeated shell-script blocks (for example repeated `check_patp` logic across `PrepScript`, `StartScript`, and `RollScript`), increasing maintenance divergence risk."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "broadcast_collector_hub_coupling",
+      "summary": "Broadcast collectors form a cross-domain hub that collapses subsystem boundaries.",
+      "related_files": [
+        "broadcast/collectors/collectors_runtime.go",
+        "broadcast/collectors/collectors_urbit.go",
+        "broadcast/state.go"
+      ],
+      "evidence": [
+        "`NewCollectorRuntime` binds broadcast collection directly to config, click, backupsvc, docker network/orchestration, and startram dependencies.",
+        "Collector code fetches runtime/deployment/network/auth-adjacent data and state shaping in the same boundary, turning broadcast read-model assembly into an orchestration gateway."
+      ],
+      "suggestion": "Split collector responsibilities into narrower interfaces per data domain (runtime status, config snapshot, external service state) and inject them via a small composition root so broadcast assembly no longer imports and owns multi-domain orchestration wiring.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_state_coupling"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "collector_error_contract_drift",
+      "summary": "Collector entrypoints mix fail-open and fail-fast error strategies in one subsystem.",
+      "related_files": [
+        "broadcast/collectors/app_profile_system_collectors.go",
+        "broadcast/collectors/collectors_runtime.go",
+        "broadcast/state.go"
+      ],
+      "evidence": [
+        "`ConstructAppsInfo`/`ConstructProfileInfo`/`ConstructSystemInfo` log warnings and return empty structs on errors.",
+        "`constructPierInfo` path returns errors that can abort bootstrap, so sibling collector paths expose incompatible failure semantics."
+      ],
+      "suggestion": "Define one collector error policy (typed partial-result + error, or strict error propagation) and apply it consistently across all collector entrypoints; update broadcast bootstrap/loop to handle that single contract explicitly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_signal_downgrade"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "token_auth_error_downgrade",
+      "summary": "Auth token APIs downgrade rich authorization errors to booleans/logs.",
+      "related_files": [
+        "auth/tokens/tokens.go",
+        "auth/auth.go"
+      ],
+      "evidence": [
+        "`AuthorizeUploadToken` returns a structured result with status and wrapped error, but `CheckToken` and `LogTokenCheck` collapse failures to bool and discard cause.",
+        "`InitializeWithContext` in `auth/auth.go` logs start failure without returning it, creating another local fail-open entrypoint."
+      ],
+      "suggestion": "Deprecate bool-return token checks and expose a single typed authorization result throughout auth call sites; make initialization return errors to callers and keep logging at top-level boundaries only.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_signal_downgrade"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "orchestration_pass_through_layer",
+      "summary": "Orchestration wrappers add indirection but little behavioral leverage.",
+      "related_files": [
+        "docker/orchestration/llama.go",
+        "docker/orchestration/minio.go",
+        "docker/orchestration/netdata.go",
+        "docker/orchestration/container/container_runtime.go"
+      ],
+      "evidence": [
+        "Top-level functions mostly forward directly to `container.*WithRuntime` with freshly built runtimes and no policy translation.",
+        "The same operation names exist across orchestration and container packages, increasing API surface and call depth without reducing coupling."
+      ],
+      "suggestion": "Collapse pure forwarding functions into one owned layer (either orchestration or container), and keep wrappers only where they enforce policy (runtime defaults, retries, error normalization, telemetry).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_indirection_overgrowth"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "stringly_reflection_patch_registry",
+      "summary": "Reflection-based patch field mapping weakens interface honesty and failure visibility.",
+      "related_files": [
+        "config/config_update_registry.go",
+        "config/config_update_schema.go",
+        "config/config_update_options.go"
+      ],
+      "evidence": [
+        "`patchField` is represented as strings and resolved via reflection (`FieldByName`), so field drift is not compile-time checked.",
+        "`setConfigPatchValueByName` and related helpers silently return on invalid/mismatched values, allowing no-op patch behavior without explicit errors."
+      ],
+      "suggestion": "Replace string/reflection patch binding with typed field accessors generated or declared at compile time; return explicit errors for unknown or non-assignable patch fields so contract breaks fail loudly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_indirection_overgrowth"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "import_smoke_tests_as_coverage_proxy",
+      "summary": "Import-smoke tests inflate coverage without validating behavior.",
+      "related_files": [
+        "broadcast/coverage_smoke_test.go",
+        "docker/events/coverage_smoke_test.go",
+        "click/lifecycle/coverage_smoke_test.go"
+      ],
+      "evidence": [
+        "Each smoke test only binds a function symbol (for example `_ = pkg.BroadcastToClients`) and contains no assertions.",
+        "These tests do not exercise failure modes or cross-module contracts they are nominally covering."
+      ],
+      "suggestion": "Replace or supplement smoke tests with behavior tests for critical boundaries (success/failure paths, propagated errors, and contract assertions) and keep smoke files only for package-level wiring checks.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "click_command_wrapper_duplication",
+      "summary": "Click runtime exposes overlapping command wrappers with duplicated control logic.",
+      "related_files": [
+        "click/internal/runtime/runtime.go",
+        "click/click.go"
+      ],
+      "evidence": [
+        "`ExecuteCommand`, `ExecuteCommandWithLusInvalidation`, and `ExecuteCommandWithSuccess` all call `ExecuteCommandWithResponse` and re-encode similar success-token error handling.",
+        "Public click service functions then wrap these patterns again, creating multiple near-equivalent paths for the same operation semantics."
+      ],
+      "suggestion": "Consolidate to one core execute API with explicit options for token checking and lus invalidation, then keep thin public wrappers that only map operation names/messages.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_indirection_overgrowth"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "embedded_script_duplication",
+      "summary": "Large embedded scripts duplicate logic and mix unrelated responsibilities.",
+      "related_files": [
+        "defaults/scripts.go",
+        "defaults/defaults.go",
+        "defaults/version.go"
+      ],
+      "evidence": [
+        "`defaults/scripts.go` contains multiple long script constants with repeated sections like patp parsing and argument handling.",
+        "Runtime boot policy, migration behavior, and shell lifecycle logic are embedded as opaque string literals, making review/change coupling high."
+      ],
+      "suggestion": "Externalize shell scripts into versioned assets/templates and share common functions across scripts; keep Go code focused on parameterization and validation rather than maintaining duplicated shell bodies.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Incremental seam injection introduced many runtime wrappers without retiring old call paths.",
+      "Global singleton/runtime access remains the default composition pattern across modules.",
+      "Error signaling lacks one enforced contract at subsystem boundaries."
+    ],
+    "likely_symptoms": [
+      "collector_error_contract_drift",
+      "orchestration_pass_through_layer",
+      "click_command_wrapper_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

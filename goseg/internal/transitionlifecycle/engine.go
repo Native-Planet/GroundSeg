@@ -1,6 +1,7 @@
 package transitionlifecycle
 
 import (
+	"errors"
 	"time"
 
 	"groundseg/orchestration"
@@ -26,7 +27,7 @@ type LifecycleStep[E comparable] struct {
 
 // Runtime carries transition emission and timing behavior.
 type Runtime[E comparable] struct {
-	Emit  func(E)
+	Emit  func(E) error
 	Sleep func(time.Duration)
 }
 
@@ -37,7 +38,7 @@ type Reducer[K comparable, T any, E any] func(*T, E) bool
 func RunLifecycle[E comparable](runtime Runtime[E], plan LifecyclePlan[E], steps ...LifecycleStep[E]) error {
 	emit := runtime.Emit
 	if emit == nil {
-		emit = func(E) {}
+		emit = func(E) error { return nil }
 	}
 
 	sleepFn := runtime.Sleep
@@ -53,30 +54,38 @@ func RunLifecycle[E comparable](runtime Runtime[E], plan LifecyclePlan[E], steps
 	}
 
 	if plan.EmitStart {
-		emit(plan.StartEvent)
+		if err := emit(plan.StartEvent); err != nil {
+			return err
+		}
 	}
 
 	policy := orchestration.NewTransitionPolicy(plan.ClearDelay, sleepFn)
 	defer policy.Cleanup(func() {
-		emit(plan.ClearEvent)
+		_ = emit(plan.ClearEvent)
 	})
 
 	for _, step := range steps {
 		var zero E
 		if step.Event != zero && (step.EmitWhen == nil || step.EmitWhen()) {
-			emit(step.Event)
+			if err := emit(step.Event); err != nil {
+				return err
+			}
 		}
 		if step.Run == nil {
 			continue
 		}
 		if err := step.Run(); err != nil {
-			emit(plan.ErrorEvent(err))
+			if emitErr := emit(plan.ErrorEvent(err)); emitErr != nil {
+				return errors.Join(err, emitErr)
+			}
 			return err
 		}
 	}
 
 	if plan.EmitSuccess {
-		emit(plan.SuccessEvent)
+		if err := emit(plan.SuccessEvent); err != nil {
+			return err
+		}
 	}
 
 	return nil

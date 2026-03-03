@@ -11,7 +11,6 @@ import (
 var (
 	C2CStoredSSIDs               []string
 	defaultWiFiRuntimeStateValue = newWiFiRuntimeState()
-	defaultWiFiRuntimeValue      = NewWiFiRuntime()
 )
 
 type wifiRuntimeState struct {

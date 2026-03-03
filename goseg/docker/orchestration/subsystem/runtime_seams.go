@@ -12,30 +12,14 @@ import (
 	"groundseg/structs"
 )
 
-var (
-	subsystemCheck502SettingsFn = config.Check502SettingsSnapshot
-	subsystemShipSettingsFn     = config.ShipSettingsSnapshot
-)
-
 type dockerRoutineRuntime struct {
-	transitionOps dockerTransitionOps
-	healthOps     dockerHealthRuntime
-	broadcastOps  dockerRoutineBroadcastOps
-	wireguardOps  dockerRoutineWireguardOps
-	systemOps     dockerRoutineSystemOps
-	httpOps       dockerRoutineHTTPOps
-	timer         dockerRoutineTimer
-	recovery      dockerRoutineRecoveryPolicy
-}
-
-type dockerTransitionOps = orchestration.DockerTransitionRuntime
-
-type dockerHealthRuntime struct {
-	Check502SettingsSnapshotFn func() dockerCheck502Settings
-	GetShipStatusFn            func([]string) (map[string]string, error)
-	GetContainerNetworkFn      func(string) (string, error)
-	GetLusCodeFn               func(string) (string, error)
-	ShipSettingsSnapshotFn     func() dockerShipSettings
+	orchestration.Runtime
+	broadcastOps dockerRoutineBroadcastOps
+	wireguardOps dockerRoutineWireguardOps
+	systemOps    dockerRoutineSystemOps
+	httpOps      dockerRoutineHTTPOps
+	timer        dockerRoutineTimer
+	recovery     dockerRoutineRecoveryPolicy
 }
 
 type dockerRoutineBroadcastOps struct {
@@ -65,40 +49,17 @@ type dockerRoutineRecoveryPolicy struct {
 	check502InitialDelay        time.Duration
 	check502PollDelay           time.Duration
 	check502ConsecutiveFailures int
-	recoverWireguardAfter502Fn  func(dockerRoutineRuntime, dockerCheck502Settings) error
+	recoverWireguardAfter502Fn  func(dockerRoutineRuntime, config.Check502Settings) error
 }
 
 type dockerRoutineTimer struct {
 	sleepFn func(time.Duration)
 }
 
-type dockerCheck502Settings = config.Check502Settings
-
-type dockerShipSettings = config.ShipSettings
-
 func newDockerRoutineRuntime() dockerRoutineRuntime {
 	orch := orchestration.NewRuntime()
 	return dockerRoutineRuntime{
-		transitionOps: orchestration.NewDockerTransitionRuntime(orch),
-		healthOps: dockerHealthRuntime{
-			Check502SettingsSnapshotFn: func() dockerCheck502Settings {
-				settings := subsystemCheck502SettingsFn()
-				return dockerCheck502Settings{
-					Piers:      append([]string(nil), settings.Piers...),
-					WgOn:       settings.WgOn,
-					Disable502: settings.Disable502,
-				}
-			},
-			GetShipStatusFn:       orch.GetShipStatusFn,
-			GetContainerNetworkFn: orch.GetContainerNetworkFn,
-			GetLusCodeFn:          orch.GetLusCodeFn,
-			ShipSettingsSnapshotFn: func() dockerShipSettings {
-				settings := subsystemShipSettingsFn()
-				return dockerShipSettings{
-					Piers: append([]string(nil), settings.Piers...),
-				}
-			},
-		},
+		Runtime: orch,
 		broadcastOps: dockerRoutineBroadcastOps{
 			getBroadcastStateFn: broadcast.GetState,
 			updateBroadcastFn:   broadcast.UpdateBroadcast,

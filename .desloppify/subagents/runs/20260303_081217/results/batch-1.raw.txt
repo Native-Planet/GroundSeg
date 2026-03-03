@@ -1,0 +1,123 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 72.6
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "goseg/docker/orchestration/runtime_ops.go defines many overlapping function-bag structs (RuntimeTransitionOps, RuntimeContainerOps, RuntimeUrbitConfigOps, RuntimeUrbitOps, RuntimeStartupOps, RuntimeConfigOps) and several methods just reconstruct RuntimeUrbitConfigOps to forward a single call.",
+        "goseg/startuporchestrator/startup_orchestrator.go and goseg/importer/importer.go each carry very large runtime dependency bags with many callback fields plus explicit nil-validation methods, indicating broad ambient authority rather than focused domain ports.",
+        "goseg/broadcast/state.go, goseg/docker/events/events.go, and goseg/handler/ship/backup.go rely on mutable package-level runtime singletons/channels/factories, which hides dependency edges and makes abstractions bypassable from unrelated call sites."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 69.4,
+        "indirection_cost": 63.8,
+        "interface_honesty": 84.7
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_ops_pass_through_layer",
+      "summary": "Runtime operation abstractions add call depth without adding policy or translation.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "RuntimeTransitionOps.LoadUrbitConfig/UrbitConf/LoadAndReadUrbitConfig/UpdateUrbitSnapshot/UpdateUrbitSection each rebuild a RuntimeUrbitConfigOps literal and immediately forward the call.",
+        "shipworkflow.newWorkflowRuntime constructs a DockerTransitionRuntime and then extracts function fields (UpdateUrbitFn/UpdateUrbitSectionFn), reinforcing function-pointer plumbing rather than a narrower domain port.",
+        "RectifyRuntime embeds orchestration.Runtime and then forwards through runtime callbacks again, creating multiple indirection layers for the same urbit-config operations."
+      ],
+      "suggestion": "Replace repeated function-bag forwarding with a single explicit urbit-config port interface (or concrete service) injected once; remove duplicate forwarding methods and keep one composition root where the concrete adapter is built.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "function_bag_indirection_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "ambient_config_bag_dependencies",
+      "summary": "Large callback/config bags blur module boundaries and make dependency intent opaque.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/main.go",
+        "goseg/system/wifi_c2c_policy.go"
+      ],
+      "evidence": [
+        "startupInitRuntime and startBackgroundServicesRuntime contain many unrelated callbacks (config/auth/router/docker/wifi/logstream/rectify/etc.), acting as a wide parameter bag across multiple concerns.",
+        "importerRuntime mixes docker transition behavior with filesystem, auth token validation, ship workflow, startram, and cleanup callbacks; this forces extensive ensure* nil-check matrices to guard runtime shape.",
+        "main.c2cRuntime and related nested runtime structs repeat the same pattern of wiring many function fields for one operation path."
+      ],
+      "suggestion": "Split runtime bags into narrower domain-specific ports (e.g., startup init port, startup background services port, import workflow port, import storage port) and move validation to constructor-time invariants for each small port.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "function_bag_indirection_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_runtime_singletons_leak_boundaries",
+      "summary": "Global mutable runtimes/channels undercut abstraction boundaries and couple modules through hidden state.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/docker/events/events.go",
+        "goseg/handler/ship/backup.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "broadcast/state.go uses package-global runtime factory/value/once and global state maps/channels (e.g., schedulePackBus), so behavior depends on hidden mutable package state.",
+        "docker/events/events.go exposes SetEventRuntimeFactory and package-global defaultEventRuntime, allowing process-wide broker mutation outside a typed composition boundary.",
+        "handler/ship/backup.go keeps a package-global backupRuntime dependency bag, and logstream/logs.go stores package-global mutable runtime config/channels, creating multiple singleton service-locator style entry points."
+      ],
+      "suggestion": "Move these globals behind explicit application-scoped services passed through constructors; keep singleton setup in bootstrap only and ban package-level mutable runtime/factory setters outside tests.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "hidden_global_service_locator"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_patch_registry_reflection_style_abstraction",
+      "summary": "Config patch abstraction centralizes updates but still encodes domain semantics as repetitive registry literals.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go",
+        "goseg/defaults/defaults.go"
+      ],
+      "evidence": [
+        "config_update_registry.go contains a very large confPatchRegistry with repeated parse/access/apply boilerplate per field, even though many entries are structurally identical.",
+        "SysConfig embeds several large domain structs; update paths are keyed by strings and per-field lambdas rather than domain-specific update commands, so abstraction stays generic while domain rules remain scattered.",
+        "defaults/defaults.go and SysConfig shape evolution require synchronized registry edits, indicating the current abstraction does not sufficiently localize change."
+      ],
+      "suggestion": "Introduce domain-scoped patch handlers (ConnectivityPatch, RuntimePatch, StartramPatch, etc.) with table-driven field metadata per domain and explicit command objects for complex mutations; keep the generic registry only as dispatch glue.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "function_bag_indirection_overuse"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Over-reliance on function-pointer dependency bags as the primary abstraction tool.",
+      "Package-level mutable singleton runtimes used as implicit service locator pattern.",
+      "Generic patch/registry indirection without corresponding domain-level command abstractions."
+    ],
+    "likely_symptoms": [
+      "runtime_ops_pass_through_layer",
+      "ambient_config_bag_dependencies",
+      "global_runtime_singletons_leak_boundaries"
+    ],
+    "possible_false_positives": [
+      "Some callback seams are intentionally test-oriented; however the breadth and duplication indicate structural overuse beyond test seams."
+    ]
+  }
+}

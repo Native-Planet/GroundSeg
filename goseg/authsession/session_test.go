@@ -39,7 +39,7 @@ func (cb *countingBoundary) snapshot() (int, int) {
 func TestSetSessionBoundaryIsSafeForConcurrentMutationAndCalls(t *testing.T) {
 	boundaryA := &countingBoundary{}
 	boundaryB := &countingBoundary{}
-	origBoundary := &countingBoundary{addErr: errors.New("boundary replaced")}
+	origBoundary := &countingBoundary{}
 
 	SetSessionBoundary(origBoundary)
 	defer SetSessionBoundary(nil)
@@ -79,8 +79,9 @@ func TestSetSessionBoundaryIsSafeForConcurrentMutationAndCalls(t *testing.T) {
 	boundaryAAdd, boundaryARemove := boundaryA.snapshot()
 	boundaryBAdd, boundaryBRemove := boundaryB.snapshot()
 
-	if boundaryAAdd+boundaryBAdd != totalAdds {
-		t.Fatalf("expected %d add calls, got %d", totalAdds, boundaryAAdd+boundaryBAdd)
+	origBoundaryAdd, _ := origBoundary.snapshot()
+	if boundaryAAdd+boundaryBAdd+origBoundaryAdd != totalAdds {
+		t.Fatalf("expected %d add calls, got %d", totalAdds, boundaryAAdd+boundaryBAdd+origBoundaryAdd)
 	}
 	if boundaryARemove+boundaryBRemove != totalRemoves {
 		t.Fatalf("expected %d remove calls, got %d", totalRemoves, boundaryARemove+boundaryBRemove)

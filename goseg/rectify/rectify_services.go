@@ -1,6 +1,7 @@
 package rectify
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -49,7 +50,7 @@ func (service StartramTransitionService) applyTransitionCompletion(current *stru
 		if eventData != transition.StartramTransitionComplete {
 			return nil
 		}
-		settings, err := service.runtime.startramSettings()
+		settings, err := service.runtime.StartramSettingsSnapshot()
 		if err != nil {
 			return fmt.Errorf("loading startram settings: %w", err)
 		}
@@ -58,7 +59,7 @@ func (service StartramTransitionService) applyTransitionCompletion(current *stru
 		if eventData != transition.StartramTransitionComplete {
 			return nil
 		}
-		settings, err := service.runtime.startramSettings()
+		settings, err := service.runtime.StartramSettingsSnapshot()
 		if err != nil {
 			return fmt.Errorf("loading startram settings: %w", err)
 		}
@@ -68,7 +69,7 @@ func (service StartramTransitionService) applyTransitionCompletion(current *stru
 			running := containerState.ActualStatus == string(transition.ContainerStatusRunning)
 			current.Profile.Startram.Info.Running = running
 			if err := service.runtime.UpdateConfig(config.WithWgOn(running)); err != nil {
-				zap.L().Error(fmt.Sprintf("%v", err))
+				return err
 			}
 		}
 		current.Profile.Startram.Info.Registered = settings.WgRegistered
@@ -90,20 +91,23 @@ func NewStartramRetrieveReconciler(runtime RectifyRuntime) *StartramRetrieveReco
 
 func (reconciler *StartramRetrieveReconciler) Reconcile(current *structs.AuthBroadcast) error {
 	runtime := reconciler.runtime
-	startramSettings, err := runtime.startramSettings()
+	startramSettings, err := runtime.StartramSettingsSnapshot()
 	if err != nil {
 		return err
 	}
-	startramConfig, err := runtime.startramConfig()
+	startramConfig, err := runtime.StartramConfig()
 	if err != nil {
 		return err
 	}
+	var reconcileErr error
 	for patp := range runtime.UrbitConfAllFn() {
 		modified := false
 		serviceCreated := true
 		local, err := reconciler.syncer.loadAndRefresh(patp)
 		if err != nil {
 			zap.L().Warn(fmt.Sprintf("Retrieve: unable to refresh urbit config for %s: %v", patp, err))
+			reconcileErr = errors.Join(reconcileErr, fmt.Errorf("unable to refresh urbit config for %s: %w", patp, err))
+			publishUrbitServiceRegistrationTransitionWithCurrentState(current, patp, serviceCreated)
 			continue
 		}
 		persistNetwork := false
@@ -147,18 +151,21 @@ func (reconciler *StartramRetrieveReconciler) Reconcile(current *structs.AuthBro
 			if persistWeb {
 				if err := reconciler.syncer.updateWebConfig(patp, &local); err != nil {
 					zap.L().Warn(fmt.Sprintf("Retrieve: unable to persist %s web config updates: %v", patp, err))
+					reconcileErr = errors.Join(reconcileErr, err)
 				}
 			}
 
 			if persistNetwork {
 				if err := reconciler.syncer.updateNetworkConfig(patp, &local); err != nil {
 					zap.L().Warn(fmt.Sprintf("Retrieve: unable to persist %s network config updates: %v", patp, err))
+					reconcileErr = errors.Join(reconcileErr, err)
 				}
 			}
 		}
 		publishUrbitServiceRegistrationTransitionWithCurrentState(current, patp, serviceCreated)
+		publishUrbitServiceRegistrationTransitionWithCurrentState(current, patp, serviceCreated)
 	}
-	return nil
+	return reconcileErr
 }
 
 type urbitConfigSyncService struct {
@@ -166,22 +173,22 @@ type urbitConfigSyncService struct {
 }
 
 func (service *urbitConfigSyncService) loadAndRefresh(patp string) (structs.UrbitDocker, error) {
-	local, err := service.runtime.LoadAndReadUrbitConfig(patp)
-	if err != nil {
+	if err := service.runtime.LoadUrbitConfigFn(patp); err != nil {
 		return structs.UrbitDocker{}, err
 	}
+	local := service.runtime.UrbitConfFn(patp)
 	return local, nil
 }
 
 func (service *urbitConfigSyncService) updateWebConfig(patp string, local *structs.UrbitDocker) error {
-	return service.runtime.UpdateUrbitWebConfig(patp, func(webConfig *structs.UrbitWebConfig) error {
+	return service.runtime.UpdateUrbitSectionFn(patp, config.UrbitConfigSectionWeb, func(webConfig *structs.UrbitWebConfig) error {
 		webConfig.CustomUrbitWeb = local.CustomUrbitWeb
 		return nil
 	})
 }
 
 func (service *urbitConfigSyncService) updateNetworkConfig(patp string, local *structs.UrbitDocker) error {
-	return service.runtime.UpdateUrbitNetworkConfig(patp, func(networkConfig *structs.UrbitNetworkConfig) error {
+	return service.runtime.UpdateUrbitSectionFn(patp, config.UrbitConfigSectionNetwork, func(networkConfig *structs.UrbitNetworkConfig) error {
 		networkConfig.WgHTTPPort = local.WgHTTPPort
 		networkConfig.WgAmesPort = local.WgAmesPort
 		networkConfig.WgS3Port = local.WgS3Port

@@ -1,0 +1,49 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 81.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "protocol/contracts/protocol_contracts.go defines each contract in multiple parallel forms: raw constants, contractCatalogEntry vars, exported alias constants, and extra unexported alias constants for metadata.",
+        "protocol/contracts/startram_contracts.go repeats the same pattern by deriving exported package state (e.g., APIConnectionError) from package-level contractCatalogEntry vars at init time.",
+        "Both files rely on package-level mutable vars as canonical contract state, coupling module boundaries to import-time construction rather than a single explicit immutable source of truth."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_catalog_multi_source_truth",
+      "summary": "Contract definitions are duplicated across constants and init-time vars, creating boundary drift risk.",
+      "related_files": [
+        "protocol/contracts/protocol_contracts.go",
+        "protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "protocol_contracts.go stores each contract as ID/action constants, a contractCatalogEntry var, exported alias constants, and duplicated introduced/compatibility aliases.",
+        "startram_contracts.go builds exported contract identity from mutable package vars (startramApiConnectionErrorContract -> APIConnectionError) instead of one immutable declaration path.",
+        "This pattern spreads ownership of protocol boundary data across several symbols per contract, increasing blast radius for edits and making drift between API-facing IDs and registry metadata more likely."
+      ],
+      "suggestion": "Refactor both files to a single immutable contract-spec declaration shape (one authoritative struct literal per contract), then generate or derive exported IDs/actions directly from that source without duplicate alias layers. Keep registry assembly explicit and immutable to reduce import-time coupling.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_definition_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract boundary metadata is modeled through repeated symbol layers instead of a single canonical declaration model."
+    ],
+    "likely_symptoms": [
+      "contract_catalog_multi_source_truth"
+    ],
+    "possible_false_positives": []
+  }
+}

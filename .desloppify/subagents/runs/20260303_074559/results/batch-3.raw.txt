@@ -1,0 +1,91 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "`PublishUrbitTransition` exposes actionable errors (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`) in `goseg/docker/events/events.go`, but multiple emit paths discard those errors with `_ = ...` in `goseg/shipworkflow/operations_runtime.go`.",
+        "`goseg/handler/ship/backup.go` calls a publish function that returns `error` and ignores it repeatedly, so transition-delivery failures are silent during backup operations.",
+        "Several handlers stringify and rewrap errors (`%v` or `%s`) instead of wrapping with `%w`, e.g. `goseg/handler/ship/backup.go` and `goseg/click/backup/service.go`, which removes structured causal chains for callers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_publish_errors_dropped",
+      "summary": "Transition publication failures are silently dropped even though the event runtime returns typed publish errors.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/handler/ship/backup.go"
+      ],
+      "evidence": [
+        "`goseg/docker/events/events.go` defines `ErrTransitionBusFull` and `ErrTransitionPublishTimeout` from `PublishUrbitTransition`.",
+        "`goseg/shipworkflow/operations_runtime.go` ignores publish errors via `_ = defaultEventRuntime.PublishUrbitTransition(...)` (line 82) and `_ = eventRuntime.PublishUrbitTransition(...)` (line 382).",
+        "`goseg/handler/ship/backup.go` invokes `publishUrbitTransitionForBackupService(...)` at lines 100, 103, 107, 110, 115, 118, 123, 131, 134, 139, 142, 158, 161 without checking returned `error`."
+      ],
+      "suggestion": "Centralize transition emission behind one helper that returns an error policy result (propagate vs best-effort), and make call sites explicitly handle publish failures (retry, downgrade event state, or return wrapped errors) instead of discarding them.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "event_emission_contract_not_enforced"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "error_chain_context_lost_by_stringification",
+      "summary": "Multiple flows convert errors to strings (`%v`/`%s`) and lose causal error chains, making downstream handling inconsistent.",
+      "related_files": [
+        "goseg/handler/ship/backup.go",
+        "goseg/click/backup/service.go"
+      ],
+      "evidence": [
+        "`goseg/handler/ship/backup.go` returns `fmt.Errorf(\"Couldn't set local backups: %v\", err)` and `fmt.Errorf(\"Couldn't set remote backups: %v\", err)` (lines 80, 93), dropping `%w` wrapping.",
+        "`goseg/handler/ship/backup.go` builds string messages and returns `fmt.Errorf(\"%s\", text)` (lines 108, 124, 132, 159), severing original causes.",
+        "`goseg/click/backup/service.go` aggregates component errors into strings (`fmt.Sprintf(\"%s: %v\", ...)`) and returns a joined string error (line 65), eliminating typed causes from callers."
+      ],
+      "suggestion": "Adopt a single wrapping convention (`%w`/`errors.Join`) for operational failures and only stringify at user-facing boundaries; keep internal returns typed so retry/classification logic can inspect causes.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_context_eroded_at_module_boundaries"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "reconcile_persistence_failures_suppressed",
+      "summary": "Rectify reconciliation swallows persistence/update failures after mutating in-memory state, producing inconsistent failure visibility.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "In `goseg/rectify/rectify_services.go`, `UpdateConfig` failure is logged (`zap.L().Error(...)`, line 71) but not returned, so the transition appears successful despite persistence failure.",
+        "The same file logs and suppresses `updateWebConfig`/`updateNetworkConfig` failures (lines 148-156) and continues processing.",
+        "`goseg/rectify/rectify.go` applies transitions via `applyTransitionUpdate` and only logs on apply failure (lines 295-299), reinforcing best-effort behavior with no structured propagation."
+      ],
+      "suggestion": "Define explicit reconcile error semantics (fatal vs degraded): accumulate suppressed update errors and return a joined error for non-recoverable state divergence, while tagging optional failures distinctly.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_without_failure_contract"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Transition/event side effects are treated as best-effort in several paths, but the API contracts still expose meaningful errors, creating mismatched expectations.",
+      "Error handling style is not standardized at module boundaries, so some call chains preserve causes while others collapse them into strings."
+    ],
+    "likely_symptoms": [
+      "transition_publish_errors_dropped",
+      "error_chain_context_lost_by_stringification",
+      "reconcile_persistence_failures_suppressed"
+    ],
+    "possible_false_positives": []
+  }
+}

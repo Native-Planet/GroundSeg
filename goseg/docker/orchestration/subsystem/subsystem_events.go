@@ -29,6 +29,9 @@ func StartDockerHealthLoops(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if ctx.Err() != nil {
+		return nil
+	}
 	return startDockerHealthLoop(ctx)
 }
 
@@ -39,6 +42,7 @@ func StartDockerSubsystem(ctx context.Context) error {
 	if err := startDockerHealthLoop(ctx); err != nil {
 		return err
 	}
+	defer StopDockerHealthLoops()
 	errs := make(chan error, 2)
 	go func() {
 		errs <- dockerListenerWithContext(ctx)
@@ -54,6 +58,18 @@ func StartDockerSubsystem(ctx context.Context) error {
 			return err
 		}
 	}
+}
+
+func StopDockerHealthLoops() {
+	dockerHealthLoopMu.Lock()
+	defer dockerHealthLoopMu.Unlock()
+
+	if !healthLoopRunning || healthLoopStopFn == nil {
+		return
+	}
+	healthLoopStopFn()
+	healthLoopRunning = false
+	healthLoopStopFn = nil
 }
 
 // dockerListenerWithContext runs until ctx is canceled.
@@ -160,7 +176,10 @@ func startDockerHealthLoop(ctx context.Context) error {
 	go func() {
 		Check502Loop(loopCtx)
 		dockerHealthLoopMu.Lock()
-		healthLoopRunning = false
+		if healthLoopRunning {
+			healthLoopRunning = false
+			healthLoopStopFn = nil
+		}
 		dockerHealthLoopMu.Unlock()
 	}()
 	return nil

@@ -51,7 +51,7 @@ func makeAtomPacket(value int64) []byte {
 
 func TestReverseLittleEndian(t *testing.T) {
 	input := []byte{1, 2, 3, 4}
-	got := reverseLittleEndian(input)
+	got := reverseLittleEndianBytes(input)
 	want := []byte{4, 3, 2, 1}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected reverse result: got %v want %v", got, want)
@@ -61,7 +61,7 @@ func TestReverseLittleEndian(t *testing.T) {
 func TestDecodeAtom(t *testing.T) {
 	original := []byte("decode-me")
 	reversed := append([]byte(nil), original...)
-	reverseLittleEndian(reversed)
+	reverseLittleEndianBytes(reversed)
 	atom := new(big.Int).SetBytes(reversed).String()
 
 	got, err := decodeAtom(atom)

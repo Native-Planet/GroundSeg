@@ -1,0 +1,86 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 76.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files hand-roll the same registry pattern: `var ...ContractCatalogSpecs = []contractCatalogEntry{...}` plus paired `...CatalogEntries()` and `...CatalogEntriesSnapshot()` functions.",
+        "Both files rely on package-level mutable `var` state for catalog entries and registry slices instead of immutable declarations or constructor-time assembly.",
+        "`protocol_contracts.go` exposes multiple alias layers for the same protocol metadata (`protocol...`, exported aliases, and additional lower-case aliases), while `startram_contracts.go` exposes a narrower surface, creating inconsistent boundary conventions across sibling contract modules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "manual_registry_duplication",
+      "summary": "Contract registry assembly is duplicated across sibling modules, creating a coupling hotspot and drift risk.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Both files duplicate the same lifecycle primitives: catalog entry vars, `...ContractCatalogSpecs` slice, and two accessor functions returning copied/snapshotted entries.",
+        "No shared builder or single declarative registration path exists, so adding/changing contracts requires repeating structural code in each module."
+      ],
+      "suggestion": "Introduce one shared registration mechanism (for example a typed `registerCatalog(namespace, specs...)` helper or declarative manifest consumed by a common builder) and migrate both files to it so boundary behavior is defined once.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_contract_registry_pattern"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_global_catalog_state",
+      "summary": "Catalog definitions are stored in package-level mutable vars, enabling hidden cross-file state coupling.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Both files define catalog entries and catalog spec slices as `var` values (`protocol...Contract`, `protocolContractCatalogSpecs`, `startram...Contract`, `startramContractCatalogSpecs`).",
+        "Any file in the same package can mutate these vars at runtime, which makes contract boundary behavior depend on import/runtime state rather than immutable declarations."
+      ],
+      "suggestion": "Make catalog state immutable: use package-level arrays/constants where possible, return constructed copies from functions, and prevent direct mutable global registry storage.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_contract_registry_pattern"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "inconsistent_contract_surface_conventions",
+      "summary": "Sibling contract modules expose inconsistent API surfaces, which weakens boundary predictability across the contracts subsystem.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` publishes duplicated alias layers (`protocol...` constants, exported `Upload...` constants, and extra lower-case aliases for introduced/compatibility metadata).",
+        "`startram_contracts.go` exports only `APIConnectionError` while keeping equivalent metadata constants private, indicating no consistent module contract for what should be externally visible."
+      ],
+      "suggestion": "Define and enforce a single exposure convention for contract modules (for example: export only contract IDs, keep metadata internal, and expose metadata via a common query API) and normalize both files to that policy.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_contract_registry_pattern"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract catalogs are authored through repeated manual patterns instead of one subsystem-level registration abstraction.",
+      "Boundary policy for what a contract module should expose is undocumented or unenforced."
+    ],
+    "likely_symptoms": [
+      "manual_registry_duplication",
+      "inconsistent_contract_surface_conventions"
+    ],
+    "possible_false_positives": []
+  }
+}

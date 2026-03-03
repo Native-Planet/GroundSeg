@@ -1,0 +1,97 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 1,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Event publishing is treated as best-effort in some workflows even though the event broker returns explicit backpressure errors (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`) in `goseg/docker/events/events.go`.",
+        "Several call sites ignore publish errors entirely (for example `PublishNewShipTransition(...)` in `goseg/shipworkflow/newship.go` and `goseg/shipworkflow/newship_service.go`, and `publishUrbitTransitionForBackupService(...)` calls in `goseg/handler/ship/backup.go`), while sibling code in `goseg/shipworkflow/operations_runtime.go` logs publish failures.",
+        "Error causes are inconsistently preserved: `fmt.Errorf(\"...: %v\", err)` and `fmt.Errorf(\"%s\", text)` patterns appear in `goseg/config/urbit.go`, `goseg/handler/ship/backup.go`, and `goseg/shipworkflow/newship.go`, while many other modules correctly use `%w` wrapping."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_publish_error_drop",
+      "summary": "Transition publish failures are silently dropped in several workflows despite the broker exposing explicit publish errors.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/handler/ship/backup.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`publishDropOnFull` in `goseg/docker/events/events.go` returns `ErrTransitionBusFull`/`ErrTransitionPublishTimeout`.",
+        "`goseg/shipworkflow/newship.go` and `goseg/shipworkflow/newship_service.go` call `PublishNewShipTransition(...)` without checking returned errors.",
+        "`goseg/handler/ship/backup.go` repeatedly calls `publishUrbitTransitionForBackupService(...)` and ignores returned errors.",
+        "Sibling code in `goseg/shipworkflow/operations_runtime.go` checks publish errors and logs warnings, creating inconsistent failure behavior for similar transition paths."
+      ],
+      "suggestion": "Define one transition emission policy and apply it everywhere: either propagate publish errors for user-facing operations, or explicitly downgrade them to warnings via a shared helper that logs and tags dropped events. Replace direct fire-and-forget publish calls with that helper across new-ship and backup paths.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_transition_error_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "stringified_error_chain_loss",
+      "summary": "Multiple modules stringify errors instead of wrapping, breaking causal chains and `errors.Is/As` behavior.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/handler/ship/backup.go",
+        "goseg/shipworkflow/newship.go"
+      ],
+      "evidence": [
+        "`goseg/config/urbit.go` uses `%v` when adding context in several returns (for example load/decode/persist helpers), which drops unwrap semantics.",
+        "`goseg/handler/ship/backup.go` converts composed text to errors with `fmt.Errorf(\"%s\", text)` in multiple handlers, severing source causes.",
+        "`goseg/shipworkflow/newship.go` returns `fmt.Errorf(\"%s\", errmsg)` from cleanup path even when `errmsg` was built from an underlying error."
+      ],
+      "suggestion": "Standardize on wrapped propagation (`%w`) whenever an underlying error exists, and only create string-only errors for true validation/user-message cases. Introduce helper constructors for user-display events versus internal wrapped errors to prevent accidental cause stripping.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_transition_error_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "async_failure_visibility_gap",
+      "summary": "Asynchronous workflow entrypoints return success before critical work finishes, while downstream failures are only logged or side-channeled.",
+      "related_files": [
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "`HandleNewShipBoot` launches `ProvisionShip` in a goroutine and returns nil immediately; errors are routed through transition events and `_ = handleError(err)` rather than caller-visible return paths.",
+        "`ProvisionShip` launches `waitForNewShipReady` asynchronously; failures in remote registration/wireguard stages occur after initial success is returned.",
+        "`StartVersionSubsystem` is fire-and-forget and only logs terminal errors from `StartVersionSubsystemWithContext`, unlike other call sites that directly propagate errors to callers."
+      ],
+      "suggestion": "Define explicit async error contracts for long-running workflows (e.g., completion channel/result future, or mandatory event-ack path) and keep synchronous handlers either blocking until critical phases succeed or returning a typed 'accepted/pending' result. Apply one contract consistently across new-ship and subsystem starters.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "inconsistent_transition_error_policy"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single project-wide policy distinguishes operational errors (must propagate) from telemetry/UI transition errors (may be best-effort).",
+      "Error construction is ad hoc across subsystems, so wrapping semantics depend on local style rather than boundary intent.",
+      "Async workflow APIs mix command-style and fire-and-forget semantics without a uniform completion/error surface."
+    ],
+    "likely_symptoms": [
+      "transition_publish_error_drop",
+      "stringified_error_chain_loss",
+      "async_failure_visibility_gap"
+    ],
+    "possible_false_positives": []
+  }
+}

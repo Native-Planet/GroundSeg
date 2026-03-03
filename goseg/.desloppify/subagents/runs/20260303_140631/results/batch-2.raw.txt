@@ -1,0 +1,118 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 71.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "importer/importer.go defines many narrow runtime interfaces (importerConfigOps, importerWorkflowOps, importerLifecycleOps, importerShipConfigOps, importerContainerOps, importerVolumeOps, importerFilesystemOps) but the dominant implementation path is importerRuntime forwarding methods with nil-check wrappers, creating an extra abstraction layer without behavior.",
+        "docker/orchestration/runtime_ops.go uses deeply nested runtime op structs (RuntimeContainerOps, RuntimeUrbitOps, RuntimeTransitionOps, RuntimeStartupOps, RuntimeSnapshotOps, etc.) and composition helpers that mostly package function pointers and forward calls, increasing indirection depth.",
+        "startuporchestrator/startup_orchestrator.go models startup as multiple callback-bag structs with repetitive withDefaults/validate/startupServiceSpecs plumbing, where most code is callback wiring rather than domain policy.",
+        "system/wifi_runtime_api.go and system/wifi_runtime_methods.go split WiFi behavior across service/runtime wrappers plus resolve/default constructor layers, while many service methods directly proxy runtime methods with light guard logic."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 66.0,
+        "indirection_cost": 58.0,
+        "interface_honesty": 69.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_overfragmentation",
+      "summary": "Runtime seam design is over-fragmented into many one-purpose interfaces and forwarding methods, raising call depth without adding policy.",
+      "related_files": [
+        "importer/importer.go",
+        "docker/orchestration/runtime_ops.go",
+        "shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "importer/importer.go contains numerous operation-specific interfaces and a large importerRuntime wrapper that re-exposes methods like storagePathFor, dispatchUploadImport, createUrbitConfig, startContainer, createVolume, etc., mostly as nil-guarded pass-throughs.",
+        "docker/orchestration/runtime_ops.go builds many function-pointer structs and merged composites (RuntimeTransitionOpsFromContainerOps/FromUrbitOps, defaultRuntime* builders), primarily wiring callbacks rather than encapsulating domain behavior.",
+        "shipworkflow/operations_runtime.go repeats the same runtime-resolution/validation/defaulting pattern with a broad callback bag and dispatch wrappers."
+      ],
+      "suggestion": "Collapse seams around domain capabilities instead of per-function wrappers. Keep one runtime interface per workflow boundary (for example: config, lifecycle, filesystem, container), move validation to constructor-time, and remove per-method pass-through wrappers that do not enforce policy.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "callback_bag_runtime_pattern"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_startup_orchestrator",
+      "summary": "Startup orchestration uses callback bags as pseudo-objects, forcing large validation/spec boilerplate that obscures core startup policy.",
+      "related_files": [
+        "startuporchestrator/startup_orchestrator.go",
+        "main.go"
+      ],
+      "evidence": [
+        "startuporchestrator/startup_orchestrator.go defines multiple runtime structs (startupInitCoreSubsystemRuntime, startupInitHostSubsystemRuntime, startupBackground*Runtime, startupBootstrapRuntime) plus repetitive withDefaults/validate/startupServiceSpecs methods.",
+        "The orchestrator logic is split across data bags and adapter methods, while domain actions are thin callback invocations (runStartupSubsystem, startupServiceSpecs, startBackgroundServicesWithRuntime).",
+        "main.go mirrors this by building bootstrapRuntime and c2cRuntime callback structs, adding another layer of indirection before real startup behavior."
+      ],
+      "suggestion": "Replace callback-bag structs with concrete service types implementing explicit interfaces (InitPhase, BackgroundServiceGroup, ServerBootstrap). Centralize dependency construction in one composition root and keep startup policy in fewer concrete methods.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "callback_bag_runtime_pattern"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "inconsistent_wrapper_contracts",
+      "summary": "Wrapper abstractions expose inconsistent contracts (silent no-op vs hard error), making interfaces dishonest and harder to reason about.",
+      "related_files": [
+        "importer/importer.go",
+        "startuporchestrator/startup_orchestrator.go",
+        "main.go"
+      ],
+      "evidence": [
+        "importer/importer.go has wrappers that sometimes fail hard on nil dependencies (startContainer/deleteVolume) but other wrappers silently do nothing (updateContainer, waitForBootCode/waitForRemoteReady when lifecycleOps is nil).",
+        "startuporchestrator/startup_orchestrator.go has storage callbacks that silently no-op when unset (configureSwap/setupTmpDir return nil), while other callbacks are treated as required via validate().",
+        "main.go bootstrapRuntime.startServer and runC2cCheck return nil if callback is missing, but startup options in orchestrator treat server startup as required behavior."
+      ],
+      "suggestion": "Define one contract style per runtime seam: either required dependencies validated at construction (no nil branches in hot paths) or explicit optional dependencies modeled as Optional* fields with documented no-op behavior. Apply consistently across wrappers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "callback_bag_runtime_pattern"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate_default_resolve_constructor_pattern",
+      "summary": "Repeated default/new/resolve constructor chains duplicate runtime wiring patterns across modules without extra leverage.",
+      "related_files": [
+        "system/wifi_runtime_api.go",
+        "system/wifi_runtime_methods.go",
+        "rectify/rectify.go",
+        "broadcast/state.go"
+      ],
+      "evidence": [
+        "system/wifi_runtime_methods.go exposes newWiFiRuntime/NewWiFiRuntime/DefaultWiFiRuntime/NewWiFiRuntimeWith with near-identical construction semantics.",
+        "system/wifi_runtime_api.go repeats resolver/default logic (resolveWiFiRuntime plus NewWiFiRuntimeService defaulting logic), while many service methods are direct runtime proxies.",
+        "rectify/rectify.go and broadcast/state.go use similar resolve/default/with-dependencies patterns, increasing boilerplate and call indirection across subsystems."
+      ],
+      "suggestion": "Standardize on a single constructor convention per subsystem (e.g., New(...options) + private defaults) and remove duplicate resolve/default wrappers unless they add policy or compatibility behavior.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "constructor_indirection_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Callback-bag runtime injection became the default abstraction style, leading to one-wrapper-per-function growth.",
+      "Defaulting and validation were implemented repeatedly per module instead of using shared runtime-construction patterns."
+    ],
+    "likely_symptoms": [
+      "duplicate_default_resolve_constructor_pattern",
+      "inconsistent_wrapper_contracts"
+    ],
+    "possible_false_positives": []
+  }
+}

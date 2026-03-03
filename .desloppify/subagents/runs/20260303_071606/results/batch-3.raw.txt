@@ -1,0 +1,111 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 77.4
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Transition publish APIs explicitly return typed failures (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`) in `goseg/docker/events/events.go`, but multiple callsites ignore publish errors entirely.",
+        "Error wrapping strategy is inconsistent across core paths: `goseg/config/urbit.go` repeatedly uses `%v` in `fmt.Errorf`, while nearby config parsing code in `goseg/config/config_update_schema.go` uses `%w` and preserves causal chains.",
+        "Failure handling in telemetry paths is mixed: `goseg/system/metrics/metrics.go` suppresses several read/parse errors and continues with partial results, while sibling system runtime code commonly returns wrapped errors immediately."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_publish_errors_dropped",
+      "summary": "Transition publish failures are silently dropped in workflow and backup paths.",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/handler/ship/backup.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "`goseg/shipworkflow/operations_runtime.go` uses `_ = defaultEventRuntime.PublishUrbitTransition(...)` in `newWorkflowRuntime`, discarding broker backpressure/cancellation failures.",
+        "`goseg/handler/ship/backup.go` calls `publishUrbitTransitionForBackupService(...)` repeatedly without checking returned errors (loading/success/failure/clear events).",
+        "`goseg/docker/events/events.go` defines concrete publish failures (`ErrTransitionPublishTimeout`, `ErrTransitionBusFull`), so dropping returns loses intended failure signaling."
+      ],
+      "suggestion": "Introduce a shared helper for transition publication that either returns errors to callers or consistently logs and classifies dropped events; replace ignored publish calls in workflow and backup handlers with that helper.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "unified_transition_error_contract_missing"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "error_chain_lost_v_formatting",
+      "summary": "Multiple modules stringify underlying errors, breaking `errors.Is/As` behavior.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/handler/ship/backup.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`goseg/config/urbit.go` returns wrapped IO/JSON failures with `%v` (for example load/decode/create/rename paths), losing causal chains.",
+        "`goseg/handler/ship/backup.go` builds text messages and returns `fmt.Errorf(\"%s\", text)` instead of preserving source errors.",
+        "`goseg/config/config_update_schema.go` already uses `%w` for parse/registry failures, so error propagation style is inconsistent inside adjacent config codepaths."
+      ],
+      "suggestion": "Standardize on `%w` whenever re-emitting a concrete upstream error, and only use string-only errors for true user-facing validation cases with no source error. Refactor backup handlers to return wrapped source errors plus structured transition messages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_wrapping_convention_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_partial_vs_failfast_metrics_behavior",
+      "summary": "Metrics collectors mix fail-fast and silent-degrade strategies without a consistent contract.",
+      "related_files": [
+        "goseg/system/metrics/metrics.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "`GetTemp` in `goseg/system/metrics/metrics.go` suppresses many file/parse errors with warnings and may still return success when partial data exists.",
+        "`getDiskLabel` in the same file swallows label lookup/read failures by returning empty values, while `GetDisk` hard-fails on mount/statfs errors.",
+        "`goseg/system/wifi_runtime_methods.go` generally propagates contextualized errors immediately, showing a different failure contract for sibling system runtime operations."
+      ],
+      "suggestion": "Define and document one telemetry error policy (strict fail-fast or explicit partial-result contract). If partial results are intended, return structured partial-error metadata (or joined warnings) instead of silent suppression.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_policy_not_standardized"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "network_runtime_client_init_context_loss",
+      "summary": "Docker client init failure in network runtime returns raw error without operation context.",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`KillContainerUsingPort` in `goseg/docker/network/network.go` returns raw `err` when client creation fails, unlike other methods in the same file that wrap with operation context.",
+        "`goseg/docker/orchestration/wireguard.go` consistently wraps failures with contextual messages (`failed to build`, `failed to read`, `unable to create`), highlighting inconsistency in nearby runtime infrastructure."
+      ],
+      "suggestion": "Wrap `DockerClientNewFn` failures in `KillContainerUsingPort` with operation context (port and action), matching the rest of the runtime error style.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_wrapping_convention_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No enforced cross-module contract for transition publication error handling.",
+      "Inconsistent team convention on `%w` vs `%v` in rethrown errors.",
+      "Telemetry components lack a shared policy for partial data vs hard failures."
+    ],
+    "likely_symptoms": [
+      "transition_publish_errors_dropped",
+      "error_chain_lost_v_formatting",
+      "mixed_partial_vs_failfast_metrics_behavior"
+    ],
+    "possible_false_positives": []
+  }
+}

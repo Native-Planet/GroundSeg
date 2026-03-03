@@ -208,6 +208,18 @@ func UploadActionContracts() []UploadActionContract {
 	return out
 }
 
+// UploadActionContractByAction returns upload action contracts keyed by action token.
+//
+// The result is a defensive copy to preserve the initialization order in this package.
+func UploadActionContractByAction() map[Action]UploadActionContract {
+	ensureActionContractsInitialized()
+	contractsByAction := make(map[Action]UploadActionContract, len(uploadActionContracts))
+	for _, contract := range uploadActionContracts {
+		contractsByAction[contract.Action] = contract
+	}
+	return contractsByAction
+}
+
 func actionContractForAction(namespace Namespace, action Action) (ActionContract, bool) {
 	ensureActionContractsInitialized()
 	for _, contract := range actionContractsForNamespace(namespace) {

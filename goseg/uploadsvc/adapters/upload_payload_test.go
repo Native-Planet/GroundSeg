@@ -2,12 +2,25 @@ package adapters
 
 import (
 	"errors"
+	"fmt"
+	"sort"
 	"testing"
 
 	"groundseg/protocol/actions"
 	"groundseg/structs"
 	"groundseg/uploadsvc"
 )
+
+func sortedUploadActions(contracts map[actions.Action]uploadsvc.UploadActionContract) []actions.Action {
+	actionsSlice := make([]actions.Action, 0, len(contracts))
+	for action := range contracts {
+		actionsSlice = append(actionsSlice, action)
+	}
+	sort.Slice(actionsSlice, func(i, j int) bool {
+		return string(actionsSlice[i]) < string(actionsSlice[j])
+	})
+	return actionsSlice
+}
 
 func sampleToken() structs.WsTokenStruct {
 	return structs.WsTokenStruct{
@@ -16,11 +29,11 @@ func sampleToken() structs.WsTokenStruct {
 	}
 }
 
-func payloadForContract(contract actions.UploadActionContract) structs.WsUploadAction {
+func payloadForContract(contract uploadsvc.UploadActionContract) structs.WsUploadAction {
 	payload := structs.WsUploadAction{
 		Action: string(contract.Action),
 	}
-	if contract.RequiredPayloads.Has(actions.UploadPayloadOpenEndpoint) {
+	if contract.RequiredPayloads.Has(uploadsvc.UploadPayloadOpenEndpoint) {
 		payload.Endpoint = "session-1"
 		payload.Remote = true
 		payload.Fix = true
@@ -29,8 +42,8 @@ func payloadForContract(contract actions.UploadActionContract) structs.WsUploadA
 	return payload
 }
 
-func forbiddenPayload(contract actions.UploadActionContract) *structs.WsUploadAction {
-	if !contract.ForbiddenPayloads.Has(actions.UploadPayloadOpenEndpoint) {
+func forbiddenPayload(contract uploadsvc.UploadActionContract) *structs.WsUploadAction {
+	if !contract.ForbiddenPayloads.Has(uploadsvc.UploadPayloadOpenEndpoint) {
 		return nil
 	}
 	payload := structs.WsUploadAction{Action: string(contract.Action), Endpoint: "session-x", Remote: true, Fix: true, SelectedDrive: "/dev/extra"}
@@ -38,7 +51,9 @@ func forbiddenPayload(contract actions.UploadActionContract) *structs.WsUploadAc
 }
 
 func TestCommandFromWsPayloadMapsProtocolContracts(t *testing.T) {
-	for _, contract := range actions.UploadActionContracts() {
+	contracts := uploadsvc.UploadActionContractByAction()
+	for _, action := range sortedUploadActions(contracts) {
+		contract := contracts[action]
 		t.Run(string(contract.Action), func(t *testing.T) {
 			payload := structs.WsUploadPayload{
 				Token:   sampleToken(),
@@ -51,13 +66,13 @@ func TestCommandFromWsPayloadMapsProtocolContracts(t *testing.T) {
 			if cmd.Action != contract.Action {
 				t.Fatalf("expected action %q, got %q", contract.Action, cmd.Action)
 			}
-			if contract.RequiredPayloads.Has(actions.UploadPayloadOpenEndpoint) && cmd.OpenEndpointRequest == nil {
+			if contract.RequiredPayloads.Has(uploadsvc.UploadPayloadOpenEndpoint) && cmd.OpenEndpointRequest == nil {
 				t.Fatalf("expected open-endpoint request for action %q", contract.Action)
 			}
-			if contract.RequiredPayloads.Has(actions.UploadPayloadReset) && cmd.ResetRequest == nil {
+			if contract.RequiredPayloads.Has(uploadsvc.UploadPayloadReset) && cmd.ResetRequest == nil {
 				t.Fatalf("expected reset request for action %q", contract.Action)
 			}
-			if contract.RequiredPayloads.Has(actions.UploadPayloadOpenEndpoint) {
+			if contract.RequiredPayloads.Has(uploadsvc.UploadPayloadOpenEndpoint) {
 				if cmd.OpenEndpointRequest.Endpoint != payloadForContract(contract).Endpoint {
 					t.Fatalf("unexpected endpoint for action %q: got=%q want=%q", contract.Action, cmd.OpenEndpointRequest.Endpoint, payloadForContract(contract).Endpoint)
 				}
@@ -70,7 +85,9 @@ func TestCommandFromWsPayloadMapsProtocolContracts(t *testing.T) {
 }
 
 func TestCommandFromWsPayloadRejectsForbiddenPayloads(t *testing.T) {
-	for _, contract := range actions.UploadActionContracts() {
+	contracts := uploadsvc.UploadActionContractByAction()
+	for _, action := range sortedUploadActions(contracts) {
+		contract := contracts[action]
 		forbidden := forbiddenPayload(contract)
 		if forbidden == nil {
 			continue
@@ -94,26 +111,26 @@ func TestCommandFromWsPayloadRejectsForbiddenPayloads(t *testing.T) {
 }
 
 func TestCommandFromWsPayloadRejectsOtherNamespaceActions(t *testing.T) {
-	for _, action := range actions.ActionMetas(actions.NamespaceC2C) {
-		payload := structs.WsUploadPayload{
-			Payload: structs.WsUploadAction{
-				Action: string(action.Action),
-			},
-		}
-		if _, err := CommandFromWsPayload(payload); err == nil {
-			t.Fatalf("expected namespace mismatch for action %q", action.Action)
-		}
+	payload := structs.WsUploadPayload{
+		Payload: structs.WsUploadAction{Action: string(actions.ActionC2CConnect)},
+	}
+	if _, err := CommandFromWsPayload(payload); err == nil {
+		t.Fatalf("expected namespace mismatch for action %q", actions.ActionC2CConnect)
 	}
 }
 
 func TestCommandFromWsPayloadUsesParsedActionOutput(t *testing.T) {
-	contract := actions.UploadActionContracts()[0]
+	contractMap := uploadsvc.UploadActionContractByAction()
+	contract, ok := contractMap[uploadsvc.ActionUploadOpenEndpoint]
+	if !ok {
+		t.Fatal("expected upload open-endpoint contract")
+	}
 	payload := structs.WsUploadPayload{
 		Token:   sampleToken(),
 		Payload: payloadForContract(contract),
 	}
 
-	parsed, err := actions.ParseUploadAction(payload.Payload.Action)
+	parsed, err := uploadsvc.ParseUploadAction(payload.Payload.Action)
 	if err != nil {
 		t.Fatalf("ParseAction rejected supported action: %v", err)
 	}
@@ -128,12 +145,48 @@ func TestCommandFromWsPayloadUsesParsedActionOutput(t *testing.T) {
 }
 
 func TestCommandFromWsPayloadRejectsUnsupportedAction(t *testing.T) {
+	invalidAction := fmt.Sprintf("%s-unsupported", uploadsvc.ActionUploadReset)
 	payload := structs.WsUploadPayload{
 		Payload: structs.WsUploadAction{
-			Action: "invalid",
+			Action: invalidAction,
 		},
 	}
-	if _, err := CommandFromWsPayload(payload); err == nil {
+	_, err := CommandFromWsPayload(payload)
+	if err == nil {
 		t.Fatal("expected unsupported action to error")
+	}
+	var unsupported actions.UnsupportedActionError
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("expected protocol unsupported action error for %q, got %T: %v", invalidAction, err, err)
+	}
+}
+
+func TestCommandFromWsPayloadSupportsAllProtocolUploadActions(t *testing.T) {
+	contracts := uploadsvc.UploadActionContractByAction()
+	actionsSlice := sortedUploadActions(contracts)
+	if len(actionsSlice) == 0 {
+		t.Fatal("expected upload action contracts")
+	}
+	for _, action := range actionsSlice {
+		parsed, err := uploadsvc.ParseUploadAction(string(action))
+		if err != nil {
+			t.Fatalf("expected protocol upload action %q to parse, got %v", action, err)
+		}
+		contract, exists := contracts[parsed]
+		if !exists {
+			t.Fatalf("expected upload action contract for %q", parsed)
+		}
+
+		payload := structs.WsUploadPayload{
+			Token:   sampleToken(),
+			Payload: payloadForContract(contract),
+		}
+		cmd, err := CommandFromWsPayload(payload)
+		if err != nil {
+			t.Fatalf("expected protocol action %q to map, got error %v", parsed, err)
+		}
+		if cmd.Action != parsed {
+			t.Fatalf("expected parser action %q to match command action %q", parsed, cmd.Action)
+		}
 	}
 }

@@ -10,7 +10,6 @@ import (
 	"groundseg/dockerclient"
 	"groundseg/logger"
 	"groundseg/session"
-	"groundseg/structs"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,10 +18,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-
-	// "io/ioutil"
-
-	"sync"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/gorilla/websocket"
@@ -41,55 +36,38 @@ const (
 	maxDockerLogConsecutiveFailures  = 5
 )
 
-type logstreamRuntimeConfig struct {
-	sessionRuntime    session.LogstreamRuntime
-	systemLogMessages <-chan []byte
+type LogstreamRuntime struct {
+	sessionRuntime             session.LogstreamRuntime
+	systemLogMessages          <-chan []byte
+	dockerLogCancelChannel     chan DockerCancel
+	systemLogParseFailureTotal uint64
 }
 
-var (
-	// zap
-	dockerLogCancelChannel = make(chan DockerCancel, 100)
-	wsLogMessagePool       = sync.Pool{
-		New: func() interface{} {
-			return new(structs.WsLogMessage)
-		},
+func NewLogstreamRuntime(logRuntime session.LogstreamRuntime, systemLogMessages <-chan []byte) *LogstreamRuntime {
+	if logRuntime == nil {
+		logRuntime = session.LogstreamRuntimeState()
 	}
-	logstreamRuntimeMu  sync.RWMutex
-	logstreamRuntimeCfg = logstreamRuntimeConfig{
-		sessionRuntime:    session.LogstreamRuntimeState(),
-		systemLogMessages: session.LogstreamRuntimeState().SystemLogMessages(),
+	if systemLogMessages == nil && logRuntime != nil {
+		systemLogMessages = logRuntime.SystemLogMessages()
 	}
-	systemLogParseFailureTotal uint64
-)
+	return &LogstreamRuntime{
+		sessionRuntime:         logRuntime,
+		systemLogMessages:      systemLogMessages,
+		dockerLogCancelChannel: make(chan DockerCancel, 100),
+	}
+}
+
+func resolveLogstreamRuntime(runtime *LogstreamRuntime) *LogstreamRuntime {
+	if runtime == nil {
+		return NewLogstreamRuntime(session.LogstreamRuntimeState(), nil)
+	}
+	return runtime
+}
 
 const maxSystemLogParseWarnings = 5
 
-func logstreamRuntimeSnapshot() logstreamRuntimeConfig {
-	logstreamRuntimeMu.RLock()
-	defer logstreamRuntimeMu.RUnlock()
-	return logstreamRuntimeCfg
-}
-
-func Configure(logRuntime session.LogstreamRuntime, systemLogMessages <-chan []byte) {
-	logstreamRuntimeMu.Lock()
-	defer logstreamRuntimeMu.Unlock()
-	if logRuntime != nil {
-		logstreamRuntimeCfg.sessionRuntime = logRuntime
-	} else {
-		logstreamRuntimeCfg.sessionRuntime = session.LogstreamRuntimeState()
-	}
-	currentRuntime := logstreamRuntimeCfg.sessionRuntime
-	if systemLogMessages != nil {
-		logstreamRuntimeCfg.systemLogMessages = systemLogMessages
-		return
-	}
-	if currentRuntime != nil {
-		logstreamRuntimeCfg.systemLogMessages = currentRuntime.SystemLogMessages()
-	}
-}
-
-func removeSysSessions() {
-	logstreamRuntimeSnapshot().sessionRuntime.RemoveSysLogSessions()
+func Configure(logRuntime session.LogstreamRuntime, systemLogMessages <-chan []byte) *LogstreamRuntime {
+	return NewLogstreamRuntime(logRuntime, systemLogMessages)
 }
 
 func OldLogsCleaner() error {
@@ -108,7 +86,6 @@ func OldLogsCleanerWithContext(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			// split legacy logs
 			if err := runLogCleanupCycle(); err != nil {
 				failureCount++
 				zap.L().Error(fmt.Sprintf("failed to clean up logs: %v", err))
@@ -154,10 +131,11 @@ func runLogCleanupCycle() error {
 
 // zap
 func SysLogStreamer() error {
-	return SysLogStreamerWithContext(context.Background())
+	return SysLogStreamerWithRuntime(context.Background(), nil)
 }
 
-func SysLogStreamerWithContext(ctx context.Context) error {
+func SysLogStreamerWithRuntime(ctx context.Context, runtime *LogstreamRuntime) error {
+	runtime = resolveLogstreamRuntime(runtime)
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -173,17 +151,19 @@ func SysLogStreamerWithContext(ctx context.Context) error {
 		}
 	}
 	for {
-		removeSysSessions()
+		if runtime.sessionRuntime != nil {
+			runtime.sessionRuntime.RemoveSysLogSessions()
+		}
 		select {
 		case <-ctx.Done():
 			return nil
-		case log, ok := <-logstreamRuntimeSnapshot().systemLogMessages:
+		case log, ok := <-runtime.systemLogMessages:
 			if !ok {
 				return nil
 			}
 			var buffer bytes.Buffer
 			if err := json.Compact(&buffer, log); err != nil {
-				parseFailures := atomic.AddUint64(&systemLogParseFailureTotal, 1)
+				parseFailures := atomic.AddUint64(&runtime.systemLogParseFailureTotal, 1)
 				if parseFailures <= maxSystemLogParseWarnings {
 					sample := string(log)
 					if len(sample) > 80 {
@@ -194,21 +174,29 @@ func SysLogStreamerWithContext(ctx context.Context) error {
 				continue
 			}
 			logJSON := []byte(fmt.Sprintf(`{"type":"system","history":false,"log":%s}`, buffer.Bytes()))
-			for _, conn := range logstreamRuntimeSnapshot().sessionRuntime.SysLogSessions() {
+			if runtime.sessionRuntime == nil {
+				continue
+			}
+			for _, conn := range runtime.sessionRuntime.SysLogSessions() {
 				if err := conn.WriteMessage(1, logJSON); err != nil {
 					writeFailure(conn, "system log websocket write failure", err)
-					logstreamRuntimeSnapshot().sessionRuntime.AddSysSessionToRemove(conn)
+					runtime.sessionRuntime.AddSysSessionToRemove(conn)
 				}
 			}
 		}
 	}
 }
 
-func DockerLogStreamer() error {
-	return DockerLogStreamerWithContext(context.Background())
+func SysLogStreamerWithContext(ctx context.Context) error {
+	return SysLogStreamerWithRuntime(ctx, nil)
 }
 
-func DockerLogStreamerWithContext(ctx context.Context) error {
+func DockerLogStreamer() error {
+	return DockerLogStreamerWithRuntime(context.Background(), nil)
+}
+
+func DockerLogStreamerWithRuntime(ctx context.Context, runtime *LogstreamRuntime) error {
+	runtime = resolveLogstreamRuntime(runtime)
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -230,13 +218,17 @@ func DockerLogStreamerWithContext(ctx context.Context) error {
 	}
 
 	for {
-		for container, sessionMap := range logstreamRuntimeSnapshot().sessionRuntime.DockerLogSessions() {
-			for conn, live := range sessionMap {
-				if !live {
-					go func(name string, streamConn *websocket.Conn) {
-						streamErrs <- streamToConnWithContext(ctx, name, streamConn)
-					}(container, conn)
-					logstreamRuntimeSnapshot().sessionRuntime.SetDockerLogSessionLive(container, conn, true)
+		if runtime.sessionRuntime != nil {
+			for container, sessionMap := range runtime.sessionRuntime.DockerLogSessions() {
+				for conn, live := range sessionMap {
+					if !live {
+						streamConn := conn
+						streamContainer := container
+						go func(name string, streamConn *websocket.Conn) {
+							streamErrs <- streamToConnWithRuntime(ctx, name, streamConn, runtime)
+						}(streamContainer, streamConn)
+						runtime.sessionRuntime.SetDockerLogSessionLive(container, conn, true)
+					}
 				}
 			}
 		}
@@ -270,11 +262,16 @@ func DockerLogStreamerWithContext(ctx context.Context) error {
 	}
 }
 
-func DockerLogConnRemover() error {
-	return DockerLogConnRemoverWithContext(context.Background())
+func DockerLogStreamerWithContext(ctx context.Context) error {
+	return DockerLogStreamerWithRuntime(ctx, nil)
 }
 
-func DockerLogConnRemoverWithContext(ctx context.Context) error {
+func DockerLogConnRemover() error {
+	return DockerLogConnRemoverWithRuntime(context.Background(), nil)
+}
+
+func DockerLogConnRemoverWithRuntime(ctx context.Context, runtime *LogstreamRuntime) error {
+	runtime = resolveLogstreamRuntime(runtime)
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -282,17 +279,26 @@ func DockerLogConnRemoverWithContext(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case c := <-dockerLogCancelChannel:
-			logstreamRuntimeSnapshot().sessionRuntime.RemoveDockerLogSession(c.Container, c.Conn)
+		case c := <-runtime.dockerLogCancelChannel:
+			if runtime.sessionRuntime != nil {
+				runtime.sessionRuntime.RemoveDockerLogSession(c.Container, c.Conn)
+			}
 		}
 	}
 }
 
-func streamToConn(containerName string, conn *websocket.Conn) {
-	_ = streamToConnWithContext(context.Background(), containerName, conn)
+func DockerLogConnRemoverWithContext(ctx context.Context) error {
+	return DockerLogConnRemoverWithRuntime(ctx, nil)
 }
 
-func streamToConnWithContext(ctx context.Context, containerName string, conn *websocket.Conn) error {
+func streamToConn(containerName string, conn *websocket.Conn) {
+	if err := streamToConnWithRuntime(context.Background(), containerName, conn, nil); err != nil {
+		zap.L().Warn(fmt.Sprintf("stream docker logs for %s: %v", containerName, err))
+	}
+}
+
+func streamToConnWithRuntime(ctx context.Context, containerName string, conn *websocket.Conn, runtime *LogstreamRuntime) error {
+	runtime = resolveLogstreamRuntime(runtime)
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -300,19 +306,17 @@ func streamToConnWithContext(ctx context.Context, containerName string, conn *we
 		return fmt.Errorf("missing websocket connection for %s", containerName)
 	}
 	defer func() {
-		dockerLogCancelChannel <- DockerCancel{Container: containerName, Conn: conn}
+		runtime.dockerLogCancelChannel <- DockerCancel{Container: containerName, Conn: conn}
 	}()
 	defer conn.Close()
 
-	// Specify options to stream logs
 	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
-		Follow:     true, // Stream the logs
+		Follow:     true,
 		Timestamps: true,
 	}
 
-	// Create a Docker client
 	cli, err := dockerclient.New()
 	if err != nil {
 		return fmt.Errorf("create docker client for %s: %w", containerName, err)
@@ -325,7 +329,6 @@ func streamToConnWithContext(ctx context.Context, containerName string, conn *we
 	}
 	defer out.Close()
 
-	// Read and print logs line by line
 	scanner := bufio.NewScanner(out)
 	for scanner.Scan() {
 		select {
@@ -423,7 +426,6 @@ func splitLogFile(inputFile string) error {
 
 // Function to keep only the 10 most recent log files in a directory
 func keepMostRecentFiles(dirPath string) error {
-	// Read the directory
 	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
 		return fmt.Errorf("failed to read directory: %w", err)
@@ -431,7 +433,6 @@ func keepMostRecentFiles(dirPath string) error {
 
 	recentFiles := logger.MostRecentPartedLogPaths(dirPath, files, 10)
 
-	// Optionally, delete files that are not in recentFiles
 	for _, file := range files {
 		fullPath := filepath.Join(dirPath, file.Name())
 		if !logContains(recentFiles, fullPath) {
@@ -444,7 +445,6 @@ func keepMostRecentFiles(dirPath string) error {
 	return nil
 }
 
-// Helper function to check if a string is in a slice
 func logContains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {

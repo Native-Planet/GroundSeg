@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"groundseg/structs"
 )
@@ -13,25 +14,33 @@ var (
 	errTransitionBusNotDefined  = errors.New("transition broker is not defined")
 )
 
+var defaultEventRuntime = sync.OnceValue(newEventRuntime)
+
 type EventRuntime struct {
+	delegate                EventBroker
 	urbitTransitionBus      chan structs.UrbitTransition
 	systemTransitionBus     chan structs.SystemTransition
 	newShipTransitionBus    chan structs.NewShipTransition
 	importShipTransitionBus chan structs.UploadTransition
 }
 
-func NewDefaultEventRuntime() EventRuntime {
-	return NewEventRuntime()
+func NewEventRuntime(overrides ...EventBroker) EventRuntime {
+	if len(overrides) > 0 && overrides[0] != nil {
+		return EventRuntime{delegate: overrides[0]}
+	}
+	return newEventRuntime()
 }
-
-func NewEventRuntime(_ ...EventBroker) EventRuntime {
-	return newTransitionRuntime(100)
-}
-
-var defaultEventRuntime = NewDefaultEventRuntime()
 
 func DefaultEventRuntime() EventRuntime {
-	return defaultEventRuntime
+	return defaultEventRuntime()
+}
+
+func NewDefaultEventRuntime() EventRuntime {
+	return DefaultEventRuntime()
+}
+
+func newEventRuntime() EventRuntime {
+	return newTransitionRuntime(100)
 }
 
 type EventBroker interface {
@@ -83,10 +92,16 @@ func (runtime EventRuntime) PublishUrbitTransition(ctx context.Context, event st
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if runtime.delegate != nil {
+		return runtime.delegate.PublishUrbitTransition(ctx, event)
+	}
 	return publishDropOnFull(ctx, runtime.urbitTransitionBus, event)
 }
 
 func (runtime EventRuntime) UrbitTransitions() <-chan structs.UrbitTransition {
+	if runtime.delegate != nil {
+		return runtime.delegate.UrbitTransitions()
+	}
 	return runtime.urbitTransitionBus
 }
 
@@ -94,10 +109,16 @@ func (runtime EventRuntime) PublishSystemTransition(ctx context.Context, event s
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if runtime.delegate != nil {
+		return runtime.delegate.PublishSystemTransition(ctx, event)
+	}
 	return publishDropOnFull(ctx, runtime.systemTransitionBus, event)
 }
 
 func (runtime EventRuntime) SystemTransitions() <-chan structs.SystemTransition {
+	if runtime.delegate != nil {
+		return runtime.delegate.SystemTransitions()
+	}
 	return runtime.systemTransitionBus
 }
 
@@ -105,10 +126,16 @@ func (runtime EventRuntime) PublishNewShipTransition(ctx context.Context, event 
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if runtime.delegate != nil {
+		return runtime.delegate.PublishNewShipTransition(ctx, event)
+	}
 	return publishDropOnFull(ctx, runtime.newShipTransitionBus, event)
 }
 
 func (runtime EventRuntime) NewShipTransitions() <-chan structs.NewShipTransition {
+	if runtime.delegate != nil {
+		return runtime.delegate.NewShipTransitions()
+	}
 	return runtime.newShipTransitionBus
 }
 
@@ -116,9 +143,15 @@ func (runtime EventRuntime) PublishImportShipTransition(ctx context.Context, eve
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if runtime.delegate != nil {
+		return runtime.delegate.PublishImportShipTransition(ctx, event)
+	}
 	return publishDropOnFull(ctx, runtime.importShipTransitionBus, event)
 }
 
 func (runtime EventRuntime) ImportShipTransitions() <-chan structs.UploadTransition {
+	if runtime.delegate != nil {
+		return runtime.delegate.ImportShipTransitions()
+	}
 	return runtime.importShipTransitionBus
 }

@@ -12,7 +12,7 @@ import (
 func TestConfPatchRegistryMatchesPatchStructFields(t *testing.T) {
 	fields := reflect.TypeOf(ConfPatch{})
 	registered := make(map[string]struct{}, fields.NumField())
-	for _, field := range confPatchRegistry {
+	for _, field := range allConfPatchFields() {
 		if field.patchField == "" {
 			continue
 		}

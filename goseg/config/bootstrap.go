@@ -46,6 +46,10 @@ func Initialize() error {
 }
 
 func initializeConfig() error {
+	if err := defaults.DefaultVersionParseError(); err != nil {
+		return fmt.Errorf("default version metadata is invalid: %w", err)
+	}
+
 	setDebugMode()
 	initializePaths()
 	ctx := RuntimeContextSnapshot()

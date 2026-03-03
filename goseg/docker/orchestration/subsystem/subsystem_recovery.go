@@ -1,6 +1,7 @@
 package subsystem
 
 import (
+	"groundseg/config"
 	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/transition"
@@ -10,14 +11,14 @@ func defaultStopTransitionRestart(rt dockerRoutineRuntime, contName string, stat
 	if state.DesiredStatus == string(transition.ContainerStatusStopped) {
 		return nil
 	}
-	_, err := rt.transitionOps.StartContainerFn(contName, state.Type)
+	_, err := rt.StartContainerFn(contName, state.Type)
 	return err
 }
 
 func defaultRestartAfterDeath(rt dockerRoutineRuntime, containerName, containerType string) error {
 	go func(name, ctype string) {
 		rt.timer.sleepFn(rt.recovery.restartDelay)
-		_, err := rt.transitionOps.StartContainerFn(name, ctype)
+		_, err := rt.StartContainerFn(name, ctype)
 		if err != nil {
 			logger.Errorf("Failed to restart %s after death: %v", name, err)
 			return
@@ -27,7 +28,7 @@ func defaultRestartAfterDeath(rt dockerRoutineRuntime, containerName, containerT
 	return nil
 }
 
-func defaultRecoverWireguardAfter502(rt dockerRoutineRuntime, settings dockerCheck502Settings) error {
+func defaultRecoverWireguardAfter502(rt dockerRoutineRuntime, settings config.Check502Settings) error {
 	if settings.Disable502 {
 		return nil
 	}

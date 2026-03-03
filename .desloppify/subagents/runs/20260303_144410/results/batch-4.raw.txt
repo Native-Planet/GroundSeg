@@ -1,0 +1,111 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Patch schema wiring is stringly-typed and reflection-driven (`patchField` string literals in `goseg/config/config_update_registry.go:245-566` consumed by `FieldByName` in `goseg/config/config_update_registry.go:163-224`), so field linkage is not compile-time safe.",
+        "Workflow handlers mix policy decisions, config writes, external API calls, and container lifecycle orchestration in single functions (for example `runStartramToggleWithRuntime` in `goseg/shipworkflow/startram_lifecycle_runtime.go:69-148` and `buildToggleMinIOLinkSteps` in `goseg/shipworkflow/urbit_operations_runtime.go:207-289`).",
+        "Runtime dependency composition is fragmented into many micro-ops structs/builders (`goseg/docker/orchestration/runtime_ops.go:19-466`) and manual override merging in `goseg/rectify/rectify.go:64-104`, increasing change surface for runtime seams.",
+        "Urbit config defaults and field mapping logic are split across a large custom unmarshal switch (`goseg/structs/configs.go:236-335`) and separate runtime normalization (`goseg/config/urbit.go:199-203`), creating multiple authority points."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "stringly_reflection_patch_mapping",
+      "summary": "Config patch registry relies on string field names + reflection, making schema linkage fragile.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`confPatchFieldSpec` stores `patchField` as a string and many entries hardcode names (e.g. `\"Piers\"`, `\"WgOn\"`) in `goseg/config/config_update_registry.go:245-566`.",
+        "Patch get/set is routed through `FieldByName` in `getConfigPatchValueByName` and `setConfigPatchValueByName` (`goseg/config/config_update_registry.go:163-224`), with several invalid-path exits returning silently.",
+        "Schema bootstrap (`buildConfPatchByKey`) validates duplicate external keys but does not validate that each `patchField` actually resolves to a valid `ConfPatch` field (`goseg/config/config_update_schema.go:272-281`)."
+      ],
+      "suggestion": "Replace `patchField` strings with typed getter/setter closures in each spec (or generated accessors), and add startup validation that every spec is bound to a concrete field path. Keep key-dup detection but remove reflection-based `FieldByName` for normal operation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "schema_definition_scattered"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "workflow_handlers_mix_policy_and_infra",
+      "summary": "Transition handlers combine domain policy and infrastructure choreography in single bodies.",
+      "related_files": [
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`runStartramToggleWithRuntime` decides behavior from settings, mutates config, starts/stops containers, dispatches per-ship payloads, and appends rebuild steps in one nested routine (`goseg/shipworkflow/startram_lifecycle_runtime.go:69-141`).",
+        "`buildToggleMinIOLinkSteps` performs state discovery, external click/docker calls, and persistent config updates inside one transition definition (`goseg/shipworkflow/urbit_operations_runtime.go:207-289`).",
+        "Multiple operations repeat a similar pattern: mutate config section, clean/rebuild runtime state, then conditionally start containers (`goseg/shipworkflow/urbit_operations_runtime.go:323-372`, `387-433`)."
+      ],
+      "suggestion": "Introduce a declarative transition operation model: separate policy selection from reusable infra steps (e.g., `updateConfigSection`, `cleanShipState`, `restartIfBoot`). Then compose handlers from shared step primitives instead of embedding orchestration logic per command.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "workflow_choreography_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_wiring_change_amplification",
+      "summary": "Runtime seam composition is over-fragmented and manually merged across modules.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many narrowly sliced ops structs and many default constructors (`defaultRuntime*`) across a single file (`goseg/docker/orchestration/runtime_ops.go:19-466`).",
+        "`mergeRectifyRuntime` performs repetitive field-by-field override merging with many explicit `if overrides.X != nil` branches (`goseg/rectify/rectify.go:64-104`).",
+        "Both files encode similar dependency-wiring concerns but through different manual patterns, which increases maintenance when adding/changing one seam."
+      ],
+      "suggestion": "Adopt one shared runtime builder/option pattern for seam composition (for example functional options + shared merge helper) and reuse it in orchestration and rectify runtimes to reduce duplicated wiring logic and update fan-out.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_wiring_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_config_defaults_split_across_layers",
+      "summary": "Urbit config parsing/default behavior is split across multiple authority points.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "`UrbitDocker.UnmarshalJSON` sets defaults and maps many keys manually via a large switch (`goseg/structs/configs.go:236-335`).",
+        "Config load/save path applies additional normalization in a separate function (`normalizeUrbitConfig`) that currently handles only `SnapTime` (`goseg/config/urbit.go:199-207`).",
+        "Because defaults/normalization are split between the model unmarshal and config IO layer, behavior evolves in multiple places and is easy to desynchronize."
+      ],
+      "suggestion": "Centralize defaulting and field mapping into one canonical config schema function (or generated mapping table), then invoke it from both unmarshal and load/persist flows so defaults are defined once and reused consistently.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "schema_definition_scattered"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Schema and wiring metadata are duplicated across reflection maps, manual switch parsing, and normalization helpers.",
+      "Transition orchestration lacks a uniform composition layer, so handlers accumulate mixed responsibilities.",
+      "Dependency seam injection evolved with ad-hoc struct layering and manual merge logic instead of one reusable composition mechanism."
+    ],
+    "likely_symptoms": [
+      "workflow_handlers_mix_policy_and_infra",
+      "runtime_seam_wiring_change_amplification",
+      "urbit_config_defaults_split_across_layers"
+    ],
+    "possible_false_positives": []
+  }
+}

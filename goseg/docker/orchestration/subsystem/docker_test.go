@@ -7,12 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"groundseg/config"
 	"groundseg/structs"
 	"groundseg/transition"
 )
 
-type dockerTransitionOpsStub = dockerTransitionOps
-type dockerHealthOpsStub = dockerHealthRuntime
 type dockerBroadcastOpsStub = dockerRoutineBroadcastOps
 type dockerWireguardOpsStub = dockerRoutineWireguardOps
 type dockerSystemOpsStub = dockerRoutineSystemOps
@@ -21,23 +20,19 @@ type dockerTimerStub = dockerRoutineTimer
 
 func testDockerRoutineRuntime() dockerRoutineRuntime {
 	rt := newDockerRoutineRuntime()
-	transitionOps := rt.transitionOps
-	transitionOps.GetContainerStateFn = func() map[string]structs.ContainerState { return map[string]structs.ContainerState{} }
-	transitionOps.UpdateContainerStateFn = func(string, structs.ContainerState) {}
-	transitionOps.StartContainerFn = func(string, string) (structs.ContainerState, error) {
+	rt.GetContainerStateFn = func() map[string]structs.ContainerState { return map[string]structs.ContainerState{} }
+	rt.UpdateContainerStateFn = func(string, structs.ContainerState) {}
+	rt.StartContainerFn = func(string, string) (structs.ContainerState, error) {
 		return structs.ContainerState{}, nil
 	}
-	transitionOps.LoadUrbitConfigFn = func(string) error { return nil }
-	transitionOps.UrbitConfFn = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
-	transitionOps.ClearLusCodeFn = func(string) {}
-	healthOps := rt.healthOps
-	healthOps.GetContainerNetworkFn = func(string) (string, error) { return "default", nil }
-	healthOps.GetLusCodeFn = func(string) (string, error) { return "", nil }
-	healthOps.GetShipStatusFn = func([]string) (map[string]string, error) { return map[string]string{}, nil }
-	healthOps.ShipSettingsSnapshotFn = func() dockerShipSettings { return dockerShipSettings{} }
-	healthOps.Check502SettingsSnapshotFn = func() dockerCheck502Settings { return dockerCheck502Settings{} }
-	rt.transitionOps = transitionOps
-	rt.healthOps = healthOps
+	rt.GetContainerNetworkFn = func(string) (string, error) { return "default", nil }
+	rt.GetLusCodeFn = func(string) (string, error) { return "", nil }
+	rt.GetShipStatusFn = func([]string) (map[string]string, error) { return map[string]string{}, nil }
+	rt.LoadUrbitConfigFn = func(string) error { return nil }
+	rt.UrbitConfFn = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
+	rt.ClearLusCodeFn = func(string) {}
+	rt.ShipSettingsSnapshotFn = func() config.ShipSettings { return config.ShipSettings{} }
+	rt.Check502SettingsSnapshotFn = func() config.Check502Settings { return config.Check502Settings{} }
 	rt.broadcastOps = dockerBroadcastOpsStub{
 		getBroadcastStateFn: func() structs.AuthBroadcast { return structs.AuthBroadcast{} },
 		updateBroadcastFn:   func(structs.AuthBroadcast) {},
@@ -64,16 +59,14 @@ func TestMakeBroadcastWireguardStartTransitionUsesBroadcastTransition(t *testing
 	state := structs.AuthBroadcast{}
 	wgOnUpdates := []bool{}
 	broadcastCalls := 0
-	transitionOps := rt.transitionOps
-	transitionOps.GetContainerStateFn = func() map[string]structs.ContainerState {
+	rt.GetContainerStateFn = func() map[string]structs.ContainerState {
 		return map[string]structs.ContainerState{
 			"wireguard": {
 				Type: string(transition.ContainerTypeWireguard),
 			},
 		}
 	}
-	transitionOps.UpdateContainerStateFn = func(string, structs.ContainerState) {}
-	rt.transitionOps = transitionOps
+	rt.UpdateContainerStateFn = func(string, structs.ContainerState) {}
 	rt.broadcastOps = dockerBroadcastOpsStub{
 		getBroadcastStateFn: func() structs.AuthBroadcast {
 			return state
@@ -125,16 +118,14 @@ func TestMakeBroadcastNonWireguardOnlyBroadcasts(t *testing.T) {
 	rt := testDockerRoutineRuntime()
 	updateWgOnCalled := false
 	broadcastCalls := 0
-	transitionOps := rt.transitionOps
-	transitionOps.GetContainerStateFn = func() map[string]structs.ContainerState {
+	rt.GetContainerStateFn = func() map[string]structs.ContainerState {
 		return map[string]structs.ContainerState{
 			"minio_zod": {
 				Type: "minio_zod",
 			},
 		}
 	}
-	transitionOps.UpdateContainerStateFn = func(string, structs.ContainerState) {}
-	rt.transitionOps = transitionOps
+	rt.UpdateContainerStateFn = func(string, structs.ContainerState) {}
 	rt.broadcastOps = dockerBroadcastOpsStub{
 		getBroadcastStateFn: func() structs.AuthBroadcast { return structs.AuthBroadcast{} },
 		updateBroadcastFn:   func(structs.AuthBroadcast) {},
@@ -169,8 +160,7 @@ func TestMakeBroadcastNonWireguardOnlyBroadcasts(t *testing.T) {
 func TestGracefulShipExitStopsRunningShips(t *testing.T) {
 	rt := testDockerRoutineRuntime()
 	zodStatusChecks := 0
-	healthOps := rt.healthOps
-	healthOps.GetShipStatusFn = func(piers []string) (map[string]string, error) {
+	rt.GetShipStatusFn = func(piers []string) (map[string]string, error) {
 		if len(piers) == 2 {
 			return map[string]string{
 				"zod": "Up 2 minutes",
@@ -186,10 +176,9 @@ func TestGracefulShipExitStopsRunningShips(t *testing.T) {
 		}
 		return map[string]string{}, nil
 	}
-	healthOps.ShipSettingsSnapshotFn = func() dockerShipSettings {
-		return dockerShipSettings{Piers: []string{"zod", "nec"}}
+	rt.ShipSettingsSnapshotFn = func() config.ShipSettings {
+		return config.ShipSettings{Piers: []string{"zod", "nec"}}
 	}
-	rt.healthOps = healthOps
 	rt.systemOps = dockerSystemOpsStub{
 		barExitFn: func(patp string) error {
 			if patp != "zod" {
@@ -213,17 +202,15 @@ func TestGracefulShipExitStopsRunningShips(t *testing.T) {
 
 func TestGracefulShipExitReturnsErrorWhenBarExitFails(t *testing.T) {
 	rt := testDockerRoutineRuntime()
-	healthOps := rt.healthOps
-	healthOps.GetShipStatusFn = func(piers []string) (map[string]string, error) {
+	rt.GetShipStatusFn = func(piers []string) (map[string]string, error) {
 		if len(piers) == 1 {
 			return map[string]string{"zod": "Up"}, nil
 		}
 		return map[string]string{}, nil
 	}
-	healthOps.ShipSettingsSnapshotFn = func() dockerShipSettings {
-		return dockerShipSettings{Piers: []string{"zod"}}
+	rt.ShipSettingsSnapshotFn = func() config.ShipSettings {
+		return config.ShipSettings{Piers: []string{"zod"}}
 	}
-	rt.healthOps = healthOps
 	rt.systemOps = dockerSystemOpsStub{
 		barExitFn: func(string) error { return errors.New("exit failed") },
 	}
@@ -242,14 +229,12 @@ func TestGracefulShipExitReturnsErrorWhenBarExitFails(t *testing.T) {
 
 func TestGracefulShipExitReturnsErrorOnInitialStatusFailure(t *testing.T) {
 	rt := testDockerRoutineRuntime()
-	healthOps := rt.healthOps
-	healthOps.GetShipStatusFn = func([]string) (map[string]string, error) {
+	rt.GetShipStatusFn = func([]string) (map[string]string, error) {
 		return nil, errors.New("docker unavailable")
 	}
-	healthOps.ShipSettingsSnapshotFn = func() dockerShipSettings {
-		return dockerShipSettings{Piers: []string{"zod"}}
+	rt.ShipSettingsSnapshotFn = func() config.ShipSettings {
+		return config.ShipSettings{Piers: []string{"zod"}}
 	}
-	rt.healthOps = healthOps
 	rt.systemOps = dockerSystemOpsStub{
 		barExitFn: func(string) error { return nil },
 	}

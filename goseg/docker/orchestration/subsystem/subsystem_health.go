@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"groundseg/config"
 	"groundseg/internal/workflow"
 	"groundseg/logger"
 	"groundseg/transition"
@@ -25,12 +26,16 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 		ctx = context.Background()
 	}
 	status := make(map[string]int)
-	rt.timer.sleepFn(rt.recovery.check502InitialDelay)
+	if !sleepOrContextDone(ctx, rt.recovery.check502InitialDelay) {
+		return
+	}
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		rt.timer.sleepFn(rt.recovery.check502PollDelay)
+		if !sleepOrContextDone(ctx, rt.recovery.check502PollDelay) {
+			return
+		}
 		if ctx.Err() != nil {
 			return
 		}
@@ -38,8 +43,13 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 		if threshold < 1 {
 			threshold = 1
 		}
-		settings := rt.healthOps.Check502SettingsSnapshotFn()
-		pierStatus, err := rt.healthOps.GetShipStatusFn(settings.Piers)
+		settings := rt.Check502SettingsSnapshotFn()
+		settings = config.Check502Settings{
+			Piers:      append([]string(nil), settings.Piers...),
+			WgOn:       settings.WgOn,
+			Disable502: settings.Disable502,
+		}
+		pierStatus, err := rt.GetShipStatusFn(settings.Piers)
 		if err != nil {
 			logger.Errorf("Couldn't get pier status: %v", err)
 			continue
@@ -48,13 +58,13 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 			if ctx.Err() != nil {
 				return
 			}
-			err := rt.transitionOps.LoadUrbitConfigFn(pier)
+			err := rt.LoadUrbitConfigFn(pier)
 			if err != nil {
 				logger.Errorf("Error loading %s config: %v", pier, err)
 				continue
 			}
-			shipConf := rt.transitionOps.UrbitConfFn(pier)
-			pierNetwork, err := rt.healthOps.GetContainerNetworkFn(pier)
+			shipConf := rt.UrbitConfFn(pier)
+			pierNetwork, err := rt.GetContainerNetworkFn(pier)
 			if err != nil {
 				logger.Warnf("Couldn't get network for %v: %v", pier, err)
 				continue
@@ -64,7 +74,7 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 				turnedOn = true
 			}
 			if turnedOn && pierNetwork != "default" && settings.WgOn {
-				if _, err := rt.healthOps.GetLusCodeFn(pier); err != nil {
+				if _, err := rt.GetLusCodeFn(pier); err != nil {
 					logger.Warnf("%v is not booted yet, skipping", pier)
 					continue
 				}
@@ -100,6 +110,23 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 	}
 }
 
+func sleepOrContextDone(ctx context.Context, d time.Duration) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if d <= 0 {
+		return ctx.Err() == nil
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
 func GracefulShipExit() error {
 	return gracefulShipExit(newDockerRoutineRuntime())
 }
@@ -110,7 +137,7 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 		DisableShipRestart = false
 	}()
 	getShipRunningStatus := func(patp string) (string, error) {
-		statuses, err := rt.healthOps.GetShipStatusFn([]string{patp})
+		statuses, err := rt.GetShipStatusFn([]string{patp})
 		if err != nil {
 			return "", fmt.Errorf("Failed to get statuses for %s: %w", patp, err)
 		}
@@ -120,8 +147,9 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 		}
 		return status, nil
 	}
-	piers := rt.healthOps.ShipSettingsSnapshotFn().Piers
-	pierStatus, err := rt.healthOps.GetShipStatusFn(piers)
+	settings := rt.ShipSettingsSnapshotFn()
+	piers := append([]string(nil), settings.Piers...)
+	pierStatus, err := rt.GetShipStatusFn(piers)
 	if err != nil {
 		return fmt.Errorf("Failed to retrieve ship information: %w", err)
 	}
@@ -131,11 +159,10 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 			pirate := patp
 			steps = append(steps, workflow.Step{
 				Name: fmt.Sprintf("stop %s with |exit for daemon restart", pirate),
-				Run:  func() error { return rt.systemOps.barExitFn(pirate) },
-			})
-			steps = append(steps, workflow.Step{
-				Name: fmt.Sprintf("wait for %s status during graceful exit", pirate),
 				Run: func() error {
+					if err := rt.systemOps.barExitFn(pirate); err != nil {
+						return fmt.Errorf("failed to stop %s with |exit for daemon restart: %w", pirate, err)
+					}
 					for {
 						status, err := getShipRunningStatus(pirate)
 						if err != nil {

@@ -24,17 +24,11 @@ func testMinIORuntime() dockerRuntime {
 		MkdirAllFn:  func(string, os.FileMode) error { return nil },
 	}
 	rt.containerOps = RuntimeContainerOps{
-		RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
-			StartContainerFn: func(string, string) (structs.ContainerState, error) {
-				return structs.ContainerState{ActualStatus: "running"}, nil
-			},
+		StartContainerFn: func(string, string) (structs.ContainerState, error) {
+			return structs.ContainerState{ActualStatus: "running"}, nil
 		},
-		RuntimeContainerStateOps: RuntimeContainerStateOps{
-			UpdateContainerStateFn: func(string, structs.ContainerState) {},
-		},
-		RuntimeContainerObservationOps: RuntimeContainerObservationOps{
-			GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil },
-		},
+		UpdateContainerStateFn:      func(string, structs.ContainerState) {},
+		GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil },
 	}
 	rt.imageOps = RuntimeImageOps{
 		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
@@ -45,11 +39,9 @@ func testMinIORuntime() dockerRuntime {
 		ConfFn: func() structs.SysConfig { return structs.SysConfig{} },
 	}
 	rt.urbitOps = RuntimeUrbitOps{
-		RuntimeUrbitConfigOps: RuntimeUrbitConfigOps{
-			LoadUrbitConfigFn: func(string) error { return nil },
-			UrbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
-			UpdateUrbitFn:     func(string, func(*structs.UrbitDocker) error) error { return nil },
-		},
+		LoadUrbitConfigFn: func(string) error { return nil },
+		UrbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
+		UpdateUrbitFn:     func(string, func(*structs.UrbitDocker) error) error { return nil },
 	}
 	rt.minioOps = RuntimeMinioOps{
 		CreateDefaultMcConfFn: func() error { return nil },
@@ -116,18 +108,14 @@ func TestLoadMCStartsContainerWhenRegistered(t *testing.T) {
 	}
 	var startedName, startedType string
 	rt.containerOps = RuntimeContainerOps{
-		RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
-			StartContainerFn: func(name, ctype string) (structs.ContainerState, error) {
-				startedName, startedType = name, ctype
-				return structs.ContainerState{ActualStatus: "running"}, nil
-			},
+		StartContainerFn: func(name, ctype string) (structs.ContainerState, error) {
+			startedName, startedType = name, ctype
+			return structs.ContainerState{ActualStatus: "running"}, nil
 		},
-		RuntimeContainerStateOps: RuntimeContainerStateOps{
-			UpdateContainerStateFn: func(name string, state structs.ContainerState) {
-				if name == "mc" && state.ActualStatus == "running" {
-					// no-op
-				}
-			},
+		UpdateContainerStateFn: func(name string, state structs.ContainerState) {
+			if name == "mc" && state.ActualStatus == "running" {
+				// no-op
+			}
 		},
 	}
 
@@ -151,19 +139,15 @@ func TestLoadMinIOsStartsPerPier(t *testing.T) {
 	}
 	var started []string
 	rt.containerOps = RuntimeContainerOps{
-		RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
-			StartContainerFn: func(name, ctype string) (structs.ContainerState, error) {
-				started = append(started, name+":"+ctype)
-				if strings.Contains(name, "~bus") {
-					return structs.ContainerState{}, errors.New("boom")
-				}
-				return structs.ContainerState{ActualStatus: "running"}, nil
-			},
+		StartContainerFn: func(name, ctype string) (structs.ContainerState, error) {
+			started = append(started, name+":"+ctype)
+			if strings.Contains(name, "~bus") {
+				return structs.ContainerState{}, errors.New("boom")
+			}
+			return structs.ContainerState{ActualStatus: "running"}, nil
 		},
-		RuntimeContainerStateOps: RuntimeContainerStateOps{
-			UpdateContainerStateFn: func(string, structs.ContainerState) {
-				// no-op
-			},
+		UpdateContainerStateFn: func(string, structs.ContainerState) {
+			// no-op
 		},
 	}
 
@@ -193,7 +177,7 @@ func TestMinioRuntimeFromDockerReturnsErrorWhenCopyRuntimeMissing(t *testing.T) 
 
 func TestMinioContainerConfBuildsExpectedConfig(t *testing.T) {
 	rt := testMinIORuntime()
-	rt.urbitOps = RuntimeUrbitOps{RuntimeUrbitConfigOps: RuntimeUrbitConfigOps{LoadUrbitConfigFn: func(string) error { return nil },
+	rt.urbitOps = RuntimeUrbitOps{LoadUrbitConfigFn: func(string) error { return nil },
 		UrbitConfFn: func(string) structs.UrbitDocker {
 			return structs.UrbitDocker{
 				UrbitNetworkConfig: structs.UrbitNetworkConfig{
@@ -205,7 +189,7 @@ func TestMinioContainerConfBuildsExpectedConfig(t *testing.T) {
 		},
 		UpdateUrbitFn: func(string, func(*structs.UrbitDocker) error) error {
 			return nil
-		}},
+		},
 	}
 	rt.imageOps = RuntimeImageOps{
 		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
@@ -255,13 +239,14 @@ func TestMCContainerConfPollsUntilWireguardUp(t *testing.T) {
 		},
 	}
 	calls := 0
-	rt.containerOps = RuntimeContainerOps{RuntimeContainerObservationOps: RuntimeContainerObservationOps{GetContainerRunningStatusFn: func(string) (string, error) {
-		calls++
-		if calls < 2 {
-			return "Exited", nil
-		}
-		return "Up 2 seconds", nil
-	}},
+	rt.containerOps = RuntimeContainerOps{
+		GetContainerRunningStatusFn: func(string) (string, error) {
+			calls++
+			if calls < 2 {
+				return "Exited", nil
+			}
+			return "Up 2 seconds", nil
+		},
 	}
 	sleepCalls := 0
 	rt.timerOps = RuntimeTimerOps{
@@ -287,15 +272,18 @@ func TestSetMinIOAdminAccountSuccess(t *testing.T) {
 	rt.contextOps = RuntimeContextOps{
 		DockerDirFn: func() string { return tmpDockerDir },
 	}
-	rt.urbitOps = RuntimeUrbitOps{RuntimeUrbitConfigOps: RuntimeUrbitConfigOps{UrbitConfFn: func(string) structs.UrbitDocker {
-		return structs.UrbitDocker{
-			UrbitNetworkConfig: structs.UrbitNetworkConfig{
-				WgS3Port: 9000,
-			},
-		}
-	}},
+	rt.urbitOps = RuntimeUrbitOps{
+		UrbitConfFn: func(string) structs.UrbitDocker {
+			return structs.UrbitDocker{
+				UrbitNetworkConfig: structs.UrbitNetworkConfig{
+					WgS3Port: 9000,
+				},
+			}
+		},
 	}
-	rt.containerOps = RuntimeContainerOps{RuntimeContainerObservationOps: RuntimeContainerObservationOps{GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil }}}
+	rt.containerOps = RuntimeContainerOps{
+		GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil },
+	}
 	rt.minioOps = RuntimeMinioOps{
 		GetMinIOPasswordFn: func(string) (string, error) { return "secret", nil },
 	}

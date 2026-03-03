@@ -35,7 +35,9 @@ func newVersionRuntime() versionRuntime {
 			stopContainerFn:            orchestration.StopContainerByName,
 			loadUrbitConfigFn:          config.LoadUrbitConfig,
 			urbitConfFn:                config.UrbitConf,
-			updateUrbitRuntimeConfigFn: config.UpdateUrbitRuntimeConfig,
+			updateUrbitRuntimeConfigFn: func(pier string, mutateFn func(*structs.UrbitRuntimeConfig) error) error {
+				return config.UpdateUrbitSectionConfig(pier, config.UrbitConfigSectionRuntime, mutateFn)
+			},
 			waitCompleteFn:             ship.WaitComplete,
 			chopPierFn:                 chopsvc.ChopPier,
 			updateUrbitFn:              config.UpdateUrbit,

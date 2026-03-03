@@ -89,7 +89,7 @@ func TestSchedulePackValidatesInputsAndPersistsSchedule(t *testing.T) {
 			Frequency:    0,
 			IntervalType: "week",
 		},
-	}); err == nil || !strings.Contains(err.Error(), "pack frequency cannot be 0") {
+	}); err == nil || !strings.Contains(err.Error(), "pack frequency must be greater than zero") {
 		t.Fatalf("expected frequency validation error, got %v", err)
 	}
 
@@ -98,7 +98,7 @@ func TestSchedulePackValidatesInputsAndPersistsSchedule(t *testing.T) {
 			Frequency:    1,
 			IntervalType: "year",
 		},
-	}); err == nil || !strings.Contains(err.Error(), "unknown interval type") {
+	}); err == nil || !strings.Contains(err.Error(), "unknown pack schedule interval type") {
 		t.Fatalf("expected interval type validation error, got %v", err)
 	}
 

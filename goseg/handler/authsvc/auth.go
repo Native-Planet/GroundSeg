@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"groundseg/auth"
+	"groundseg/auth/tokens"
 	"groundseg/authsession"
 	"groundseg/broadcast"
 	"groundseg/config"
@@ -83,10 +83,10 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 	if err != nil {
 		return make(map[string]string), fmt.Errorf("Couldn't unmarshal login payload: %w", err)
 	}
-	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
+	isAuthenticated := tokens.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
 		resetFailedLoginState()
-		newToken, err := auth.AuthToken(loginPayload.Token.Token)
+		newToken, err := tokens.AuthToken(loginPayload.Token.Token)
 		if err != nil {
 			return make(map[string]string), err
 		}
@@ -209,8 +209,8 @@ func PwHandler(msg []byte, urbitMode bool) error {
 	case "modify":
 		zap.L().Info("Setting new password")
 		conf := config.Conf()
-		if auth.Hasher(pwPayload.Payload.Old) == conf.PwHash {
-			if err := config.UpdateConfTyped(config.WithPwHash(auth.Hasher(pwPayload.Payload.Password))); err != nil {
+		if tokens.Hasher(pwPayload.Payload.Old) == conf.PwHash {
+			if err := config.UpdateConfTyped(config.WithPwHash(tokens.Hasher(pwPayload.Payload.Password))); err != nil {
 				return fmt.Errorf("Unable to update password: %w", err)
 			}
 			if urbitMode {

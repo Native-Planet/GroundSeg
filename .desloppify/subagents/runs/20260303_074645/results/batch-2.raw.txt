@@ -1,0 +1,119 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 72.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Config mutation routing is duplicated across layers: `config.UrbitSectionMutator` in `goseg/config/urbit.go` and section aliases + forwarding in `goseg/docker/orchestration/runtime_ops.go` both encode section-to-mutator behavior.",
+        "Large seam-bag runtime types in `goseg/docker/orchestration/runtime_ops.go` and `goseg/docker/orchestration/container/netdata.go` centralize many unrelated dependencies in single structs, increasing coupling and making call sites coordinate wide runtime surfaces.",
+        "Session connection lifecycle logic is split between `ClientManager` and `ConnectionRegistry` with repeated guarding and bucket traversal patterns (`findMuConn`, `removeConnectionByConn`, repeated nil/ensure/lock sequences), which obscures ownership boundaries.",
+        "Test suites repeatedly implement manual seam-reset and environment scaffolding patterns (for example `resetBackupSeams`, `resetBackupsvcDependencies`, and multiple global restore helpers in `accesspoint_test.go`) instead of shared harness utilities."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_config_mutation_routing",
+      "summary": "Urbit config section mutation is encoded in multiple places, creating drift-prone duplicated control logic.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`UrbitSectionMutator` in `urbit.go` uses a large section switch with type assertions per section.",
+        "`runtime_ops.go` re-exports section constants and repeats routing via `RuntimeUrbitConfigOps.UpdateUrbitSection`, forwarding through the same section-mutator mapping path.",
+        "`config_update_schema.go` introduces a second registry-driven mutation system (`confPatchField` registry) in the same config domain, resulting in parallel mutation frameworks."
+      ],
+      "suggestion": "Consolidate mutation routing behind one typed registry/strategy API for config updates, then have orchestration depend on that single API instead of re-aliasing sections and forwarding section-specific mutation contracts.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_mutation_model_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_god_structs",
+      "summary": "Runtime seam structs aggregate too many unrelated responsibilities, weakening module boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/container/netdata.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many embedded runtime op groups (`RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeSnapshotOps`, etc.) in one file, mixing lifecycle, config, file, image, wireguard, netdata, and minio seams.",
+        "`NetdataRuntime` in `netdata.go` includes file I/O, container lifecycle, metadata lookup, volume ops, sleep/polling, and base-path concerns in one dependency carrier.",
+        "`RectifyRuntime` embeds orchestration runtime plus event runtime, pulling broad orchestration concerns into event-loop handlers."
+      ],
+      "suggestion": "Split runtime seam carriers by use-case vertical (for example config mutation, container lifecycle, artifact write, event loop) and pass narrow interfaces to each workflow entry point; avoid embedding broad orchestration runtime where only one concern is needed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_surface_sprawl"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_state_ownership_blur",
+      "summary": "Session state management has blurred ownership between manager and registry, with repeated traversal and guard logic.",
+      "related_files": [
+        "goseg/session/client_manager.go",
+        "goseg/session/connection_registry.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`ClientManager` repeats `nil` checks, `ensureState`, and lock patterns across many methods before delegating to registry operations.",
+        "`ConnectionRegistry.findMuConn` and related helpers linearly scan both auth and unauth buckets repeatedly, while removal and broadcast also iterate both maps independently.",
+        "`logstream_session_store.go` follows a separate session-storage pattern (copy/set/remove plus lock handling) instead of reusing a coherent session-store abstraction, indicating parallel management styles inside the same subsystem."
+      ],
+      "suggestion": "Define a single session-store ownership boundary that encapsulates bucket traversal, connection lookup indexes, and mutation semantics; keep `ClientManager` as orchestration-only wrapper with minimal state logic.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "session_store_boundary_drift"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_seam_reset_duplication",
+      "summary": "Tests repeatedly hand-roll seam reset/setup scaffolding, indicating missing shared test architecture.",
+      "related_files": [
+        "goseg/click/backup/service_test.go",
+        "goseg/backupsvc/service_test.go",
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "`service_test.go` in backup defines `resetBackupSeams` with global seam reassignment/reset.",
+        "`backupsvc/service_test.go` defines another full dependency reset helper (`resetBackupsvcDependencies`) with captured originals.",
+        "`accesspoint_test.go` introduces multiple restore helpers (`resetParameterGlobalsForTest`, `resetRouterGlobalsForTest`) for global state.",
+        "Startup tests build large inline runtime structs repeatedly for callback wiring validation."
+      ],
+      "suggestion": "Introduce shared per-subsystem test harness builders (runtime/seam fixture constructors + standardized cleanup) to remove repeated global reset code and centralize fixture policy.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_harness_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Config and runtime mutation paths evolved through parallel abstractions instead of one stable ownership model.",
+      "Dependency injection strategy favored broad seam carriers over narrow task-focused interfaces.",
+      "Subsystem-level shared testing utilities are underdeveloped, so each package re-implements seam reset mechanics."
+    ],
+    "likely_symptoms": [
+      "duplicated_config_mutation_routing",
+      "runtime_seam_god_structs",
+      "test_seam_reset_duplication"
+    ],
+    "possible_false_positives": [
+      "Some broad runtime structs may be intentionally transitional for incremental refactors, but current shape still imposes coherence costs."
+    ]
+  }
+}

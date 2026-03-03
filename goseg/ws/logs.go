@@ -3,7 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"fmt"
-	"groundseg/auth"
+	"groundseg/auth/tokens"
 	"groundseg/docker/orchestration"
 	"groundseg/logger"
 	"groundseg/session"
@@ -19,7 +19,7 @@ type LogPayload struct {
 }
 
 var (
-	logTokenCheckForLogs         = auth.LogTokenCheck
+	logTokenCheckForLogs         = tokens.LogTokenCheck
 	retrieveSysLogHistoryForLogs = logger.RetrieveSysLogHistory
 	findContainerForLogs         = orchestration.FindContainer
 )

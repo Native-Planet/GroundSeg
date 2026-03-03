@@ -1,9 +1,9 @@
 package backup
 
 import (
+	"errors"
 	"fmt"
 	"groundseg/click/internal/runtime"
-	"strings"
 )
 
 var (
@@ -39,7 +39,7 @@ func backupAgent(patp, agent string) error {
 }
 
 func BackupTlon(patp string) error {
-	var errors []string
+	var errs []error
 
 	components := []struct {
 		name string
@@ -55,12 +55,12 @@ func BackupTlon(patp string) error {
 
 	for _, component := range components {
 		if component.err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", component.name, component.err))
+			errs = append(errs, fmt.Errorf("%s: %w", component.name, component.err))
 		}
 	}
 
-	if len(errors) == 0 {
+	if len(errs) == 0 {
 		return nil
 	}
-	return fmt.Errorf("backup errors: %s", strings.Join(errors, ", "))
+	return errors.Join(errs...)
 }

@@ -1,0 +1,246 @@
+{
+  "assessments": {
+    "error_consistency": 55.4
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Event publishing is treated as best-effort in some workflows even though the event broker returns explicit backpressure errors (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`) in `goseg/docker/events/events.go`.",
+        "Several call sites ignore publish errors entirely (for example `PublishNewShipTransition(...)` in `goseg/shipworkflow/newship.go` and `goseg/shipworkflow/newship_service.go`, and `publishUrbitTransitionForBackupService(...)` calls in `goseg/handler/ship/backup.go`), while sibling code in `goseg/shipworkflow/operations_runtime.go` logs publish failures.",
+        "Error causes are inconsistently preserved: `fmt.Errorf(\"...: %v\", err)` and `fmt.Errorf(\"%s\", text)` patterns appear in `goseg/config/urbit.go`, `goseg/handler/ship/backup.go`, and `goseg/shipworkflow/newship.go`, while many other modules correctly use `%w` wrapping."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_publish_error_drop",
+      "summary": "Transition publish failures are silently dropped in several workflows despite the broker exposing explicit publish errors.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/handler/ship/backup.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`publishDropOnFull` in `goseg/docker/events/events.go` returns `ErrTransitionBusFull`/`ErrTransitionPublishTimeout`.",
+        "`goseg/shipworkflow/newship.go` and `goseg/shipworkflow/newship_service.go` call `PublishNewShipTransition(...)` without checking returned errors.",
+        "`goseg/handler/ship/backup.go` repeatedly calls `publishUrbitTransitionForBackupService(...)` and ignores returned errors.",
+        "Sibling code in `goseg/shipworkflow/operations_runtime.go` checks publish errors and logs warnings, creating inconsistent failure behavior for similar transition paths."
+      ],
+      "suggestion": "Define one transition emission policy and apply it everywhere: either propagate publish errors for user-facing operations, or explicitly downgrade them to warnings via a shared helper that logs and tags dropped events. Replace direct fire-and-forget publish calls with that helper across new-ship and backup paths.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_transition_error_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "stringified_error_chain_loss",
+      "summary": "Multiple modules stringify errors instead of wrapping, breaking causal chains and `errors.Is/As` behavior.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/handler/ship/backup.go",
+        "goseg/shipworkflow/newship.go"
+      ],
+      "evidence": [
+        "`goseg/config/urbit.go` uses `%v` when adding context in several returns (for example load/decode/persist helpers), which drops unwrap semantics.",
+        "`goseg/handler/ship/backup.go` converts composed text to errors with `fmt.Errorf(\"%s\", text)` in multiple handlers, severing source causes.",
+        "`goseg/shipworkflow/newship.go` returns `fmt.Errorf(\"%s\", errmsg)` from cleanup path even when `errmsg` was built from an underlying error."
+      ],
+      "suggestion": "Standardize on wrapped propagation (`%w`) whenever an underlying error exists, and only create string-only errors for true validation/user-message cases. Introduce helper constructors for user-display events versus internal wrapped errors to prevent accidental cause stripping.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_transition_error_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "async_failure_visibility_gap",
+      "summary": "Asynchronous workflow entrypoints return success before critical work finishes, while downstream failures are only logged or side-channeled.",
+      "related_files": [
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "`HandleNewShipBoot` launches `ProvisionShip` in a goroutine and returns nil immediately; errors are routed through transition events and `_ = handleError(err)` rather than caller-visible return paths.",
+        "`ProvisionShip` launches `waitForNewShipReady` asynchronously; failures in remote registration/wireguard stages occur after initial success is returned.",
+        "`StartVersionSubsystem` is fire-and-forget and only logs terminal errors from `StartVersionSubsystemWithContext`, unlike other call sites that directly propagate errors to callers."
+      ],
+      "suggestion": "Define explicit async error contracts for long-running workflows (e.g., completion channel/result future, or mandatory event-ack path) and keep synchronous handlers either blocking until critical phases succeed or returning a typed 'accepted/pending' result. Apply one contract consistently across new-ship and subsystem starters.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "inconsistent_transition_error_policy"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 1,
+    "dimension_coverage": 1.0,
+    "evidence_density": 1.0,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 7.712,
+    "dimensions_with_findings": 1
+  },
+  "review_scope": {
+    "reviewed_files_count": 80,
+    "successful_batch_count": 1,
+    "full_sweep_included": false,
+    "total_files": 391,
+    "imported_dimensions": [
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/contracts/protocol_contracts.go",
+    "goseg/protocol/contracts/startram_contracts.go",
+    "goseg/system/metrics/metrics.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/importer/importer.go",
+    "goseg/defaults/version.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/main.go",
+    "goseg/system/wifi_c2c_policy.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/main_test.go",
+    "goseg/routines/version.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/rectify/rectify.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/network/network.go",
+    "goseg/handler/ship/backup.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/startram/doc.go",
+    "goseg/system/system.go",
+    "goseg/uploadsvc/doc.go",
+    "goseg/config/bootstrap.go",
+    "goseg/config/config.go",
+    "goseg/config/config_events.go",
+    "goseg/shipworkflow/lifecycle.go",
+    "goseg/shipworkflow/newship.go",
+    "goseg/shipworkflow/newship_service.go",
+    "goseg/docker/orchestration/container_bridge.go",
+    "goseg/docker/orchestration/container_config.go",
+    "goseg/docker/orchestration/container_config_test.go",
+    "README.md",
+    "goseg/auth/token_service.go",
+    "goseg/click/backup/service.go",
+    "goseg/docker/orchestration/container/netdata.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/leak/handler_protocol.go",
+    "goseg/session/client_manager.go",
+    "goseg/backupsvc/service_test.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/config/urbit.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/connection_registry.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/system/disk_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260303_075820",
+    "created_at": "2026-03-03T07:59:35+00:00",
+    "batch_count": 1,
+    "batch_indexes": [
+      1
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "10819ac1fd5f1fc3ccb7c8dbc1f2996b53fdd48e420cbbb5425427a61706109f"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "error_consistency"
+    ],
+    "imported_dimensions": [
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

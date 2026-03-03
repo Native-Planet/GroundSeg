@@ -30,13 +30,6 @@ func (config *SysConfig) UpdateConnectivityConfig(update func(*ConnectivityConfi
 	update(&config.ConnectivityConfig)
 }
 
-func (config *SysConfig) UpdateRuntimeConfig(update func(*RuntimeConfig)) {
-	if config == nil || update == nil {
-		return
-	}
-	update(&config.RuntimeConfig)
-}
-
 func (config *SysConfig) UpdateStartramConfig(update func(*StartramConfig)) {
 	if config == nil || update == nil {
 		return
@@ -44,11 +37,11 @@ func (config *SysConfig) UpdateStartramConfig(update func(*StartramConfig)) {
 	update(&config.StartramConfig)
 }
 
-func (config *SysConfig) UpdatePenpaiConfig(update func(*PenpaiConfig)) {
+func (config *SysConfig) UpdateRuntimeConfig(update func(*RuntimeConfig)) {
 	if config == nil || update == nil {
 		return
 	}
-	update(&config.PenpaiConfig)
+	update(&config.RuntimeConfig)
 }
 
 func (config *SysConfig) UpdateAuthSessionConfig(update func(*AuthSessionConfig)) {
@@ -56,6 +49,13 @@ func (config *SysConfig) UpdateAuthSessionConfig(update func(*AuthSessionConfig)
 		return
 	}
 	update(&config.AuthSessionConfig)
+}
+
+func (config *SysConfig) UpdatePenpaiConfig(update func(*PenpaiConfig)) {
+	if config == nil || update == nil {
+		return
+	}
+	update(&config.PenpaiConfig)
 }
 
 type AuthSessionConfig struct {
@@ -206,48 +206,6 @@ type UrbitDocker struct {
 	UrbitWebConfig
 	UrbitFeatureConfig
 	UrbitBackupConfig
-}
-
-func (u *UrbitDocker) UpdateRuntimeConfig(update func(*UrbitRuntimeConfig)) {
-	if u == nil || update == nil {
-		return
-	}
-	update(&u.UrbitRuntimeConfig)
-}
-
-func (u *UrbitDocker) UpdateNetworkConfig(update func(*UrbitNetworkConfig)) {
-	if u == nil || update == nil {
-		return
-	}
-	update(&u.UrbitNetworkConfig)
-}
-
-func (u *UrbitDocker) UpdateScheduleConfig(update func(*UrbitScheduleConfig)) {
-	if u == nil || update == nil {
-		return
-	}
-	update(&u.UrbitScheduleConfig)
-}
-
-func (u *UrbitDocker) UpdateWebConfig(update func(*UrbitWebConfig)) {
-	if u == nil || update == nil {
-		return
-	}
-	update(&u.UrbitWebConfig)
-}
-
-func (u *UrbitDocker) UpdateFeatureConfig(update func(*UrbitFeatureConfig)) {
-	if u == nil || update == nil {
-		return
-	}
-	update(&u.UrbitFeatureConfig)
-}
-
-func (u *UrbitDocker) UpdateBackupConfig(update func(*UrbitBackupConfig)) {
-	if u == nil || update == nil {
-		return
-	}
-	update(&u.UrbitBackupConfig)
 }
 
 // Helper function to convert a value to int, returns 0 if not an int

@@ -1,0 +1,116 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 74.3
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules implement large function-field runtime bags plus merge/validation scaffolding (for example `importerRuntime` with many callback fields and `ensureForWorkflow` nil-checks, `startupInitRuntime`/`startBackgroundServicesRuntime` with callback matrices, and `workflowRuntime` + `backupRuntimeDependencies` override merging).",
+        "Core orchestration abstractions are split into many micro-ops structs (`Runtime*Ops` families) with high composition depth in `docker/orchestration/runtime_ops.go`, increasing call indirection without clear behavioral policy at each layer.",
+        "Config patching uses reflection and string field names (`FieldByName`, `patchField` strings) in `config_update_registry.go`, which weakens interface honesty and allows runtime-only failure modes for what should be typed config-domain operations."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 70.0,
+        "indirection_cost": 67.0,
+        "interface_honesty": 72.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_runtime_sprawl",
+      "summary": "Function-field runtime bags have grown into low-leverage indirection layers across subsystems.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/handler/ship/backup.go"
+      ],
+      "evidence": [
+        "`importerRuntime` embeds many ops structs and then requires long nil-guard methods (`ensureInitializedForInit`, `ensureForWorkflow`) plus extensive manual override wiring in `withDefaultsImporterRuntime`.",
+        "`startBackgroundServicesRuntime` and related startup runtime structs expose large callback matrices with separate validate/missing/spec assembly paths, duplicating dependency-wiring logic.",
+        "`workflowRuntime` and `backupRuntimeDependencies` repeat the same override-by-function-field pattern, indicating a systemic abstraction pattern rather than a local need."
+      ],
+      "suggestion": "Replace callback-bag structs with capability-oriented interfaces per use case (for example: storage prep, transition emit, container lifecycle), inject concrete adapters via constructors, and keep test seams at package boundaries with small fakes. Consolidate nil validation into constructor-time checks so call paths do not repeatedly guard per function field.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_callback_bag_pattern"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "micro_ops_fragmentation_in_orchestration",
+      "summary": "Orchestration runtime is fragmented into many micro-op structs that increase coordination cost.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many narrowly sliced `Runtime*Ops` structs and composition wrappers (`RuntimeTransitionOpsFromContainerOps`, `RuntimeTransitionOpsFromUrbitOps`) before business logic executes.",
+        "`WireguardRuntime` methods repeatedly check for missing function dependencies at call time, indicating the abstraction does not guarantee required capabilities upfront.",
+        "`RectifyRuntime` depends on function fields from orchestration runtime and adds another merge/resolve layer (`mergeRectifyRuntime`, `resolveRectifyRuntime`), extending indirection depth."
+      ],
+      "suggestion": "Collapse micro-op slices into a smaller set of cohesive domain ports (for example `ContainerLifecyclePort`, `UrbitConfigPort`, `StartramPort`) with explicit required methods, and enforce completeness in constructors. Keep optional behavior in separate extension interfaces instead of nil-checked function members.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_callback_bag_pattern"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "reflective_config_patch_registry_leaks_contracts",
+      "summary": "Config patch abstraction relies on reflection and string field names, weakening contract safety.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`config_update_registry.go` reads/writes patch fields via `reflect.Value.FieldByName` and string keys (`patchField`), so schema mismatches are detected at runtime rather than compile time.",
+        "The approach builds a generic registry over many concrete config domains (`ConnectivityConfig`, `StartramConfig`, `RuntimeConfig`, etc.), but domain boundaries still live in concrete structs in `structs/configs.go`, making the generic reflection layer an additional fragile indirection."
+      ],
+      "suggestion": "Replace reflective field access with typed per-domain patch DTOs and explicit mappers (generated or handwritten). Keep generic helpers only for shared parse mechanics, while binding field selection through compile-time references.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "over_generic_runtime_reflection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "single_impl_interface_without_polymorphic_pressure",
+      "summary": "Some interfaces/abstractions add indirection despite a single concrete implementation path.",
+      "related_files": [
+        "goseg/system/wifi_c2c_policy.go",
+        "goseg/main.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`C2CModeOrchestrator` is defined as an interface, but default flow construction (`NewC2CModeFlow`) returns one concrete `c2cModeFlow` path and call sites use it directly for immediate execution.",
+        "`main.go` wires C2C mode through nested runtime wrappers (`c2cRuntime`/`c2cModeRuntime`) while the behavior is still bound to concrete system functions, limiting actual substitution benefit."
+      ],
+      "suggestion": "Demote single-implementation interfaces to concrete types until there are real competing implementations, or move interfaces to consumer-side boundaries where multiple adapters are used in production. This reduces wrapper depth and clarifies ownership of C2C behavior.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "runtime_callback_bag_pattern"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability was implemented primarily through per-function override seams, which scaled into callback-bag architectures across packages.",
+      "Abstraction design optimizes for injection flexibility over cohesive domain ports, causing high indirection and repeated runtime validation."
+    ],
+    "likely_symptoms": [
+      "callback_bag_runtime_sprawl",
+      "micro_ops_fragmentation_in_orchestration",
+      "single_impl_interface_without_polymorphic_pressure"
+    ],
+    "possible_false_positives": []
+  }
+}

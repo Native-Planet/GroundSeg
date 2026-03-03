@@ -13,15 +13,23 @@ type C2CModeOrchestrator interface {
 	ExitC2CMode() error
 }
 
-type c2cModeDependencies struct {
-	radio           wifiRadioService
-	accessPoint     accessPointLifecycle
-	getStoredSSIDs  func([]string)
+type c2cModeServiceDependencies struct {
+	radio          wifiRadioService
+	accessPoint    accessPointLifecycle
+	getStoredSSIDs func([]string)
+}
+
+type c2cModeLifecycleDependencies struct {
 	startResolved   func() error
 	stopResolved    func() error
 	rebootSystem    func() error
 	pause           func(time.Duration)
 	publishInterval func(string)
+}
+
+type c2cModeDependencies struct {
+	c2cModeServiceDependencies
+	c2cModeLifecycleDependencies
 }
 
 type c2cModeFlow struct {
@@ -37,42 +45,48 @@ var (
 
 func defaultC2CModeDependencies() c2cModeDependencies {
 	return c2cModeDependencies{
-		radio:           newWiFiRadioService(DefaultWiFiRuntime()),
-		accessPoint:     defaultAccessPointLifecycle,
-		getStoredSSIDs:  func(ssids []string) { C2CStoredSSIDs = ssids },
-		startResolved:   func() error { return runSystemdResolvedForRuntime(DefaultWiFiRuntime(), "start") },
-		stopResolved:    func() error { return runSystemdResolvedForRuntime(DefaultWiFiRuntime(), "stop") },
-		rebootSystem:    func() error { return runRebootCommandForRuntime(DefaultWiFiRuntime()) },
-		pause:           func(d time.Duration) { time.Sleep(d) },
-		publishInterval: func(event string) { ConfChannel() <- event },
+		c2cModeServiceDependencies: c2cModeServiceDependencies{
+			radio:          newWiFiRadioService(DefaultWiFiRuntime()),
+			accessPoint:    defaultAccessPointLifecycle,
+			getStoredSSIDs: func(ssids []string) { C2CStoredSSIDs = ssids },
+		},
+		c2cModeLifecycleDependencies: c2cModeLifecycleDependencies{
+			startResolved:   func() error { return runSystemdResolvedForRuntime(DefaultWiFiRuntime(), "start") },
+			stopResolved:    func() error { return runSystemdResolvedForRuntime(DefaultWiFiRuntime(), "stop") },
+			rebootSystem:    func() error { return runRebootCommandForRuntime(DefaultWiFiRuntime()) },
+			pause:           func(d time.Duration) { time.Sleep(d) },
+			publishInterval: func(event string) { ConfChannel() <- event },
+		},
 	}
 }
 
 func sanitizeC2CModeDependencies(overrides c2cModeDependencies) c2cModeDependencies {
 	dependencies := defaultC2CModeDependencies()
-	if overrides.radio != nil {
-		dependencies.radio = overrides.radio
+	serviceOverrides := overrides.c2cModeServiceDependencies
+	if serviceOverrides.radio != nil {
+		dependencies.radio = serviceOverrides.radio
 	}
-	if overrides.accessPoint != nil {
-		dependencies.accessPoint = overrides.accessPoint
+	if serviceOverrides.accessPoint != nil {
+		dependencies.accessPoint = serviceOverrides.accessPoint
 	}
-	if overrides.getStoredSSIDs != nil {
-		dependencies.getStoredSSIDs = overrides.getStoredSSIDs
+	if serviceOverrides.getStoredSSIDs != nil {
+		dependencies.getStoredSSIDs = serviceOverrides.getStoredSSIDs
 	}
-	if overrides.startResolved != nil {
-		dependencies.startResolved = overrides.startResolved
+	lifecycleOverrides := overrides.c2cModeLifecycleDependencies
+	if lifecycleOverrides.startResolved != nil {
+		dependencies.startResolved = lifecycleOverrides.startResolved
 	}
-	if overrides.stopResolved != nil {
-		dependencies.stopResolved = overrides.stopResolved
+	if lifecycleOverrides.stopResolved != nil {
+		dependencies.stopResolved = lifecycleOverrides.stopResolved
 	}
-	if overrides.rebootSystem != nil {
-		dependencies.rebootSystem = overrides.rebootSystem
+	if lifecycleOverrides.rebootSystem != nil {
+		dependencies.rebootSystem = lifecycleOverrides.rebootSystem
 	}
-	if overrides.pause != nil {
-		dependencies.pause = overrides.pause
+	if lifecycleOverrides.pause != nil {
+		dependencies.pause = lifecycleOverrides.pause
 	}
-	if overrides.publishInterval != nil {
-		dependencies.publishInterval = overrides.publishInterval
+	if lifecycleOverrides.publishInterval != nil {
+		dependencies.publishInterval = lifecycleOverrides.publishInterval
 	}
 	return dependencies
 }
@@ -175,7 +189,7 @@ func (flow c2cModeFlow) ExitC2CMode() error {
 }
 
 func runSystemdResolvedForRuntime(runtime wifiRuntime, mode string) error {
-	_, err := runtime.runCommand("systemctl", mode, "systemd-resolved")
+	_, err := runtime.RunCommand("systemctl", mode, "systemd-resolved")
 	if err != nil {
 		return fmt.Errorf("failed to %s systemd-resolved: %w", mode, err)
 	}
@@ -184,7 +198,7 @@ func runSystemdResolvedForRuntime(runtime wifiRuntime, mode string) error {
 
 // EnableResolved starts the systemd-resolved service for default runtime operations.
 func EnableResolved() error {
-	_, err := DefaultWiFiRuntime().runCommand("systemctl", "start", "systemd-resolved")
+	_, err := DefaultWiFiRuntime().RunCommand("systemctl", "start", "systemd-resolved")
 	if err != nil {
 		return fmt.Errorf("failed to start systemd-resolved: %w", err)
 	}
@@ -192,7 +206,7 @@ func EnableResolved() error {
 }
 
 func runRebootCommandForRuntime(runtime wifiRuntime) error {
-	cmd := runtime.execCommand("reboot")
+	cmd := runtime.ExecCommand("reboot")
 	_, err := cmd.CombinedOutput()
 	return err
 }

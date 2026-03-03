@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"groundseg/internal/testseams"
 )
 
 func TestResolveAPPasswordUsesEnvOverride(t *testing.T) {
@@ -86,21 +88,14 @@ func TestMakeConfigRejectsInvalidInputs(t *testing.T) {
 }
 
 func TestWriteHostapdConfigWritesConfigFile(t *testing.T) {
-	originalWlan := wlan
-	originalSSID := ssid
-	originalPassword := password
-	originalPath := hostapdConfigPath
-	t.Cleanup(func() {
-		wlan = originalWlan
-		ssid = originalSSID
-		password = originalPassword
-		hostapdConfigPath = originalPath
-	})
+	testseams.WithRestore(t, &wlan, "wlan0")
+	testseams.WithRestore(t, &ssid, "GroundSegTest")
+	testseams.WithRestore(t, &password, "valid-passphrase")
+	testseams.WithRestore(t, &hostapdConfigPath, filepath.Join(t.TempDir(), "hostapd.config"))
 
 	wlan = "wlan0"
 	ssid = "GroundSegTest"
 	password = "valid-passphrase"
-	hostapdConfigPath = filepath.Join(t.TempDir(), "hostapd.config")
 
 	if err := writeHostapdConfig(hostapdConfigPath, wlan, ssid, password); err != nil {
 		t.Fatalf("writeHostapdConfig returned error: %v", err)
@@ -115,19 +110,12 @@ func TestWriteHostapdConfigWritesConfigFile(t *testing.T) {
 	}
 }
 
-func resetParameterGlobalsForTest() func() {
-	originalWlan := wlan
-	originalInet := inet
-	originalIP := ip
-	originalSSID := ssid
-	originalPassword := password
-	return func() {
-		wlan = originalWlan
-		inet = originalInet
-		ip = originalIP
-		ssid = originalSSID
-		password = originalPassword
-	}
+func resetParameterGlobalsForTest(t *testing.T) {
+	testseams.WithRestore(t, &wlan, wlan)
+	testseams.WithRestore(t, &inet, inet)
+	testseams.WithRestore(t, &ip, ip)
+	testseams.WithRestore(t, &ssid, ssid)
+	testseams.WithRestore(t, &password, password)
 }
 
 func TestValidateIP(t *testing.T) {
@@ -149,8 +137,7 @@ func TestHasInterface(t *testing.T) {
 }
 
 func TestCheckParametersValidationPaths(t *testing.T) {
-	restore := resetParameterGlobalsForTest()
-	t.Cleanup(restore)
+	resetParameterGlobalsForTest(t)
 
 	makeRuntime := func() AccessPointRuntime {
 		rt := accessPointRuntime()
@@ -204,23 +191,14 @@ func TestCheckParametersValidationPaths(t *testing.T) {
 	}
 }
 
-func resetRouterGlobalsForTest() func() {
-	originalWlan := wlan
-	originalInet := inet
-	originalIP := ip
-	originalNetmask := netmask
-	originalHostapdPath := hostapdConfigPath
-	originalExec := executeRouterShellFn
-	originalSleep := routerSleepFn
-	return func() {
-		wlan = originalWlan
-		inet = originalInet
-		ip = originalIP
-		netmask = originalNetmask
-		hostapdConfigPath = originalHostapdPath
-		executeRouterShellFn = originalExec
-		routerSleepFn = originalSleep
-	}
+func resetRouterGlobalsForTest(t *testing.T) {
+	testseams.WithRestore(t, &wlan, wlan)
+	testseams.WithRestore(t, &inet, inet)
+	testseams.WithRestore(t, &ip, ip)
+	testseams.WithRestore(t, &netmask, netmask)
+	testseams.WithRestore(t, &hostapdConfigPath, hostapdConfigPath)
+	testseams.WithRestore(t, &executeRouterShellFn, executeRouterShellFn)
+	testseams.WithRestore(t, &routerSleepFn, routerSleepFn)
 }
 
 func hasCommand(commands []string, want string) bool {
@@ -233,8 +211,7 @@ func hasCommand(commands []string, want string) bool {
 }
 
 func TestPreStartUsesLegacyNmcliFallbackOnError(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	var commands []string
 	executeRouterShellFn = func(cmd string) (string, error) {
@@ -255,8 +232,7 @@ func TestPreStartUsesLegacyNmcliFallbackOnError(t *testing.T) {
 }
 
 func TestIsRunningReturnsFalseOnNoMatch(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	rt := accessPointRuntime()
 	rt.RunProcessProbeFn = func(_ string, _ ...string) *exec.Cmd {
@@ -273,8 +249,7 @@ func TestIsRunningReturnsFalseOnNoMatch(t *testing.T) {
 }
 
 func TestIsRunningDetectsHostapdAndDnsmasqByName(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	rt := accessPointRuntime()
 	rt.RunProcessProbeFn = func(_ string, _ ...string) *exec.Cmd {
@@ -291,8 +266,7 @@ func TestIsRunningDetectsHostapdAndDnsmasqByName(t *testing.T) {
 }
 
 func TestIsRunningExactMatcherRejectsSubstringMatch(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	rt := accessPointRuntime()
 	rt.RunProcessProbeFn = func(_ string, _ ...string) *exec.Cmd {
@@ -335,8 +309,7 @@ func TestNewProcessProbeMatcherRejectsEmptyTerms(t *testing.T) {
 }
 
 func TestIsRunningPropagatesProbeFailure(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	rt := accessPointRuntime()
 	rt.RunProcessProbeFn = func(_ string, _ ...string) *exec.Cmd {
@@ -356,8 +329,7 @@ func TestIsRunningPropagatesProbeFailure(t *testing.T) {
 }
 
 func TestPreStartPropagatesFailedCommandError(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	executeRouterShellFn = func(cmd string) (string, error) {
 		if cmd == "rfkill unblock wlan" {
@@ -376,8 +348,7 @@ func TestPreStartPropagatesFailedCommandError(t *testing.T) {
 }
 
 func TestStartRouterFailsWhenPreStartFails(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	wlan = "wlan0"
 	inet = "eth0"
@@ -408,8 +379,7 @@ func TestStartRouterFailsWhenPreStartFails(t *testing.T) {
 }
 
 func TestStartRouterBuildsExpectedCommandFlow(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	wlan = "wlan0"
 	inet = "eth0"
@@ -462,8 +432,7 @@ func TestExecuteShellReturnsCommandContextOnError(t *testing.T) {
 }
 
 func TestStopRouterBuildsExpectedTeardownCommands(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	wlan = "wlan0"
 	var commands []string
@@ -492,8 +461,7 @@ func TestStopRouterBuildsExpectedTeardownCommands(t *testing.T) {
 }
 
 func TestStopRouterReturnsConcreteError(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	wlan = "wlan0"
 	executeRouterShellFn = func(cmd string) (string, error) {
@@ -513,8 +481,7 @@ func TestStopRouterReturnsConcreteError(t *testing.T) {
 }
 
 func TestFormatShellCommand(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	if got := formatShellCommand("ip"); got != "ip" {
 		t.Fatalf("expected bare command string without args, got %q", got)
@@ -525,8 +492,7 @@ func TestFormatShellCommand(t *testing.T) {
 }
 
 func TestExecuteRouterCommandReturnsShellErrors(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	executeRouterShellFn = func(cmd string) (string, error) {
 		if cmd == "ip link set wlan0 up" {
@@ -545,8 +511,7 @@ func TestExecuteRouterCommandReturnsShellErrors(t *testing.T) {
 }
 
 func TestStartRouterWithRuntimeSkipsNatCommandsWithoutInternetBridge(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	wlan = "wlan0"
 	inet = ""
@@ -584,8 +549,7 @@ func TestStartRouterWithRuntimeSkipsNatCommandsWithoutInternetBridge(t *testing.
 }
 
 func TestStartRouterHaltsOnFirstIpFailure(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	wlan = "wlan0"
 	inet = "eth0"
@@ -615,8 +579,7 @@ func TestStartRouterHaltsOnFirstIpFailure(t *testing.T) {
 }
 
 func TestStopRouterHaltsOnFirstTeardownFailure(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	wlan = "wlan0"
 	commands := []string{}
@@ -641,8 +604,7 @@ func TestStopRouterHaltsOnFirstTeardownFailure(t *testing.T) {
 }
 
 func TestStartRouterWithRuntimeForwardsForwardingAndNATErrorPaths(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	baseRuntime := AccessPointRuntime{Wlan: "wlan0", Inet: "eth0", IP: "192.168.45.1", Netmask: "255.255.255.0", HostapdConfigPath: "/tmp/hostapd.config"}
 	routerSleepFn = func(_ time.Duration) {}
@@ -746,8 +708,7 @@ func TestStartRouterWithRuntimeForwardsForwardingAndNATErrorPaths(t *testing.T) 
 }
 
 func TestStartRouterWithRuntimeIpAddrFailure(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	routerSleepFn = func(_ time.Duration) {}
 	baseRuntime := AccessPointRuntime{Wlan: "wlan0", Inet: "", IP: "192.168.45.1", Netmask: "255.255.255.0", HostapdConfigPath: "/tmp/hostapd.config"}
@@ -769,8 +730,7 @@ func TestStartRouterWithRuntimeIpAddrFailure(t *testing.T) {
 }
 
 func TestStopRouterWithRuntimeSkipsWlanRulesWhenNoInterface(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	var commands []string
 	executeRouterShellFn = func(cmd string) (string, error) {
@@ -792,8 +752,7 @@ func TestStopRouterWithRuntimeSkipsWlanRulesWhenNoInterface(t *testing.T) {
 }
 
 func TestStopRouterWithRuntimeErrorPaths(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	testCases := []struct {
 		name           string
@@ -884,8 +843,7 @@ func TestStopRouterWithRuntimeErrorPaths(t *testing.T) {
 }
 
 func TestPreStartLegacyNmcliReportsErrorOutput(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	executeRouterShellFn = func(cmd string) (string, error) {
 		switch cmd {
@@ -914,8 +872,7 @@ func TestPreStartLegacyNmcliReportsErrorOutput(t *testing.T) {
 }
 
 func TestPreStartFailsIfKillallWpaSupplicantFails(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	executeRouterShellFn = func(cmd string) (string, error) {
 		if cmd == "killall wpa_supplicant" {
@@ -934,8 +891,7 @@ func TestPreStartFailsIfKillallWpaSupplicantFails(t *testing.T) {
 }
 
 func TestPreStartFailsWhenLegacyNmcliCommandFails(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	executeRouterShellFn = func(cmd string) (string, error) {
 		switch cmd {
@@ -964,8 +920,7 @@ func TestPreStartFailsWhenLegacyNmcliCommandFails(t *testing.T) {
 }
 
 func TestPreStartFailsIfDelayFails(t *testing.T) {
-	restore := resetRouterGlobalsForTest()
-	t.Cleanup(restore)
+	resetRouterGlobalsForTest(t)
 
 	executeRouterShellFn = func(cmd string) (string, error) {
 		switch cmd {

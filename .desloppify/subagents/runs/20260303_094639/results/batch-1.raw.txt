@@ -1,0 +1,117 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 68.4
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "goseg/docker/orchestration/runtime_ops.go defines many function-field seam structs (RuntimeContainerOps, RuntimeUrbitOps, RuntimeConfigOps, RuntimeStartupOps, etc.) plus manual merge helpers RuntimeTransitionOpsFromContainerOps and RuntimeTransitionOpsFromUrbitOps that re-copy fields one by one.",
+        "goseg/importer/importer.go uses another large callback bag (importerRuntime and embedded sub-runtimes) with many ensure* guard methods, indicating orchestration behavior is expressed as mutable wiring state rather than cohesive interfaces.",
+        "goseg/startuporchestrator/startup_orchestrator.go repeats the same callback-bag pattern (startupInitRuntime, startBackgroundServicesRuntime) and contains a mutable collection abstraction (startupBackgroundServices.add) implemented with a value receiver, so the append is lost.",
+        "goseg/structs/configs.go embeds multiple config domains into SysConfig and goseg/config/config_update_registry.go applies patches through generic root-level mutation closures, reinforcing broad cross-domain coupling through a shared root bag."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 62.0,
+        "indirection_cost": 48.5,
+        "interface_honesty": 70.5
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_service_locator_pattern",
+      "summary": "Large callback-bag runtimes act as service locators, adding indirection depth without clear abstraction boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Runtime ops are split into many function-field structs (e.g., RuntimeContainerOps, RuntimeUrbitOps, RuntimeStartupOps) and then recomposed; behavior is mostly wiring rather than domain-level contracts.",
+        "importerRuntime embeds DockerTransitionRuntime plus multiple callback sub-structs and validates dozens of nil callbacks via ensure* methods before executing workflows.",
+        "StartupRuntime and startBackgroundServicesRuntime repeat this function-field seam style for subsystem boot orchestration."
+      ],
+      "suggestion": "Replace callback bags with narrower behavior-oriented interfaces per use case (e.g., ContainerLifecycle, UrbitConfigStore, BackgroundServiceRunner), inject those interfaces directly into orchestrators/importer workflows, and remove broad runtime structs that expose unrelated capabilities.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "manual_field_merge_brittleness",
+      "summary": "Hand-maintained merge/copy helpers create high abstraction maintenance cost and drift risk.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "RuntimeTransitionOpsFromContainerOps and RuntimeTransitionOpsFromUrbitOps manually copy many optional function fields with repetitive nil checks.",
+        "mergeWiFiRuntime repeats per-field override logic for every wifiRuntime function seam.",
+        "Each added seam requires touching multiple merge/copy functions, increasing accidental omission risk and making abstractions expensive to evolve."
+      ],
+      "suggestion": "Standardize on one override mechanism (single merge utility or option constructors) and group seams into small immutable capability structs so new dependencies do not require duplicated per-field merge code.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "dishonest_mutable_collection_api",
+      "summary": "startupBackgroundServices exposes a mutating API but uses value receivers, so stateful abstraction semantics are broken.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "startupBackgroundServices.add has receiver `func (services startupBackgroundServices) add(...)`, appending to a copy.",
+        "Call sites in startBackgroundServicesWithRuntime use `services.add(...)` expecting background handles to accumulate; with value receiver, append is discarded.",
+        "This makes stop()/health() abstraction unreliable because internal service list may remain empty despite successful service starts."
+      ],
+      "suggestion": "Change mutating methods on startupBackgroundServices to pointer receivers (at least add), then add/adjust tests to assert that added services are retained and observed by health/stop flows.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "sysconfig_root_bag_coupling",
+      "summary": "A single embedded SysConfig root and generic patch registry blur domain boundaries and encourage cross-domain mutation coupling.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/defaults/defaults.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "SysConfig embeds ConnectivityConfig, StartramConfig, RuntimeConfig, AuthSessionConfig, and PenpaiConfig into one mutable root object.",
+        "confPatchRegistry in config_update_registry.go routes heterogeneous keys through shared generic mutation adapters targeting the same root update surface.",
+        "Startup/default initialization consumes and mutates the same broad config surface, increasing dependency fan-in across unrelated subsystems."
+      ],
+      "suggestion": "Split configuration by bounded contexts with explicit per-domain repositories/services, then map external patch keys to domain-specific command handlers instead of a single root mutation registry.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "shared_root_config_bag"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Test seam strategy expanded into production-facing runtime shapes without corresponding interface narrowing.",
+      "Configuration evolved as an embedded root object, causing mutation APIs to optimize for convenience over domain boundaries."
+    ],
+    "likely_symptoms": [
+      "manual_field_merge_brittleness",
+      "dishonest_mutable_collection_api"
+    ],
+    "possible_false_positives": []
+  }
+}

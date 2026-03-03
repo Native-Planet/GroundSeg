@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker/orchestration/subsystem"
@@ -56,22 +57,37 @@ var (
 	initWebErr    error
 )
 
-type bootstrapRuntime struct {
-	Orchestrator bootstrapOrchestratorRuntime
-	Server       bootstrapServerRuntime
-	Connectivity bootstrapConnectivityRuntime
+type bootstrapRuntime interface {
+	bootstrap(context.Context, startuporchestrator.StartupOptions) error
+	startServer(context.Context, int) error
+	runC2cCheck(context.Context) error
 }
 
-type bootstrapOrchestratorRuntime struct {
-	RunBootstrapFn func(context.Context, startuporchestrator.StartupOptions) error
+type bootstrapRuntimeFns struct {
+	runBootstrapFn func(context.Context, startuporchestrator.StartupOptions) error
+	runServerFn    func(context.Context, int) error
+	runC2cCheckFn  func(context.Context) error
 }
 
-type bootstrapServerRuntime struct {
-	StartServerFn func(context.Context, int) error
+func (runtime bootstrapRuntimeFns) bootstrap(ctx context.Context, opts startuporchestrator.StartupOptions) error {
+	if runtime.runBootstrapFn == nil {
+		return startuporchestrator.Bootstrap(ctx, opts)
+	}
+	return runtime.runBootstrapFn(ctx, opts)
 }
 
-type bootstrapConnectivityRuntime struct {
-	RunC2cCheckFn func(context.Context) error
+func (runtime bootstrapRuntimeFns) startServer(ctx context.Context, httpPort int) error {
+	if runtime.runServerFn == nil {
+		return runServer(ctx, httpPort, defaultServerRuntime())
+	}
+	return runtime.runServerFn(ctx, httpPort)
+}
+
+func (runtime bootstrapRuntimeFns) runC2cCheck(ctx context.Context) error {
+	if runtime.runC2cCheckFn == nil {
+		return C2cCheckWith(ctx, defaultC2cRuntime())
+	}
+	return runtime.runC2cCheckFn(ctx)
 }
 
 type serverRuntime struct {
@@ -84,29 +100,10 @@ func bootstrapRuntimeWith(
 	startServerFn func(context.Context, int) error,
 	runC2cCheckFn func(context.Context) error,
 ) bootstrapRuntime {
-	if runBootstrapFn == nil {
-		runBootstrapFn = startuporchestrator.Bootstrap
-	}
-	if startServerFn == nil {
-		startServerFn = func(ctx context.Context, httpPort int) error {
-			return runServer(ctx, httpPort, defaultServerRuntime())
-		}
-	}
-	if runC2cCheckFn == nil {
-		runC2cCheckFn = func(ctx context.Context) error {
-			return C2cCheckWith(ctx, defaultC2cRuntime())
-		}
-	}
-	return bootstrapRuntime{
-		Orchestrator: bootstrapOrchestratorRuntime{
-			RunBootstrapFn: runBootstrapFn,
-		},
-		Server: bootstrapServerRuntime{
-			StartServerFn: startServerFn,
-		},
-		Connectivity: bootstrapConnectivityRuntime{
-			RunC2cCheckFn: runC2cCheckFn,
-		},
+	return bootstrapRuntimeFns{
+		runBootstrapFn: runBootstrapFn,
+		runServerFn:    startServerFn,
+		runC2cCheckFn:  runC2cCheckFn,
 	}
 }
 
@@ -408,13 +405,19 @@ func runServer(ctx context.Context, httpPort int, runtime serverRuntime) error {
 		case <-ctx.Done():
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
+			shutdownErrs := make([]error, 0, 2)
 			if err := runtime.shutdown(shutdownCtx, server); err != nil {
 				logger.Errorf("Error shutting down HTTP server: %v", err)
+				shutdownErrs = append(shutdownErrs, fmt.Errorf("error shutting down HTTP server: %w", err))
 			}
 			if err := runtime.shutdown(shutdownCtx, wsServer); err != nil {
 				logger.Errorf("Error shutting down websocket server: %v", err)
+				shutdownErrs = append(shutdownErrs, fmt.Errorf("error shutting down websocket server: %w", err))
 			}
-			return nil
+			if len(shutdownErrs) == 0 {
+				return nil
+			}
+			return errors.Join(shutdownErrs...)
 		case listener := <-listenerErrCh:
 			switch listener.name {
 			case "http":
@@ -486,23 +489,24 @@ func startDevMode(opts appStartupOptions) {
 		return
 	}
 	logger.Info("Starting pprof (:6060)")
-	go http.ListenAndServe("0.0.0.0:6060", nil)
+	go func() {
+		if err := http.ListenAndServe("0.0.0.0:6060", nil); err != nil && err != http.ErrServerClosed {
+			logger.Errorf("pprof server failed: %v", err)
+		}
+	}()
 }
 
 func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime bootstrapRuntime) error {
-	if runtime.Orchestrator.RunBootstrapFn == nil {
-		return fmt.Errorf("bootstrap runtime is not configured")
+	if runtime == nil {
+		runtime = bootstrapRuntimeWith(nil, nil, nil)
 	}
-	if runtime.Server.StartServerFn == nil {
-		return fmt.Errorf("bootstrap runtime is not configured")
-	}
-	return runtime.Orchestrator.RunBootstrapFn(ctx, startuporchestrator.StartupOptions{
+	return runtime.bootstrap(ctx, startuporchestrator.StartupOptions{
 		HTTPPort: opts.httpPort,
 		ValidateConfig: func() error {
 			return initWebErr
 		},
-		StartServer:    runtime.Server.StartServerFn,
-		StartC2cCheck:  runtime.Connectivity.RunC2cCheckFn,
+		StartServer:    runtime.startServer,
+		StartC2cCheck:  runtime.runC2cCheck,
 		StartupRuntime: startuporchestrator.StartupRuntime{},
 	})
 }

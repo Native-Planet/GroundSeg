@@ -1,0 +1,98 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 81.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md declares `protocol/actions` as the single source of truth for websocket command tokens, but `protocol/contracts/protocol_contracts.go` redefines those same upload/c2c action tokens, namespaces, and compatibility metadata in a second registry.",
+        "`protocol/contracts/protocol_contracts.go` builds contract IDs from token strings (e.g., `protocol.actions.upload.open-endpoint`) while also exporting action tokens/namespaces, coupling transport action vocabulary and governance catalog in one module.",
+        "`protocol/contracts/startram_contracts.go` exports `APIConnectionError` as a mutable package variable, making a core contract identifier overrideable at runtime instead of immutable."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md compatibility guidance requires parser/executor tests for action-surface changes, but does not require contract-catalog tests that verify `IntroducedIn`/`Compatibility` metadata behavior in `protocol/contracts/*`.",
+        "`protocol/contracts/protocol_contracts.go` and `protocol/contracts/startram_contracts.go` encode governance metadata directly as literals/variables with no adjacent executable quality-gate guidance in README for keeping docs/runtime contracts synchronized."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "dual_source_action_contracts",
+      "summary": "Action contract authority is split between README-declared `protocol/actions` and duplicated token/namespace definitions in `protocol/contracts`, creating drift-prone governance boundaries.",
+      "related_files": [
+        "README.md",
+        "protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "README.md states the shared websocket action registry in `protocol/actions` should be treated as single source of truth.",
+        "`protocol/contracts/protocol_contracts.go` redeclares action tokens (`open-endpoint`, `reset`, `connect`) and namespaces (`upload`, `c2c`) plus compatibility metadata for the same action surfaces."
+      ],
+      "suggestion": "Make `protocol/actions` the only source for action token/namespace values and have contract catalog entries reference those constants directly; keep governance metadata in one authoritative contract schema to remove parallel definitions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "split_contract_authority"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_contract_identifier",
+      "summary": "Core StarTram contract ID is exported as mutable state, weakening contract immutability guarantees across modules.",
+      "related_files": [
+        "protocol/contracts/startram_contracts.go",
+        "protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "`startram_contracts.go` defines `APIConnectionError` as `var APIConnectionError ContractID = ...`, which can be reassigned by any importing code.",
+        "`protocol_contracts.go` uses constant aliases for public contract IDs/actions, showing an inconsistent mutability boundary inside the same contracts subsystem."
+      ],
+      "suggestion": "Export immutable contract identifiers via constants (or immutable accessors) consistently across contract files so downstream modules cannot mutate governance IDs at runtime.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "split_contract_authority"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "governance_gate_missing_contract_assertions",
+      "summary": "Documented verification path lacks explicit quality gates for contract-catalog governance metadata, leaving docs-vs-runtime compatibility drift under-validated.",
+      "related_files": [
+        "README.md",
+        "protocol/contracts/protocol_contracts.go",
+        "protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README local verification lists broad `go test ./...` and selected integration packages, and compatibility guidance only mandates parser/executor tests when action surfaces change.",
+        "Both contracts files carry governance fields (`IntroducedIn`, `Compatibility`, message contracts), but README does not require dedicated catalog contract checks/snapshots for those governance invariants."
+      ],
+      "suggestion": "Add an explicit contract-governance test gate in README (and CI) that validates catalog IDs, compatibility class, introduced versions, and snapshot stability for `protocol/contracts` whenever action or error contracts change.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "split_contract_authority"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance is distributed across docs, action registry, and per-file literals without a single enforced authority boundary.",
+      "Compatibility policy emphasizes action parsing behavior more than contract-catalog invariants."
+    ],
+    "likely_symptoms": [
+      "dual_source_action_contracts",
+      "mutable_contract_identifier",
+      "governance_gate_missing_contract_assertions"
+    ],
+    "possible_false_positives": []
+  }
+}

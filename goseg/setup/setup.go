@@ -3,7 +3,7 @@ package setup
 import (
 	"encoding/json"
 	"fmt"
-	"groundseg/auth"
+	"groundseg/auth/tokens"
 	"groundseg/authsession"
 	"groundseg/config"
 	"groundseg/startram"
@@ -22,7 +22,7 @@ var (
 	}
 
 	updateConfTypedForSetup  = config.UpdateConfTyped
-	hasherForSetup           = auth.Hasher
+	hasherForSetup           = tokens.Hasher
 	cycleWgKeyForSetup       = config.CycleWgKey
 	startramRegisterForSetup = startram.Register
 	addToAuthMapForSetup     = authsession.AddToAuthMap

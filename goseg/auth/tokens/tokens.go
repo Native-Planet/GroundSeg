@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"groundseg/authsession"
 	"groundseg/config"
 	"groundseg/structs"
 	"io/ioutil"
@@ -12,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gorilla/websocket"
 
 	fernet "github.com/fernet/fernet-go"
 )
@@ -224,7 +227,7 @@ func AuthToken(token string) (string, error) {
 	return encryptedText, nil
 }
 
-func CreateToken(r *http.Request, authed bool) (map[string]string, error) {
+func CreateToken(r *http.Request, conn *websocket.Conn, authed bool) (map[string]string, error) {
 	// extract conn info
 	ip, userAgent, err := requestIdentityFromRequest(r)
 	if err != nil {
@@ -255,6 +258,11 @@ func CreateToken(r *http.Request, authed bool) (map[string]string, error) {
 		"id": id,
 	}
 	token["token"] = encryptedText
+	if conn != nil {
+		if err := authsession.AddToAuthMap(conn, token, authed); err != nil {
+			return nil, fmt.Errorf("add token to auth map: %w", err)
+		}
+	}
 	return token, nil
 }
 

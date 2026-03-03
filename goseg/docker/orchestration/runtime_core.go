@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"groundseg/config"
 	"groundseg/internal/seams"
 )
 
@@ -8,33 +9,21 @@ type Runtime struct {
 	RuntimeTransitionOps
 	RuntimeHealthOps
 	RuntimeStartupOps
+	RuntimeStartramOps
 }
 
-// DockerTransitionRuntime contains the narrow dependencies required for transition-driven
-// container workflows like start/restart/stop handling.
-type DockerTransitionRuntime struct {
-	RuntimeTransitionOps
-}
-
-// DockerHealthRuntime contains the narrow dependencies required for health checks and
-// 502 recovery loops.
-type DockerHealthRuntime struct {
-	RuntimeHealthOps
-}
-
-// NewDockerTransitionRuntime builds transition-focused dependencies from the general runtime
-// seam, limiting coupling between lifecycle handlers and unrelated concerns.
-func NewDockerTransitionRuntime(runtime Runtime) DockerTransitionRuntime {
-	return DockerTransitionRuntime{
-		RuntimeTransitionOps: seams.Merge(RuntimeTransitionOps{}, runtime.RuntimeTransitionOps),
+func (runtime Runtime) UpdateConfig(opts ...config.ConfUpdateOption) error {
+	if runtime.UpdateConfTypedFn == nil {
+		return errConfUpdateMissing
 	}
+	return runtime.UpdateConfTypedFn(opts...)
 }
 
-// NewDockerHealthRuntime builds health-loop focused dependencies from the general runtime seam.
-func NewDockerHealthRuntime(runtime Runtime) DockerHealthRuntime {
-	return DockerHealthRuntime{
-		RuntimeHealthOps: seams.Merge(RuntimeHealthOps{}, runtime.RuntimeHealthOps),
+func (runtime Runtime) WithWgOn(enabled bool) config.ConfUpdateOption {
+	if runtime.WithWgOnFn == nil {
+		return config.WithWgOn(enabled)
 	}
+	return runtime.WithWgOnFn(enabled)
 }
 
 type StartupRuntime struct {
@@ -54,37 +43,62 @@ type RuntimeOption func(*Runtime)
 
 func WithContainerOps(ops RuntimeContainerOps) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeTransitionOps.RuntimeContainerOps = seams.Merge(runtime.RuntimeTransitionOps.RuntimeContainerOps, ops)
+		runtime.RuntimeTransitionOps = seams.Merge(runtime.RuntimeTransitionOps, RuntimeTransitionOpsFromContainerOps(ops))
 	}
 }
 
 func WithUrbitOps(ops RuntimeUrbitOps) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeTransitionOps.RuntimeUrbitOps = seams.Merge(runtime.RuntimeTransitionOps.RuntimeUrbitOps, ops)
+		runtime.RuntimeTransitionOps = seams.Merge(runtime.RuntimeTransitionOps, RuntimeTransitionOpsFromUrbitOps(ops))
 	}
 }
 
 func WithSnapshotOps(ops RuntimeSnapshotOps) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeHealthOps.RuntimeSnapshotOps = seams.Merge(runtime.RuntimeHealthOps.RuntimeSnapshotOps, ops)
+		runtime.RuntimeHealthOps = seams.Merge(runtime.RuntimeHealthOps, RuntimeHealthOps{
+			ConfFn:                        ops.ConfFn,
+			StartramSettingsSnapshotFn:    ops.StartramSettingsSnapshotFn,
+			ShipSettingsSnapshotFn:        ops.ShipSettingsSnapshotFn,
+			ShipRuntimeSettingsSnapshotFn: ops.ShipRuntimeSettingsSnapshotFn,
+			GetStartramConfigFn:           ops.GetStartramConfigFn,
+			Check502SettingsSnapshotFn:    ops.Check502SettingsSnapshotFn,
+		})
 	}
 }
 
 func WithConfigOps(ops RuntimeConfigOps) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeStartupOps.RuntimeConfigOps = seams.Merge(runtime.RuntimeStartupOps.RuntimeConfigOps, ops)
+		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, RuntimeStartupOps{
+			UpdateConfTypedFn: ops.UpdateConfTypedFn,
+			WithWgOnFn:        ops.WithWgOnFn,
+			CycleWgKeyFn:      ops.CycleWgKeyFn,
+			BarExitFn:         ops.BarExitFn,
+		})
 	}
 }
 
 func WithLoadOps(ops RuntimeLoadOps) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeStartupOps.RuntimeLoadOps = seams.Merge(runtime.RuntimeStartupOps.RuntimeLoadOps, ops)
+		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, RuntimeStartupOps{
+			LoadWireguardFn: ops.LoadWireguardFn,
+			LoadMCFn:        ops.LoadMCFn,
+			LoadMinIOsFn:    ops.LoadMinIOsFn,
+			LoadUrbitsFn:    ops.LoadUrbitsFn,
+		})
 	}
 }
 
 func WithServiceOps(ops RuntimeServiceOps) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeStartupOps.RuntimeServiceOps = seams.Merge(runtime.RuntimeStartupOps.RuntimeServiceOps, ops)
+		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, RuntimeStartupOps{
+			SvcDeleteFn: ops.SvcDeleteFn,
+		})
+	}
+}
+
+func WithStartramOps(ops RuntimeStartramOps) RuntimeOption {
+	return func(runtime *Runtime) {
+		runtime.RuntimeStartramOps = seams.Merge(runtime.RuntimeStartramOps, ops)
 	}
 }
 
@@ -93,6 +107,7 @@ func WithRuntimeDependencies(dependencies Runtime) RuntimeOption {
 		runtime.RuntimeTransitionOps = seams.Merge(runtime.RuntimeTransitionOps, dependencies.RuntimeTransitionOps)
 		runtime.RuntimeHealthOps = seams.Merge(runtime.RuntimeHealthOps, dependencies.RuntimeHealthOps)
 		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, dependencies.RuntimeStartupOps)
+		runtime.RuntimeStartramOps = seams.Merge(runtime.RuntimeStartramOps, dependencies.RuntimeStartramOps)
 	}
 }
 
@@ -101,6 +116,7 @@ func NewRuntimeWithDependencies(overrides Runtime) Runtime {
 		RuntimeTransitionOps: seams.Merge(defaultRuntimeTransitionOps(), overrides.RuntimeTransitionOps),
 		RuntimeHealthOps:     seams.Merge(defaultRuntimeHealthOps(), overrides.RuntimeHealthOps),
 		RuntimeStartupOps:    seams.Merge(defaultRuntimeStartupOps(), overrides.RuntimeStartupOps),
+		RuntimeStartramOps:   seams.Merge(defaultRuntimeStartramOps(), overrides.RuntimeStartramOps),
 	}
 }
 

@@ -8,68 +8,43 @@ import (
 
 	"github.com/mdlayher/wifi"
 	"go.uber.org/zap"
+	"groundseg/internal/seams"
 )
 
 type wifiRuntime struct {
-	execCommand        func(string, ...string) *exec.Cmd
-	runCommand         func(string, ...string) (string, error)
-	newWifiClient      func() (*wifi.Client, error)
-	clientInterfacesFn func(*wifi.Client) ([]*wifi.Interface, error)
-	clientBSSFn        func(*wifi.Client, *wifi.Interface) (*wifi.BSS, error)
-	wifiInfoTicker     func() *time.Ticker
+	ExecCommand        func(string, ...string) *exec.Cmd
+	RunCommand         func(string, ...string) (string, error)
+	NewWifiClient      func() (*wifi.Client, error)
+	ClientInterfacesFn func(*wifi.Client) ([]*wifi.Interface, error)
+	ClientBSSFn        func(*wifi.Client, *wifi.Interface) (*wifi.BSS, error)
+	WifiInfoTicker     func() *time.Ticker
+}
+
+func newWiFiRuntime() wifiRuntime {
+	return wifiRuntime{
+		ExecCommand:        exec.Command,
+		RunCommand:         runCommand,
+		NewWifiClient:      wifi.New,
+		ClientInterfacesFn: func(c *wifi.Client) ([]*wifi.Interface, error) { return c.Interfaces() },
+		ClientBSSFn:        func(c *wifi.Client, iface *wifi.Interface) (*wifi.BSS, error) { return c.BSS(iface) },
+		WifiInfoTicker:     func() *time.Ticker { return time.NewTicker(10 * time.Second) },
+	}
 }
 
 func NewWiFiRuntime() wifiRuntime {
-	return wifiRuntime{
-		execCommand:        exec.Command,
-		runCommand:         runCommand,
-		newWifiClient:      wifi.New,
-		clientInterfacesFn: func(c *wifi.Client) ([]*wifi.Interface, error) { return c.Interfaces() },
-		clientBSSFn:        func(c *wifi.Client, iface *wifi.Interface) (*wifi.BSS, error) { return c.BSS(iface) },
-		wifiInfoTicker:     func() *time.Ticker { return time.NewTicker(10 * time.Second) },
-	}
+	return newWiFiRuntime()
 }
 
 func DefaultWiFiRuntime() wifiRuntime {
-	return defaultWiFiRuntimeValue
-}
-
-func defaultWiFiRuntime() wifiRuntime {
-	return DefaultWiFiRuntime()
-}
-
-func withWiFiRuntime(overrides wifiRuntime) wifiRuntime {
-	return NewWiFiRuntimeWith(overrides)
+	return newWiFiRuntime()
 }
 
 func NewWiFiRuntimeWith(overrides wifiRuntime) wifiRuntime {
-	return mergeWiFiRuntime(defaultWiFiRuntime(), overrides)
-}
-
-func mergeWiFiRuntime(defaults, overrides wifiRuntime) wifiRuntime {
-	if overrides.execCommand != nil {
-		defaults.execCommand = overrides.execCommand
-	}
-	if overrides.runCommand != nil {
-		defaults.runCommand = overrides.runCommand
-	}
-	if overrides.newWifiClient != nil {
-		defaults.newWifiClient = overrides.newWifiClient
-	}
-	if overrides.clientInterfacesFn != nil {
-		defaults.clientInterfacesFn = overrides.clientInterfacesFn
-	}
-	if overrides.clientBSSFn != nil {
-		defaults.clientBSSFn = overrides.clientBSSFn
-	}
-	if overrides.wifiInfoTicker != nil {
-		defaults.wifiInfoTicker = overrides.wifiInfoTicker
-	}
-	return defaults
+	return seams.MergeAll(newWiFiRuntime(), overrides)
 }
 
 func (runtime wifiRuntime) ifCheck() (bool, error) {
-	out, err := runtime.runCommand("nmcli", "radio", "wifi")
+	out, err := runtime.RunCommand("nmcli", "radio", "wifi")
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("couldn't check interface: %v", err))
 		return false, fmt.Errorf("couldn't check interface: %w", err)
@@ -79,7 +54,7 @@ func (runtime wifiRuntime) ifCheck() (bool, error) {
 
 func (runtime wifiRuntime) wifiDevices() ([]string, error) {
 	cmd := "nmcli device status | grep wifi | awk '{print $1}'"
-	out, err := runtime.execCommand("sh", "-c", cmd).Output()
+	out, err := runtime.ExecCommand("sh", "-c", cmd).Output()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read wifi devices: %w", err)
 	}
@@ -109,7 +84,7 @@ func (runtime wifiRuntime) primaryWifiDevice() (string, error) {
 }
 
 func (runtime wifiRuntime) listSSIDs(dev string) ([]string, error) {
-	out, err := runtime.runCommand("nmcli", "-t", "dev", "wifi", "list", "ifname", dev)
+	out, err := runtime.RunCommand("nmcli", "-t", "dev", "wifi", "list", "ifname", dev)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't gather wifi networks: %w", err)
 	}
@@ -125,14 +100,14 @@ func (runtime wifiRuntime) listSSIDs(dev string) ([]string, error) {
 }
 
 func (runtime wifiRuntime) connectedSSID(client *wifi.Client, dev string) (string, error) {
-	interfaces, err := runtime.clientInterfacesFn(client)
+	interfaces, err := runtime.ClientInterfacesFn(client)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("couldn't get devices: %v", err))
 		return "", fmt.Errorf("couldn't get devices: %w", err)
 	}
 	for _, iface := range interfaces {
 		if iface.Name == dev && iface.Type == wifi.InterfaceTypeStation {
-			bss, err := runtime.clientBSSFn(client, iface)
+			bss, err := runtime.ClientBSSFn(client, iface)
 			if err != nil {
 				return "", fmt.Errorf("failed to get BSS for %s: %w", dev, err)
 			}
@@ -143,7 +118,7 @@ func (runtime wifiRuntime) connectedSSID(client *wifi.Client, dev string) (strin
 }
 
 func (runtime wifiRuntime) connect(ssid, password string) error {
-	cmd := runtime.execCommand("nmcli", "dev", "wifi", "connect", ssid, "password", password)
+	cmd := runtime.ExecCommand("nmcli", "dev", "wifi", "connect", ssid, "password", password)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to connect to wifi: %w", err)
@@ -152,7 +127,7 @@ func (runtime wifiRuntime) connect(ssid, password string) error {
 }
 
 func (runtime wifiRuntime) disconnect(ifaceName string) error {
-	client, err := runtime.newWifiClient()
+	client, err := runtime.NewWifiClient()
 	if err != nil {
 		return fmt.Errorf("couldn't create wifi client: %w", err)
 	}
@@ -165,18 +140,27 @@ func (runtime wifiRuntime) disconnect(ifaceName string) error {
 }
 
 func (runtime wifiRuntime) toggleDevice(dev string) error {
-	_ = dev
+	target := strings.TrimSpace(dev)
+	if target == "" {
+		var err error
+		target, err = runtime.primaryWifiDevice()
+		if err != nil {
+			return fmt.Errorf("resolve wifi device for toggle: %w", err)
+		}
+	}
+
 	wifiEnabled, err := runtime.ifCheck()
 	if err != nil {
 		return fmt.Errorf("failed to detect wifi radio state: %w", err)
 	}
-	cmd := "off"
+
+	command := "down"
 	if !wifiEnabled {
-		cmd = "on"
+		command = "up"
 	}
-	_, err = runtime.runCommand("nmcli", "radio", "wifi", cmd)
+	_, err = runtime.RunCommand("ip", "link", "set", target, command)
 	if err != nil {
-		return fmt.Errorf("failed to set wifi radio %s: %w", cmd, err)
+		return fmt.Errorf("failed to toggle wifi interface %s %s: %w", target, command, err)
 	}
 	return nil
 }
@@ -188,7 +172,7 @@ func (runtime wifiRuntime) applyCaptiveRules() error {
 		"net.ipv4.conf.all.send_redirects": "0",
 	}
 	for key, value := range sysctlSettings {
-		if _, err := runtime.runCommand("sysctl", "-w", fmt.Sprintf("%s=%s", key, value)); err != nil {
+		if _, err := runtime.RunCommand("sysctl", "-w", fmt.Sprintf("%s=%s", key, value)); err != nil {
 			return fmt.Errorf("failed to set %s: %w", key, err)
 		}
 	}

@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"fmt"
+	"groundseg/docker/lifecycle"
 	"strings"
 	"time"
 )
@@ -12,7 +13,7 @@ const (
 
 var (
 	shipExitPollInterval = 1 * time.Second
-	getShipStatusForWait = GetShipStatus
+	getShipStatusForWait = lifecycle.DefaultRuntime.GetShipStatus
 	nowForShipExit       = time.Now
 	sleepForShipExit     = time.Sleep
 )

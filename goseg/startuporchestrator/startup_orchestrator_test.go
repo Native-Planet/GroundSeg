@@ -40,7 +40,7 @@ func TestRunStartupSubsystemsReturnsRequiredFailure(t *testing.T) {
 			name:   "required failure",
 			policy: startupSubsystemRequired,
 			initFn: func() error {
-			return errors.New("required failure")
+				return errors.New("required failure")
 			},
 		},
 	})
@@ -58,8 +58,8 @@ func TestRunStartupSubsystemSkipsDisabledSubsystem(t *testing.T) {
 		name:   "disabled subsystem",
 		policy: startupSubsystemDisabled,
 		initFn: func() error {
-		called = true
-		return nil
+			called = true
+			return nil
 		},
 	})
 	if err != nil {
@@ -74,23 +74,31 @@ func TestBootstrapRequiresStartupRuntimeCallbacks(t *testing.T) {
 	runtime := StartupRuntime{
 		// initializeConfig intentionally omitted
 		startupInitRuntime: startupInitRuntime{
-			initializeAuthFn:          func() error { return nil },
-			initializeRouterFn:        func() error { return nil },
-			initializeSystemSupportFn: func() error { return nil },
-			initializeExporterFn:      func() error { return nil },
-			initializeImporterFn:      func() error { return nil },
-			initializeBroadcastFn:     func() error { return nil },
-			initializeDockerFn:        func() error { return nil },
-			initializeWiFiFn:         func() error { return nil },
-			startMDNSServerFn:        func() error { return nil },
-			initializeResolvedFn:      func() error { return nil },
-			networkReachabilityFn:     func(string) bool { return true },
-			primeRekorKeyFn:           func() error { return nil },
-			ConfigureSwapFn: func(string, int) error { return nil },
-			SetupTmpDirFn:   func() error { return nil },
+			startupInitCoreSubsystems: &startupInitCoreSubsystemRuntime{
+				initializeAuthFn:          func() error { return nil },
+				initializeRouterFn:        func() error { return nil },
+				initializeSystemSupportFn: func() error { return nil },
+				initializeExporterFn:      func() error { return nil },
+				initializeImporterFn:      func() error { return nil },
+				initializeBroadcastFn:     func() error { return nil },
+				initializeDockerFn:        func() error { return nil },
+			},
+			startupInitHostSubsystems: &startupInitHostSubsystemRuntime{
+				initializeWiFiFn:      func() error { return nil },
+				startMDNSServerFn:     func() error { return nil },
+				initializeResolvedFn:  func() error { return nil },
+				networkReachabilityFn: func(string) bool { return true },
+				primeRekorKeyFn:       func() error { return nil },
+			},
+			startupInitStorageSubsystems: &startupInitStorageSubsystemRuntime{
+				configureSwapFn: func(string, int) error { return nil },
+				setupTmpDirFn:   func() error { return nil },
+			},
 		},
 		startupBootstrapRuntime: startupBootstrapRuntime{
-			StartStartupContainersFn: func(bool) {},
+			bootstrap: startupBootstrapRuntimeFns{
+				startStartupContainersFn: func(bool) {},
+			},
 		},
 	}
 	if err := runtime.validate(); err == nil {
@@ -113,25 +121,30 @@ func TestStartBackgroundServicesWithRuntimeCallsExpectedServices(t *testing.T) {
 	c2cCalled := make(chan struct{}, 1)
 
 	runtime := startBackgroundServicesRuntime{
-		startVersionSubsystemFn:     func(context.Context) error { calls <- "version"; return nil },
-		startDockerSubsystemFn:      func(context.Context) error { calls <- "docker"; return nil },
-		startUrbitTransitionFn:      func(context.Context) error { calls <- "urbit"; return nil },
-		startImportShipTransitionFn: func(context.Context) error { calls <- "import"; return nil },
-		startRectifyUrbitFn:         func(context.Context) error { calls <- "rectify"; return nil },
-		syncRetrieveFn:              func(context.Context) error { calls <- "sync"; return nil },
-		startLeakFn:                 func(context.Context) error { calls <- "leak"; return nil },
+		startupBackgroundCoreSubsystems: &startupBackgroundCoreSubsystemRuntime{
+			startVersionSubsystemFn: func(context.Context) error { calls <- "version"; return nil },
+			startDockerSubsystemFn:  func(context.Context) error { calls <- "docker"; return nil },
+			startLeakFn:             func(context.Context) error { calls <- "leak"; return nil },
+			startSysLogStreamerFn:   func(context.Context) error { calls <- "logstream"; return nil },
+			startOldLogsCleanerFn:   func(context.Context) error { return nil },
+			startDiskUsageWarningFn: func(context.Context) error { return nil },
+			startSmartDiskCheckFn:   func(context.Context) error { return nil },
+			startPackScheduleLoopFn: func(context.Context) error { return nil },
+			startChopRoutinesFn:     func(context.Context) error { return nil },
+			startBackupRoutinesFn:   func(context.Context) error { return nil },
+		},
+		startupBackgroundShipSubsystems: &startupBackgroundShipSubsystemRuntime{
+			startUrbitTransitionFn:      func(context.Context) error { calls <- "urbit"; return nil },
+			startSystemTransitionFn:     func(context.Context) error { return nil },
+			startNewShipTransitionFn:    func(context.Context) error { return nil },
+			startImportShipTransitionFn: func(context.Context) error { calls <- "import"; return nil },
+			startRectifyUrbitFn:         func(context.Context) error { calls <- "rectify"; return nil },
+		},
+		startupBackgroundStartramSubsystems: &startupBackgroundStartramSubsystemRuntime{
+			syncRetrieveFn:                 func(context.Context) error { calls <- "sync"; return nil },
+			startStartramRenewalReminderFn: func(context.Context) error { return nil },
+		},
 	}
-
-	runtime = backgroundServiceRuntimeForTest(runtime, map[string]func(context.Context) error{
-		"version":                func(context.Context) error { calls <- "version"; return nil },
-		"docker":                 func(context.Context) error { calls <- "docker"; return nil },
-		"leak":                   func(context.Context) error { calls <- "leak"; return nil },
-		"urbit-transition":       func(context.Context) error { calls <- "urbit"; return nil },
-		"import-ship-transition": func(context.Context) error { calls <- "import"; return nil },
-		"rectify":                func(context.Context) error { calls <- "rectify"; return nil },
-		"docker-log-streamer":    func(context.Context) error { calls <- "logstream"; return nil },
-		"startram-sync":          func(context.Context) error { calls <- "sync"; return nil },
-	})
 
 	services, err := startBackgroundServicesWithRuntime(context.Background(), true, func(_ context.Context) error {
 		c2cCalled <- struct{}{}
@@ -172,9 +185,11 @@ func TestStartBackgroundServicesWithRuntimeCallsExpectedServices(t *testing.T) {
 func TestStartBackgroundServicesSkipsStartramSyncWhenNotRegistered(t *testing.T) {
 	callCount := 0
 	runtime := startBackgroundServicesRuntime{
-		syncRetrieveFn: func(context.Context) error {
-			callCount++
-			return errors.New("unexpected sync call")
+		startupBackgroundStartramSubsystems: &startupBackgroundStartramSubsystemRuntime{
+			syncRetrieveFn: func(context.Context) error {
+				callCount++
+				return errors.New("unexpected sync call")
+			},
 		},
 	}
 	services, err := startBackgroundServicesWithRuntime(context.Background(), false, nil, runtime)
@@ -184,6 +199,16 @@ func TestStartBackgroundServicesSkipsStartramSyncWhenNotRegistered(t *testing.T)
 	defer services.stop()
 	if callCount != 0 {
 		t.Fatalf("expected no startram sync call when unregistered, got %d", callCount)
+	}
+}
+
+func TestStartupBackgroundServicesAddRetainsHandles(t *testing.T) {
+	runtimeServices := &startupBackgroundServices{}
+	runtimeServices.add(backgroundServiceHandle{name: "a"})
+	runtimeServices.add(backgroundServiceHandle{name: "b"})
+
+	if got := len(runtimeServices.services); got != 2 {
+		t.Fatalf("expected startup background services to retain appended handles, got %d", got)
 	}
 }
 
@@ -202,54 +227,6 @@ func TestStartBackgroundServicesDefaultsApply(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected defaults to make empty background runtime valid, got %v", err)
 	}
-}
-
-func backgroundServiceRuntimeForTest(runtime startBackgroundServicesRuntime, overrides map[string]func(context.Context) error) startBackgroundServicesRuntime {
-	for name, callback := range overrides {
-		switch name {
-		case "version":
-			runtime.startVersionSubsystemFn = callback
-		case "docker":
-			runtime.startDockerSubsystemFn = callback
-		case "urbit-transition":
-			runtime.startUrbitTransitionFn = callback
-		case "system-transition":
-			runtime.startSystemTransitionFn = callback
-		case "new-ship-transition":
-			runtime.startNewShipTransitionFn = callback
-		case "import-ship-transition":
-			runtime.startImportShipTransitionFn = callback
-		case "rectify":
-			runtime.startRectifyUrbitFn = callback
-		case "startram-sync":
-			runtime.syncRetrieveFn = callback
-		case "leak":
-			runtime.startLeakFn = callback
-		case "sys-log-streamer":
-			runtime.startSysLogStreamerFn = callback
-		case "docker-log-streamer":
-			runtime.startDockerLogStreamerFn = callback
-		case "docker-log-conn-remover":
-			runtime.startDockerLogConnRemoverFn = callback
-		case "old-logs-cleaner":
-			runtime.startOldLogsCleanerFn = callback
-		case "disk-usage-warning":
-			runtime.startDiskUsageWarningFn = callback
-		case "smart-disk-check":
-			runtime.startSmartDiskCheckFn = callback
-		case "startram-renewal":
-			runtime.startStartramRenewalReminderFn = callback
-		case "pack-schedule":
-			runtime.startPackScheduleLoopFn = callback
-		case "chop-routines":
-			runtime.startChopRoutinesFn = callback
-		case "backup-routines":
-			runtime.startBackupRoutinesFn = callback
-		default:
-			panic("unknown background service: " + name)
-		}
-	}
-	return runtime
 }
 
 func TestWaitForVersionDiscoveryUsesRemoteVersionWhenSuccessful(t *testing.T) {

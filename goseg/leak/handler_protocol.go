@@ -26,7 +26,7 @@ func decodePacketPayload(result []byte) ([]byte, error) {
 		return nil, leakProtocolError{reason: "payload too short"}
 	}
 	stripped := result[5:]
-	jamValue := new(big.Int).SetBytes(reverseLittleEndian(stripped))
+	jamValue := new(big.Int).SetBytes(reverseLittleEndianBytes(stripped))
 	cue := noun.Cue(jamValue)
 	cell, ok := cue.(noun.Cell)
 	if !ok {
@@ -47,14 +47,7 @@ func decodeAtom(atom string) ([]byte, error) {
 	if !ok {
 		return []byte{}, fmt.Errorf("error converting string to big.Int")
 	}
-	return reverseLittleEndian(bigInt.Bytes()), nil
-}
-
-func reverseLittleEndian(byteSlice []byte) []byte {
-	for i, j := 0, len(byteSlice)-1; i < j; i, j = i+1, j-1 {
-		byteSlice[i], byteSlice[j] = byteSlice[j], byteSlice[i]
-	}
-	return byteSlice
+	return reverseLittleEndianBytes(bigInt.Bytes()), nil
 }
 
 func parseActionPayload(patp string, byteArray []byte) (structs.GallsegPayload, error) {

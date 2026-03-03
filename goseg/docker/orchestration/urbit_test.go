@@ -21,22 +21,16 @@ func testUrbitRuntime() UrbitRuntime {
 			ShipRuntimeSettingsSnapshotFn: func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{} },
 		},
 		RuntimeUrbitOps: RuntimeUrbitOps{
-			RuntimeUrbitConfigOps: RuntimeUrbitConfigOps{
-				LoadUrbitConfigFn: func(string) error { return nil },
-				UrbitConfFn: func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
-				UpdateUrbitFn: func(string, func(*structs.UrbitDocker) error) error {
-					return nil
-				},
+			LoadUrbitConfigFn: func(string) error { return nil },
+			UrbitConfFn: func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
+			UpdateUrbitFn: func(string, func(*structs.UrbitDocker) error) error {
+				return nil
 			},
 		},
 		RuntimeContainerOps: RuntimeContainerOps{
-			RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
-				StartContainerFn:       func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
-				CreateContainerFn:      func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
-				},
-			RuntimeContainerStateOps: RuntimeContainerStateOps{
-				UpdateContainerStateFn: func(string, structs.ContainerState) {},
-			},
+			StartContainerFn:      func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+			CreateContainerFn:     func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+			UpdateContainerStateFn: func(string, structs.ContainerState) {},
 		},
 		RuntimeImageOps: RuntimeImageOps{
 			GetLatestContainerInfoFn: func(string) (map[string]string, error) {

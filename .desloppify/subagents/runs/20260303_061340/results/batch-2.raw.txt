@@ -1,0 +1,70 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "test_strategy": 78.0
+  },
+  "dimension_notes": {
+    "test_strategy": {
+      "evidence": [
+        "README.md defines contract-governance expectations and references `goseg/protocol/contracts/contracts_test.go` plus a path-aware CI gate, but the reviewed contract source files (`protocol_contracts.go`, `startram_contracts.go`) only declare catalog data and snapshot helpers with no local invariant hooks (e.g., uniqueness/lifecycle assertions) that would fail fast when entries drift.",
+        "goseg/system/metrics/metrics.go reads live host paths (`/proc/mounts`, `/dev/disk/by-label`, `/sys/class/hwmon`) and uses real timing (`cpu.Percent(time.Second, false)`), but README quality gates list generic `go test ./...` plus selected integration packages and do not document a dedicated strategy for deterministic metrics validation across host/runtime variability."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract_catalog_drift_not_guarded_locally",
+      "summary": "Contract compatibility metadata changes rely on process policy instead of local executable invariants, making regression detection fragile.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README.md requires per-contract lifecycle assertions in `goseg/protocol/contracts/contracts_test.go` and CI gating for contract-surface changes.",
+        "protocol_contracts.go and startram_contracts.go define mutable catalog specs/snapshots and compatibility metadata, but include no local self-checking mechanism in the reviewed files to enforce uniqueness/lifecycle consistency at definition time.",
+        "Because governance is externalized to workflow, metadata drift (e.g., contract ID/version/compatibility inconsistency) is only caught if external tests remain fully synchronized with these files."
+      ],
+      "suggestion": "Add table-driven contract invariant tests tightly coupled to each catalog file (or shared invariant helpers called from per-file tests) that assert ID uniqueness, namespace/action consistency, non-empty IntroducedIn/Compatibility, and snapshot immutability behavior; keep CI gate as secondary protection rather than primary detection.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "policy_not_embedded_as_executable_checks"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "metrics_runtime_coupling_lacks_documented_test_plan",
+      "summary": "Metrics collection is tightly coupled to host runtime state without a documented deterministic test strategy, increasing flake and blind-spot risk.",
+      "related_files": [
+        "README.md",
+        "goseg/system/metrics/metrics.go"
+      ],
+      "evidence": [
+        "metrics.go reads live OS/hardware endpoints (`/proc/mounts`, `/dev/disk/by-label`, `/sys/class/hwmon`) and waits real time for CPU usage (`time.Second` sampling).",
+        "README backend quality gate does not specify targeted metrics package strategy or matrix conditions for these host-coupled paths.",
+        "Current implementation has no injected seams for filesystem/time dependencies in the reviewed file, so deterministic unit validation of failure/edge paths is difficult."
+      ],
+      "suggestion": "Introduce dependency seams for filesystem reads, statfs, and CPU sampler/time source, then add deterministic unit tests for mount parsing, label decoding, scanner/statfs error paths, and temperature-source absence; document required host/integration coverage for metrics in README quality gate.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "policy_not_embedded_as_executable_checks"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Quality controls are primarily documented as process/CI policy rather than enforced by close-to-code deterministic tests around volatile contract/runtime boundaries.",
+      "Host-dependent runtime code lacks test seams, so strategic risk areas are harder to validate with stable automated tests."
+    ],
+    "likely_symptoms": [
+      "contract_catalog_drift_not_guarded_locally",
+      "metrics_runtime_coupling_lacks_documented_test_plan"
+    ],
+    "possible_false_positives": []
+  }
+}

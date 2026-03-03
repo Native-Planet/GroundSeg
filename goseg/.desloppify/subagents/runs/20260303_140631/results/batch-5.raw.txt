@@ -1,0 +1,92 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Best-effort paths convert real failures to success in multiple subsystems: `runStartupSubsystem` returns `nil` for optional subsystem failures after only logging (`startuporchestrator/startup_orchestrator.go:57-61`), and `publishTransition` suppresses runtime validation errors by silently replacing the invalid runtime with defaults (`shipworkflow/operations_runtime.go:220-223`).",
+        "Error context/wrapping policy is inconsistent inside and across modules: `rectify/rectify_services.go` wraps some errors (`loading startram settings`) but returns raw errors in adjacent paths (`Reconcile` and `loadAndRefresh`), while `docker/network/network.go` returns a raw Docker client creation error in `KillContainerUsingPort` (`line 44`) but wraps analogous client-init failures in sibling functions (`GetContainerNetwork`, `CreateVolume`, `DeleteVolume`).",
+        "Partial-failure handling in iterative workflows is inconsistent and often hidden: per-pier reconcile failures are logged and skipped (`rectify/rectify_services.go:105-108`) while ship status lookup failures break the wait loop without surfacing an error (`shipworkflow/operations_runtime.go:437-439`), making caller-visible failure modes unpredictable."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "best_effort_error_demotion",
+      "summary": "Several orchestration paths demote concrete errors to success, producing unpredictable failure contracts across runtime flows.",
+      "related_files": [
+        "startuporchestrator/startup_orchestrator.go",
+        "shipworkflow/operations_runtime.go",
+        "rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`runStartupSubsystem` logs optional init failures and returns `nil`, so callers cannot distinguish degraded startup from clean startup (`startuporchestrator/startup_orchestrator.go:57-61`).",
+        "`publishTransition` catches runtime validation failure and silently falls back to `defaultWorkflowRuntime()` instead of surfacing configuration problems (`shipworkflow/operations_runtime.go:220-223`).",
+        "`UrbitTransitionApplier.Apply` treats unknown transitions as non-errors and returns `nil` after warning (`rectify/rectify_services.go:22-24`), while other transition paths are strict and return errors."
+      ],
+      "suggestion": "Define a single policy for degradable vs fatal errors (for example: strict by default, explicit `BestEffort` wrappers where intended). Return structured warnings/errors upward for optional/startup and transition-runtime failures, and make callers opt into suppression explicitly instead of implicit `nil` returns.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_best_effort_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "inconsistent_error_wrapping_context",
+      "summary": "Error wrapping/context is inconsistent in adjacent code paths, forcing callers to handle mixed raw and contextualized errors.",
+      "related_files": [
+        "rectify/rectify_services.go",
+        "docker/network/network.go",
+        "system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "In `rectify_services`, some failures are wrapped with operation context (`loading startram settings`), but nearby calls return raw errors (`Reconcile` returns `err` from `startramSettings`/`startramConfig`; `loadAndRefresh` returns raw `LoadUrbitConfigFn` error).",
+        "`KillContainerUsingPort` returns raw client-construction error (`docker/network/network.go:44`), while sibling methods in the same file wrap analogous failures with operation context (`GetContainerNetwork`, `CreateVolume`, `DeleteVolume`).",
+        "`system/wifi_runtime_methods.go` consistently wraps command errors with operation context, highlighting divergence from the raw-return paths above."
+      ],
+      "suggestion": "Adopt a uniform boundary rule: wrap all external dependency failures with operation + target context at module boundaries, while preserving `%w`. Apply this consistently in `rectify` and `docker/network` so error consumers get predictable diagnostics.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_context_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "hidden_partial_failures_in_loops",
+      "summary": "Loop-based workflows silently continue or exit on per-item errors, masking partial failure and making outcomes non-deterministic for callers.",
+      "related_files": [
+        "rectify/rectify_services.go",
+        "shipworkflow/operations_runtime.go",
+        "docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "`StartramRetrieveReconciler.Reconcile` logs and `continue`s on `loadAndRefresh` failure (`rectify/rectify_services.go:105-108`), so the run can report success despite skipped piers.",
+        "`urbitCleanDelete` breaks polling when `getShipRunningStatus` returns an error (`shipworkflow/operations_runtime.go:437-439`) and proceeds to deletion logic without surfacing the status-read failure.",
+        "`dockerSubscriptionHandler` logs malformed event-data assertions and continues (`subsystem_events.go:129-132`), while other event-loop errors are terminal; this mixes drop-and-continue with fail-fast behavior in the same flow."
+      ],
+      "suggestion": "Standardize per-item error handling in iterative workflows: collect and return aggregated errors (with item identity), and reserve `continue` paths for explicitly classified non-fatal cases. Expose partial-failure summaries so callers can detect degraded runs.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_best_effort_policy"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No shared contract for when background/transition paths may suppress errors versus must propagate them.",
+      "Boundary-level error wrapping conventions are not consistently enforced across subsystems."
+    ],
+    "likely_symptoms": [
+      "best_effort_error_demotion",
+      "hidden_partial_failures_in_loops"
+    ],
+    "possible_false_positives": []
+  }
+}

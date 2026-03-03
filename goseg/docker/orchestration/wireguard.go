@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"groundseg/docker/orchestration/container"
 	"groundseg/docker/orchestration/internal/artifactwriter"
+	"groundseg/internal/seams"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,7 +20,7 @@ import (
 func (rt WireguardRuntime) LoadWireguard() error {
 	zap.L().Info("Loading Startram Wireguard container")
 	if rt.BasePathFn == nil {
-		return fmt.Errorf("missing base path getter")
+		return seams.MissingRuntimeDependency("wireguard base path getter", "")
 	}
 	confPath := filepath.Join(rt.BasePathFn(), "settings", "wireguard.json")
 	return container.RunContainerWithRuntime(container.ContainerRuntimePlan{
@@ -36,7 +37,7 @@ func (rt WireguardRuntime) LoadWireguard() error {
 
 func (rt WireguardRuntime) wgContainerConf() (dockerc.Config, dockerc.HostConfig, error) {
 	if rt.GetLatestContainerInfoFn == nil {
-		return dockerc.Config{}, dockerc.HostConfig{}, fmt.Errorf("missing image runtime")
+		return dockerc.Config{}, dockerc.HostConfig{}, seams.MissingRuntimeDependency("wireguard image selector", "")
 	}
 	containerInfo, err := rt.GetLatestContainerInfoFn("wireguard")
 	if err != nil {
@@ -50,7 +51,7 @@ func (rt WireguardRuntime) wgContainerConf() (dockerc.Config, dockerc.HostConfig
 		OpenStdin: true,
 	}
 	if rt.GetWgConfFn == nil {
-		return containerConfig, dockerc.HostConfig{}, fmt.Errorf("missing wg config runtime")
+		return containerConfig, dockerc.HostConfig{}, seams.MissingRuntimeDependency("wireguard config callback", "")
 	}
 	wgConfig, err := rt.GetWgConfFn()
 	if err != nil {
@@ -70,7 +71,7 @@ func (rt WireguardRuntime) wgContainerConf() (dockerc.Config, dockerc.HostConfig
 
 func (rt WireguardRuntime) buildWgConf() (string, error) {
 	if rt.GetWgConfBlobFn == nil || rt.GetWgPrivkeyFn == nil {
-		return "", fmt.Errorf("missing wireguard config runtime")
+		return "", seams.MissingRuntimeDependency("wireguard key material runtime", "")
 	}
 	confB64, err := rt.GetWgConfBlobFn()
 	if err != nil {
@@ -92,10 +93,10 @@ func (rt WireguardRuntime) WriteWgConf() error {
 		return fmt.Errorf("failed to build wireguard configuration: %w", err)
 	}
 	if rt.DockerDirFn == nil {
-		return fmt.Errorf("missing docker dir getter")
+		return seams.MissingRuntimeDependency("wireguard docker directory callback", "")
 	}
 	if rt.ReadFileFn == nil {
-		return fmt.Errorf("missing file reader")
+		return seams.MissingRuntimeDependency("wireguard config file reader", "")
 	}
 	filePath := filepath.Join(rt.DockerDirFn(), "wireguard", "_data", "wg0.conf")
 	existingConf, err := rt.ReadFileFn(filePath)
@@ -137,7 +138,7 @@ func wireguardConfigWriteArtifactOptions(rt WireguardRuntime, filePath string, c
 		WriterContainerName: "wg_writer",
 		SelectImageFn: func() (string, error) {
 			if rt.GetLatestContainerImageFn == nil {
-				return "", fmt.Errorf("missing image selector")
+				return "", seams.MissingRuntimeDependency("wireguard image selector", "")
 			}
 			return rt.GetLatestContainerImageFn("wireguard")
 		},
@@ -151,7 +152,7 @@ func wireguardConfigWriteArtifactOptions(rt WireguardRuntime, filePath string, c
 
 func (rt WireguardRuntime) copyWGFileToVolume(filePath string, targetPath string, volumeName string) error {
 	if rt.CopyFileToVolumeFn == nil {
-		return fmt.Errorf("missing copy-to-volume runtime")
+		return seams.MissingRuntimeDependency("missing copy-to-volume runtime", "wireguard")
 	}
 	return rt.CopyFileToVolumeFn(
 		filePath,
@@ -160,7 +161,7 @@ func (rt WireguardRuntime) copyWGFileToVolume(filePath string, targetPath string
 		"wg_writer",
 		func() (string, error) {
 			if rt.GetLatestContainerImageFn == nil {
-				return "", fmt.Errorf("missing image selector")
+				return "", seams.MissingRuntimeDependency("missing wireguard image selector", "")
 			}
 			return rt.GetLatestContainerImageFn("wireguard")
 		},

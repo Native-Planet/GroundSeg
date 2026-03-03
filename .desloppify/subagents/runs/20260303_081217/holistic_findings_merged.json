@@ -1,0 +1,432 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 48.6,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 69.4,
+        "Indirection Cost": 63.8,
+        "Interface Honesty": 84.7
+      }
+    },
+    "design_coherence": 57.9,
+    "error_consistency": 48.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "goseg/docker/orchestration/runtime_ops.go defines many overlapping function-bag structs (RuntimeTransitionOps, RuntimeContainerOps, RuntimeUrbitConfigOps, RuntimeUrbitOps, RuntimeStartupOps, RuntimeConfigOps) and several methods just reconstruct RuntimeUrbitConfigOps to forward a single call.",
+        "goseg/startuporchestrator/startup_orchestrator.go and goseg/importer/importer.go each carry very large runtime dependency bags with many callback fields plus explicit nil-validation methods, indicating broad ambient authority rather than focused domain ports.",
+        "goseg/broadcast/state.go, goseg/docker/events/events.go, and goseg/handler/ship/backup.go rely on mutable package-level runtime singletons/channels/factories, which hides dependency edges and makes abstractions bypassable from unrelated call sites."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 69.4,
+        "indirection_cost": 63.8,
+        "interface_honesty": 84.7
+      }
+    },
+    "design_coherence": {
+      "evidence": [
+        "Urbit config mutation paths are duplicated across layers: `goseg/config/urbit.go` defines section-specific update wrappers and section mutator conversion, while `goseg/docker/orchestration/runtime_ops.go` re-implements per-section update fallbacks with repeated copy-mutate-assign closures.",
+        "Indirection-heavy pass-through APIs are repeated: `goseg/auth/token_service.go` mostly aliases/wraps `auth/tokens` behavior with shallow guards, and `goseg/docker/orchestration/runtime_ops.go` repeatedly reconstructs `RuntimeUrbitConfigOps` just to forward calls.",
+        "Session broadcasting/state ownership is split and partially duplicated: `goseg/session/client_manager.go` has active broadcaster logic, while `goseg/session/connection_registry.go` contains a separate broadcast loop and additional state operations, creating overlap in responsibilities."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "Rectify transition handlers log and continue on persistence failures instead of returning errors (`goseg/rectify/rectify_services.go:70-72`, `:148-156`), so callers receive success even when state writes fail.",
+        "Transition publish failures are handled as warn-and-continue in multiple paths (`goseg/rectify/rectify.go:293-296`, `goseg/shipworkflow/operations_runtime.go:71-73`), while other transition APIs return explicit errors (`goseg/docker/events/events.go:81-95`).",
+        "Broadcast delivery failure semantics diverge across subsystems: leak broadcast returns aggregated errors (`goseg/leak/broadcast.go:151-153`), but websocket session broadcast only logs/closes and cannot return failure (`goseg/session/client_manager.go:256-275`, `:300-315`).",
+        "Critical defaults initialization parse errors are logged but not surfaced (`goseg/defaults/version.go:186-189`), creating silent degraded runtime state."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_ops_pass_through_layer",
+      "summary": "Runtime operation abstractions add call depth without adding policy or translation.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "RuntimeTransitionOps.LoadUrbitConfig/UrbitConf/LoadAndReadUrbitConfig/UpdateUrbitSnapshot/UpdateUrbitSection each rebuild a RuntimeUrbitConfigOps literal and immediately forward the call.",
+        "shipworkflow.newWorkflowRuntime constructs a DockerTransitionRuntime and then extracts function fields (UpdateUrbitFn/UpdateUrbitSectionFn), reinforcing function-pointer plumbing rather than a narrower domain port.",
+        "RectifyRuntime embeds orchestration.Runtime and then forwards through runtime callbacks again, creating multiple indirection layers for the same urbit-config operations."
+      ],
+      "suggestion": "Replace repeated function-bag forwarding with a single explicit urbit-config port interface (or concrete service) injected once; remove duplicate forwarding methods and keep one composition root where the concrete adapter is built.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "function_bag_indirection_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "ambient_config_bag_dependencies",
+      "summary": "Large callback/config bags blur module boundaries and make dependency intent opaque.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/main.go",
+        "goseg/system/wifi_c2c_policy.go"
+      ],
+      "evidence": [
+        "startupInitRuntime and startBackgroundServicesRuntime contain many unrelated callbacks (config/auth/router/docker/wifi/logstream/rectify/etc.), acting as a wide parameter bag across multiple concerns.",
+        "importerRuntime mixes docker transition behavior with filesystem, auth token validation, ship workflow, startram, and cleanup callbacks; this forces extensive ensure* nil-check matrices to guard runtime shape.",
+        "main.c2cRuntime and related nested runtime structs repeat the same pattern of wiring many function fields for one operation path."
+      ],
+      "suggestion": "Split runtime bags into narrower domain-specific ports (e.g., startup init port, startup background services port, import workflow port, import storage port) and move validation to constructor-time invariants for each small port.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "function_bag_indirection_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_runtime_singletons_leak_boundaries",
+      "summary": "Global mutable runtimes/channels undercut abstraction boundaries and couple modules through hidden state.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/docker/events/events.go",
+        "goseg/handler/ship/backup.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "broadcast/state.go uses package-global runtime factory/value/once and global state maps/channels (e.g., schedulePackBus), so behavior depends on hidden mutable package state.",
+        "docker/events/events.go exposes SetEventRuntimeFactory and package-global defaultEventRuntime, allowing process-wide broker mutation outside a typed composition boundary.",
+        "handler/ship/backup.go keeps a package-global backupRuntime dependency bag, and logstream/logs.go stores package-global mutable runtime config/channels, creating multiple singleton service-locator style entry points."
+      ],
+      "suggestion": "Move these globals behind explicit application-scoped services passed through constructors; keep singleton setup in bootstrap only and ban package-level mutable runtime/factory setters outside tests.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "hidden_global_service_locator"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_patch_registry_reflection_style_abstraction",
+      "summary": "Config patch abstraction centralizes updates but still encodes domain semantics as repetitive registry literals.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go",
+        "goseg/defaults/defaults.go"
+      ],
+      "evidence": [
+        "config_update_registry.go contains a very large confPatchRegistry with repeated parse/access/apply boilerplate per field, even though many entries are structurally identical.",
+        "SysConfig embeds several large domain structs; update paths are keyed by strings and per-field lambdas rather than domain-specific update commands, so abstraction stays generic while domain rules remain scattered.",
+        "defaults/defaults.go and SysConfig shape evolution require synchronized registry edits, indicating the current abstraction does not sufficiently localize change."
+      ],
+      "suggestion": "Introduce domain-scoped patch handlers (ConnectivityPatch, RuntimePatch, StartramPatch, etc.) with table-driven field metadata per domain and explicit command objects for complex mutations; keep the generic registry only as dispatch glue.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "function_bag_indirection_overuse"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_urbit_section_update_paths",
+      "summary": "Urbit section-update behavior is implemented in multiple layers with parallel logic.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`config/urbit.go` centralizes section typing via `UrbitSectionMutator` and exposes `UpdateUrbitSection` plus per-section wrappers.",
+        "`runtime_ops.go` repeats section-specific mutation behavior in `UpdateUrbitRuntimeConfig`, `UpdateUrbitNetworkConfig`, `UpdateUrbitScheduleConfig`, `UpdateUrbitFeatureConfig`, `UpdateUrbitWebConfig`, and `UpdateUrbitBackupConfig` with near-identical copy-mutate-assign blocks.",
+        "Callers like `shipworkflow/urbit_operations_runtime.go` depend on this split surface, so behavior changes require coordination across at least two modules."
+      ],
+      "suggestion": "Make one layer the canonical owner of section mutation (prefer `config/urbit.go`) and have orchestration delegate through a single typed section API. Remove duplicated per-section fallback implementations from runtime ops and keep only one adapter point.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "urbit_config_surface_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "low_leverage_pass_through_facades",
+      "summary": "Multiple facades add call depth without adding meaningful policy or behavior.",
+      "related_files": [
+        "goseg/auth/token_service.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "`auth/token_service.go` contains many wrappers that immediately delegate to `tokens.*` after simple nil/empty checks, while also re-exporting status constants/types.",
+        "`runtime_ops.go` methods on `RuntimeTransitionOps` repeatedly instantiate `RuntimeUrbitConfigOps{...}` and forward (`LoadUrbitConfig`, `UrbitConf`, `LoadAndReadUrbitConfig`, `UpdateUrbitSnapshot`, `UpdateUrbitSection`).",
+        "The same concept (config update/read) is exposed through several thin surfaces (`RuntimeTransitionOps`, `RuntimeUrbitConfigOps`, and direct config APIs), increasing navigation and maintenance overhead."
+      ],
+      "suggestion": "Collapse pass-through layers: keep one public seam per responsibility and move trivial validation into a shared helper. For orchestration, create one reusable `urbitConfigOps()` accessor instead of reconstructing structs per method, and remove wrappers that only mirror downstream APIs.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "facade_indirection_without_policy"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_broadcast_responsibility_overlap",
+      "summary": "Session broadcast and registry concerns overlap across two components.",
+      "related_files": [
+        "goseg/session/client_manager.go",
+        "goseg/session/connection_registry.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`client_manager.go` owns active broadcasting via `sessionBroadcaster.broadcast` and write-failure handling/removal.",
+        "`connection_registry.go` also defines a broadcast loop over client buckets with similar write/update behavior, indicating duplicated responsibility in the same subsystem.",
+        "`logstream_session_store.go` introduces a third session-state holder with its own locking/session lifecycle methods, reinforcing fragmented ownership boundaries for connection/session state."
+      ],
+      "suggestion": "Define a single owner for websocket broadcast and session mutation in the session subsystem. Remove duplicate broadcast implementations, make manager vs registry boundaries explicit (or merge them), and keep logstream store scoped strictly to logstream concerns.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "session_state_ownership_fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "rectify_swallowed_persistence_errors",
+      "summary": "Rectify transition flows swallow config persistence errors and return success, masking failed state reconciliation.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "In `StartramTransitionService.applyTransitionCompletion`, `UpdateConfig` failure is only logged (`rectify_services.go:70-72`) and function still returns nil.",
+        "In `StartramRetrieveReconciler.Reconcile`, failures from `updateWebConfig`/`updateNetworkConfig` are only warned (`rectify_services.go:148-156`) and reconciliation continues.",
+        "Rectify event loops call `applyTransitionUpdate` (`rectify.go:425`) which already downgrades publish errors to warnings (`rectify.go:293-296`), compounding silent failure paths."
+      ],
+      "suggestion": "Define per-transition error policy and propagate non-recoverable persistence failures back to callers. Return aggregated reconciliation errors (for example with `errors.Join`) when updates fail, and only downgrade explicitly non-critical failures.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_error_policy_without_contract"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_publish_contract_mismatch",
+      "summary": "Transition publishing uses incompatible failure contracts across modules (hard errors vs warn-and-drop), making failure handling unpredictable.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`docker/events` returns structured publish failures (`ErrTransitionPublishTimeout`, `ErrTransitionBusFull`) from `publishDropOnFull` (`events.go:81-95`).",
+        "`shipworkflow` default emitter catches `PublishUrbitTransition` errors and only logs warning (`operations_runtime.go:71-73`) with no propagation.",
+        "`rectify` similarly logs and drops broadcast transition publish failures (`rectify.go:293-296`) rather than returning them."
+      ],
+      "suggestion": "Introduce a shared transition-publish policy abstraction (strict vs best-effort) and apply it consistently. Callers should explicitly choose whether to propagate, retry, or downgrade publish errors, rather than each module silently deciding.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "best_effort_error_policy_without_contract"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast_delivery_error_semantics_diverge",
+      "summary": "Two broadcast paths handling similar delivery failures expose different error behavior, causing inconsistent caller expectations.",
+      "related_files": [
+        "goseg/leak/broadcast.go",
+        "goseg/session/client_manager.go"
+      ],
+      "evidence": [
+        "`leak.updateBroadcast` collects delivery failures (`dropping ...`, missing channel) and returns `errors.Join(...)` (`broadcast.go:105-153`).",
+        "`session` broadcast methods (`BroadcastAuth`/`BroadcastUnauth`) return no error and handle write failures internally via connection removal/logging (`client_manager.go:256-275`, `300-315`), so callers cannot detect partial delivery failure."
+      ],
+      "suggestion": "Standardize broadcast error surface across transports: either expose partial-failure results from both paths or codify both as best-effort with explicit metrics/events so loss is observable and policy-consistent.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_error_policy_without_contract"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "defaults_version_init_failure_is_silent",
+      "summary": "Default version metadata parse failure is logged at init-time but not returned, allowing process startup in a silently degraded state.",
+      "related_files": [
+        "goseg/defaults/version.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "`defaults.init` logs JSON unmarshal failure and does not fail fast (`version.go:186-189`).",
+        "Version update paths later rely on version metadata synchronization and emit generic operational errors (`routines/version.go:126-129`), making root-cause attribution harder when baseline defaults are invalid."
+      ],
+      "suggestion": "Replace init-time silent logging with explicit startup validation that returns an error (or panic with clear message) when default version payload cannot be parsed, and wire that into startup bootstrap checks.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 3,
+    "dimension_coverage": 0.333,
+    "evidence_density": 0.917,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 28.48,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 65,
+    "successful_batch_count": 3,
+    "full_sweep_included": false,
+    "total_files": 391,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/defaults/version.go",
+    "goseg/importer/importer.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/main.go",
+    "goseg/system/wifi_c2c_policy.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/main_test.go",
+    "goseg/routines/version.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/rectify/rectify.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/network/network.go",
+    "goseg/handler/ship/backup.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/auth/token_service.go",
+    "goseg/click/backup/service.go",
+    "goseg/docker/orchestration/container/netdata.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/leak/handler_protocol.go",
+    "goseg/session/client_manager.go",
+    "goseg/system/metrics/metrics.go",
+    "goseg/backupsvc/service_test.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/config/urbit.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/connection_registry.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/system/disk_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260303_081217",
+    "created_at": "2026-03-03T08:14:32+00:00",
+    "batch_count": 3,
+    "batch_indexes": [
+      1,
+      2,
+      3
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "44966a022d3fbcc96a7a0bd0844c07f25be82737b877fb0bf8e1092635e0737b"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

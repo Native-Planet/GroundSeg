@@ -1,0 +1,51 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 89.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files implement near-identical per-domain catalog wiring (`*ContractCatalogSpecs`, `*ContractCatalogEntries()`, `*ContractCatalogEntriesSnapshot()`), which indicates repeated cross-module boundary plumbing rather than a single composition point.",
+        "Both files keep registry inputs as package-level mutable vars (`protocolContractCatalogSpecs`, `startramContractCatalogSpecs`), so contract-boundary state is spread across files and can be modified from elsewhere in the package.",
+        "The same contract data is split across multiple symbol layers (internal constants/entries plus exported aliases), increasing coordination points when evolving boundaries."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Contract-catalog boundary assembly is duplicated and mutable across sibling files, which creates architecture drift risk as more contract domains are added."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "duplicated_catalog_boundary_plumbing",
+      "summary": "Contract catalog boundary assembly is duplicated across domain files, increasing coupling drift risk.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Each file repeats the same boundary pattern: domain-specific `*ContractCatalogSpecs` plus paired `*ContractCatalogEntries()` and `*ContractCatalogEntriesSnapshot()` functions.",
+        "Both specs are mutable package vars instead of immutable definitions, so boundary composition depends on distributed package state rather than a single explicit registry contract.",
+        "Parallel duplication means adding a new contract domain requires copying structural wiring, which is a recurring cross-module architecture smell."
+      ],
+      "suggestion": "Introduce one shared registration abstraction for contract domains (for example, a single immutable domain spec constructor and centralized registry composition function) and convert per-domain spec collections to immutable values so boundary assembly is explicit and uniform.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_contract_registry_pattern"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Missing single composition abstraction for contract-domain registration, leading to repeated manual boundary wiring.",
+      "Package-level mutable registry state used for catalog composition instead of immutable boundary declarations."
+    ],
+    "likely_symptoms": [
+      "duplicated_catalog_boundary_plumbing"
+    ],
+    "possible_false_positives": []
+  }
+}

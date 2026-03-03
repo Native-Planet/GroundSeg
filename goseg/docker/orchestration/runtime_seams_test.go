@@ -10,207 +10,8 @@ import (
 
 	"groundseg/config"
 	"groundseg/structs"
+	"groundseg/transition"
 )
-
-type runtimeContainerTestOps struct {
-	startContainerFn       func(string, string) (structs.ContainerState, error)
-	stopContainerByNameFn  func(string) error
-	restartContainerFn     func(string) error
-	deleteContainerFn      func(string) error
-	getContainerStateFn    func() map[string]structs.ContainerState
-	updateContainerStateFn func(string, structs.ContainerState)
-	getShipStatusFn        func([]string) (map[string]string, error)
-	waitForShipExitFn      func(string, time.Duration) error
-}
-
-func (ops runtimeContainerTestOps) runtimeOps() RuntimeContainerOps {
-	return RuntimeContainerOps{
-		RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
-			StartContainerFn:      ops.startContainerFn,
-			StopContainerByNameFn: ops.stopContainerByNameFn,
-			RestartContainerFn:    ops.restartContainerFn,
-			DeleteContainerFn:     ops.deleteContainerFn,
-		},
-		RuntimeContainerStateOps: RuntimeContainerStateOps{
-			GetContainerStateFn: ops.getContainerStateFn,
-			UpdateContainerStateFn: func(name string, state structs.ContainerState) {
-				if ops.updateContainerStateFn != nil {
-					ops.updateContainerStateFn(name, state)
-				}
-			},
-		},
-		RuntimeContainerLifecycleStatusOps: RuntimeContainerLifecycleStatusOps{
-			GetShipStatusFn:   ops.getShipStatusFn,
-			WaitForShipExitFn: ops.waitForShipExitFn,
-		},
-	}
-}
-
-type runtimeUrbitTestOps struct {
-	loadUrbitConfigFn     func(string) error
-	urbitConfFn           func(string) structs.UrbitDocker
-	updateUrbitFn         func(string, func(*structs.UrbitDocker) error) error
-	getContainerNetworkFn func(string) (string, error)
-	getLusCodeFn          func(string) (string, error)
-	clearLusCodeFn        func(string)
-}
-
-func (ops runtimeUrbitTestOps) runtimeOps() RuntimeUrbitOps {
-	return RuntimeUrbitOps{
-		RuntimeUrbitConfigOps: RuntimeUrbitConfigOps{
-			LoadUrbitConfigFn: ops.loadUrbitConfigFn,
-			UrbitConfFn: func(patp string) structs.UrbitDocker {
-				if ops.urbitConfFn == nil {
-					return structs.UrbitDocker{}
-				}
-				return ops.urbitConfFn(patp)
-			},
-			UpdateUrbitFn: ops.updateUrbitFn,
-		},
-		RuntimeUrbitWorkflowOps: RuntimeUrbitWorkflowOps{
-			GetContainerNetworkFn: func(patp string) (string, error) {
-				if ops.getContainerNetworkFn == nil {
-					return "", nil
-				}
-				return ops.getContainerNetworkFn(patp)
-			},
-			GetLusCodeFn: func(patp string) (string, error) {
-				if ops.getLusCodeFn == nil {
-					return "", nil
-				}
-				return ops.getLusCodeFn(patp)
-			},
-				ClearLusCodeFn: func(patp string) {
-					if ops.clearLusCodeFn != nil {
-						ops.clearLusCodeFn(patp)
-					}
-				},
-			},
-		}
-	}
-
-type runtimeSnapshotTestOps struct {
-	startramSettingsSnapshotFn func() config.StartramSettings
-	shipSettingsSnapshotFn     func() config.ShipSettings
-	getStartramConfigFn        func() structs.StartramRetrieve
-	check502SettingsSnapshotFn func() config.Check502Settings
-}
-
-func (ops runtimeSnapshotTestOps) runtimeOps() RuntimeSnapshotOps {
-	return RuntimeSnapshotOps{
-		StartramSettingsSnapshotFn: func() config.StartramSettings {
-			if ops.startramSettingsSnapshotFn == nil {
-				return config.StartramSettings{}
-			}
-			return ops.startramSettingsSnapshotFn()
-		},
-		ShipSettingsSnapshotFn: func() config.ShipSettings {
-			if ops.shipSettingsSnapshotFn == nil {
-				return config.ShipSettings{}
-			}
-			return ops.shipSettingsSnapshotFn()
-		},
-		GetStartramConfigFn: func() structs.StartramRetrieve {
-			if ops.getStartramConfigFn == nil {
-				return structs.StartramRetrieve{}
-			}
-			return ops.getStartramConfigFn()
-		},
-		Check502SettingsSnapshotFn: func() config.Check502Settings {
-			if ops.check502SettingsSnapshotFn == nil {
-				return config.Check502Settings{}
-			}
-			return ops.check502SettingsSnapshotFn()
-		},
-	}
-}
-
-type runtimeConfigTestOps struct {
-	updateConfTypedFn func(...config.ConfUpdateOption) error
-	withWgOnFn        func(bool) config.ConfUpdateOption
-	cycleWgKeyFn      func() error
-	barExitFn         func(string) error
-}
-
-func (ops runtimeConfigTestOps) runtimeOps() RuntimeConfigOps {
-	return RuntimeConfigOps{
-		UpdateConfTypedFn: func(opts ...config.ConfUpdateOption) error {
-			if ops.updateConfTypedFn == nil {
-				return nil
-			}
-			return ops.updateConfTypedFn(opts...)
-		},
-		WithWgOnFn: func(enabled bool) config.ConfUpdateOption {
-			if ops.withWgOnFn == nil {
-				return config.WithWgOn(enabled)
-			}
-			return ops.withWgOnFn(enabled)
-		},
-		CycleWgKeyFn: func() error {
-			if ops.cycleWgKeyFn == nil {
-				return nil
-			}
-			return ops.cycleWgKeyFn()
-		},
-		BarExitFn: func(patp string) error {
-			if ops.barExitFn == nil {
-				return nil
-			}
-			return ops.barExitFn(patp)
-		},
-	}
-}
-
-type runtimeLoadTestOps struct {
-	loadWireguardFn func() error
-	loadMCFn        func() error
-	loadMinIOsFn    func() error
-	loadUrbitsFn    func() error
-}
-
-func (ops runtimeLoadTestOps) runtimeOps() RuntimeLoadOps {
-	return RuntimeLoadOps{
-		LoadWireguardFn: func() error {
-			if ops.loadWireguardFn == nil {
-				return nil
-			}
-			return ops.loadWireguardFn()
-		},
-		LoadMCFn: func() error {
-			if ops.loadMCFn == nil {
-				return nil
-			}
-			return ops.loadMCFn()
-		},
-		LoadMinIOsFn: func() error {
-			if ops.loadMinIOsFn == nil {
-				return nil
-			}
-			return ops.loadMinIOsFn()
-		},
-		LoadUrbitsFn: func() error {
-			if ops.loadUrbitsFn == nil {
-				return nil
-			}
-			return ops.loadUrbitsFn()
-		},
-	}
-}
-
-type runtimeServiceTestOps struct {
-	svcDeleteFn func(string, string) error
-}
-
-func (ops runtimeServiceTestOps) runtimeOps() RuntimeServiceOps {
-	return RuntimeServiceOps{
-		SvcDeleteFn: func(patp, kind string) error {
-			if ops.svcDeleteFn == nil {
-				return nil
-			}
-			return ops.svcDeleteFn(patp, kind)
-		},
-	}
-}
 
 type startupBootstrapTestOps struct {
 	initializeFn func() error
@@ -321,124 +122,127 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 	)
 
 	rt := NewRuntime(
-		WithContainerOps(runtimeContainerTestOps{
-			startContainerFn: func(string, string) (structs.ContainerState, error) {
+		WithContainerOps(RuntimeContainerOps{
+			StartContainerFn: func(string, string) (structs.ContainerState, error) {
 				startCalled = true
 				return structs.ContainerState{ActualStatus: "running"}, nil
 			},
-			stopContainerByNameFn: func(string) error {
+			StopContainerByNameFn: func(string) error {
 				stopCalled = true
 				return nil
 			},
-			restartContainerFn: func(string) error {
+			RestartContainerFn: func(string) error {
 				restartCalled = true
 				return nil
 			},
-			deleteContainerFn: func(string) error {
+			DeleteContainerFn: func(string) error {
 				deleteCalled = true
 				return nil
 			},
-			getContainerStateFn: func() map[string]structs.ContainerState {
+			GetContainerStateFn: func() map[string]structs.ContainerState {
 				getStateCalled = true
 				return map[string]structs.ContainerState{"wireguard": {ActualStatus: "running"}}
 			},
-			updateContainerStateFn: func(string, structs.ContainerState) {
+			UpdateContainerStateFn: func(name string, state structs.ContainerState) {
 				updateStateCalled = true
+				_ = name
+				_ = state
 			},
-			getShipStatusFn: func([]string) (map[string]string, error) {
+			GetShipStatusFn: func([]string) (map[string]string, error) {
 				getStatusCalled = true
 				return map[string]string{"~zod": "Up"}, nil
 			},
-			waitForShipExitFn: func(string, time.Duration) error {
+			WaitForShipExitFn: func(string, time.Duration) error {
 				waitCalled = true
 				return nil
 			},
-		}.runtimeOps()),
-		WithUrbitOps(runtimeUrbitTestOps{
-			loadUrbitConfigFn: func(string) error {
+		}),
+		WithUrbitOps(RuntimeUrbitOps{
+			LoadUrbitConfigFn: func(string) error {
 				loadUrbitConfigCalled = true
 				return nil
 			},
-			urbitConfFn: func(string) structs.UrbitDocker {
+			UrbitConfFn: func(string) structs.UrbitDocker {
 				urbitConfCalled = true
 				return structs.UrbitDocker{}
 			},
-			updateUrbitFn: func(string, func(*structs.UrbitDocker) error) error {
+			UpdateUrbitFn: func(string, func(*structs.UrbitDocker) error) error {
 				updateUrbitCalled = true
 				return nil
 			},
-			getContainerNetworkFn: func(string) (string, error) {
+			GetContainerNetworkFn: func(string) (string, error) {
 				getContainerNetworkCalled = true
 				return "wireguard", nil
 			},
-			getLusCodeFn: func(string) (string, error) {
+			GetLusCodeFn: func(string) (string, error) {
 				getLusCodeCalled = true
 				return "lus", nil
 			},
-			clearLusCodeFn: func(string) {
+			ClearLusCodeFn: func(string) {
 				clearLusCodeCalled = true
 			},
-		}.runtimeOps()),
-		WithSnapshotOps(runtimeSnapshotTestOps{
-			startramSettingsSnapshotFn: func() config.StartramSettings {
+		}),
+		WithSnapshotOps(RuntimeSnapshotOps{
+			StartramSettingsSnapshotFn: func() config.StartramSettings {
 				startramSnapshotCalled = true
 				return config.StartramSettings{}
 			},
-			shipSettingsSnapshotFn: func() config.ShipSettings {
+			ShipSettingsSnapshotFn: func() config.ShipSettings {
 				shipSnapshotCalled = true
 				return config.ShipSettings{}
 			},
-			getStartramConfigFn: func() structs.StartramRetrieve {
+			GetStartramConfigFn: func() structs.StartramRetrieve {
 				getStartramConfigCalled = true
 				return structs.StartramRetrieve{}
 			},
-			check502SettingsSnapshotFn: func() config.Check502Settings {
+			Check502SettingsSnapshotFn: func() config.Check502Settings {
 				check502SnapshotCalled = true
 				return config.Check502Settings{}
 			},
-		}.runtimeOps()),
-		WithConfigOps(runtimeConfigTestOps{
-			updateConfTypedFn: func(...config.ConfUpdateOption) error {
+		}),
+		WithConfigOps(RuntimeConfigOps{
+			UpdateConfTypedFn: func(...config.ConfUpdateOption) error {
 				updateConfCalled = true
 				return nil
 			},
-			withWgOnFn: func(enabled bool) config.ConfUpdateOption {
+			WithWgOnFn: func(enabled bool) config.ConfUpdateOption {
 				withWgOnCalled = true
 				return config.WithWgOn(enabled)
 			},
-			cycleWgKeyFn: func() error {
+			CycleWgKeyFn: func() error {
 				cycleWgKeyCalled = true
 				return nil
 			},
-			barExitFn: func(string) error {
+			BarExitFn: func(string) error {
 				barExitCalled = true
 				return nil
 			},
-		}.runtimeOps()),
-		WithLoadOps(runtimeLoadTestOps{
-			loadWireguardFn: func() error {
+		}),
+		WithLoadOps(RuntimeLoadOps{
+			LoadWireguardFn: func() error {
 				loadWireguardCalled = true
 				return nil
 			},
-			loadMCFn: func() error {
+			LoadMCFn: func() error {
 				loadMCCalled = true
 				return nil
 			},
-			loadMinIOsFn: func() error {
+			LoadMinIOsFn: func() error {
 				loadMinIOsCalled = true
 				return nil
 			},
-			loadUrbitsFn: func() error {
+			LoadUrbitsFn: func() error {
 				loadUrbitsCalled = true
 				return nil
 			},
-		}.runtimeOps()),
-		WithServiceOps(runtimeServiceTestOps{
-			svcDeleteFn: func(string, string) error {
+		}),
+		WithServiceOps(RuntimeServiceOps{
+			SvcDeleteFn: func(patp, kind string) error {
 				svcDeleteCalled = true
+				_, _ = patp, kind
 				return nil
 			},
-		}.runtimeOps()),
+		}),
 	)
 
 	if _, err := rt.StartContainerFn("wireguard", "wireguard"); err != nil {
@@ -683,6 +487,111 @@ func TestNewStartramRuntimeUsesOverridesForServiceLoaders(t *testing.T) {
 	}
 }
 
+func TestNewStartramRuntimeWithDefaultsAppliesStartramSeamDefaults(t *testing.T) {
+	dispatchCalled := false
+	publishCalled := false
+	recoverCalled := false
+
+	runtime := NewStartramRuntimeWithDefaults(RuntimeStartramOps{
+		DispatchUrbitPayloadFn: func(payload structs.WsUrbitPayload) error {
+			dispatchCalled = true
+			if payload.Payload.Action != "toggle-network" {
+				t.Fatalf("unexpected action %q", payload.Payload.Action)
+			}
+			return nil
+		},
+		PublishEventFn: func(event structs.Event) {
+			publishCalled = true
+			if event.Type == "" {
+				t.Fatalf("event type should not be empty")
+			}
+		},
+		RecoverWireguardFleetFn: func(_ []string, _ bool) error {
+			recoverCalled = true
+			return nil
+		},
+	})
+
+	if err := runtime.DispatchUrbitPayloadFn(structs.WsUrbitPayload{
+		Payload: structs.WsUrbitAction{
+			Type:   "urbit",
+			Action: "toggle-network",
+			Patp:   "~zod",
+		},
+	}); err != nil {
+		t.Fatalf("unexpected dispatch error: %v", err)
+	}
+	if runtime.PublishEventFn == nil {
+		t.Fatal("expected publish callback to be set")
+	}
+	runtime.PublishEventFn(structs.Event{
+		Type: string(transition.StartramTransitionCancel),
+	})
+	runtime.RecoverWireguardFleetFn([]string{"~zod"}, true)
+
+	if !dispatchCalled {
+		t.Fatal("expected dispatch callback to run")
+	}
+	if !publishCalled {
+		t.Fatal("expected publish callback to run")
+	}
+	if !recoverCalled {
+		t.Fatal("expected recover callback to run")
+	}
+}
+
+func TestResolveStartramRuntimeKeepsProvidedStartramRuntimeOverrides(t *testing.T) {
+	providedPublishCalled := false
+	defaultDispatchCalled := false
+	defaultRecoverCalled := false
+
+	providedRuntime := NewRuntime(WithStartramOps(RuntimeStartramOps{
+		PublishEventFn: func(event structs.Event) {
+			providedPublishCalled = true
+			if event.Type == "" {
+				t.Fatalf("event type should not be empty")
+			}
+		},
+	}))
+	resolved := ResolveStartramRuntime(providedRuntime, RuntimeStartramOps{
+		DispatchUrbitPayloadFn: func(payload structs.WsUrbitPayload) error {
+			defaultDispatchCalled = true
+			if payload.Payload.Action != "toggle-network" {
+				t.Fatalf("unexpected action %q", payload.Payload.Action)
+			}
+			return nil
+		},
+		RecoverWireguardFleetFn: func(_ []string, _ bool) error {
+			defaultRecoverCalled = true
+			return nil
+		},
+	})
+
+	if err := resolved.DispatchUrbitPayloadFn(structs.WsUrbitPayload{
+		Payload: structs.WsUrbitAction{
+			Type:   "urbit",
+			Action: "toggle-network",
+			Patp:   "~zod",
+		},
+	}); err != nil {
+		t.Fatalf("unexpected dispatch error: %v", err)
+	}
+	resolved.PublishEventFn(structs.Event{
+		Type: string(transition.StartramTransitionRestart),
+	})
+	resolved.RecoverWireguardFleetFn([]string{"~zod"}, false)
+
+	if !defaultDispatchCalled {
+		t.Fatal("expected default dispatch callback to run")
+	}
+	if !providedPublishCalled {
+		t.Fatal("expected provided publish callback to run")
+	}
+	if !defaultRecoverCalled {
+		t.Fatal("expected default recover callback to run")
+	}
+}
+
 func TestMinioRuntimeFromDockerWiresRuntimeDependencies(t *testing.T) {
 	rt := newDockerRuntime()
 	rt.contextOps = RuntimeContextOps{
@@ -690,8 +599,8 @@ func TestMinioRuntimeFromDockerWiresRuntimeDependencies(t *testing.T) {
 		DockerDirFn: func() string { return "/tmp/docker" },
 	}
 	rt.configOps = RuntimeSnapshotOps{
-		ConfFn:                    func() structs.SysConfig { return structs.SysConfig{} },
-		ShipSettingsSnapshotFn:    func() config.ShipSettings { return config.ShipSettings{} },
+		ConfFn:                 func() structs.SysConfig { return structs.SysConfig{} },
+		ShipSettingsSnapshotFn: func() config.ShipSettings { return config.ShipSettings{} },
 	}
 	rt.fileOps = RuntimeFileOps{
 		OpenFn:      func(string) (*os.File, error) { return nil, nil },
@@ -708,16 +617,10 @@ func TestMinioRuntimeFromDockerWiresRuntimeDependencies(t *testing.T) {
 		},
 	}
 	rt.containerOps = RuntimeContainerOps{
-		RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
-			StartContainerFn:    func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
-			CreateContainerFn:   func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
-		},
-		RuntimeContainerStateOps: RuntimeContainerStateOps{
-			UpdateContainerStateFn: func(string, structs.ContainerState) {},
-		},
-		RuntimeContainerObservationOps: RuntimeContainerObservationOps{
-			GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil },
-		},
+		StartContainerFn:            func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+		CreateContainerFn:           func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+		UpdateContainerStateFn:      func(string, structs.ContainerState) {},
+		GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil },
 	}
 	rt.commandOps = RuntimeCommandOps{
 		CopyFileToVolumeFn: func(string, string, string, string, volumeWriterImageSelector) error { return nil },
@@ -732,11 +635,9 @@ func TestMinioRuntimeFromDockerWiresRuntimeDependencies(t *testing.T) {
 	}
 	rt.commandOps.RandReadFn = func([]byte) (int, error) { return 0, nil }
 	rt.urbitOps = RuntimeUrbitOps{
-		RuntimeUrbitConfigOps: RuntimeUrbitConfigOps{
-			LoadUrbitConfigFn: func(string) error { return nil },
-			UrbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
-			UpdateUrbitFn:     func(string, func(*structs.UrbitDocker) error) error { return nil },
-		},
+		LoadUrbitConfigFn: func(string) error { return nil },
+		UrbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
+		UpdateUrbitFn:     func(string, func(*structs.UrbitDocker) error) error { return nil },
 	}
 	rt.minioOps = RuntimeMinioOps{
 		SetMinIOPasswordFn:    func(string, string) error { return nil },

@@ -86,6 +86,16 @@ var contractCatalogFragments = []func() []contractCatalogEntry{
 	startramContractCatalogEntries,
 }
 
+func catalogEntries(specs []contractCatalogEntry) []contractCatalogEntry {
+	out := make([]contractCatalogEntry, len(specs))
+	copy(out, specs)
+	return out
+}
+
+func catalogEntriesSnapshot(specs []contractCatalogEntry) []contractCatalogEntry {
+	return catalogEntries(specs)
+}
+
 // ContractCatalogEntries returns the canonical catalog source list used by LoadRegistry.
 func ContractCatalogEntries() []ContractCatalogEntry {
 	entries := make([]ContractCatalogEntry, 0, 16)

@@ -83,12 +83,12 @@ Runtime boundary expectations for backend changes:
 
 1. Preserve explicit error propagation (`%w`) at handler/service boundaries.
 2. Keep fetch-only APIs separate from state-mutating sync APIs (for example `Fetch*` vs `Sync*`).
-3. For flows that touch registration/version/upload paths, include at least one deterministic unit test in the changed package.
-4. For upload and Wi-Fi websocket command contracts, follow package governance documents:
+3. For flows that touch registration/version/upload/C2C paths, include at least one deterministic unit test in the changed package.
+4. For upload, C2C, Wi-Fi websocket command, and protocol-contract surfaces, follow package governance documents:
    - `goseg/uploadsvc/GOVERNANCE.md`
    - `goseg/system/wifi/README.md`
 5. For StarTram external API masking semantics, follow `goseg/startram/GOVERNANCE.md`.
-6. For protocol and error contract surfaces, define compatibility descriptors through:
+6. For protocol and error contract surfaces across all active families (upload, C2C, StarTram), define compatibility descriptors through:
    - `goseg/protocol/contracts/contracts.go` (`ContractDescriptor`, shared registry, active/deprecated helpers)
    - `goseg/protocol/contracts/protocol_contracts.go` (upload/C2C contract metadata and namespace bindings)
    - `goseg/protocol/contracts/startram_contracts.go` (StarTram error contract metadata)

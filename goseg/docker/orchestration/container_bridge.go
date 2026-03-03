@@ -11,6 +11,8 @@ import (
 
 import "groundseg/docker/orchestration/container"
 
+type netdataRuntimeOps = container.NetdataRuntime
+
 type dockerContainerRuntimeInputs struct {
 	confFn                      func() structs.SysConfig
 	basePathFn                  func() string
@@ -100,12 +102,14 @@ func (inputs dockerContainerRuntimeInputs) llamaRuntimeTemplate() container.Llam
 	}
 }
 
-func (inputs dockerContainerRuntimeInputs) netdataRuntimeTemplate() container.NetdataRuntime {
-	return container.NetdataRuntime{
-		OpenFn:                      inputs.openFn,
-		ReadFileFn:                  inputs.readFileFn,
-		WriteFileFn:                 inputs.writeFileFn,
-		MkdirAllFn:                  inputs.mkdirAllFn,
+func (inputs dockerContainerRuntimeInputs) netdataRuntimeOps() netdataRuntimeOps {
+	return netdataRuntimeOps{
+		RuntimeFileOps: container.RuntimeFileOps{
+			OpenFn:      inputs.openFn,
+			ReadFileFn:  inputs.readFileFn,
+			WriteFileFn: inputs.writeFileFn,
+			MkdirAllFn:  inputs.mkdirAllFn,
+		},
 		StartContainerFn:            inputs.startContainerFn,
 		UpdateContainerState:        inputs.updateContainerStateFn,
 		CreateDefaultFn:             inputs.createDefaultNetdataFn,
@@ -124,7 +128,7 @@ func (inputs dockerContainerRuntimeInputs) netdataRuntimeTemplate() container.Ne
 }
 
 func (inputs dockerContainerRuntimeInputs) applyNetdataRuntime(rt container.NetdataRuntime) container.NetdataRuntime {
-	return seams.Merge(inputs.netdataRuntimeTemplate(), rt)
+	return seams.Merge(container.NetdataRuntime(inputs.netdataRuntimeOps()), rt)
 }
 
 func (inputs dockerContainerRuntimeInputs) minioRuntimeTemplate() container.MinioRuntime {

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
 	"groundseg/docker/orchestration"
 	"groundseg/internal/workflow"
 	"groundseg/structs"
@@ -96,12 +95,7 @@ func RecoverWireguardFleet(runtime wireguardRecoveryRuntime, piers []string, del
 		loadMinIOs:        true,
 	})
 
-	if len(steps) == 0 {
-		return nil
-	}
-	if joined := workflow.Join(steps, func(err error) {
-		zap.L().Error(err.Error())
-	}); joined != nil {
+	if joined := runOrchestrationSteps(steps, "wireguard recovery"); joined != nil {
 		return joined
 	}
 	return nil

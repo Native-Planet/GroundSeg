@@ -47,7 +47,7 @@ func (service nmcliWiFiRadioService) RefreshInfo(device string) {
 		return
 	}
 
-	client, err := service.runtime.newWifiClient()
+	client, err := service.runtime.NewWifiClient()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't create wifi client with device %v: %v", device, err))
 		info.Status = false
@@ -76,14 +76,14 @@ func (service nmcliWiFiRadioService) RefreshInfo(device string) {
 }
 
 func (service nmcliWiFiRadioService) Enable() error {
-	if _, err := service.runtime.runCommand("nmcli", "radio", "wifi", "on"); err != nil {
+	if _, err := service.runtime.RunCommand("nmcli", "radio", "wifi", "on"); err != nil {
 		return fmt.Errorf("enable wifi radio: %w", err)
 	}
 	return nil
 }
 
 func (service nmcliWiFiRadioService) SetLinkUp(device string) error {
-	if _, err := service.runtime.runCommand("sudo", "ip", "link", "set", device, "up"); err != nil {
+	if _, err := service.runtime.RunCommand("sudo", "ip", "link", "set", device, "up"); err != nil {
 		return fmt.Errorf("set ip link for device %s: %w", device, err)
 	}
 	return nil

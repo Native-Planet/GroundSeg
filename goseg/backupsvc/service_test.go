@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"groundseg/internal/testseams"
 )
 
 type fakeDirEntry struct {
@@ -19,8 +21,7 @@ func (f fakeDirEntry) Type() fs.FileMode          { return 0 }
 func (f fakeDirEntry) Info() (fs.FileInfo, error) { return nil, nil }
 
 func TestResolveBackupRootReturnsMMCPathWhenAvailable(t *testing.T) {
-	restore := resetBackupsvcDependencies()
-	defer restore()
+	resetBackupsvcDependencies(t)
 
 	isMountedMMCFn = func(path string) (bool, error) {
 		if path != "/mnt/test" {
@@ -35,8 +36,7 @@ func TestResolveBackupRootReturnsMMCPathWhenAvailable(t *testing.T) {
 }
 
 func TestEnsureLocalDirsCreatesAllDirectories(t *testing.T) {
-	restore := resetBackupsvcDependencies()
-	defer restore()
+	resetBackupsvcDependencies(t)
 
 	created := []string{}
 	mkdirAllFn = func(path string, perm os.FileMode) error {
@@ -66,8 +66,7 @@ func TestEnsureLocalDirsCreatesAllDirectories(t *testing.T) {
 }
 
 func TestLatestBackupFileSelectsNewestTimestamp(t *testing.T) {
-	restore := resetBackupsvcDependencies()
-	defer restore()
+	resetBackupsvcDependencies(t)
 
 	readDirFn = func(path string) ([]fs.DirEntry, error) {
 		switch path {
@@ -97,8 +96,7 @@ func TestLatestBackupFileSelectsNewestTimestamp(t *testing.T) {
 }
 
 func TestUploadLatestBackupCallsStartramUpload(t *testing.T) {
-	restore := resetBackupsvcDependencies()
-	defer restore()
+	resetBackupsvcDependencies(t)
 
 	readDirFn = func(path string) ([]fs.DirEntry, error) {
 		if path == "/base/~zod" {
@@ -139,8 +137,7 @@ func TestUploadLatestBackupCallsStartramUpload(t *testing.T) {
 }
 
 func TestMostRecentDailyBackupTimeReturnsLatest(t *testing.T) {
-	restore := resetBackupsvcDependencies()
-	defer restore()
+	resetBackupsvcDependencies(t)
 
 	readDirFn = func(path string) ([]fs.DirEntry, error) {
 		if path == "/base/~zod/daily" {
@@ -164,8 +161,7 @@ func TestMostRecentDailyBackupTimeReturnsLatest(t *testing.T) {
 }
 
 func TestCreateLocalBackupPropagatesCreateErrors(t *testing.T) {
-	restore := resetBackupsvcDependencies()
-	defer restore()
+	resetBackupsvcDependencies(t)
 
 	mkdirAllFn = func(_ string, _ os.FileMode) error { return nil }
 	expected := fmt.Errorf("create backup error")
@@ -182,18 +178,10 @@ func TestCreateLocalBackupPropagatesCreateErrors(t *testing.T) {
 	}
 }
 
-func resetBackupsvcDependencies() func() {
-	origIsMounted := isMountedMMCFn
-	origMkdirAll := mkdirAllFn
-	origReadDir := readDirFn
-	origCreateBackup := createBackupFn
-	origUploadBackup := uploadBackupFn
-
-	return func() {
-		isMountedMMCFn = origIsMounted
-		mkdirAllFn = origMkdirAll
-		readDirFn = origReadDir
-		createBackupFn = origCreateBackup
-		uploadBackupFn = origUploadBackup
-	}
+func resetBackupsvcDependencies(t *testing.T) {
+	testseams.WithRestore(t, &isMountedMMCFn, isMountedMMCFn)
+	testseams.WithRestore(t, &mkdirAllFn, mkdirAllFn)
+	testseams.WithRestore(t, &readDirFn, readDirFn)
+	testseams.WithRestore(t, &createBackupFn, createBackupFn)
+	testseams.WithRestore(t, &uploadBackupFn, uploadBackupFn)
 }

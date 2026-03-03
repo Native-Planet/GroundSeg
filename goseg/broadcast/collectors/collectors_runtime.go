@@ -7,11 +7,10 @@ import (
 	"groundseg/config"
 	"groundseg/docker/network"
 	"groundseg/docker/orchestration"
+	"groundseg/internal/seams"
 	"groundseg/startram"
 	"groundseg/structs"
-	"reflect"
 	"time"
-	"unsafe"
 )
 
 var defaultCollectorRuntimeValue = NewCollectorRuntime()
@@ -81,51 +80,9 @@ func DefaultCollectorRuntime() collectorRuntime {
 
 func collectorRuntimeWithDefaults(runtime collectorRuntime) collectorRuntime {
 	defaultRuntime := NewCollectorRuntime()
-	defaultRuntime.collectorUrbitRuntime = mergeRuntimeCallbacks(defaultRuntime.collectorUrbitRuntime, runtime.collectorUrbitRuntime)
-	defaultRuntime.collectorConfigRuntime = mergeRuntimeCallbacks(defaultRuntime.collectorConfigRuntime, runtime.collectorConfigRuntime)
+	defaultRuntime.collectorUrbitRuntime = seams.Merge(defaultRuntime.collectorUrbitRuntime, runtime.collectorUrbitRuntime)
+	defaultRuntime.collectorConfigRuntime = seams.Merge(defaultRuntime.collectorConfigRuntime, runtime.collectorConfigRuntime)
 	return defaultRuntime
-}
-
-func mergeRuntimeCallbacks[T any](defaults, overrides T) T {
-	defaultValue := reflect.ValueOf(&defaults).Elem()
-	overrideValue := reflect.ValueOf(overrides)
-	if !defaultValue.IsValid() || !overrideValue.IsValid() {
-		return defaults
-	}
-	if defaultValue.Kind() != reflect.Struct || overrideValue.Kind() != reflect.Struct {
-		return defaults
-	}
-	for i := 0; i < overrideValue.NumField(); i++ {
-		overrideField := overrideValue.Field(i)
-		if !isNonZeroValue(overrideField) {
-			continue
-		}
-		defaultField := settableValue(defaultValue.Field(i))
-		overridden := settableValue(overrideField)
-		if defaultField.CanSet() {
-			defaultField.Set(overridden)
-		}
-	}
-	return defaults
-}
-
-func settableValue(v reflect.Value) reflect.Value {
-	if v.CanSet() || !v.CanAddr() {
-		return v
-	}
-	return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
-}
-
-func isNonZeroValue(v reflect.Value) bool {
-	if !v.IsValid() {
-		return false
-	}
-	switch v.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
-		return !v.IsNil()
-	default:
-		return !v.IsZero()
-	}
 }
 
 func collectorRuntimeOrDefault(runtime ...collectorRuntime) collectorRuntime {

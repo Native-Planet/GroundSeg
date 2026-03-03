@@ -3,6 +3,7 @@ package shipworkflow
 import (
 	"fmt"
 
+	"go.uber.org/zap"
 	"groundseg/internal/workflow"
 )
 
@@ -67,4 +68,16 @@ func appendShipContainerRebuildSteps(
 		})
 	}
 	return steps
+}
+
+func runOrchestrationSteps(steps []workflow.Step, runbook string) error {
+	if len(steps) == 0 {
+		return nil
+	}
+	return workflow.Join(steps, func(err error) {
+		zap.L().Error("ship workflow orchestration failure",
+			zap.String("runbook", runbook),
+			zap.Error(err),
+		)
+	})
 }

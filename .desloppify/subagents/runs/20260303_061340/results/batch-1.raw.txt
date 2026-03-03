@@ -1,0 +1,100 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 66.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime dependency abstraction is split into many callback-bag structs with repeated nil-check/forwarding glue (`goseg/docker/orchestration/runtime_ops.go`, `goseg/importer/importer.go`, `goseg/startuporchestrator/startup_orchestrator.go`).",
+        "Tests must construct large synthetic runtime assemblies to exercise basic behavior (`goseg/docker/orchestration/runtime_seams_test.go`, `goseg/docker/orchestration/wireguard_test.go`), indicating high indirection cost for ordinary call paths.",
+        "`NewEventRuntime(_ ...EventBroker)` accepts broker input but always creates a new in-memory runtime, while production paths still bind to `DefaultEventRuntime()` globals (`goseg/docker/events/events.go`, `goseg/rectify/rectify.go`, `goseg/shipworkflow/operations_runtime.go`)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 64.0,
+        "indirection_cost": 58.0,
+        "interface_honesty": 69.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_sprawl",
+      "summary": "Callback-bag runtimes create high-cost indirection with low domain leverage.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/runtime_seams_test.go"
+      ],
+      "evidence": [
+        "`RuntimeUrbitConfigOps` and sibling structs define many per-method function fields plus near-identical guard/forward wrappers.",
+        "`importerRuntime` carries a very large function-field surface and duplicates this with both `ensure*` validation and `withDefaultsImporterRuntime` merge logic.",
+        "Tests recreate large adapter scaffolding (`runtimeContainerTestOps`, `runtimeUrbitTestOps`, etc.) to run focused scenarios, showing abstraction overhead leaking into consumers."
+      ],
+      "suggestion": "Refactor runtime seams into a few cohesive capability interfaces (for example: config store, container lifecycle, event publishing) with required constructor dependencies, then remove per-method callback bags and duplicated `ensure/withDefaults` glue.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_over_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "event_broker_interface_not_honored",
+      "summary": "Event broker API advertises injection but implementation ignores it and falls back to globals.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify_test.go"
+      ],
+      "evidence": [
+        "`NewEventRuntime(_ ...EventBroker)` discards provided broker arguments and always returns `newTransitionRuntime(100)`.",
+        "Core flows publish/subscribe via `events.DefaultEventRuntime()` directly, so call sites do not use an injected broker boundary.",
+        "Rectify tests rely on shared default runtime channels with once-started goroutines, reflecting hidden global coupling rather than explicit dependency wiring."
+      ],
+      "suggestion": "Make `EventRuntime` construction honest: either remove unused broker-injection parameters, or support them and thread an `EventBroker` dependency through rectify/workflow runtimes instead of direct `DefaultEventRuntime()` access.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_over_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "one_off_transition_wrappers",
+      "summary": "Several transition wrapper types add ceremony without meaningful policy or reuse.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/broadcast/transitions.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`urbitTransitionCommand` and `newShipTransitionCommand` are thin single-field structs whose `Apply` methods just forward to one reducer/update function.",
+        "`startramRunningTransition` only assigns one boolean field, while the same package already supports direct mutation via `ApplyBroadcastMutation`.",
+        "The extra wrapper types increase type surface and call depth without adding validation, policy, or cross-cutting behavior."
+      ],
+      "suggestion": "Collapse one-off transition command structs into direct function-based mutations or shared typed reducer helpers, and keep explicit wrapper types only where they enforce extra policy/validation beyond assignment.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_over_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams were introduced as per-method callback fields, but without consolidation into domain-level ports.",
+      "Global default runtime singletons remain in core event flows, undermining declared injection boundaries.",
+      "Transition handling grew by adding wrapper types per action instead of consolidating around reusable reducer/mutation primitives."
+    ],
+    "likely_symptoms": [
+      "runtime_callback_bag_sprawl",
+      "one_off_transition_wrappers"
+    ],
+    "possible_false_positives": []
+  }
+}

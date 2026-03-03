@@ -20,25 +20,17 @@ func testLlamaRuntime(dockerDir string) dockerRuntime {
 			WriteFileFn: func(string, []byte, os.FileMode) error { return nil },
 		},
 		containerOps: RuntimeContainerOps{
-			RuntimeContainerLifecycleOps: RuntimeContainerLifecycleOps{
-				StopContainerByNameFn: func(string) error { return nil },
-				StartContainerFn:      func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
-				CreateContainerFn:     nil,
-			},
-			RuntimeContainerStateOps: RuntimeContainerStateOps{
-				UpdateContainerStateFn: func(string, structs.ContainerState) {},
-			},
-			RuntimeContainerNetworkOps: RuntimeContainerNetworkOps{
-				AddOrGetNetworkFn: func(string) (string, error) { return "default", nil },
-			},
+			StopContainerByNameFn:  func(string) error { return nil },
+			StartContainerFn:       func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+			CreateContainerFn:      nil,
+			UpdateContainerStateFn: func(string, structs.ContainerState) {},
+			AddOrGetNetworkFn:      func(string) (string, error) { return "default", nil },
 		},
 		configOps: RuntimeSnapshotOps{
 			ConfFn: func() structs.SysConfig { return structs.SysConfig{} },
 		},
 		urbitOps: RuntimeUrbitOps{
-			RuntimeUrbitConfigOps: RuntimeUrbitConfigOps{
-				UrbitConfAllFn: func() map[string]structs.UrbitDocker { return map[string]structs.UrbitDocker{} },
-			},
+			UrbitConfAllFn: func() map[string]structs.UrbitDocker { return map[string]structs.UrbitDocker{} },
 		},
 		volumeOps: RuntimeVolumeOps{
 			VolumeExistsFn: func(string) (bool, error) { return false, nil },

@@ -1,0 +1,97 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 76.0,
+    "test_strategy": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md defines a governance rule to use typed contract APIs for protocol/error contract surfaces, but goseg/protocol/contracts/startram_contracts.go still embeds raw literals directly in catalog construction (ContractID(\"startram.errors.api-connection\"), IntroducedIn string, Compatibility literal) instead of a constant set parallel to protocol_contracts.go.",
+        "goseg/protocol/contracts/protocol_contracts.go and goseg/protocol/contracts/startram_contracts.go both build catalogs from package-level var state (`*_contract`, `*_contractCatalogSpecs`, exported `APIConnectionError` var), so contract metadata can be mutated at runtime from inside the package rather than being enforced as immutable governance data."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md quality gate description is strongly upload-focused in its concrete checks (`check-upload-contract.sh` coverage called out as upload branch matrix/upload dispatch/startram masked error), while goseg/protocol/contracts/protocol_contracts.go now also carries C2C action compatibility metadata (`protocol.actions.c2c.connect`) with no explicit C2C-focused gate scope described in the same contract-governance section.",
+        "Contract compatibility/version fields in both contract files are hand-authored string/literal metadata (`IntroducedIn`, compatibility constants) without any in-file declared invariant hooks or manifest references that would make omissions obvious when governance evolves."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_definition_pattern_drift",
+      "summary": "StarTram contract metadata bypasses the typed constant pattern used by protocol contracts.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "protocol_contracts.go defines per-contract typed constants for ID/action/namespace/version/compatibility and then composes catalog entries from those constants.",
+        "startram_contracts.go directly embeds `ContractID(\"startram.errors.api-connection\")`, `IntroducedIn: \"2026.01.20\"`, and `CompatibilityBackwardSafe` in the entry, diverging from the governance style documented in README runtime contract section."
+      ],
+      "suggestion": "Refactor startram contract declarations to the same typed-constant structure used in protocol contracts (ID/version/compatibility/message constants + entry assembly), and keep a uniform descriptor-construction pattern across contract domains.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_contract_catalog_state",
+      "summary": "Contract catalogs are defined as mutable package vars, weakening governance as immutable boundaries.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Both files store canonical contract descriptors in package-level `var` values (`protocolUploadOpenEndpointContract`, `startramApiConnectionErrorContract`, `*_contractCatalogSpecs`).",
+        "startram file also exports `APIConnectionError` as a mutable `var` rather than a constant alias, allowing accidental reassignment inside package code."
+      ],
+      "suggestion": "Make contract identifiers and descriptor inputs immutable (`const` where possible), and return catalog entries from pure constructor functions so governance metadata is not represented as mutable package state.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract_gate_scope_not_aligned_with_catalog_growth",
+      "summary": "Documented contract quality gate scope does not clearly cover new non-upload protocol contracts.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README quality gate examples and script naming are upload-centric, plus StarTram masked-error checks; no explicit C2C contract policy assertion is listed.",
+        "protocol_contracts.go includes C2C compatibility metadata (`protocol.actions.c2c.connect`) that has the same lifecycle-risk profile as upload contracts but is not explicitly represented in the documented targeted checks."
+      ],
+      "suggestion": "Expand the documented gate and test matrix to enumerate all active protocol contract families (upload + c2c + startram error contracts), and require per-family lifecycle-policy assertions so new catalog entries cannot land without matching tests.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "governance_checks_too_path_specific"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance is documented, but declaration and enforcement patterns are not centralized enough to prevent drift between contract families.",
+      "Quality-gate documentation emphasizes specific paths/use-cases, creating risk that catalog expansion outruns explicit test policy coverage."
+    ],
+    "likely_symptoms": [
+      "contract_definition_pattern_drift",
+      "contract_gate_scope_not_aligned_with_catalog_growth"
+    ],
+    "possible_false_positives": []
+  }
+}

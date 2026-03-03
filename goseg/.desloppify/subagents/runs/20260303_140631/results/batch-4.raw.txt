@@ -1,0 +1,133 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 71.5
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Configuration shape and mutation rules are represented in multiple parallel mechanisms: `structs/configs.go` custom `UrbitDocker.UnmarshalJSON` key-switch mapping, `config/config_update_schema.go` patch-field registry/parsers, and `config/urbit.go` section-mutator registry.",
+        "`shipworkflow/urbit_operations_runtime.go` combines transition dispatch, domain aliasing, Docker lifecycle actions, schedule updates, and direct config persistence in one file with many near-duplicate step builders.",
+        "`docker/orchestration/runtime_ops.go` and `docker/orchestration/container/netdata.go` both define large runtime seam structs with many function fields and repeated dependency-validation/default wiring patterns.",
+        "Storage-related behavior is exercised by overlapping test suites in both `system/disk_test.go` and `system/storage/storage_test.go` for the same concerns (`ListHardDisks`, `SmartCheckAllDrives`, `IsMountedMMC`, `CreateGroundSegFilesystem`), indicating split ownership rather than a single coherent test boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_schema_triplication",
+      "summary": "Urbit/system config behavior is split across three independent schema/mutation systems.",
+      "related_files": [
+        "structs/configs.go",
+        "config/config_update_schema.go",
+        "config/urbit.go"
+      ],
+      "evidence": [
+        "`structs/configs.go` implements a large manual key switch in `UrbitDocker.UnmarshalJSON`.",
+        "`config/config_update_schema.go` separately defines typed patch parsing/apply registry via `confPatchField` and `buildConfigPatch`.",
+        "`config/urbit.go` adds a third section-mutator dispatch table (`urbitSectionMutators`) for scoped updates."
+      ],
+      "suggestion": "Unify around one canonical field registry for Urbit/system config (field key, parse, default, apply), then generate/drive both JSON decode and patch application from that registry to remove parallel schemas.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fragmented_config_model"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_workflow_god_module",
+      "summary": "Urbit operations runtime file mixes too many responsibilities in one orchestration surface.",
+      "related_files": [
+        "shipworkflow/urbit_operations_runtime.go",
+        "config/urbit.go",
+        "docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`shipworkflow/urbit_operations_runtime.go` contains command routing, transition-step composition, config mutation, Docker start/create/delete behavior, and Startram/click integration in the same unit.",
+        "Multiple handlers (`buildUrbitDomainSteps`, `buildMinIODomainSteps`, `buildToggleDevModeSteps`, `buildRuntimeConfigIntSteps`, `schedulePack`) each combine policy decisions with side-effect execution details.",
+        "The same file directly coordinates config sections and infrastructure calls rather than delegating to narrower service boundaries."
+      ],
+      "suggestion": "Split the file into focused collaborators (transition planner, config mutator service, infra executor) and keep the top-level handler as composition-only dispatch; extract reusable step templates for config-toggle and restart patterns.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "orchestration_responsibility_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_overfragmentation",
+      "summary": "Runtime seam pattern is over-fragmented, increasing indirection and wiring churn.",
+      "related_files": [
+        "docker/orchestration/runtime_ops.go",
+        "docker/orchestration/container/netdata.go",
+        "rectify/rectify.go"
+      ],
+      "evidence": [
+        "`docker/orchestration/runtime_ops.go` defines many narrowly split ops structs and multiple default builders that mostly forward function pointers.",
+        "`docker/orchestration/container/netdata.go` repeats runtime dependency checking via several `require*` helpers before side-effect methods.",
+        "`rectify/rectify.go` merges runtime dependencies again (`mergeRectifyRuntime`, `resolveRectifyRuntime`) instead of consuming a smaller, stable service interface."
+      ],
+      "suggestion": "Collapse seam definitions into domain-oriented interfaces per use case (e.g., container lifecycle, config mutation, event publishing) and centralize validation in one constructor to reduce repeated wiring and guard logic.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "orchestration_responsibility_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_storage_test_boundaries",
+      "summary": "Disk/storage tests duplicate the same behavior across two packages, signaling unclear ownership.",
+      "related_files": [
+        "system/disk_test.go",
+        "system/storage/storage_test.go"
+      ],
+      "evidence": [
+        "Both files test overlapping scenarios for `ListHardDisks` parse/error behavior.",
+        "Both files verify `SmartCheckAllDrives` device-type routing behavior.",
+        "Both files include mounted-MMC behavior checks and filesystem creation-related coverage, but in different package contexts with different seam styles."
+      ],
+      "suggestion": "Define a single primary storage boundary (likely `system/storage`) and migrate duplicated behavioral tests there; keep only thin compatibility tests in `system` if legacy wrappers must remain.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "migration_overlap"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_store_pattern_divergence",
+      "summary": "Session state management uses two divergent custom collection patterns for similar lifecycle concerns.",
+      "related_files": [
+        "session/connection_registry.go",
+        "session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`connection_registry.go` manages auth/unauth buckets plus token sets with ad-hoc transition and cleanup logic.",
+        "`logstream_session_store.go` separately manages system/docker session collections with parallel copy/set/add/remove semantics and lock choreography.",
+        "Both files independently implement collection lifecycle operations (init/snapshot/remove/cleanup) without shared policy abstractions, increasing drift risk."
+      ],
+      "suggestion": "Introduce a small shared session-collection primitive (bucket operations, snapshot, remove, stale cleanup) and compose specialized registries on top, so auth and logstream stores share lifecycle semantics instead of duplicating them.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "session_state_pattern_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Configuration concerns evolved through incremental layers without a single canonical schema source.",
+      "Runtime/test seam injection expanded per feature, producing repeated wiring and validation scaffolding.",
+      "Migration from legacy `system` paths to `system/storage` appears incomplete, leaving duplicated behavioral ownership."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_overfragmentation",
+      "duplicated_storage_test_boundaries",
+      "session_store_pattern_divergence"
+    ],
+    "possible_false_positives": []
+  }
+}

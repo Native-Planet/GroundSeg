@@ -3,6 +3,7 @@ package uploadsvc
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"groundseg/protocol/actions"
 )
@@ -24,13 +25,13 @@ type Service interface {
 }
 
 type Command struct {
-	Action              actions.Action
+	Action              Action
 	OpenEndpointRequest *OpenEndpointRequest
 	ResetRequest        *ResetRequest
 }
 
 type CommandValidationError struct {
-	Action  actions.Action
+	Action  Action
 	Problem string
 }
 
@@ -46,14 +47,14 @@ type Executor struct {
 }
 
 type uploadActionDescriptor struct {
-	action    actions.Action
+	action    Action
 	execute   func(Service, Command) error
 	operation func(Command) string
 }
 
 var uploadActionDescriptors = []uploadActionDescriptor{
 	{
-		action: actions.ActionUploadOpenEndpoint,
+		action: ActionUploadOpenEndpoint,
 		execute: func(service Service, cmd Command) error {
 			return service.OpenEndpoint(*cmd.OpenEndpointRequest)
 		},
@@ -65,14 +66,14 @@ var uploadActionDescriptors = []uploadActionDescriptor{
 		},
 	},
 	{
-		action: actions.ActionUploadReset,
+		action: ActionUploadReset,
 		execute: func(service Service, cmd Command) error {
 			return service.Reset()
 		},
 	},
 }
 
-func CommandFromPayload(action actions.Action, openReq *OpenEndpointRequest, resetReq *ResetRequest) (Command, error) {
+func CommandFromPayload(action Action, openReq *OpenEndpointRequest, resetReq *ResetRequest) (Command, error) {
 	cmd := Command{
 		Action:              action,
 		OpenEndpointRequest: openReq,
@@ -86,7 +87,7 @@ func CommandFromPayload(action actions.Action, openReq *OpenEndpointRequest, res
 
 // CommandFromUploadInputs applies upload-specific normalization for ws payload shape and
 // routes validation through ValidateCommand.
-func CommandFromUploadInputs(action actions.Action, openReq OpenEndpointRequest, resetReq *ResetRequest) (Command, error) {
+func CommandFromUploadInputs(action Action, openReq OpenEndpointRequest, resetReq *ResetRequest) (Command, error) {
 	contract, err := actionContractForAction(action)
 	if err != nil {
 		return Command{}, err
@@ -106,7 +107,7 @@ func openReqPointerForPayload(openReq OpenEndpointRequest, contract actions.Uplo
 	return &openReq
 }
 
-func actionContractForAction(action actions.Action) (actions.UploadActionContract, error) {
+func actionContractForAction(action Action) (actions.UploadActionContract, error) {
 	contract, isSupported := actions.UploadActionContractForAction(action)
 	if !isSupported {
 		return actions.UploadActionContract{}, actions.UnsupportedActionError{Namespace: actions.NamespaceUpload, Action: action}
@@ -149,31 +150,31 @@ func ValidateCommand(cmd Command) error {
 	return nil
 }
 
-func openEndpointMissingError(action actions.Action) string {
+func openEndpointMissingError(action Action) string {
 	switch action {
-	case actions.ActionUploadOpenEndpoint:
+	case ActionUploadOpenEndpoint:
 		return "open-endpoint request is required"
 	default:
 		return fmt.Sprintf("%s action requires an open-endpoint payload", action)
 	}
 }
 
-func resetRequestMissingError(action actions.Action) string {
+func resetRequestMissingError(action Action) string {
 	switch action {
-	case actions.ActionUploadReset:
+	case ActionUploadReset:
 		return "reset request is required"
 	default:
 		return fmt.Sprintf("%s action requires a reset payload", action)
 	}
 }
 
-func actionUploadPayloadViolationMessage(action actions.Action, forbiddenPayload actions.UploadPayload) string {
+func actionUploadPayloadViolationMessage(action Action, forbiddenPayload actions.UploadPayload) string {
 	switch action {
-	case actions.ActionUploadOpenEndpoint:
+	case ActionUploadOpenEndpoint:
 		if forbiddenPayload == actions.UploadPayloadReset {
 			return "open-endpoint command must not include reset payload"
 		}
-	case actions.ActionUploadReset:
+	case ActionUploadReset:
 		if forbiddenPayload == actions.UploadPayloadOpenEndpoint {
 			return "reset command must not include open-endpoint payload"
 		}
@@ -182,14 +183,12 @@ func actionUploadPayloadViolationMessage(action actions.Action, forbiddenPayload
 }
 
 func newUploadDispatcher() (actions.ActionDispatcher[actions.Action, Service, Command], error) {
-	contracts := actions.UploadActionContracts()
-	contractByAction := make(map[actions.Action]actions.UploadActionContract, len(contracts))
-	for _, contract := range contracts {
-		if _, exists := contractByAction[contract.Action]; exists {
-			return actions.ActionDispatcher[actions.Action, Service, Command]{}, fmt.Errorf("upload action %q has duplicate contract definition", contract.Action)
-		}
-		contractByAction[contract.Action] = contract
+	contracts := actions.UploadActionContractByAction()
+	actionsKeys := make([]actions.Action, 0, len(contracts))
+	for action := range contracts {
+		actionsKeys = append(actionsKeys, action)
 	}
+	sort.Slice(actionsKeys, func(i, j int) bool { return string(actionsKeys[i]) < string(actionsKeys[j]) })
 	descriptorByAction := make(map[actions.Action]uploadActionDescriptor, len(uploadActionDescriptors))
 	for _, descriptor := range uploadActionDescriptors {
 		if _, exists := descriptorByAction[descriptor.action]; exists {
@@ -200,7 +199,8 @@ func newUploadDispatcher() (actions.ActionDispatcher[actions.Action, Service, Co
 
 	dispatcherBindings := make([]actions.ActionBinding[actions.Action, Service, Command], 0, len(contracts))
 	seen := make(map[actions.Action]struct{}, len(contracts))
-	for _, contract := range contracts {
+	for _, action := range actionsKeys {
+		contract := contracts[action]
 		descriptor, ok := descriptorByAction[contract.Action]
 		if !ok {
 			return actions.ActionDispatcher[actions.Action, Service, Command]{}, fmt.Errorf("upload action definition missing for %q", contract.Action)
@@ -269,7 +269,7 @@ func (e Executor) Execute(cmd Command) error {
 	return err
 }
 
-func (e Executor) SupportedActions() []actions.Action {
+func (e Executor) SupportedActions() []Action {
 	return e.dispatcher.Supported()
 }
 

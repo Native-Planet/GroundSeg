@@ -40,12 +40,20 @@ func BroadcastToClients() error {
 	if err != nil {
 		return err
 	}
-	cm.BroadcastAuth(authJson)
+	if err := cm.BroadcastAuth(authJson); err != nil {
+		return err
+	}
 	return nil
 }
 
 // broadcast to unauth clients
 func UnauthBroadcast(input []byte) error {
-	auth.GetClientManager().BroadcastUnauth(input)
+	cm := auth.GetClientManager()
+	if cm == nil {
+		return nil
+	}
+	if err := cm.BroadcastUnauth(input); err != nil {
+		return err
+	}
 	return nil
 }

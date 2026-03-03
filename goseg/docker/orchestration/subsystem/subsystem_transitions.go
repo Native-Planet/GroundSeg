@@ -119,10 +119,10 @@ func dockerDieTransition(rt dockerRoutineRuntime, contName string, state *struct
 	if state.Type != string(transition.ContainerTypeVere) {
 		return nil
 	}
-	if err := rt.transitionOps.LoadUrbitConfigFn(contName); err != nil {
+	if err := rt.LoadUrbitConfigFn(contName); err != nil {
 		return fmt.Errorf("failed to load config for %s: %w", contName, err)
 	}
-	conf := rt.transitionOps.UrbitConfFn(contName)
+	conf := rt.UrbitConfFn(contName)
 	if conf.DisableShipRestarts {
 		logger.Infof("Leaving %s container alone after death due to DisableShipRestarts=true", contName)
 		state.DesiredStatus = string(transition.ContainerStatusStopped)
@@ -134,7 +134,7 @@ func dockerDieAfterTransition(rt dockerRoutineRuntime, contName string, state *s
 	if state.Type != string(transition.ContainerTypeVere) {
 		return nil
 	}
-	rt.transitionOps.ClearLusCodeFn(contName)
+	rt.ClearLusCodeFn(contName)
 	if state.DesiredStatus == string(transition.ContainerStatusDied) || state.DesiredStatus == string(transition.ContainerStatusStopped) {
 		logger.Infof("Ship desired status: %s", state.DesiredStatus)
 		return nil
@@ -151,7 +151,7 @@ func scheduleShipRestart(rt dockerRoutineRuntime, containerName, containerType s
 }
 
 func updateContainerTransition(rt dockerRoutineRuntime, contName string, mutate func(*structs.ContainerState) error) (*structs.ContainerState, error) {
-	containerState, exists := rt.transitionOps.GetContainerStateFn()[contName]
+	containerState, exists := rt.GetContainerStateFn()[contName]
 	if !exists {
 		return nil, nil
 	}
@@ -159,6 +159,6 @@ func updateContainerTransition(rt dockerRoutineRuntime, contName string, mutate 
 	if err := mutate(&containerState); err != nil {
 		return nil, err
 	}
-	rt.transitionOps.UpdateContainerStateFn(contName, containerState)
+	rt.UpdateContainerStateFn(contName, containerState)
 	return &containerState, nil
 }

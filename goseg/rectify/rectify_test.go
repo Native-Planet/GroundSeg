@@ -9,9 +9,11 @@ import (
 
 	"groundseg/broadcast"
 	"groundseg/docker/events"
+	"groundseg/shipworkflow"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/testutil"
+	"groundseg/transition"
 )
 
 var (
@@ -20,6 +22,9 @@ var (
 	newShipTransitionOnce      sync.Once
 	systemTransitionOnce       sync.Once
 	rectifyUrbitOnce           sync.Once
+	rectifyTestRuntime         = RectifyRuntime{
+		EventRuntime: events.NewEventRuntime(),
+	}
 )
 
 func initializeRectifyTestEnv() {
@@ -33,7 +38,7 @@ func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	initializeRectifyTestEnv()
 	urbitTransitionHandlerOnce.Do(func() {
 		go func() {
-			if err := UrbitTransitionHandlerWithContext(context.Background()); err != nil {
+			if err := UrbitTransitionHandlerWithContextAndRuntime(context.Background(), rectifyTestRuntime); err != nil {
 				t.Fatalf("UrbitTransitionHandlerWithContext failed: %v", err)
 			}
 		}()
@@ -47,7 +52,7 @@ func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	broadcast.UpdateBroadcast(current)
 
 	eventValue := "pack-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	events.DefaultEventRuntime().PublishUrbitTransition(context.Background(), structs.UrbitTransition{
+	rectifyTestRuntime.EventRuntime.PublishUrbitTransition(context.Background(), structs.UrbitTransition{
 		Patp:  "zod",
 		Type:  "pack",
 		Event: eventValue,
@@ -63,7 +68,7 @@ func TestNewShipTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	initializeRectifyTestEnv()
 	newShipTransitionOnce.Do(func() {
 		go func() {
-			if err := NewShipTransitionHandlerWithContext(context.Background()); err != nil {
+			if err := NewShipTransitionHandlerWithContextAndRuntime(context.Background(), rectifyTestRuntime); err != nil {
 				t.Fatalf("NewShipTransitionHandlerWithContext failed: %v", err)
 			}
 		}()
@@ -72,8 +77,8 @@ func TestNewShipTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
 	bootStage := "booting-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	patp := "~zod-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: bootStage})
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "patp", Event: patp})
+	rectifyTestRuntime.EventRuntime.PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: bootStage})
+	rectifyTestRuntime.EventRuntime.PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "patp", Event: patp})
 
 	testutil.WaitForCondition(t, func() bool {
 		state := broadcast.GetState()
@@ -85,7 +90,7 @@ func TestSystemTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	initializeRectifyTestEnv()
 	systemTransitionOnce.Do(func() {
 		go func() {
-			if err := SystemTransitionHandlerWithContext(context.Background()); err != nil {
+			if err := SystemTransitionHandlerWithContextAndRuntime(context.Background(), rectifyTestRuntime); err != nil {
 				t.Fatalf("SystemTransitionHandlerWithContext failed: %v", err)
 			}
 		}()
@@ -93,7 +98,7 @@ func TestSystemTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 
 	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
 	event := "bug-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	events.DefaultEventRuntime().PublishSystemTransition(context.Background(), structs.SystemTransition{Type: "bugReportError", Event: event})
+	rectifyTestRuntime.EventRuntime.PublishSystemTransition(context.Background(), structs.SystemTransition{Type: "bugReportError", Event: event})
 
 	testutil.WaitForCondition(t, func() bool {
 		state := broadcast.GetState()
@@ -123,4 +128,39 @@ func TestRectifyUrbitAppliesStartramEvents(t *testing.T) {
 			state.Profile.Startram.Transition.Toggle == "loading" &&
 			state.Profile.Startram.Transition.Endpoint == ""
 	}, "rectify startram transitions were not applied")
+}
+
+func TestSetUrbitTransitionSupportsWorkflowRegistryAndTelemetry(t *testing.T) {
+	for transitionType := range shipworkflow.UrbitTransitionReducerMap() {
+		var event structs.UrbitTransition
+		event.Type = string(transitionType)
+		event.Event = "ok"
+		event.Value = 1
+
+		state := structs.UrbitTransitionBroadcast{}
+		if !setUrbitTransition(&state, event) {
+			t.Fatalf("expected urbit transition from workflow registry to be recognized: %s", transitionType)
+		}
+	}
+
+	for _, transitionType := range []transition.UrbitTransitionType{
+		transition.UrbitTransitionChop,
+		transition.UrbitTransitionShipCompressed,
+		transition.UrbitTransitionBucketCompressed,
+		transition.UrbitTransitionPenpaiCompanion,
+		transition.UrbitTransitionGallseg,
+		transition.UrbitTransitionDeleteService,
+		transition.UrbitTransitionLocalTlonBackupsEnabled,
+		transition.UrbitTransitionRemoteTlonBackupsEnabled,
+		transition.UrbitTransitionLocalTlonBackup,
+		transition.UrbitTransitionLocalTlonBackupSchedule,
+		transition.UrbitTransitionHandleRestoreTlonBackup,
+		transition.UrbitTransitionServiceRegistrationStatus,
+	} {
+		event := structs.UrbitTransition{Type: string(transitionType), Event: "ok", Value: 1}
+		state := structs.UrbitTransitionBroadcast{}
+		if !setUrbitTransition(&state, event) {
+			t.Fatalf("expected urbit transition to be recognized: %s", transitionType)
+		}
+	}
 }

@@ -1,0 +1,98 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 62.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime seams are split into many single-purpose interfaces/func wrappers that mostly forward calls with nil-guards (e.g., importerConfigOps/importerWorkflowOps and importerRuntime forwarding methods).",
+        "Startup orchestration repeats the same abstraction pattern with multiple tiny interface families plus parallel validate/startupServiceSpecs plumbing, increasing indirection without adding domain policy.",
+        "Orchestration runtime defines a very wide function-bag API (many *Fn fields across Runtime*Ops structs), and downstream modules compensate with long missing-callback validation lists.",
+        "Config patching uses reflection by string field name; invalid names become silent false/return paths instead of compile-time failures, which weakens abstraction honesty."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 45.0,
+        "interface_honesty": 71.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime-seams-pass-through-chains",
+      "summary": "Runtime seam layers are over-fragmented into pass-through wrappers, creating deep call chains with little behavioral leverage.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "importer defines multiple tiny ops interfaces and runtime structs (config/workflow/lifecycle/ship/container/volume/files) where methods mostly nil-check then forward (e.g., importer.go lines ~46-236 and ~612-775).",
+        "startup orchestrator introduces several small interface groups plus mirrored runtime structs and explicit validate/spec plumbing (startup_orchestrator.go lines ~80-125 and ~352-629).",
+        "main bootstrap uses interface+struct wrappers for orchestrator/server/connectivity that mostly forward to function fields/defaults (main.go lines ~61-110, ~117-146).",
+        "shipworkflow defines adapter interfaces and function types (workflowTransitionEmitter/workflowSleeper/workflowBarExit/etc.) that largely wrap direct function calls (operations_runtime.go lines ~34-82)."
+      ],
+      "suggestion": "Collapse seam layers around a smaller number of cohesive runtime capabilities per subsystem (for example: one importer runtime contract and one startup service registry), and keep wrappers only where they enforce policy or translation. Prefer direct function injection for local tests over interface+wrapper stacks when there is no polymorphic behavior.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wide-runtime-param-bags",
+      "summary": "Large function-bag runtime structs hide true dependency boundaries and force defensive nil-validation across consumers.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "orchestration runtime_ops defines many broad structs of function pointers (RuntimeContainerOps/RuntimeHealthOps/RuntimeStartupOps/RuntimeUrbitOps/etc.; runtime_ops.go lines ~24-229), acting as wide dependency bags.",
+        "shipworkflow runtime validation lists many required callbacks (operations_runtime.go lines ~160-199), showing consumers must defensively validate bag contents instead of relying on honest contracts.",
+        "rectify runtime embeds orchestration.Runtime and then relies on optional callback presence checks for core behavior (rectify.go lines ~28-79), indicating partially-initialized runtime states are a first-class path."
+      ],
+      "suggestion": "Replace broad function bags with narrower typed ports per use-case (e.g., transition emission, container lifecycle, config sync) and constructor-level completeness guarantees. This removes repeated nil checks and makes dependency contracts explicit at compile time.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "stringly-reflective-patch-binding",
+      "summary": "Generic config patch abstraction falls back to reflection-by-string, weakening type guarantees and allowing silent binding failures.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "config_update_registry maps patch fields by string names and resolves with reflect.FieldByName (config_update_registry.go lines ~16-23, ~163-176, ~187-199).",
+        "setConfigPatchValueByName silently returns on invalid/unsettable/convertibility failures instead of surfacing contract errors (config_update_registry.go lines ~187-224).",
+        "Struct layer exposes typed update methods on SysConfig (structs/configs.go lines ~23-55), but registry bypasses compile-time field safety through reflective lookup."
+      ],
+      "suggestion": "Use typed field accessors generated or declared per patch field (no reflect.FieldByName), and make binding mismatches explicit errors during registry construction so patch contracts fail fast.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Test seam strategy evolved into pervasive function-pointer and tiny-interface layering without a clear limit on abstraction granularity.",
+      "Dependency injection is modeled as mutable runtime bags instead of minimal, compile-time-complete contracts."
+    ],
+    "likely_symptoms": [
+      "runtime-seams-pass-through-chains",
+      "wide-runtime-param-bags"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {
+    "design_coherence": 72.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Urbit config mutation is implemented through repeated per-section wrappers in both config and orchestration layers (`UpdateUrbitRuntimeConfig`/`Network`/`Schedule`/`Feature`/`Web`/`Backup` in `goseg/config/urbit.go` and mirrored methods in `goseg/docker/orchestration/runtime_ops.go`).",
+        "Transition handling relies on many near-identical imperative step builders and reducer assignments (multiple `build*Steps` functions in `goseg/shipworkflow/urbit_operations_runtime.go` and long explicit reducer maps in `goseg/rectify/rectify.go`).",
+        "Runtime seam construction uses large callback bags and reflection/unsafe callback merging (`mergeRuntimeCallbacks`, `settableValue` in `goseg/broadcast/collectors/collectors_runtime.go`; many runtime callback structs in `goseg/docker/orchestration/runtime_ops.go`) rather than narrower typed ports.",
+        "Session lifecycle logic mixes real connection management with synthetic placeholder bookkeeping (`enqueueFakeConnIfNilOrUnconnected` in `goseg/session/connection_registry.go`) while `ClientManager` performs repeated map scans and lock choreography around that storage."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_section_update_fanout",
+      "summary": "Urbit config section updates are duplicated across layers, creating a brittle multi-site mutation API.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`goseg/config/urbit.go` defines section-specific mutation methods plus `UpdateUrbitSectionConfig` type-switch logic for all sections.",
+        "`goseg/docker/orchestration/runtime_ops.go` repeats the same section fan-out with `UpdateUrbitRuntimeConfig`/`Network`/`Schedule`/`Feature`/`Web`/`Backup` wrappers and fallback closures into `UpdateUrbitFn`.",
+        "`goseg/structs/configs.go` already exposes section-level update methods on `UrbitDocker`, but orchestration/config still duplicate section routing behavior instead of sharing one mutation path."
+      ],
+      "suggestion": "Collapse section updates into one typed mutation gateway (for example `UpdateUrbitSection[T]`) owned by config, and have orchestration delegate to that single API instead of maintaining mirrored per-section wrappers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_section_routing"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_template_duplication",
+      "summary": "Transition orchestration is copy-paste heavy, making behavior consistency depend on manual edits across many handlers.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`goseg/shipworkflow/urbit_operations_runtime.go` has many similarly shaped builders (`buildHandleLoomSteps`, `buildHandleSnapTimeSteps`, toggle builders, link/unlink builders) that each hand-roll persist/config/restart/error scaffolding.",
+        "`goseg/rectify/rectify.go` uses long explicit reducer maps assigning `event.Event`/`event.Value` into specific fields one-by-one, repeating the same mapping structure.",
+        "Both files encode transition semantics as repeated imperative snippets instead of declarative transition descriptors, increasing drift risk when adding or changing transition types."
+      ],
+      "suggestion": "Introduce declarative transition specs (event key, target field, optional pre/post hooks) and generate common step/reducer wiring from those specs, keeping only unique side effects in custom handlers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_transition_wiring"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "callback_bag_overreach",
+      "summary": "Large runtime callback bags plus reflective merge logic create high-indirection plumbing with weak compile-time guarantees.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/container/netdata.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/collectors/collectors_runtime.go` merges overrides via reflection and `unsafe` (`mergeRuntimeCallbacks`, `settableValue`) instead of typed composition.",
+        "`goseg/docker/orchestration/runtime_ops.go` defines many nested callback structs for runtime wiring, producing broad constructor/state surfaces.",
+        "`goseg/docker/orchestration/container/netdata.go` further adds local runtime-requirement validation methods, indicating duplicated dependency validation patterns across subsystems."
+      ],
+      "suggestion": "Replace generic callback-bag merging with narrow typed interfaces per use-case and constructor-time dependency injection; keep validation in constructors so invalid runtimes are unrepresentable.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_indirection"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_registry_mixed_state_model",
+      "summary": "Session registry combines real websocket lifecycle with synthetic placeholder entries, obscuring invariants and complicating manager logic.",
+      "related_files": [
+        "goseg/session/connection_registry.go",
+        "goseg/session/client_manager.go"
+      ],
+      "evidence": [
+        "`goseg/session/connection_registry.go` inserts fake connections (`enqueueFakeConnIfNilOrUnconnected`) when `client`/`conn` is nil, so storage contains both real and sentinel entries.",
+        "`goseg/session/client_manager.go` must repeatedly guard nils and scan both auth/unauth buckets (`findMuConn`, `HasAnyAuthConnection`, `GetMuConn`) to compensate for mixed storage semantics.",
+        "The same registry is also responsible for cleanup, transition, and broadcast snapshot preparation, indicating responsibility bundling around non-uniform state."
+      ],
+      "suggestion": "Separate token/session bookkeeping from live connection tracking: store token presence explicitly (without fake `MuConn` entries) and keep websocket collections strictly non-nil/live, with indexed lookup by connection identity.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "session_state_conflation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_harness_state_reset_duplication",
+      "summary": "Test suites reimplement similar global-seam reset and fixture wiring patterns, increasing maintenance overhead and inconsistency risk.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/exporter/exporter_test.go",
+        "goseg/startram/state_sync_test.go"
+      ],
+      "evidence": [
+        "`goseg/accesspoint/accesspoint_test.go` uses multiple ad-hoc reset helpers (`resetParameterGlobalsForTest`, `resetRouterGlobalsForTest`) and repeated command-capture scaffolding.",
+        "`goseg/importer/importer_test.go` and `goseg/exporter/exporter_test.go` each manually snapshot/restore package globals and event drains with similar patterns.",
+        "`goseg/startram/state_sync_test.go` repeats save/restore of package-level defaults (`defaultAPIClient`, `defaultConfigService`, syncers), showing shared fixture concerns spread across files."
+      ],
+      "suggestion": "Create shared test harness utilities for seam snapshot/restore and event-drain setup (per package or internal testutil) to reduce repeated fixture code and enforce consistent test state isolation.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "global_seam_test_plumbing"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Manual routing patterns are duplicated instead of being represented as data/specs.",
+      "Runtime seams rely on broad callback bags rather than narrow stable interfaces.",
+      "Global mutable seams in tests force repetitive setup/teardown scaffolding."
+    ],
+    "likely_symptoms": [
+      "urbit_section_update_fanout",
+      "transition_template_duplication",
+      "test_harness_state_reset_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

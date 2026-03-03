@@ -25,15 +25,12 @@ type ConnectivityPatch struct {
 }
 
 type RuntimePatch struct {
-	GracefulExit  *bool
-	SwapVal       *int
-	SwapFile      *string
-	Setup         *string
-	LastKnownMDNS *string
-	LinuxUpdates  *struct {
-		Value    int    `json:"value"`
-		Interval string `json:"interval"`
-	}
+	GracefulExit   *bool
+	SwapVal        *int
+	SwapFile       *string
+	Setup          *string
+	LastKnownMDNS  *string
+	LinuxUpdates   *linuxUpdatesPatch
 	DockerData     *string
 	GSVersion      *string
 	CfgDir         *string
@@ -68,6 +65,11 @@ type AuthSessionPatch struct {
 	UnauthorizedSessions map[string]structs.SessionInfo
 }
 
+type linuxUpdatesPatch struct {
+	Value    int    `json:"value"`
+	Interval string `json:"interval"`
+}
+
 type ConfPatch struct {
 	ConnectivityPatch
 	RuntimePatch
@@ -78,13 +80,7 @@ type ConfPatch struct {
 
 type confPatchParser func(*ConfPatch, interface{}) error
 type confPatchHasUpdateFn func(*ConfPatch) bool
-type confPatchApplyTarget interface {
-	UpdateConnectivityConfig(func(*structs.ConnectivityConfig))
-	UpdateRuntimeConfig(func(*structs.RuntimeConfig))
-	UpdateStartramConfig(func(*structs.StartramConfig))
-	UpdatePenpaiConfig(func(*structs.PenpaiConfig))
-	UpdateAuthSessionConfig(func(*structs.AuthSessionConfig))
-}
+type confPatchApplyTarget = *structs.SysConfig
 
 type confPatchApplyFn func(confPatchApplyTarget, *ConfPatch)
 type confPatchApplyValueFn[T any] func(confPatchApplyTarget, T)
@@ -98,7 +94,7 @@ type confPatchField struct {
 }
 
 func (patch *ConfPatch) hasUpdates() bool {
-	for _, field := range confPatchRegistry {
+	for _, field := range allConfPatchFields() {
 		if field.hasUpdates(patch) {
 			return true
 		}
@@ -270,7 +266,7 @@ var (
 )
 
 func init() {
-	confPatchByKey, confPatchByKeyErr = buildConfPatchByKey(confPatchRegistry)
+	confPatchByKey, confPatchByKeyErr = buildConfPatchByKey(allConfPatchFields())
 }
 
 func buildConfPatchByKey(fields []confPatchField) (map[string]confPatchField, error) {
@@ -350,27 +346,15 @@ func parseDiskWarningMap(name string, value interface{}) (map[string]structs.Dis
 	return copied, nil
 }
 
-func parseLinuxUpdatesValue(name string, value interface{}) (struct {
-	Value    int    `json:"value"`
-	Interval string `json:"interval"`
-}, error) {
+func parseLinuxUpdatesValue(name string, value interface{}) (linuxUpdatesPatch, error) {
 	raw, err := json.Marshal(value)
 	if err != nil {
-		return struct {
-			Value    int    `json:"value"`
-			Interval string `json:"interval"`
-		}{}, fmt.Errorf("invalid %s value: %w", name, err)
+		return linuxUpdatesPatch{}, fmt.Errorf("invalid %s value: %w", name, err)
 	}
 
-	var parsed struct {
-		Value    int    `json:"value"`
-		Interval string `json:"interval"`
-	}
+	var parsed linuxUpdatesPatch
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return struct {
-			Value    int    `json:"value"`
-			Interval string `json:"interval"`
-		}{}, fmt.Errorf("invalid %s value: %w", name, err)
+		return linuxUpdatesPatch{}, fmt.Errorf("invalid %s value: %w", name, err)
 	}
 	return parsed, nil
 }
