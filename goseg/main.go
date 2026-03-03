@@ -331,6 +331,8 @@ func main() {
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
+	// Auto-link S3 for ships that are still unlinked after RustFS provisioning.
+	go routines.AutoConfigureObjectStoreLinks()
 	// Load Penpai
 	loadService(docker.LoadLlama, "Unable to load Llama GPT!")
 	startServer()
