@@ -93,9 +93,9 @@ var (
         "tag": "edge"
       },
       "minio": {
-        "amd64_sha256": "6d6cf693fd70ca6e15709fa44d39b44f98fc5b58795697486a95ac1cc2ad9880",
-        "arm64_sha256": "510eb939d4651d02806e696ff37c71902a17b8297b4a241670f7b59fd2eb4415",
-        "repo": "registry.hub.docker.com/rustfs/rustfs",
+        "amd64_sha256": "f6a3001a765dc59a8e365149ade0ea628494230e984891877ead016eb24ba9a9",
+        "arm64_sha256": "567779c9f29aca670f84d066051290faeaae6c3ad3a3b7062de4936aaab2a29d",
+        "repo": "registry.hub.docker.com/minio/minio",
         "tag": "latest"
       },
       "miniomc": {
