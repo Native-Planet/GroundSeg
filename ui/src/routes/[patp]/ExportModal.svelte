@@ -41,7 +41,7 @@
 
   const execIfBucketChanged = async state => {
     if (state == "ready")
-      await requestExport("minio_"+patp)
+      await requestExport("rustfs_"+patp)
     return state
   }
 

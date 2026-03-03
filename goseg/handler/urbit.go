@@ -656,11 +656,11 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 	areAliases, err := AreSubdomainsAliases(alias, oldDomain)
 	if err != nil {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-		return fmt.Errorf("Failed to check MinIO domain alias for %s: %v", patp, err)
+		return fmt.Errorf("Failed to check RustFS domain alias for %s: %v", patp, err)
 	}
 	if !areAliases {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-		return fmt.Errorf("Invalid MinIO domain alias for %s", patp)
+		return fmt.Errorf("Invalid RustFS domain alias for %s", patp)
 	}
 	// Creae Alias
 	if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
@@ -795,8 +795,8 @@ func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 		if err := startram.SvcDelete("s3."+patp, "s3"); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't remove s3 anchor for %v: %v", patp, err))
 		}
-		if err := docker.DeleteContainer("minio_" + patp); err != nil {
-			zap.L().Error(fmt.Sprintf("Couldn't delete minio docker container for %v: %v", patp, err))
+		if err := docker.DeleteContainer(docker.GetObjectStoreContainerName(patp)); err != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't delete object store container for %v: %v", patp, err))
 		}
 	}
 	// get custom directory info before deleting config
@@ -863,7 +863,7 @@ func exportShip(patp string, urbitPayload structs.WsUrbitPayload, shipConf struc
 }
 
 func exportBucket(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
-	containerName := fmt.Sprintf("minio_%s", patp)
+	containerName := docker.GetObjectStoreContainerName(patp)
 	// whitelist the patp token pair
 	if err := exporter.WhitelistContainer(containerName, urbitPayload.Token); err != nil {
 		return err
@@ -1064,7 +1064,7 @@ func toggleMinIOLink(patp string, shipConf structs.UrbitDocker) error {
 		// unlink from urbit
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "unlinking"}
 		if err := click.UnlinkStorage(patp); err != nil {
-			return fmt.Errorf("Failed to unlink MinIO information %s: %v", patp, err)
+			return fmt.Errorf("Failed to unlink RustFS information %s: %v", patp, err)
 		}
 
 		// Update config
@@ -1082,9 +1082,9 @@ func toggleMinIOLink(patp string, shipConf structs.UrbitDocker) error {
 	} else {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "linking"}
 		// create service account
-		svcAccount, err := docker.CreateMinIOServiceAccount(patp)
+		svcAccount, err := docker.CreateObjectStoreCredentials(patp)
 		if err != nil {
-			return fmt.Errorf("Failed to create MinIO service account for %s: %v", patp, err)
+			return fmt.Errorf("Failed to create RustFS credentials for %s: %v", patp, err)
 		}
 		// get minio endpoint
 		var endpoint string
@@ -1094,7 +1094,7 @@ func toggleMinIOLink(patp string, shipConf structs.UrbitDocker) error {
 		}
 		// link to urbit
 		if err := click.LinkStorage(patp, endpoint, svcAccount); err != nil {
-			return fmt.Errorf("Failed to link MinIO information %s: %v", patp, err)
+			return fmt.Errorf("Failed to link RustFS information %s: %v", patp, err)
 		}
 
 		// Update config

@@ -11,7 +11,7 @@
   <div class="tab" on:click={()=>tab="system"}>GroundSeg</div>
   <div class="tab" on:click={()=>tab="wireguard"}>Wireguard</div>
   <div class="tab" on:click={()=>tab="urbit"}>Urbit</div>
-  <div class="tab" on:click={()=>tab="minio"}>MinIO</div>
+  <div class="tab" on:click={()=>tab="rustfs"}>RustFS</div>
 </div>
 <div class="panel">
   {#if tab == "system"}
@@ -20,8 +20,8 @@
     <Wireguard {wide} />
   {:else if tab == "urbit"}
     urbit logs
-  {:else if tab == "minio"}
-    minio logs
+  {:else if tab == "rustfs"}
+    rustfs logs
   {/if}
 </div>
 

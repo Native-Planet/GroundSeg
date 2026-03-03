@@ -318,10 +318,8 @@ func main() {
 		if err := docker.LoadWireguard(); err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to load Wireguard: %v", err))
 		} else {
-			// Load MC
-			loadService(docker.LoadMC, "Unable to load MinIO Client!")
-			// Load MinIOs
-			loadService(docker.LoadMinIOs, "Unable to load MinIO containers!")
+			// Load object stores
+			loadService(docker.LoadObjectStores, "Unable to load RustFS containers!")
 		}
 	}
 	// Load Netdata

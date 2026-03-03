@@ -270,6 +270,9 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 		"New version available in %s channel! Current: %+v, Latest: %+v\n",
 		release, currentVersion, latestVersion,
 	))
+	if err := docker.CleanupLegacyMinIOContainers(); err != nil {
+		zap.L().Warn(fmt.Sprintf("Legacy MinIO container cleanup encountered errors during update: %v", err))
+	}
 	conf := config.Conf()
 	statuses, err := docker.GetShipStatus(conf.Piers)
 	if err != nil {
@@ -288,7 +291,7 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 			latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
 			if config.Architecture == "amd64" {
 				if latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256 {
-					if contains([]string{"netdata", "wireguard", "miniomc"}, sw) {
+					if contains([]string{"netdata", "wireguard"}, sw) {
 						docker.StartContainer(sw, sw)
 					} else if sw == "vere" {
 						for pier, status := range statuses {
@@ -361,14 +364,14 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
-								docker.StartContainer("minio_"+pier, "minio")
+								docker.StartContainer(docker.GetObjectStoreContainerName(pier), "minio")
 							}
 						}
 					}
 				}
 			} else {
 				if latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256 {
-					if contains([]string{"netdata", "wireguard", "miniomc"}, sw) {
+					if contains([]string{"netdata", "wireguard"}, sw) {
 						docker.StartContainer(sw, sw)
 					} else if sw == "vere" {
 						for pier, status := range statuses {
@@ -441,7 +444,7 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
-								docker.StartContainer("minio_"+pier, "minio")
+								docker.StartContainer(docker.GetObjectStoreContainerName(pier), "minio")
 							}
 						}
 					}

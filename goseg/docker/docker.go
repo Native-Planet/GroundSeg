@@ -288,11 +288,6 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-	case "miniomc":
-		containerConfig, hostConfig, err = mcContainerConf()
-		if err != nil {
-			return containerState, err
-		}
 	case "wireguard":
 		containerConfig, hostConfig, err = wgContainerConf()
 		if err != nil {
@@ -307,16 +302,28 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
 		return containerState, errmsg
 	}
-	// get the desired tag and hash from config
-	imageInfo, err := GetLatestContainerInfo(containerType)
-	if err != nil {
-		return containerState, err
-	}
-	// check if the desired image is available locally
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
-	_, err = PullImageIfNotExist(desiredImage, imageInfo)
-	if err != nil {
-		return containerState, err
+	var imageInfo map[string]string
+	desiredImage := containerConfig.Image
+	if containerType == "minio" {
+		if desiredImage == "" {
+			return containerState, fmt.Errorf("empty image ref for %s", containerName)
+		}
+		if err := PullImageByRef(desiredImage); err != nil {
+			return containerState, err
+		}
+		imageInfo = map[string]string{"hash": ""}
+	} else {
+		// get the desired tag and hash from config
+		imageInfo, err = GetLatestContainerInfo(containerType)
+		if err != nil {
+			return containerState, err
+		}
+		// check if the desired image is available locally
+		desiredImage = fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+		_, err = PullImageIfNotExist(desiredImage, imageInfo)
+		if err != nil {
+			return containerState, err
+		}
 	}
 	// check if container exists
 	existingContainer, _ := FindContainer(containerName)
@@ -401,7 +408,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	if err != nil {
 		return containerState, fmt.Errorf("failed to inspect container %s: %v", containerName, err)
 	}
-	if strings.Contains(containerName, "minio_") {
+	if IsObjectStoreContainerName(containerName) {
 		if err := setMinIOAdminAccount(containerName); err != nil {
 			return containerState, fmt.Errorf("failed to set admin account %s: %v", containerName, err)
 		}
@@ -445,11 +452,6 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		if err != nil {
 			return containerState, err
 		}
-	case "miniomc":
-		containerConfig, hostConfig, err = mcContainerConf()
-		if err != nil {
-			return containerState, err
-		}
 	case "wireguard":
 		containerConfig, hostConfig, err = wgContainerConf()
 		if err != nil {
@@ -464,15 +466,26 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
 		return containerState, errmsg
 	}
-	imageInfo, err := GetLatestContainerInfo(containerType)
-	if err != nil {
-		return containerState, err
-	}
-	// check if the desired image is available locally
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
-	_, err = PullImageIfNotExist(desiredImage, imageInfo)
-	if err != nil {
-		return containerState, err
+	var desiredImage string
+	if containerType == "minio" {
+		desiredImage = containerConfig.Image
+		if desiredImage == "" {
+			return containerState, fmt.Errorf("empty image ref for %s", containerName)
+		}
+		if err := PullImageByRef(desiredImage); err != nil {
+			return containerState, err
+		}
+	} else {
+		imageInfo, err := GetLatestContainerInfo(containerType)
+		if err != nil {
+			return containerState, err
+		}
+		// check if the desired image is available locally
+		desiredImage = fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+		_, err = PullImageIfNotExist(desiredImage, imageInfo)
+		if err != nil {
+			return containerState, err
+		}
 	}
 	ctx := context.Background()
 	cli, err := dockerclient.New()
@@ -608,6 +621,41 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 	return true, nil
 }
 
+// pull image by reference (tag or digest) if missing locally
+func PullImageByRef(imageRef string) error {
+	ctx := context.Background()
+	cli, err := dockerclient.New()
+	if err != nil {
+		return err
+	}
+	defer cli.Close()
+
+	images, err := cli.ImageList(ctx, imagetypes.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, img := range images {
+		for _, tag := range img.RepoTags {
+			if tag == imageRef {
+				return nil
+			}
+		}
+		for _, digest := range img.RepoDigests {
+			if digest == imageRef {
+				return nil
+			}
+		}
+	}
+
+	resp, err := cli.ImagePull(ctx, imageRef, imagetypes.PullOptions{})
+	if err != nil {
+		return err
+	}
+	defer resp.Close()
+	_, _ = io.Copy(ioutil.Discard, resp)
+	return nil
+}
+
 // looks for a container with the given name and returns it, or nil if not found
 func FindContainer(containerName string) (*container.Summary, error) {
 	cli, err := dockerclient.New()
@@ -685,6 +733,13 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 	output, err := ioutil.ReadAll(hijackedResp.Reader)
 	if err != nil {
 		return "", err
+	}
+	inspect, err := cli.ContainerExecInspect(ctx, resp.ID)
+	if err != nil {
+		return "", err
+	}
+	if inspect.ExitCode != 0 {
+		return string(output), fmt.Errorf("docker exec exited with code %d", inspect.ExitCode)
 	}
 	return string(output), nil
 }

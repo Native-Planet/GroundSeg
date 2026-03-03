@@ -248,20 +248,17 @@ func Check502Loop() {
 							if err := docker.DeleteContainer(patp); err != nil {
 								zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
 							}
-							minio := fmt.Sprintf("minio_%s", patp)
-							if err := docker.DeleteContainer(minio); err != nil {
-								zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+							storeContainer := docker.GetObjectStoreContainerName(patp)
+							if err := docker.DeleteContainer(storeContainer); err != nil {
+								zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", storeContainer, err))
 							}
 						}
 						// create startram containers
 						if err := docker.LoadUrbits(); err != nil {
 							zap.L().Error(fmt.Sprintf("Failed to load urbits: %v", err))
 						}
-						if err := docker.LoadMC(); err != nil {
-							zap.L().Error(fmt.Sprintf("Failed to load minio client: %v", err))
-						}
-						if err := docker.LoadMinIOs(); err != nil {
-							zap.L().Error(fmt.Sprintf("Failed to load minios: %v", err))
+						if err := docker.LoadObjectStores(); err != nil {
+							zap.L().Error(fmt.Sprintf("Failed to load RustFS containers: %v", err))
 						}
 						// remove from map after restart
 						delete(status, pier)

@@ -77,11 +77,14 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	patp := strings.TrimPrefix(container, "minio_")
+	patp := container
 	exportTrans := "exportShip"
 	compressedTrans := "shipCompressed"
-	isMinIO := strings.Contains(container, "minio_")
+	isMinIO := docker.IsObjectStoreContainerName(container)
 	if isMinIO {
+		if parsedPatp, err := docker.GetPatpFromObjectStoreContainer(container); err == nil {
+			patp = parsedPatp
+		}
 		exportTrans = "exportBucket"
 		compressedTrans = "bucketCompressed"
 	}
@@ -143,11 +146,16 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	volumeDirectory := defaults.DockerData("volumes")
-	filePath := filepath.Join(volumeDirectory, container, "_data")
-	shipConf := config.UrbitConf(container)
-
-	if customLoc, ok := shipConf.CustomPierLocation.(string); ok {
-		filePath = customLoc
+	volumeName := container
+	if isMinIO {
+		volumeName = docker.GetMinIODataVolumeName(container)
+	}
+	filePath := filepath.Join(volumeDirectory, volumeName, "_data")
+	if !isMinIO {
+		shipConf := config.UrbitConf(container)
+		if customLoc, ok := shipConf.CustomPierLocation.(string); ok {
+			filePath = customLoc
+		}
 	}
 
 	// Create a temporary file for the zip

@@ -115,26 +115,19 @@ func handleStartramRestart() {
 			if err := docker.DeleteContainer(patp); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
 			}
-			minio := fmt.Sprintf("minio_%s", patp)
-			if err := docker.DeleteContainer(minio); err != nil {
-				zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
+			storeContainer := docker.GetObjectStoreContainerName(patp)
+			if err := docker.DeleteContainer(storeContainer); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", storeContainer, err))
 			}
-		}
-		// delete mc
-		if err := docker.DeleteContainer("mc"); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to delete minio client: %v", err))
 		}
 		// create startram containers
 		startram.EventBus <- structs.Event{Type: "restart", Data: "urbits"}
 		if err := docker.LoadUrbits(); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to load urbits: %v", err))
 		}
-		startram.EventBus <- structs.Event{Type: "restart", Data: "minios"}
-		if err := docker.LoadMC(); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to load minio client: %v", err))
-		}
-		if err := docker.LoadMinIOs(); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to load minios: %v", err))
+		startram.EventBus <- structs.Event{Type: "restart", Data: "rustfs"}
+		if err := docker.LoadObjectStores(); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to load RustFS containers: %v", err))
 		}
 		startram.EventBus <- structs.Event{Type: "restart", Data: "done"}
 		time.Sleep(3 * time.Second)
@@ -187,24 +180,16 @@ func handleStartramToggle() {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	}
-	// delete mc
-	if err := docker.DeleteContainer("mc"); err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to delete minio client: %v", err))
-	}
-	// load mc
-	if err := docker.LoadMC(); err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to load minio client: %v", err))
-	}
 	for _, patp := range conf.Piers {
-		// delete minio
-		minio := fmt.Sprintf("minio_%s", patp)
-		if err := docker.DeleteContainer(minio); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
+		// delete object store container
+		storeContainer := docker.GetObjectStoreContainerName(patp)
+		if err := docker.DeleteContainer(storeContainer); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", storeContainer, err))
 		}
 	}
-	// load minio
-	if err := docker.LoadMinIOs(); err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to load minios: %v", err))
+	// load object stores
+	if err := docker.LoadObjectStores(); err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to load RustFS containers: %v", err))
 	}
 	startram.EventBus <- structs.Event{Type: "toggle", Data: nil}
 }

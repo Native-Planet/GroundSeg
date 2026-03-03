@@ -55,8 +55,8 @@
             Restarting StarTram
           {:else if tRestart == "urbits"}
             Fixing Urbit Ships
-          {:else if tRestart == "minios"}
-            Fixing MinIO containers
+          {:else if tRestart == "rustfs"}
+            Fixing RustFS containers
           {:else if tRestart == "done"}
             Success!
           {:else}

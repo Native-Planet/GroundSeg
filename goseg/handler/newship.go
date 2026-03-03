@@ -206,7 +206,7 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload, customDrive string) 
 				errmsg := fmt.Sprintf("Failed to delete local container for new ship: %v", err)
 				zap.L().Error(errmsg)
 			}
-			docker.StartContainer("minio_"+patp, "minio")
+			docker.StartContainer(docker.GetObjectStoreContainerName(patp), "minio")
 			info, err := docker.StartContainer(patp, "vere")
 			if err != nil {
 				errmsg := fmt.Sprintf("%v", err)

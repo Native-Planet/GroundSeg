@@ -554,7 +554,7 @@ func waitForShipReady(filename, patp string, remote, fix bool) {
 				errmsg := fmt.Sprintf("Failed to delete local container for imported ship: %v", err)
 				zap.L().Error(errmsg)
 			}
-			docker.StartContainer("minio_"+patp, "minio")
+			docker.StartContainer(docker.GetObjectStoreContainerName(patp), "minio")
 			zap.L().Debug(fmt.Sprintf("Starting container %s after switching networks", patp))
 			info, err := docker.StartContainer(patp, "vere")
 			if err != nil {
