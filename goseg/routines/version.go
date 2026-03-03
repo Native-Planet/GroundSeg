@@ -360,7 +360,7 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 								go handler.ChopPier(pier, urbConf)
 							}
 						}
-					} else if sw == "minio" {
+					} else if sw == "minio" || sw == "rustfs" {
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
@@ -440,7 +440,7 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 								go handler.ChopPier(pier, urbConf)
 							}
 						}
-					} else if sw == "minio" {
+					} else if sw == "minio" || sw == "rustfs" {
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {

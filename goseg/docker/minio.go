@@ -58,12 +58,51 @@ func consumeForceLegacyMigrationForShip(patp string) bool {
 	return true
 }
 
+func objectStoreContainerInfo() (map[string]string, error) {
+	// Preferred path: explicit rustfs item on version server.
+	if info, err := GetLatestContainerInfo("rustfs"); err == nil {
+		repo := strings.TrimSpace(info["repo"])
+		tag := strings.TrimSpace(info["tag"])
+		if repo != "" {
+			if tag == "" {
+				tag = "latest"
+			}
+			info["tag"] = tag
+			return info, nil
+		}
+	}
+	// Compatibility path: minio item pointed at rustfs.
+	info, err := GetLatestContainerInfo("minio")
+	if err != nil {
+		return nil, err
+	}
+	repo := strings.TrimSpace(info["repo"])
+	tag := strings.TrimSpace(info["tag"])
+	if repo == "" {
+		return nil, fmt.Errorf("empty object store repo from version info")
+	}
+	if tag == "" {
+		tag = "latest"
+	}
+	info["tag"] = tag
+	return info, nil
+}
+
 func objectStoreImageRef() string {
 	if image := strings.TrimSpace(os.Getenv("GROUNDSEG_S3_IMAGE")); image != "" {
 		return image
 	}
 	if image := strings.TrimSpace(os.Getenv("GROUNDSEG_RUSTFS_IMAGE")); image != "" {
 		return image
+	}
+	if containerInfo, err := objectStoreContainerInfo(); err == nil {
+		repo := strings.TrimSpace(containerInfo["repo"])
+		tag := strings.TrimSpace(containerInfo["tag"])
+		hash := strings.TrimSpace(containerInfo["hash"])
+		if strings.Contains(strings.ToLower(repo), "rustfs") && hash != "" && !strings.EqualFold(hash, "none") {
+			return fmt.Sprintf("%s:%s@sha256:%s", repo, tag, hash)
+		}
+		return fmt.Sprintf("%s:%s", repo, tag)
 	}
 	return defaultRustFSImageRef
 }
@@ -77,10 +116,11 @@ func legacyMinIOMigrationImageRef() string {
 		repo := strings.TrimSpace(containerInfo["repo"])
 		tag := strings.TrimSpace(containerInfo["tag"])
 		hash := strings.TrimSpace(containerInfo["hash"])
-		if repo != "" && tag != "" && hash != "" {
+		// Use version-server minio value only when it actually points to a MinIO image.
+		if strings.Contains(strings.ToLower(repo), "minio") && repo != "" && tag != "" && hash != "" {
 			return fmt.Sprintf("%s:%s@sha256:%s", repo, tag, hash)
 		}
-		if repo != "" {
+		if strings.Contains(strings.ToLower(repo), "minio") && repo != "" {
 			if tag == "" {
 				tag = "latest"
 			}
