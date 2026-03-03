@@ -8,9 +8,11 @@ import (
 	"groundseg/config"
 	"groundseg/dockerclient"
 	"groundseg/structs"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	awsv2 "github.com/aws/aws-sdk-go-v2/aws"
@@ -24,9 +26,37 @@ import (
 
 const (
 	defaultRustFSImageRef = "rustfs/rustfs:latest"
-	legacyMinIOImageRef   = "minio/minio:latest"
+	legacyMinIOImageRef   = "registry.hub.docker.com/minio/minio:latest"
 	minioMigrationMarker  = ".groundseg-rustfs-migration-complete"
 )
+
+var (
+	forceLegacyMigration          bool
+	forceLegacyMigrationConsumed  = make(map[string]bool)
+	forceLegacyMigrationConsumedM sync.Mutex
+)
+
+func SetForceLegacyMigration(force bool) {
+	forceLegacyMigrationConsumedM.Lock()
+	defer forceLegacyMigrationConsumedM.Unlock()
+	forceLegacyMigration = force
+	if !force {
+		forceLegacyMigrationConsumed = make(map[string]bool)
+	}
+}
+
+func consumeForceLegacyMigrationForShip(patp string) bool {
+	forceLegacyMigrationConsumedM.Lock()
+	defer forceLegacyMigrationConsumedM.Unlock()
+	if !forceLegacyMigration {
+		return false
+	}
+	if forceLegacyMigrationConsumed[patp] {
+		return false
+	}
+	forceLegacyMigrationConsumed[patp] = true
+	return true
+}
 
 func objectStoreImageRef() string {
 	if image := strings.TrimSpace(os.Getenv("GROUNDSEG_S3_IMAGE")); image != "" {
@@ -36,6 +66,28 @@ func objectStoreImageRef() string {
 		return image
 	}
 	return defaultRustFSImageRef
+}
+
+func legacyMinIOMigrationImageRef() string {
+	if image := strings.TrimSpace(os.Getenv("GROUNDSEG_LEGACY_MINIO_IMAGE")); image != "" {
+		return image
+	}
+	containerInfo, err := GetLatestContainerInfo("minio")
+	if err == nil {
+		repo := strings.TrimSpace(containerInfo["repo"])
+		tag := strings.TrimSpace(containerInfo["tag"])
+		hash := strings.TrimSpace(containerInfo["hash"])
+		if repo != "" && tag != "" && hash != "" {
+			return fmt.Sprintf("%s:%s@sha256:%s", repo, tag, hash)
+		}
+		if repo != "" {
+			if tag == "" {
+				tag = "latest"
+			}
+			return fmt.Sprintf("%s:%s", repo, tag)
+		}
+	}
+	return legacyMinIOImageRef
 }
 
 // Returns "<repo>", "<tag>" from configured object storage image ref.
@@ -323,31 +375,108 @@ func waitForS3Ready(client *s3v2.Client) error {
 	return fmt.Errorf("timed out waiting for S3 readiness: %w", lastErr)
 }
 
-func migrateBucketObjects(source *s3v2.Client, target *s3v2.Client, bucket string) error {
-	paginator := s3v2.NewListObjectsV2Paginator(source, &s3v2.ListObjectsV2Input{Bucket: awsv2.String(bucket)})
+func bucketHasObjects(client *s3v2.Client, bucket string) (bool, error) {
+	out, err := client.ListObjectsV2(context.Background(), &s3v2.ListObjectsV2Input{
+		Bucket:  awsv2.String(bucket),
+		MaxKeys: awsv2.Int32(1),
+	})
+	if err != nil {
+		if bucketNotFound(err) {
+			return false, fmt.Errorf("bucket missing")
+		}
+		return false, err
+	}
+	return len(out.Contents) > 0, nil
+}
+
+func listBucketNames(client *s3v2.Client) ([]string, error) {
+	out, err := client.ListBuckets(context.Background(), &s3v2.ListBucketsInput{})
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, bucket := range out.Buckets {
+		if bucket.Name != nil && strings.TrimSpace(*bucket.Name) != "" {
+			names = append(names, *bucket.Name)
+		}
+	}
+	return names, nil
+}
+
+func getContainerIPv4(containerName string) (string, error) {
+	cli, err := dockerclient.New()
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+
+	inspect, err := cli.ContainerInspect(context.Background(), containerName)
+	if err != nil {
+		return "", err
+	}
+	if inspect.NetworkSettings == nil {
+		return "", fmt.Errorf("container %s has no network settings", containerName)
+	}
+	for _, netInfo := range inspect.NetworkSettings.Networks {
+		if netInfo != nil && strings.TrimSpace(netInfo.IPAddress) != "" {
+			return netInfo.IPAddress, nil
+		}
+	}
+	return "", fmt.Errorf("container %s has no IPv4 address", containerName)
+}
+
+func wireguardEndpoint(port int) (string, error) {
+	ip, err := getContainerIPv4("wireguard")
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("http://%s:%d", ip, port), nil
+}
+
+func migrateBucketObjects(source *s3v2.Client, target *s3v2.Client, sourceBucket string, targetBucket string) (int, error) {
+	copied := 0
+	paginator := s3v2.NewListObjectsV2Paginator(source, &s3v2.ListObjectsV2Input{Bucket: awsv2.String(sourceBucket)})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.Background())
 		if err != nil {
 			if bucketNotFound(err) {
-				return fmt.Errorf("legacy bucket missing")
+				return copied, fmt.Errorf("legacy bucket missing")
 			}
-			return err
+			return copied, err
 		}
 		for _, obj := range page.Contents {
 			if obj.Key == nil || *obj.Key == "" {
 				continue
 			}
 			getOut, err := source.GetObject(context.Background(), &s3v2.GetObjectInput{
-				Bucket: awsv2.String(bucket),
+				Bucket: awsv2.String(sourceBucket),
 				Key:    obj.Key,
 			})
 			if err != nil {
-				return err
+				return copied, err
+			}
+			tmp, err := os.CreateTemp("", "groundseg-migrate-object-*")
+			if err != nil {
+				_ = getOut.Body.Close()
+				return copied, err
+			}
+			written, copyErr := io.Copy(tmp, getOut.Body)
+			_ = getOut.Body.Close()
+			if copyErr != nil {
+				_ = tmp.Close()
+				_ = os.Remove(tmp.Name())
+				return copied, copyErr
+			}
+			if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+				_ = tmp.Close()
+				_ = os.Remove(tmp.Name())
+				return copied, err
 			}
 			_, putErr := target.PutObject(context.Background(), &s3v2.PutObjectInput{
-				Bucket:             awsv2.String(bucket),
+				Bucket:             awsv2.String(targetBucket),
 				Key:                obj.Key,
-				Body:               getOut.Body,
+				Body:               tmp,
+				ContentLength:      awsv2.Int64(written),
 				ContentType:        getOut.ContentType,
 				ContentEncoding:    getOut.ContentEncoding,
 				ContentDisposition: getOut.ContentDisposition,
@@ -355,13 +484,15 @@ func migrateBucketObjects(source *s3v2.Client, target *s3v2.Client, bucket strin
 				CacheControl:       getOut.CacheControl,
 				Metadata:           getOut.Metadata,
 			})
-			_ = getOut.Body.Close()
+			_ = tmp.Close()
+			_ = os.Remove(tmp.Name())
 			if putErr != nil {
-				return putErr
+				return copied, putErr
 			}
+			copied++
 		}
 	}
-	return nil
+	return copied, nil
 }
 
 func setMinIOAdminAccount(containerName string) error {
@@ -377,8 +508,15 @@ func setMinIOAdminAccount(containerName string) error {
 	if err != nil {
 		return err
 	}
-	targetClient, err := newS3Client(fmt.Sprintf("http://localhost:%v", urbConf.WgS3Port), patp, pwd)
+	targetEndpoint, err := wireguardEndpoint(urbConf.WgS3Port)
 	if err != nil {
+		return err
+	}
+	targetClient, err := newS3Client(targetEndpoint, patp, pwd)
+	if err != nil {
+		return err
+	}
+	if err := waitForS3Ready(targetClient); err != nil {
 		return err
 	}
 	if err := ensureBucketExists(targetClient, "bucket"); err != nil {
@@ -396,6 +534,10 @@ func setMinIOAdminAccount(containerName string) error {
 func maybeMigrateLegacyMinIOData(patp string, urbConf structs.UrbitDocker, targetClient *s3v2.Client) error {
 	legacyVolume := GetLegacyMinIOContainerName(patp)
 	targetVolume := GetObjectStoreDataVolumeName(patp)
+	forceMigration := consumeForceLegacyMigrationForShip(patp)
+	if forceMigration {
+		zap.L().Info(fmt.Sprintf("Forcing legacy migration for %s (ignoring success marker)", patp))
+	}
 
 	legacyExists, err := volumeExists(legacyVolume)
 	if err != nil {
@@ -411,23 +553,38 @@ func maybeMigrateLegacyMinIOData(patp string, urbConf structs.UrbitDocker, targe
 	if !targetExists {
 		return nil
 	}
-	hasMarker, err := volumeHasMarker(targetVolume, minioMigrationMarker)
-	if err == nil && hasMarker {
-		return nil
-	}
-	legacyHasData, err := volumeHasAnyData(legacyVolume)
-	if err != nil {
-		return err
-	}
-	if !legacyHasData {
-		return writeMigrationMarker(targetVolume, "legacy-empty")
-	}
-	targetHasData, err := volumeHasAnyData(targetVolume)
-	if err != nil {
-		return err
-	}
-	if targetHasData {
-		return writeMigrationMarker(targetVolume, "target-populated")
+
+	if !forceMigration {
+		markerStatus, err := readMigrationMarkerStatus(targetVolume, minioMigrationMarker)
+		if err != nil {
+			return err
+		}
+		switch markerStatus {
+		case "ok":
+			targetHasObjects, err := bucketHasObjects(targetClient, "bucket")
+			if err == nil && targetHasObjects {
+				return nil
+			}
+			zap.L().Info(fmt.Sprintf("Ignoring stale success marker for %s and retrying legacy migration", patp))
+		case "target-populated", "target-bucket-populated":
+			targetHasObjects, err := bucketHasObjects(targetClient, "bucket")
+			if err == nil && targetHasObjects {
+				return nil
+			}
+			zap.L().Info(fmt.Sprintf("Ignoring stale migration marker for %s and retrying legacy migration", patp))
+		case "legacy-no-bucket", "legacy-empty":
+			zap.L().Info(fmt.Sprintf("Retrying legacy migration for %s (previous status: %s)", patp, markerStatus))
+		}
+
+		targetHasObjects, err := bucketHasObjects(targetClient, "bucket")
+		if err != nil {
+			if !strings.Contains(strings.ToLower(err.Error()), "bucket missing") {
+				return err
+			}
+		}
+		if targetHasObjects {
+			return writeMigrationMarker(targetVolume, "target-bucket-populated")
+		}
 	}
 
 	sourceSecret, err := randomHex(16)
@@ -454,25 +611,92 @@ func maybeMigrateLegacyMinIOData(patp string, urbConf structs.UrbitDocker, targe
 		}
 	}()
 
-	sourceClient, err := newS3Client(fmt.Sprintf("http://localhost:%d", sourcePort), patp, sourceSecret)
+	sourceEndpoint, err := wireguardEndpoint(sourcePort)
+	if err != nil {
+		return err
+	}
+	sourceClient, err := newS3Client(sourceEndpoint, patp, sourceSecret)
 	if err != nil {
 		return err
 	}
 	if err := waitForS3Ready(sourceClient); err != nil {
 		return err
 	}
-	if err := migrateBucketObjects(sourceClient, targetClient, "bucket"); err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "legacy bucket missing") {
-			return writeMigrationMarker(targetVolume, "legacy-no-bucket")
+
+	sourceBuckets, err := listBucketNames(sourceClient)
+	if err != nil {
+		return fmt.Errorf("failed to list legacy buckets: %w", err)
+	}
+	if len(sourceBuckets) == 0 {
+		return fmt.Errorf("legacy volume %s has no discoverable buckets", legacyVolume)
+	}
+	zap.L().Info(fmt.Sprintf("Legacy source buckets for %s: %v", patp, sourceBuckets))
+
+	nonEmptySource := false
+	for _, sourceBucket := range sourceBuckets {
+		hasObjects, err := bucketHasObjects(sourceClient, sourceBucket)
+		if err != nil {
+			return err
 		}
-		return fmt.Errorf("failed to migrate legacy bucket: %w", err)
+		if hasObjects {
+			nonEmptySource = true
+			break
+		}
+	}
+	if !nonEmptySource {
+		return writeMigrationMarker(targetVolume, "legacy-empty")
+	}
+
+	totalCopied := 0
+	copyBucket := func(sourceBucket string, targetBucket string) error {
+		if err := ensureBucketExists(targetClient, targetBucket); err != nil {
+			return err
+		}
+		copied, err := migrateBucketObjects(sourceClient, targetClient, sourceBucket, targetBucket)
+		if err != nil {
+			return err
+		}
+		totalCopied += copied
+		zap.L().Info(fmt.Sprintf("Legacy migration copied %d objects from %s to %s for %s", copied, sourceBucket, targetBucket, patp))
+		return nil
+	}
+
+	primaryBucket := "bucket"
+	if contains(sourceBuckets, primaryBucket) {
+		if err := copyBucket(primaryBucket, primaryBucket); err != nil {
+			return fmt.Errorf("failed to migrate legacy bucket %s: %w", primaryBucket, err)
+		}
+		for _, sourceBucket := range sourceBuckets {
+			if sourceBucket == primaryBucket {
+				continue
+			}
+			if err := copyBucket(sourceBucket, sourceBucket); err != nil {
+				return fmt.Errorf("failed to migrate auxiliary legacy bucket %s: %w", sourceBucket, err)
+			}
+		}
+	} else if len(sourceBuckets) == 1 {
+		// Preserve existing URL shape by normalizing single legacy bucket into target "bucket".
+		if err := copyBucket(sourceBuckets[0], primaryBucket); err != nil {
+			return fmt.Errorf("failed to normalize legacy bucket %s into %s: %w", sourceBuckets[0], primaryBucket, err)
+		}
+	} else {
+		for _, sourceBucket := range sourceBuckets {
+			if err := copyBucket(sourceBucket, sourceBucket); err != nil {
+				return fmt.Errorf("failed to migrate legacy bucket %s: %w", sourceBucket, err)
+			}
+		}
+	}
+
+	if totalCopied == 0 {
+		return fmt.Errorf("legacy migration found non-empty source buckets but copied 0 objects for %s", patp)
 	}
 	return writeMigrationMarker(targetVolume, "ok")
 }
 
 func startLegacyMinIOMigrationSource(containerName, volumeName, accessKey, secretKey string, s3Port, consolePort int) error {
 	_ = DeleteContainer(containerName)
-	if err := PullImageByRef(legacyMinIOImageRef); err != nil {
+	imageRef := legacyMinIOMigrationImageRef()
+	if err := PullImageByRef(imageRef); err != nil {
 		return err
 	}
 
@@ -484,7 +708,7 @@ func startLegacyMinIOMigrationSource(containerName, volumeName, accessKey, secre
 
 	ctx := context.Background()
 	containerConfig := container.Config{
-		Image:      legacyMinIOImageRef,
+		Image:      imageRef,
 		Entrypoint: []string{"minio"},
 		Cmd: []string{
 			"server",
@@ -560,6 +784,25 @@ func volumeHasMarker(volumeName, marker string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+func readMigrationMarkerStatus(volumeName, marker string) (string, error) {
+	mountpoint, err := volumeMountpoint(volumeName)
+	if err != nil {
+		return "", err
+	}
+	content, err := os.ReadFile(filepath.Join(mountpoint, marker))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	parts := strings.Fields(string(content))
+	if len(parts) == 0 {
+		return "", nil
+	}
+	return parts[0], nil
 }
 
 func writeMigrationMarker(volumeName, status string) error {

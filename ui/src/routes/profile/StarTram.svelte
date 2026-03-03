@@ -56,7 +56,7 @@
           {:else if tRestart == "urbits"}
             Fixing Urbit Ships
           {:else if tRestart == "rustfs"}
-            Fixing RustFS containers
+            Fixing S3 containers
           {:else if tRestart == "done"}
             Success!
           {:else}

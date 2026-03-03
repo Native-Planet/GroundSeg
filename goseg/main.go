@@ -200,6 +200,11 @@ func main() {
 			zap.L().Info("Starting pprof (:6060)")
 			go http.ListenAndServe("0.0.0.0:6060", nil)
 		}
+		// force rerun of legacy MinIO -> RustFS migration once per ship for this process.
+		if arg == "migrate" || arg == "--migrate" || arg == "--force-migrate" {
+			docker.SetForceLegacyMigration(true)
+			zap.L().Info("Forcing legacy S3 migration for this run")
+		}
 		// set non-default port like `--http-port=8060`
 		if strings.HasPrefix(arg, "--http-port=") {
 			portStr := strings.TrimPrefix(arg, "--http-port=")

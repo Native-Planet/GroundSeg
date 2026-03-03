@@ -11,7 +11,7 @@
   <div class="tab" on:click={()=>tab="system"}>GroundSeg</div>
   <div class="tab" on:click={()=>tab="wireguard"}>Wireguard</div>
   <div class="tab" on:click={()=>tab="urbit"}>Urbit</div>
-  <div class="tab" on:click={()=>tab="rustfs"}>RustFS</div>
+  <div class="tab" on:click={()=>tab="rustfs"}>S3</div>
 </div>
 <div class="panel">
   {#if tab == "system"}
@@ -21,7 +21,7 @@
   {:else if tab == "urbit"}
     urbit logs
   {:else if tab == "rustfs"}
-    rustfs logs
+    s3 logs
   {/if}
 </div>
 

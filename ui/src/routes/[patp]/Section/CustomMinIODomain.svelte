@@ -23,7 +23,7 @@
   })
 
   let docsInfo = {
-    title: "Custom RustFS Domain",
+    title: "Custom S3 Domain",
     description: "Publish locally hosted media from custom domain.",
     docName: "Custom StarTram Domains",
     docURL: "https://manual.groundseg.app/guide/custom-domains.html"
@@ -33,7 +33,7 @@
 
 <div>
   <div class="section-title-wrapper">
-    <div class="section-title">Custom RustFS Domain</div>
+    <div class="section-title">Custom S3 Domain</div>
     <div class="what" on:click={()=>openModal(DocsModal, {info:docsInfo})}>?</div>
   </div>
   <div class="wrapper">

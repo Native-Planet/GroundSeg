@@ -13,7 +13,7 @@
 <Drawer title={patp+" Logs"}>
   <div class="log-options">
     <div class="log-option" class:active={type=="urbit"} on:click={()=>type="urbit"}>Urbit</div>
-    <div class="log-option" class:active={type=="rustfs"} on:click={()=>type="rustfs"}>RustFS</div>
+    <div class="log-option" class:active={type=="rustfs"} on:click={()=>type="rustfs"}>S3</div>
   </div>
   {#if type == "urbit"}
     <LogArea type={patp} />

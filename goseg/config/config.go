@@ -213,6 +213,7 @@ func GetStoragePath(operation string) string {
 	var operationPaths = map[string]string{
 		"uploads": "uploads",
 		"temp":    "temp",
+		"export":  "exports",
 		"exports": "exports",
 		"logs":    "logs",
 	}
