@@ -200,6 +200,11 @@ func main() {
 			zap.L().Info("Starting pprof (:6060)")
 			go http.ListenAndServe("0.0.0.0:6060", nil)
 		}
+		// force rerun of legacy MinIO -> RustFS migration once per ship for this process.
+		if arg == "migrate" || arg == "--migrate" || arg == "--force-migrate" {
+			docker.SetForceLegacyMigration(true)
+			zap.L().Info("Forcing legacy S3 migration for this run")
+		}
 		// set non-default port like `--http-port=8060`
 		if strings.HasPrefix(arg, "--http-port=") {
 			portStr := strings.TrimPrefix(arg, "--http-port=")
@@ -318,16 +323,16 @@ func main() {
 		if err := docker.LoadWireguard(); err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to load Wireguard: %v", err))
 		} else {
-			// Load MC
-			loadService(docker.LoadMC, "Unable to load MinIO Client!")
-			// Load MinIOs
-			loadService(docker.LoadMinIOs, "Unable to load MinIO containers!")
+			// Load object stores
+			loadService(docker.LoadObjectStores, "Unable to load RustFS containers!")
 		}
 	}
 	// Load Netdata
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
+	// Auto-link S3 for ships that are still unlinked after RustFS provisioning.
+	go routines.AutoConfigureObjectStoreLinks()
 	// Load Penpai
 	loadService(docker.LoadLlama, "Unable to load Llama GPT!")
 	startServer()

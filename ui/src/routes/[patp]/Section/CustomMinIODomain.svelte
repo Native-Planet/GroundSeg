@@ -1,7 +1,7 @@
 <script>
   // Style
   import "../theme.css"
-  import { setMinIODomain } from '$lib/stores/websocket'
+  import { setRustFSDomain } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
   import { onMount, createEventDispatcher, afterUpdate } from 'svelte'
   import DocsModal from '$lib/DocsModal.svelte'
@@ -23,7 +23,7 @@
   })
 
   let docsInfo = {
-    title: "Custom MinIO Domain",
+    title: "Custom S3 Domain",
     description: "Publish locally hosted media from custom domain.",
     docName: "Custom StarTram Domains",
     docURL: "https://manual.groundseg.app/guide/custom-domains.html"
@@ -33,12 +33,12 @@
 
 <div>
   <div class="section-title-wrapper">
-    <div class="section-title">Custom MinIO Domain</div>
+    <div class="section-title">Custom S3 Domain</div>
     <div class="what" on:click={()=>openModal(DocsModal, {info:docsInfo})}>?</div>
   </div>
   <div class="wrapper">
-    <input type="text" placeholder="minio.example.com" bind:value={domain} disabled={t.length > 0} />
-    <button disabled={(domain.length < 1) || (domain == minioAlias) || (t.length > 0)} class="save-button" on:click={()=>setMinIODomain(patp, domain)}>
+    <input type="text" placeholder="storage.example.com" bind:value={domain} disabled={t.length > 0} />
+    <button disabled={(domain.length < 1) || (domain == minioAlias) || (t.length > 0)} class="save-button" on:click={()=>setRustFSDomain(patp, domain)}>
       {#if t.length < 1}
         Save
       {:else if t == "loading"}

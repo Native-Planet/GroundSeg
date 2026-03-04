@@ -556,6 +556,10 @@ export const setMinIODomain = (patp, domain) => {
   send(payload)
 }
 
+export const setRustFSDomain = (patp, domain) => {
+  setMinIODomain(patp, domain)
+}
+
 export const setUrbitDomain = (patp, domain) => {
   let payload = {
     "type":"urbit",
@@ -602,6 +606,10 @@ export const toggleMinIOLink = patp => {
     "patp":patp
   }
   send(payload)
+}
+
+export const toggleRustFSLink = patp => {
+  toggleMinIOLink(patp)
 }
 
 export const toggleUrbitPower = patp => {

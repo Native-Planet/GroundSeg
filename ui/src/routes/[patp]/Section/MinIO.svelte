@@ -4,7 +4,7 @@
 
   import Clipboard from 'clipboard'
   import { onMount, createEventDispatcher } from 'svelte'
-  import { toggleMinIOLink } from '$lib/stores/websocket'
+  import { toggleRustFSLink } from '$lib/stores/websocket'
   import CustomMinIODomain from './CustomMinIODomain.svelte'
   import { URBIT_MODE } from '$lib/stores/data'
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
@@ -33,7 +33,7 @@
 </script>
 
 <div>
-  <div class="section-title">MinIO</div>
+  <div class="section-title">S3</div>
   <div class="wrapper">
     <button disabled={!startramRunning} id="copy" class="btn copy-btn" data-clipboard-text={minioPwd}>
       <img
@@ -43,7 +43,7 @@
       {#if copied}
         Copied!
       {:else}
-        Copy MinIO Password
+        Copy S3 Password
       {/if}
     </button>
     <a href={minioUrl} target="_blank" class="btn">
@@ -51,7 +51,7 @@
     </a>
     <button
       class="btn"
-      on:click={()=>toggleMinIOLink(patp)}
+      on:click={()=>toggleRustFSLink(patp)}
       disabled={(tToggleMinIOLink == "linking") || !startramRunning || !running || (tToggleMinIOLink == "unlinking")}
       >
       {#if tToggleMinIOLink == "linking"}
@@ -59,9 +59,9 @@
       {:else if tToggleMinIOLink == "unlinking"}
         Unlinking..
       {:else if tToggleMinIOLink == "success"}
-        MinIO connected!
+        S3 connected!
       {:else if tToggleMinIOLink == "unlink-success"}
-        MinIO disconnected!
+        S3 disconnected!
       {:else}
         {minioLinked ? "Disconnect from Urbit" : "Connect to Urbit"}
       {/if}
@@ -71,11 +71,11 @@
       class="btn domain-btn"
       class:active={showCustom}
       on:click={()=>showCustom = !showCustom}>
-      {minioAlias.length > 0 ? "Modify" : "Set"} Custom MinIO Domain
+      {minioAlias.length > 0 ? "Modify" : "Set"} Custom S3 Domain
     </button>
   </div>
   {#if showCustom}
-    <!-- Custom MinIO Domain -->
+    <!-- Custom S3 Domain -->
     <CustomMinIODomain {patp} {minioAlias} on:done={()=>showCustom = false} />
   {/if}
 </div>

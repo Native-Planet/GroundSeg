@@ -13,12 +13,12 @@
 <Drawer title={patp+" Logs"}>
   <div class="log-options">
     <div class="log-option" class:active={type=="urbit"} on:click={()=>type="urbit"}>Urbit</div>
-    <div class="log-option" class:active={type=="minio"} on:click={()=>type="minio"}>MinIO</div>
+    <div class="log-option" class:active={type=="rustfs"} on:click={()=>type="rustfs"}>S3</div>
   </div>
   {#if type == "urbit"}
     <LogArea type={patp} />
-  {:else if type == "minio" }
-    <LogArea type={"minio_" + patp}/>
+  {:else if type == "rustfs" }
+    <LogArea type={"rustfs_" + patp}/>
   {/if}
 </Drawer>
 {/if}

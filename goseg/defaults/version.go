@@ -17,14 +17,14 @@ var (
   "groundseg": {
     "canary": {
       "groundseg": {
-        "amd64_sha256": "653863b4db936794c15b9eff7ba0310458859c84ec6de11d68c0fc13cbf34e9e",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_edge_v2.4.9-rc2",
-        "arm64_sha256": "6b05281d5ce7a4ff7c0a0a4069ce1004825a2dcd88b4ffe19986c5d6825aefcc",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_edge_v2.4.9-rc2",
-        "slsa_url": "https://files.native.computer/bin/groundseg_edge_v2.4.9-rc2.jsonl",
+        "amd64_sha256": "dae50918c6c67da3ac738fa0bede05f14d83dc31ee8f17ca4311c542dd5550d8",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_edge_v2.4.11-rc2",
+        "arm64_sha256": "6144e7834d422891e470bd58faf7b2ada08c1ca4757dc4ae5731d17a88db11da",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_edge_v2.4.11-rc2",
+        "slsa_url": "https://files.native.computer/bin/groundseg_latest_v2.4.13.jsonl",
         "major": 2,
         "minor": 4,
-        "patch": 9
+        "patch": 11
       },
       "manual": {
         "amd64_sha256": "e59d3e83cffb7be6c56b58624caa095cb8ec4075ecff7962db510d891696ca86",
@@ -51,7 +51,7 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "bfe8f2da02e9bcf16fb12146b5787438c7102185bbdd80b79da1baba46f2074e",
+        "amd64_sha256": "1e75a40f2ba19939c1cc538a381111f79fe541ee1732712fd64027596dabf68d",
         "arm64_sha256": "None",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
         "tag": "canary"
@@ -67,18 +67,24 @@ var (
         "arm64_sha256": "403d741b1b5bcf5df1e48eab0af8038355fae3e29419ad5980428f9aebd1576c",
         "repo": "registry.hub.docker.com/linuxserver/wireguard",
         "tag": "latest"
+      },
+      "rustfs": {
+        "amd64_sha256": "35c522d3926bfb3129eb9a9eb8c3431367d15366c63d973987a827a213ee7954",
+        "arm64_sha256": "62117ed0cbaf1326c0710530a7a6440d2976b92d29cb9ed8c43a339a340f5e87",
+        "repo": "registry.hub.docker.com/rustfs/rustfs",
+        "tag": "latest"
       }
     },
     "edge": {
       "groundseg": {
-        "amd64_sha256": "653863b4db936794c15b9eff7ba0310458859c84ec6de11d68c0fc13cbf34e9e",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_edge_v2.4.9-rc2",
-        "arm64_sha256": "6b05281d5ce7a4ff7c0a0a4069ce1004825a2dcd88b4ffe19986c5d6825aefcc",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_edge_v2.4.9-rc2",
-        "slsa_url": "https://files.native.computer/bin/groundseg_edge_v2.4.9-rc2.jsonl",
+        "amd64_sha256": "306aab3a754a88caf5ad49c841a07cec829a89ec7551e06a6f11f67d68d49347",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_edge_v2.5.0-rc0",
+        "arm64_sha256": "c73fc6c94adedf70fe3505ae902055ae19bd920f2af506ae11d1e75be826a2d5",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_edge_v2.5.0-rc0",
+        "slsa_url": "https://files.native.computer/bin/groundseg_edge_v2.5.0-rc0.jsonl",
         "major": 2,
-        "minor": 4,
-        "patch": 9
+        "minor": 5,
+        "patch": 0
       },
       "manual": {
         "amd64_sha256": "318a4a8922197493eefb73bfbd568728b5278f4146d2ba712929a032fd495092",
@@ -87,8 +93,8 @@ var (
         "tag": "edge"
       },
       "minio": {
-        "amd64_sha256": "6d6cf693fd70ca6e15709fa44d39b44f98fc5b58795697486a95ac1cc2ad9880",
-        "arm64_sha256": "510eb939d4651d02806e696ff37c71902a17b8297b4a241670f7b59fd2eb4415",
+        "amd64_sha256": "f6a3001a765dc59a8e365149ade0ea628494230e984891877ead016eb24ba9a9",
+        "arm64_sha256": "567779c9f29aca670f84d066051290faeaae6c3ad3a3b7062de4936aaab2a29d",
         "repo": "registry.hub.docker.com/minio/minio",
         "tag": "latest"
       },
@@ -105,10 +111,10 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "a0ec8cdf7018dbaa2e5598cedb5fd8b8a56e6e2386e7da60e2d930658ea0378f",
-        "arm64_sha256": "ca4e8537bc8198dc8a97f23180b2ab5d0e40e2315b12fbfe80ad4d8f5119278b",
+        "amd64_sha256": "a4af757cd710226be794c32fcd83589db6da19bedba8b90d60455ab5c8ff20a1",
+        "arm64_sha256": "5183d3fa645015e204bb3e075e50484c7dc3dd37b9f3b191f2454ef2b1d35d1e",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
-        "tag": "v4.0"
+        "tag": "v4.3"
       },
       "webui": {
         "amd64_sha256": "cc6ea93a53dcd50bef7be7077c41dc475943baee83343cece13884cb2a351308",
@@ -121,18 +127,24 @@ var (
         "arm64_sha256": "403d741b1b5bcf5df1e48eab0af8038355fae3e29419ad5980428f9aebd1576c",
         "repo": "registry.hub.docker.com/linuxserver/wireguard",
         "tag": "latest"
+      },
+      "rustfs": {
+        "amd64_sha256": "35c522d3926bfb3129eb9a9eb8c3431367d15366c63d973987a827a213ee7954",
+        "arm64_sha256": "62117ed0cbaf1326c0710530a7a6440d2976b92d29cb9ed8c43a339a340f5e87",
+        "repo": "registry.hub.docker.com/rustfs/rustfs",
+        "tag": "latest"
       }
     },
     "latest": {
       "groundseg": {
-        "amd64_sha256": "b9f246bfab0968af1aeec70c13ca1ac5e565e1937b759cc7da41f1256fa8b46d",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_latest_v2.4.8",
-        "arm64_sha256": "9553529b2047494b8baf1e315fd5e5ae2066388b647b2529469456f6acbef271",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_latest_v2.4.8",
-        "slsa_url": "https://files.native.computer/bin/groundseg_latest_v2.4.8.jsonl",
+        "amd64_sha256": "55a3c041acb33f1a2da8e1902d3243f0bf650a16a1ad3cd309a7f0da338401c0",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_latest_v2.4.13",
+        "arm64_sha256": "dcb2899ed59245416c72b57daea25b9d43ce0548752a0f8bdac8918fc0fc4c81",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_latest_v2.4.13",
+        "slsa_url": "https://files.native.computer/bin/groundseg_latest_v2.4.13.jsonl",
         "major": 2,
         "minor": 4,
-        "patch": 8
+        "patch": 13
       },
       "manual": {
         "amd64_sha256": "e59d3e83cffb7be6c56b58624caa095cb8ec4075ecff7962db510d891696ca86",
@@ -159,10 +171,10 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "a1f924e949e2fd55c65f546edcd3b0f709d24032ae7d67784fcd352cfab21a26",
-        "arm64_sha256": "a6d025ce755631e77264395d68f79b9369f1d69502fee72a659d165ab0d28371",
+        "amd64_sha256": "7194cdf9df489ec68155a7d801c4444cd76857702d0cefc59de8dc04a4c9cc13",
+        "arm64_sha256": "f96275f3c79dd9d7154f077890c52edb4aa808386d4472dc77b5bb7325a2135f",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
-        "tag": "v4.0"
+        "tag": "v4.3"
       },
       "webui": {
         "amd64_sha256": "cc6ea93a53dcd50bef7be7077c41dc475943baee83343cece13884cb2a351308",
@@ -174,6 +186,12 @@ var (
         "amd64_sha256": "ae6f8e8cc1303bc9c0b5fa1b1ef4176c25a2c082e29bf8b554ce1196731e7db2",
         "arm64_sha256": "403d741b1b5bcf5df1e48eab0af8038355fae3e29419ad5980428f9aebd1576c",
         "repo": "registry.hub.docker.com/linuxserver/wireguard",
+        "tag": "latest"
+      },
+      "rustfs": {
+        "amd64_sha256": "35c522d3926bfb3129eb9a9eb8c3431367d15366c63d973987a827a213ee7954",
+        "arm64_sha256": "62117ed0cbaf1326c0710530a7a6440d2976b92d29cb9ed8c43a339a340f5e87",
+        "repo": "registry.hub.docker.com/rustfs/rustfs",
         "tag": "latest"
       }
     }

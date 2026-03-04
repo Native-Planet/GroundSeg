@@ -187,8 +187,9 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 		if err := dumpDockerLogs(pier, bugReportDir+"/"+pier+".log"); err != nil {
 			zap.L().Warn(fmt.Sprintf("Couldn't dump pier logs: %v", err))
 		}
-		if err := dumpDockerLogs("minio_"+pier, bugReportDir+"/minio_"+pier+".log"); err != nil {
-			zap.L().Warn(fmt.Sprintf("Couldn't dump minio logs: %v", err))
+		storeContainer := docker.GetObjectStoreContainerName(pier)
+		if err := dumpDockerLogs(storeContainer, bugReportDir+"/"+storeContainer+".log"); err != nil {
+			zap.L().Warn(fmt.Sprintf("Couldn't dump RustFS logs: %v", err))
 		}
 	}
 
@@ -228,7 +229,7 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 	}
 
 	// service config jsons
-	configFiles := []string{"mc.json", "netdata.json", "wireguard.json"}
+	configFiles := []string{"netdata.json", "wireguard.json"}
 	for _, configFile := range configFiles {
 		srcPath = filepath.Join(config.BasePath, "settings", configFile)
 		destPath = filepath.Join(bugReportDir, configFile)
