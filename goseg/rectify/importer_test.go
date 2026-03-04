@@ -17,7 +17,7 @@ var importShipTransitionHandlerOnce sync.Once
 
 func startImportShipTransitionHandler() {
 	importShipTransitionHandlerOnce.Do(func() {
-		go ImportShipTransitionHandler()
+		go ImportShipTransitionHandlerWithContextAndRuntime(context.Background(), nil)
 	})
 }
 
@@ -25,7 +25,7 @@ func TestImportShipTransitionHandlerAppliesUploadTransitions(t *testing.T) {
 	initializeRectifyTestEnv()
 	startImportShipTransitionHandler()
 
-	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
+	broadcast.DefaultBroadcastStateRuntime().UpdateBroadcast(structs.AuthBroadcast{})
 	suffix := strconv.FormatInt(time.Now().UnixNano(), 10)
 	status := "creating-" + suffix
 	patp := "~zod-" + suffix
@@ -38,7 +38,7 @@ func TestImportShipTransitionHandlerAppliesUploadTransitions(t *testing.T) {
 	events.DefaultEventRuntime().PublishImportShipTransition(context.Background(), structs.UploadTransition{Type: "extracted", Value: extracted})
 
 	testutil.WaitForCondition(t, func() bool {
-		state := broadcast.GetState()
+		state := broadcast.DefaultBroadcastStateRuntime().GetState()
 		return state.Upload.Status == status &&
 			state.Upload.Patp == patp &&
 			state.Upload.Error == errMsg &&
@@ -55,12 +55,12 @@ func TestImportShipTransitionHandlerIgnoresUnknownTransitionTypes(t *testing.T) 
 	initial.Upload.Patp = "~bus"
 	initial.Upload.Error = "none"
 	initial.Upload.Extracted = 42
-	broadcast.UpdateBroadcast(initial)
+	broadcast.DefaultBroadcastStateRuntime().UpdateBroadcast(initial)
 
 	events.DefaultEventRuntime().PublishImportShipTransition(context.Background(), structs.UploadTransition{Type: "unknown", Event: "ignored"})
 	time.Sleep(100 * time.Millisecond)
 
-	state := broadcast.GetState()
+	state := broadcast.DefaultBroadcastStateRuntime().GetState()
 	if state.Upload != initial.Upload {
 		t.Fatalf("unexpected upload state change for unknown transition: got %+v want %+v", state.Upload, initial.Upload)
 	}

@@ -7,8 +7,6 @@ import (
 	"groundseg/broadcast"
 	"groundseg/click"
 	"groundseg/docker"
-	dockerOrchestration "groundseg/docker/orchestration"
-	"groundseg/logger"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/transition"
@@ -32,7 +30,7 @@ func toggleAlias(patp string) error {
 	if currentConf.ShowUrbitWeb == "custom" {
 		nextShowUrbitWeb = "default"
 	}
-	if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionWeb, func(conf *structs.UrbitWebConfig) error {
+	if err := persistShipUrbitWebConfig(patp, func(conf *structs.UrbitWebConfig) error {
 		conf.ShowUrbitWeb = nextShowUrbitWeb
 		return nil
 	}); err != nil {
@@ -87,7 +85,7 @@ func toggleBootStatus(patp string) error {
 			nextBootStatus = "noboot"
 		}
 	}
-	if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+	if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 		conf.BootStatus = nextBootStatus
 		return nil
 	}); err != nil {
@@ -101,7 +99,7 @@ func toggleAutoReboot(patp string) error {
 		return fmt.Errorf("failed to load fresh urbit config: %w", err)
 	}
 	currentConf := getUrbitConfigFn(patp)
-	if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionFeature, func(conf *structs.UrbitFeatureConfig) error {
+	if err := persistShipUrbitFeatureConfig(patp, func(conf *structs.UrbitFeatureConfig) error {
 		conf.DisableShipRestarts = !currentConf.DisableShipRestarts
 		return nil
 	}); err != nil {
@@ -133,7 +131,7 @@ func buildUrbitDomainSteps(patp string, payload structs.WsUrbitPayload) []transi
 				if err := startram.AliasCreate(patp, alias); err != nil {
 					return fmt.Errorf("set urbit domain alias for %s: %w", patp, err)
 				}
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionWeb, func(conf *structs.UrbitWebConfig) error {
+				if err := persistShipUrbitWebConfig(patp, func(conf *structs.UrbitWebConfig) error {
 					conf.CustomUrbitWeb = alias
 					conf.ShowUrbitWeb = "custom"
 					return nil
@@ -164,7 +162,7 @@ func buildMinIODomainSteps(patp string, payload structs.WsUrbitPayload) []transi
 				if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
 					return fmt.Errorf("set minio domain alias for %s: %w", patp, err)
 				}
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionWeb, func(conf *structs.UrbitWebConfig) error {
+				if err := persistShipUrbitWebConfig(patp, func(conf *structs.UrbitWebConfig) error {
 					conf.CustomS3Web = alias
 					return nil
 				}); err != nil {
@@ -205,87 +203,117 @@ func buildRebuildContainerSteps(patp string, _ structs.WsUrbitPayload) []transit
 }
 
 func buildToggleMinIOLinkSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[string] {
-	var isLinked bool
-	var endpoint string
+	coordinator := minIOLinkTransitionCoordinator{patp: patp}
+	return coordinator.steps()
+}
+
+type minIOLinkTransitionCoordinator struct {
+	patp      string
+	linkState minIOLinkState
+}
+
+func (c *minIOLinkTransitionCoordinator) steps() []transitionStep[string] {
 	return []transitionStep[string]{
 		{
-			Run: func() error {
-				shipConf := getUrbitConfigFn(patp)
-				// todo: scry for actual info
-				isLinked = shipConf.MinIOLinked
-				endpoint = shipConf.CustomS3Web
-				if endpoint == "" {
-					endpoint = fmt.Sprintf("s3.%s", shipConf.WgURL)
-				}
-				return nil
-			},
+			Run: c.loadCurrentState,
 		},
 		{
 			Event: "unlinking",
 			EmitWhen: func() bool {
-				return isLinked
+				return c.linkState.IsLinked
 			},
-			Run: func() error {
-				if err := click.UnlinkStorage(patp); err != nil {
-					return fmt.Errorf("failed to unlink minio information %s: %w", patp, err)
-				}
-
-				// Update config
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionFeature, func(conf *structs.UrbitFeatureConfig) error {
-					conf.MinIOLinked = false
-					return nil
-				}); err != nil {
-					return fmt.Errorf("could not update urbit config: %w", err)
-				}
-				return nil
-			},
+			Run: c.unlinkIfNeeded,
 		},
 		{
 			Event: "unlink-success",
 			EmitWhen: func() bool {
-				return isLinked
-			},
-			Run: func() error {
-				return nil
+				return c.linkState.IsLinked
 			},
 		},
 		{
 			Event: "linking",
 			EmitWhen: func() bool {
-				return !isLinked
+				return !c.linkState.IsLinked
 			},
-			Run: func() error {
-				// create service account
-				svcAccount, err := docker.CreateMinIOServiceAccount(patp)
-				if err != nil {
-					return fmt.Errorf("failed to create minio service account for %s: %w", patp, err)
-				}
-
-				// link to urbit
-				if err := click.LinkStorage(patp, endpoint, svcAccount); err != nil {
-					return fmt.Errorf("failed to link minio information %s: %w", patp, err)
-				}
-
-				// Update config
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionFeature, func(conf *structs.UrbitFeatureConfig) error {
-					conf.MinIOLinked = true
-					return nil
-				}); err != nil {
-					return fmt.Errorf("could not update urbit config: %w", err)
-				}
-				return nil
-			},
+			Run: c.linkIfNeeded,
 		},
 		{
 			Event: "success",
 			EmitWhen: func() bool {
-				return !isLinked
-			},
-			Run: func() error {
-				return nil
+				return !c.linkState.IsLinked
 			},
 		},
 	}
+}
+
+func (c *minIOLinkTransitionCoordinator) loadCurrentState() error {
+	state, stateErr := loadMinIOLinkState(c.patp)
+	if stateErr != nil {
+		return stateErr
+	}
+	c.linkState = state
+	return nil
+}
+
+func (c *minIOLinkTransitionCoordinator) unlinkIfNeeded() error {
+	if !c.linkState.IsLinked {
+		return nil
+	}
+	return unbindMinIOLink(c.patp)
+}
+
+func (c *minIOLinkTransitionCoordinator) linkIfNeeded() error {
+	if c.linkState.IsLinked {
+		return nil
+	}
+	return linkMinIOLink(c.patp, c.linkState)
+}
+
+type minIOLinkState struct {
+	IsLinked bool
+	Endpoint string
+}
+
+func loadMinIOLinkState(patp string) (minIOLinkState, error) {
+	shipConf := getUrbitConfigFn(patp)
+	endpoint := shipConf.CustomS3Web
+	if endpoint == "" {
+		endpoint = fmt.Sprintf("s3.%s", shipConf.WgURL)
+	}
+	return minIOLinkState{
+		IsLinked: shipConf.MinIOLinked,
+		Endpoint: endpoint,
+	}, nil
+}
+
+func unbindMinIOLink(patp string) error {
+	if err := click.UnlinkStorage(patp); err != nil {
+		return fmt.Errorf("failed to unlink minio information %s: %w", patp, err)
+	}
+	if err := persistShipUrbitFeatureConfig(patp, func(conf *structs.UrbitFeatureConfig) error {
+		conf.MinIOLinked = false
+		return nil
+	}); err != nil {
+		return fmt.Errorf("could not update urbit config: %w", err)
+	}
+	return nil
+}
+
+func linkMinIOLink(patp string, state minIOLinkState) error {
+	svcAccount, err := docker.CreateMinIOServiceAccount(patp)
+	if err != nil {
+		return fmt.Errorf("failed to create minio service account for %s: %w", patp, err)
+	}
+	if err := click.LinkStorage(patp, state.Endpoint, svcAccount); err != nil {
+		return fmt.Errorf("failed to link minio information %s: %w", patp, err)
+	}
+	if err := persistShipUrbitFeatureConfig(patp, func(conf *structs.UrbitFeatureConfig) error {
+		conf.MinIOLinked = true
+		return nil
+	}); err != nil {
+		return fmt.Errorf("could not update urbit config: %w", err)
+	}
+	return nil
 }
 
 func handleLoom(patp string, urbitPayload structs.WsUrbitPayload) error {
@@ -307,7 +335,7 @@ func handleSnapTime(patp string, urbitPayload structs.WsUrbitPayload) error {
 func buildToggleChopOnVereUpdateSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[string] {
 	return buildSingleStepTransition(patp, func() error {
 		currentConf := getUrbitConfigFn(patp)
-		return persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionFeature, func(conf *structs.UrbitFeatureConfig) error {
+		return persistShipUrbitFeatureConfig(patp, func(conf *structs.UrbitFeatureConfig) error {
 			conf.ChopOnUpgrade = !currentConf.ChopOnUpgrade
 			return nil
 		})
@@ -323,7 +351,7 @@ func buildTogglePowerSteps(patp string, _ structs.WsUrbitPayload) []transitionSt
 func buildToggleDevModeSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[string] {
 	return buildSingleStepTransition(patp, func() error {
 		currentConf := getUrbitConfigFn(patp)
-		if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionFeature, func(conf *structs.UrbitFeatureConfig) error {
+		if err := persistShipUrbitFeatureConfig(patp, func(conf *structs.UrbitFeatureConfig) error {
 			conf.DevMode = !currentConf.DevMode
 			return nil
 		}); err != nil {
@@ -354,7 +382,7 @@ func buildRuntimeConfigIntSteps(
 ) []transitionStep[string] {
 	shipConf := getUrbitConfigFn(patp)
 	return buildSingleStepTransition(patp, func() error {
-		if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+		if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 			setter(conf)
 			return nil
 		}); err != nil {
@@ -393,7 +421,7 @@ func schedulePack(patp string, urbitPayload structs.WsUrbitPayload) error {
 	intervalType := urbitPayload.Payload.IntervalType
 	switch intervalType {
 	case "month", "week", "day":
-		if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionSchedule, func(conf *structs.UrbitScheduleConfig) error {
+		if err := persistShipUrbitScheduleConfig(patp, func(conf *structs.UrbitScheduleConfig) error {
 			conf.MeldTime = urbitPayload.Payload.Time
 			conf.MeldSchedule = true
 			conf.MeldScheduleType = intervalType
@@ -407,14 +435,18 @@ func schedulePack(patp string, urbitPayload structs.WsUrbitPayload) error {
 	default:
 		return fmt.Errorf("unknown pack schedule interval type: %s", intervalType)
 	}
-	if err := broadcast.PublishSchedulePack("schedule"); err != nil {
-		logger.Errorf("failed to publish schedule-pack event for %s: %v", patp, err)
+	if err := broadcast.DefaultBroadcastStateRuntime().PublishSchedulePack("schedule"); err != nil {
+		return transition.HandleTransitionPublishError(
+			fmt.Sprintf("publish schedule-pack transition for %s", patp),
+			err,
+			transition.TransitionPolicyForCriticality(transition.TransitionPublishNonCritical),
+		)
 	}
 	return nil
 }
 
 func pausePackSchedule(patp string, urbitPayload structs.WsUrbitPayload) error {
-	if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionSchedule, func(conf *structs.UrbitScheduleConfig) error {
+	if err := persistShipUrbitScheduleConfig(patp, func(conf *structs.UrbitScheduleConfig) error {
 		conf.MeldSchedule = false
 		return nil
 	}); err != nil {
@@ -424,7 +456,7 @@ func pausePackSchedule(patp string, urbitPayload structs.WsUrbitPayload) error {
 }
 
 func setNewMaxPierSize(patp string, urbitPayload structs.WsUrbitPayload) error {
-	if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+	if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 		conf.SizeLimit = urbitPayload.Payload.Value
 		return nil
 	}); err != nil {

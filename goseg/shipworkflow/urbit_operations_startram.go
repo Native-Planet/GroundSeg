@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	dockerOrchestration "groundseg/docker/orchestration"
 	"groundseg/startram"
 	"groundseg/structs"
 )
 
 func startramReminder(patp string, remind bool) error {
-	if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionFeature, func(conf *structs.UrbitFeatureConfig) error {
+	if err := persistShipUrbitFeatureConfig(patp, func(conf *structs.UrbitFeatureConfig) error {
 		conf.StartramReminder = remind
 		return nil
 	}); err != nil {

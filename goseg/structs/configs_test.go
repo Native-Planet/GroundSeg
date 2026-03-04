@@ -5,31 +5,45 @@ import (
 	"testing"
 )
 
-func TestToInt(t *testing.T) {
-	if got := toInt(float64(42)); got != 42 {
-		t.Fatalf("expected 42, got %d", got)
-	}
-	if got := toInt("42"); got != 0 {
-		t.Fatalf("expected fallback 0 for non-number, got %d", got)
-	}
-}
+func TestParseRequiredTypes(t *testing.T) {
+	t.Run("parse bool", func(t *testing.T) {
+		if _, err := parseRequiredBool("flag", 0); err == nil {
+			t.Fatal("expected parseRequiredBool to reject int")
+		}
+		parsed, err := parseRequiredBool("flag", false)
+		if err != nil {
+			t.Fatalf("parseRequiredBool valid path failed: %v", err)
+		}
+		if parsed {
+			t.Fatal("expected false")
+		}
+	})
 
-func TestToBoolAndToString(t *testing.T) {
-	if !toBool(true, false) {
-		t.Fatal("expected true bool conversion")
-	}
-	if toBool("true", false) {
-		t.Fatal("expected default false for invalid bool type")
-	}
-	if !toBool(nil, true) {
-		t.Fatal("expected default true for nil bool value")
-	}
-	if toString("abc") != "abc" {
-		t.Fatal("expected string conversion")
-	}
-	if toString(123) != "" {
-		t.Fatal("expected empty string fallback for non-string")
-	}
+	t.Run("parse int", func(t *testing.T) {
+		if _, err := parseRequiredInt("value", "42"); err == nil {
+			t.Fatal("expected parseRequiredInt to reject wrong type")
+		}
+		parsed, err := parseRequiredInt("value", float64(42))
+		if err != nil {
+			t.Fatalf("parseRequiredInt valid path failed: %v", err)
+		}
+		if parsed != 42 {
+			t.Fatalf("expected 42, got %d", parsed)
+		}
+	})
+
+	t.Run("parse string", func(t *testing.T) {
+		if _, err := parseRequiredString("value", 123); err == nil {
+			t.Fatal("expected parseRequiredString to reject wrong type")
+		}
+		parsed, err := parseRequiredString("value", "ok")
+		if err != nil {
+			t.Fatalf("parseRequiredString valid path failed: %v", err)
+		}
+		if parsed != "ok" {
+			t.Fatalf("expected ok, got %q", parsed)
+		}
+	})
 }
 
 func TestUrbitDockerUnmarshalJSONParsesKnownFields(t *testing.T) {
@@ -82,15 +96,17 @@ func TestUrbitDockerUnmarshalJSONParsesKnownFields(t *testing.T) {
 	}
 }
 
-func TestUrbitDockerUnmarshalJSONUsesSafeDefaultsForInvalidTypes(t *testing.T) {
+func TestUrbitDockerUnmarshalJSONRejectsInvalidTypes(t *testing.T) {
 	raw := map[string]any{
 		"minio_linked":          "not-bool",
-		"disable_ship_restarts": "nope",
-		"startram_reminder":     nil,
+		"disable_ship_restarts": 1,
+		"startram_reminder":     map[string]any{"value": true},
 		"chop_on_upgrade":       nil,
 		"remote_tlon_backup":    nil,
-		"local_tlon_backup":     nil,
+		"local_tlon_backup":     "yes",
 		"custom_pier_location":  123,
+		"http_port":             "8080",
+		"pier_name":             3,
 	}
 	data, err := json.Marshal(raw)
 	if err != nil {
@@ -98,28 +114,35 @@ func TestUrbitDockerUnmarshalJSONUsesSafeDefaultsForInvalidTypes(t *testing.T) {
 	}
 	var ship UrbitDocker
 	if err := json.Unmarshal(data, &ship); err != nil {
-		t.Fatalf("unmarshal with invalid types should not fail: %v", err)
+		return
 	}
-	if ship.MinIOLinked {
-		t.Fatal("invalid minio_linked type should default to false")
-	}
-	if ship.DisableShipRestarts != false {
-		t.Fatalf("invalid disable_ship_restarts type should default false, got %+v", ship.DisableShipRestarts)
-	}
-	if ship.StartramReminder != true || ship.ChopOnUpgrade != true {
-		t.Fatalf("nil reminder/chop should default true, got reminder=%+v chop=%+v", ship.StartramReminder, ship.ChopOnUpgrade)
-	}
-	if !ship.RemoteTlonBackup || !ship.LocalTlonBackup {
-		t.Fatalf("nil backup flags should default true, got remote=%v local=%v", ship.RemoteTlonBackup, ship.LocalTlonBackup)
-	}
-	if ship.CustomPierLocation != "" {
-		t.Fatalf("invalid custom_pier_location type should coerce to empty string, got %+v", ship.CustomPierLocation)
-	}
+	t.Fatal("expected unmarshal with invalid types to fail")
 }
 
 func TestUrbitDockerUnmarshalJSONRejectsInvalidJSON(t *testing.T) {
 	var ship UrbitDocker
 	if err := json.Unmarshal([]byte("{invalid"), &ship); err == nil {
 		t.Fatal("expected invalid json error")
+	}
+}
+
+func TestUpdateConnectivityConfigRejectsNilCallback(t *testing.T) {
+	conf := &SysConfig{}
+	err := conf.UpdateConnectivityConfig(nil)
+	if err == nil {
+		t.Fatal("expected UpdateConnectivityConfig nil callback error")
+	}
+}
+
+func TestUpdateConnectivityConfigWritesWithCorrectType(t *testing.T) {
+	conf := &SysConfig{}
+	err := conf.UpdateConnectivityConfig(func(c *ConnectivityConfig) {
+		c.EndpointUrl = "wss://example"
+	})
+	if err != nil {
+		t.Fatalf("expected section update success, got: %v", err)
+	}
+	if conf.Connectivity.EndpointUrl != "wss://example" {
+		t.Fatalf("expected endpoint URL to be updated, got %q", conf.Connectivity.EndpointUrl)
 	}
 }

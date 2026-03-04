@@ -1,0 +1,88 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 76.5
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/config/config_update_registry.go uses panic in configPatchFieldFromSpec when apply/target are missing, while sibling config parsing paths in goseg/config/config_update_schema.go consistently return typed errors.",
+        "goseg/importer/importer.go sets transition publishing to TransitionPublishBestEffort and repeatedly logs+continues on publish failures (e.g., runImportPhases Emit/OnError, finalizeImportedPierReadiness), but goseg/shipworkflow/operations_runtime.go defaults TransitionErrorPolicy to TransitionPublishStrict and returns transition publish failures.",
+        "goseg/startuporchestrator/startup_orchestrator.go suppresses optional init/start/health errors (logOptionalStartupFailure then return nil), creating non-failing but degraded startup paths not reflected in return values."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "panic_vs_error_config_patch",
+      "summary": "Config patch assembly uses panic for invalid specs while adjacent config update paths use recoverable errors.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "configPatchFieldFromSpec panics when apply is nil or target accessors are missing.",
+        "confPatch parsing/apply helpers in config_update_schema.go are error-returning and propagate failures through normal error channels."
+      ],
+      "suggestion": "Replace panic branches in configPatchFieldFromSpec with returned construction errors (or startup-time validation errors) and propagate them through confPatch service initialization so malformed specs fail predictably without process crash.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_publish_policy_drift",
+      "summary": "Transition publish failures are treated as best-effort in importer flows but strict in ship workflow flows, causing inconsistent failure semantics for similar state events.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "publishImportTransitionWithPolicy defaults to TransitionPublishBestEffort in importer.",
+        "runImportPhases and finalizeImportedPierReadiness log warnings and continue when publishImportStatus/publishImportError fail.",
+        "workflowRuntime in operations_runtime defaults TransitionErrorPolicy to TransitionPublishStrict and emitWorkflowTransition returns failures via HandleTransitionPublishError."
+      ],
+      "suggestion": "Define a single transition error-policy contract per lifecycle stage (critical vs non-critical events), then apply it consistently across importer and shipworkflow emitters; for critical importer phases, escalate publish failures instead of warning-only continuation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "error_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "optional_startup_error_swallowing",
+      "summary": "Optional startup task failures are logged and dropped, making degraded startup states non-observable to callers.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "runStartupSubsystem, startupOrchestrator.start, and startupOrchestrator.health call logOptionalStartupFailure then return nil for optional task errors.",
+        "main exits only on returned bootstrap error, so optional failures never surface as startup result state."
+      ],
+      "suggestion": "Return a structured startup result that includes optional-failure diagnostics (or aggregate optional errors into a typed warning error) so callers can make explicit decisions about degraded mode instead of relying only on logs.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_policy_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No unified error-severity contract across subsystems for when to fail fast versus log-and-continue.",
+      "Lifecycle/event publication paths evolved with different default policies (strict vs best-effort) without cross-module normalization."
+    ],
+    "likely_symptoms": [
+      "transition_publish_policy_drift",
+      "optional_startup_error_swallowing"
+    ],
+    "possible_false_positives": []
+  }
+}

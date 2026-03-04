@@ -80,12 +80,12 @@ func resetUploadSessionsForTest(t *testing.T) {
 func authorizeTokenIDsForTest(t *testing.T, tokenIDs ...string) importerRuntime {
 	t.Helper()
 	runtime := defaultImporterRuntime()
-	configOps := configRuntime(t, &runtime)
+	uploadOps := uploadRuntime(t, &runtime)
 	authorizedTokens := make(map[string]struct{}, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
 		authorizedTokens[tokenID] = struct{}{}
 	}
-	configOps.validateUploadSessionTokenFn = func(sessionToken structs.WsTokenStruct, providedToken structs.WsTokenStruct, _ *http.Request) tokens.UploadTokenAuthorizationResult {
+	uploadOps.ValidateUploadSessionTokenFn = func(sessionToken structs.WsTokenStruct, providedToken structs.WsTokenStruct, _ *http.Request) tokens.UploadTokenAuthorizationResult {
 		if sessionToken != (structs.WsTokenStruct{}) {
 			if sessionToken.ID != providedToken.ID || sessionToken.Token != providedToken.Token {
 				return tokens.UploadTokenAuthorizationResult{
@@ -124,60 +124,28 @@ func setUploadDirsForTest(t *testing.T) {
 	})
 }
 
-func configRuntime(t *testing.T, runtime *importerRuntime) *importerConfigRuntime {
+func initRuntime(t *testing.T, runtime *importerRuntime) *importerRuntime {
 	t.Helper()
-	if runtime.configOps == nil {
-		t.Fatalf("importer config runtime is not configured")
+	if runtime == nil {
+		t.Fatalf("importer init runtime is not configured")
 	}
-	return runtime.configOps
+	return runtime
 }
 
-func workflowRuntimeOps(t *testing.T, runtime *importerRuntime) *importerWorkflowRuntime {
+func uploadRuntime(t *testing.T, runtime *importerRuntime) *importerRuntime {
 	t.Helper()
-	if runtime.workflowOps == nil {
-		t.Fatalf("importer workflow runtime is not configured")
+	if runtime == nil {
+		t.Fatalf("importer upload runtime is not configured")
 	}
-	return runtime.workflowOps
+	return runtime
 }
 
-func lifecycleRuntime(t *testing.T, runtime *importerRuntime) *importerLifecycleRuntime {
+func provisionRuntime(t *testing.T, runtime *importerRuntime) *importerRuntime {
 	t.Helper()
-	if runtime.lifecycleOps == nil {
-		t.Fatalf("importer lifecycle runtime is not configured")
+	if runtime == nil {
+		t.Fatalf("importer provision runtime is not configured")
 	}
-	return runtime.lifecycleOps
-}
-
-func shipConfigRuntime(t *testing.T, runtime *importerRuntime) *importerShipConfigRuntime {
-	t.Helper()
-	if runtime.shipConfigOps == nil {
-		t.Fatalf("importer ship config runtime is not configured")
-	}
-	return runtime.shipConfigOps
-}
-
-func containerRuntime(t *testing.T, runtime *importerRuntime) *importerContainerRuntime {
-	t.Helper()
-	if runtime.containerOps == nil {
-		t.Fatalf("importer container runtime is not configured")
-	}
-	return runtime.containerOps
-}
-
-func volumeRuntime(t *testing.T, runtime *importerRuntime) *importerVolumeRuntime {
-	t.Helper()
-	if runtime.volumeOps == nil {
-		t.Fatalf("importer volume runtime is not configured")
-	}
-	return runtime.volumeOps
-}
-
-func filesRuntime(t *testing.T, runtime *importerRuntime) *importerFilesystemRuntime {
-	t.Helper()
-	if runtime.filesOps == nil {
-		t.Fatalf("importer files runtime is not configured")
-	}
-	return runtime.filesOps
+	return runtime
 }
 
 func TestResetPublishesBaselineTransitions(t *testing.T) {
@@ -377,8 +345,8 @@ func TestValidateUploadRequestRejectsTokenMismatch(t *testing.T) {
 
 func TestInitializeReturnsErrorForStoragePathFailures(t *testing.T) {
 	runtime := defaultImporterRuntime()
-	configOps := configRuntime(t, &runtime)
-	configOps.storagePathForFn = func(_ string) (string, error) {
+	initOps := initRuntime(t, &runtime)
+	initOps.StoragePathForFn = func(_ string) (string, error) {
 		return "", errors.New("storage unavailable")
 	}
 
@@ -390,8 +358,8 @@ func TestInitializeReturnsErrorForStoragePathFailures(t *testing.T) {
 func TestInitializeSetsUploadAndTempDirectories(t *testing.T) {
 	runtime := defaultImporterRuntime()
 	base := t.TempDir()
-	configOps := configRuntime(t, &runtime)
-	configOps.storagePathForFn = func(pathType string) (string, error) {
+	initOps := initRuntime(t, &runtime)
+	initOps.StoragePathForFn = func(pathType string) (string, error) {
 		if pathType == "uploads" {
 			return filepath.Join(base, "uploads"), nil
 		}
@@ -594,8 +562,8 @@ func TestPersistChunkToTempPropagatesCloseError(t *testing.T) {
 	setUploadDirsForTest(t)
 	closeErr := errors.New("close failed")
 	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
-		fileOps := filesRuntime(t, runtime)
-		fileOps.closeTempFileFn = func(*os.File) error {
+		uploadOps := uploadRuntime(t, runtime)
+		uploadOps.CloseTempFileFn = func(*os.File) error {
 			return closeErr
 		}
 	})
@@ -613,8 +581,8 @@ func TestAllChunksReceivedPropagatesFilesystemError(t *testing.T) {
 	setUploadDirsForTest(t)
 	statErr := errors.New("stat access denied")
 	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
-		fileOps := filesRuntime(t, runtime)
-		fileOps.statFn = func(string) (os.FileInfo, error) {
+		uploadOps := uploadRuntime(t, runtime)
+		uploadOps.StatFn = func(string) (os.FileInfo, error) {
 			return nil, statErr
 		}
 	})
@@ -644,10 +612,10 @@ func TestCombineChunksReturnsErrorWhenChunkMissing(t *testing.T) {
 func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testing.T) {
 	setUploadDirsForTest(t)
 	runtime := defaultImporterRuntime()
-	configOps := configRuntime(t, &runtime)
+	initOps := initRuntime(t, &runtime)
 	uploadPath := uploadDir
 	tempPath := tempDir
-	configOps.storagePathForFn = func(pathType string) (string, error) {
+	initOps.StoragePathForFn = func(pathType string) (string, error) {
 		switch pathType {
 		case "uploads":
 			return uploadPath, nil
@@ -663,18 +631,18 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 
 	workflowCalled := false
 	postCalled := false
-	workflowOps := workflowRuntimeOps(t, &runtime)
-	workflowOps.runImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps := provisionRuntime(t, &runtime)
+	provisionOps.RunImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		workflowCalled = true
 		t.Logf("configure workflow called")
 		return nil
 	}
-	workflowOps.runImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		postCalled = true
 		t.Logf("post-import workflow called")
 		return nil
 	}
-	workflowOps.cleanupMultipartFn = func(string) error { return nil }
+	provisionOps.CleanupMultipartFn = func(string) error { return nil }
 
 	if err := configureUploadedPier(context.Background(), shipworkflow.UploadImportCommand{
 		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
@@ -689,11 +657,11 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 
 	workflowCalled = false
 	postCalled = false
-	workflowOps.runImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		workflowCalled = true
 		return configureErr
 	}
-	workflowOps.runImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		postCalled = false
 		return nil
 	}
@@ -710,11 +678,11 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 
 	workflowCalled = false
 	postCalled = false
-	workflowOps.runImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		workflowCalled = true
 		return nil
 	}
-	workflowOps.runImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		postCalled = true
 		return postErr
 	}
@@ -734,11 +702,11 @@ func TestFinalizeUploadOnCompletionDispatchesUploadImportCommand(t *testing.T) {
 	setUploadDirsForTest(t)
 
 	runtime := defaultImporterRuntime()
-	workflowOps := workflowRuntimeOps(t, &runtime)
+	provisionOps := provisionRuntime(t, &runtime)
 
 	requestCtx := context.WithValue(context.Background(), "test-key", "test-value")
 	var observedCmd shipworkflow.UploadImportCommand
-	workflowOps.uploadCoordinatorFn = func(ctx context.Context, cmd shipworkflow.UploadImportCommand) error {
+	provisionOps.UploadCoordinatorFn = func(ctx context.Context, cmd shipworkflow.UploadImportCommand) error {
 		if ctx != requestCtx {
 			t.Fatalf("unexpected dispatch context: %v", ctx)
 		}
@@ -792,8 +760,8 @@ func TestFinalizeUploadOnCompletionWrapsDispatchFailureAndImportError(t *testing
 
 	dispatchErr := errors.New("dispatch failed")
 	runtime := defaultImporterRuntime()
-	workflowOps := workflowRuntimeOps(t, &runtime)
-	workflowOps.uploadCoordinatorFn = func(context.Context, shipworkflow.UploadImportCommand) error {
+	provisionOps := provisionRuntime(t, &runtime)
+	provisionOps.UploadCoordinatorFn = func(context.Context, shipworkflow.UploadImportCommand) error {
 		return dispatchErr
 	}
 
@@ -827,16 +795,16 @@ func TestFinalizeUploadOnCompletionWrapsDispatchFailureAndImportError(t *testing
 
 func TestFinalizeImportedPierReadinessReturnsAcmeFixErrorWhenFixIsEnabled(t *testing.T) {
 	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
-		lifecycleOps := lifecycleRuntime(t, runtime)
-		lifecycleOps.shipworkflowWaitForBootCodeFn = func(string, time.Duration) {}
-		lifecycleOps.shipworkflowWaitForRemoteReadyFn = func(string, time.Duration) {}
-		lifecycleOps.shipworkflowSwitchToWireguardFn = func(string, bool) error {
+		provisionOps := provisionRuntime(t, runtime)
+		provisionOps.ShipworkflowWaitForBootCodeFn = func(string, time.Duration) {}
+		provisionOps.ShipworkflowWaitForRemoteReadyFn = func(string, time.Duration) {}
+		provisionOps.ShipworkflowSwitchToWireguardFn = func(string, bool) error {
 			return nil
 		}
 	})
 	expectedErr := errors.New("acme fix failed")
-	lifecycleOps := lifecycleRuntime(t, &runtime)
-	lifecycleOps.acmeFixFn = func(string) error {
+	provisionOps := provisionRuntime(t, &runtime)
+	provisionOps.AcmeFixFn = func(string) error {
 		return expectedErr
 	}
 
@@ -854,22 +822,19 @@ func TestFinalizeImportedPierReadinessReturnsAcmeFixErrorWhenFixIsEnabled(t *tes
 
 func TestPrepareImportedPierEnvironmentPropagatesRealCleanupErrors(t *testing.T) {
 	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
-		shipConfigOps := shipConfigRuntime(t, runtime)
-		shipConfigOps.shipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
-		shipConfigOps.shipcreatorAppendSysConfigPierFn = func(string) error { return nil }
+		provisionOps := provisionRuntime(t, runtime)
+		provisionOps.ShipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
+		provisionOps.ShipcreatorAppendSysConfigPierFn = func(string) error { return nil }
 
-		containerOps := containerRuntime(t, runtime)
-		containerOps.deleteContainerFn = func(string) error {
+		provisionOps.DeleteContainerFn = func(string) error {
 			return errors.New("failed to delete container: permission denied")
 		}
-		volumeOps := volumeRuntime(t, runtime)
-		volumeOps.dockerDeleteVolumeFn = func(string) error {
+		provisionOps.DeleteVolumeFn = func(string) error {
 			return errors.New("volume cleanup should be ignored when container cleanup fails")
 		}
-		volumeOps.dockerCreateVolumeFn = func(string) error { return nil }
+		provisionOps.CreateVolumeFn = func(string) error { return nil }
 
-		fileOps := filesRuntime(t, runtime)
-		fileOps.mkdirAllFn = func(string, os.FileMode) error { return nil }
+		provisionOps.MkdirAllFn = func(string, os.FileMode) error { return nil }
 	})
 
 	err := prepareImportedPierEnvironment(importedPierContext{
@@ -883,22 +848,19 @@ func TestPrepareImportedPierEnvironmentPropagatesRealCleanupErrors(t *testing.T)
 
 func TestPrepareImportedPierEnvironmentIgnoresNotFoundCleanupErrors(t *testing.T) {
 	runtime := importerRuntimeWith(func(runtime *importerRuntime) {
-		shipConfigOps := shipConfigRuntime(t, runtime)
-		shipConfigOps.shipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
-		shipConfigOps.shipcreatorAppendSysConfigPierFn = func(string) error { return nil }
+		provisionOps := provisionRuntime(t, runtime)
+		provisionOps.ShipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
+		provisionOps.ShipcreatorAppendSysConfigPierFn = func(string) error { return nil }
 
-		containerOps := containerRuntime(t, runtime)
-		containerOps.deleteContainerFn = func(string) error {
+		provisionOps.DeleteContainerFn = func(string) error {
 			return errdefs.NotFound(errors.New("container not found"))
 		}
-		volumeOps := volumeRuntime(t, runtime)
-		volumeOps.dockerDeleteVolumeFn = func(string) error {
+		provisionOps.DeleteVolumeFn = func(string) error {
 			return errors.New("no such volume")
 		}
-		volumeOps.dockerCreateVolumeFn = func(string) error { return nil }
+		provisionOps.CreateVolumeFn = func(string) error { return nil }
 
-		fileOps := filesRuntime(t, runtime)
-		fileOps.mkdirAllFn = func(string, os.FileMode) error { return nil }
+		provisionOps.MkdirAllFn = func(string, os.FileMode) error { return nil }
 	})
 
 	if err := prepareImportedPierEnvironment(importedPierContext{

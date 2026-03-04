@@ -1,0 +1,108 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "docker/orchestration/runtime_ops.go defines many overlapping runtime seam structs (RuntimeStartupOps, RuntimeConfigOps, RuntimeLoadOps, RuntimeServiceOps, RuntimeSnapshotOps) plus multiple default builders that rewire similar callbacks, spreading one wiring concern across many partially duplicated types.",
+        "config/config_update_registry.go and config/config_update_schema.go split one config-patch registry mechanism across two large files with reflective field access by string names (getConfigPatchValueByName/setConfigPatchValueByName), combining parsing, mutation, and persistence-coupled mapping in one subsystem.",
+        "system/disk_test.go and system/storage/storage_test.go duplicate behavior-level tests for the same storage responsibilities (ListHardDisks, IsMountedMMC, RemoveMultipartFiles, SmartCheckAllDrives, fstab reconciliation), signaling unresolved boundary migration and parallel test scaffolds."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_fragmentation",
+      "summary": "Runtime wiring is fragmented into overlapping seam structs and duplicated default constructors.",
+      "related_files": [
+        "docker/orchestration/runtime_ops.go",
+        "shipworkflow/startram_lifecycle_runtime.go",
+        "shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "runtime_ops.go declares many narrowly different seam structs and separate default constructors (`defaultRuntimeStartupOps`, `defaultRuntimeConfig`, `defaultRuntimeLoad`, `defaultRuntimeService`) that repeatedly map similar callbacks.",
+        "shipworkflow runtime entrypoints rely on broad callback bags (e.g., `runStartramToggleWithRuntime`) that combine transition logic, config mutation, and container operations, making seam shape growth drive workflow complexity."
+      ],
+      "suggestion": "Introduce a smaller set of cohesive runtime ports (for example: config port, container port, transition port), then have one assembler create them once and pass focused interfaces into shipworkflow handlers. Remove overlapping seam structs by composing these ports instead of re-declaring callback bundles.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_dependency_surface_sprawl"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "reflective_patch_registry_overreach",
+      "summary": "Config patch handling mixes registry, reflection, and domain update logic in one oversized mechanism.",
+      "related_files": [
+        "config/config_update_registry.go",
+        "config/config_update_schema.go",
+        "structs/configs.go"
+      ],
+      "evidence": [
+        "config_update_registry.go uses reflection and string field names (`FieldByName`) to read/write patch values generically, while also defining domain-specific apply wiring.",
+        "config_update_schema.go holds parser/accessor/application primitives plus patch struct definitions, so schema description and execution engine are tightly coupled in the same layer."
+      ],
+      "suggestion": "Split patch handling into explicit domain modules (connectivity/runtime/startram/etc.) with typed field accessors (no reflective string lookup), and keep a thin top-level registry that only aggregates domain patch handlers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_dependency_surface_sprawl"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "storage_test_layer_duplication",
+      "summary": "Two storage test suites validate nearly identical responsibilities through parallel APIs.",
+      "related_files": [
+        "system/disk_test.go",
+        "system/storage/storage_test.go"
+      ],
+      "evidence": [
+        "Both files test overlapping behaviors for disk listing, MMC mount detection, multipart cleanup, SMART checks, and fstab reconciliation with similar fixtures/assertions.",
+        "The overlap indicates mixed responsibility between legacy `system` disk utilities and `system/storage` seams-based utilities, increasing maintenance cost and ambiguity over canonical behavior."
+      ],
+      "suggestion": "Complete the storage boundary migration: pick one canonical API surface for disk/storage behavior, keep compatibility shims thin, and consolidate duplicated tests into shared table-driven suites targeting the canonical package.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "incomplete_boundary_migration"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_store_pattern_duplication",
+      "summary": "Session state management duplicates bucket mutation/snapshot patterns across two store types.",
+      "related_files": [
+        "session/connection_registry.go",
+        "session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "connection_registry.go and logstream_session_store.go both implement custom map/slice bucket lifecycle operations (snapshot/copy, append-if-missing style guards, remove-and-cleanup) with separate ad hoc concurrency/state rules.",
+        "Repeated low-level collection choreography in both files obscures higher-level session policies and makes behavior consistency dependent on manual duplication."
+      ],
+      "suggestion": "Extract shared session-bucket primitives (copy-on-read snapshots, remove-with-empty-bucket cleanup, dedupe append) into one internal helper and keep each store focused on policy differences (auth transitions vs logstream semantics).",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "incomplete_boundary_migration"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime dependency surfaces grew incrementally via callback bags instead of stable cohesive ports.",
+      "Migration from legacy storage/session patterns is partial, leaving parallel implementations and test duplication.",
+      "Config mutation framework centralized too much policy and mechanism in reflective infrastructure."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_fragmentation",
+      "storage_test_layer_duplication",
+      "session_store_pattern_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

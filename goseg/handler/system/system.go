@@ -27,10 +27,10 @@ var (
 	withSwapValForSystemHandler   = config.WithSwapVal
 	runUpgradeForSystemHandler    = system.RunUpgrade
 	toggleDeviceForSystemHandler  = func(dev string) error {
-		return system.DefaultWiFiRuntimeService().ToggleDevice(dev)
+		return system.NewWiFiRuntimeService().ToggleDevice(dev)
 	}
 	connectToWifiForSystemHandler = func(ssid, password string) error {
-		return system.DefaultWiFiRuntimeService().ConnectToWifi(ssid, password)
+		return system.NewWiFiRuntimeService().ConnectToWifi(ssid, password)
 	}
 	publishSystemTransitionForSystemHandler = func(_ context.Context, transition structs.SystemTransition) error {
 		_ = events.DefaultEventRuntime().PublishSystemTransition(context.Background(), transition)

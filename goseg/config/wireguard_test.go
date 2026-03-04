@@ -41,7 +41,7 @@ func TestUpdateWGConfWritesVersionData(t *testing.T) {
 	runtime := defaultWireguardRuntime()
 	runtime.loadWGSpecs = func() (structs.SysConfig, structs.Channel) {
 		cfg := structs.SysConfig{}
-		cfg.UpdateBranch = "latest"
+		cfg.Connectivity.UpdateBranch = "latest"
 		return cfg, structs.Channel{
 			Wireguard: structs.VersionDetails{
 				Repo:        "ghcr.io/nativeplanet/wireguard",

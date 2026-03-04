@@ -1,0 +1,111 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Urbit config decoding in `goseg/structs/configs.go` silently coerces or drops invalid field types (e.g., `toInt`, `toBool`, unchecked type assertions), while `goseg/config/config_update_schema.go` rejects invalid types with explicit errors.",
+        "`goseg/rectify/rectify_services.go` mixes wrapped and unwrapped returns (`return err` for snapshot/config/update calls beside contextual `fmt.Errorf(...: %w)`), which makes equivalent failures produce different diagnostic quality.",
+        "Internal bus backpressure is handled inconsistently: `goseg/broadcast/state.go` returns `errSchedulePackBusFull`, `goseg/leak/broadcast.go` accumulates and returns drop errors, but `goseg/docker/orchestration/subsystem/subsystem_events.go` blocks on `eventBus <- ...` with no overflow error path.",
+        "`goseg/system/wifi_runtime_api.go` has void/no-op paths in `ConstructWifiInfo` (early returns on missing service/device) while adjacent WiFi APIs return explicit errors."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "urbit_config_type_errors_silently_dropped",
+      "summary": "Urbit JSON decoding silently accepts invalid field types instead of returning parse errors.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "`UrbitDocker.UnmarshalJSON` uses permissive helpers (`toInt`, `toBool`, `toString`) and ignored assertions like `u.MinioVersion, _ = v.(string)`, so malformed values become zero/defaults without error.",
+        "The config patch path (`parseBoolValue`, `parseIntValue`, `parseStringValue` in `config_update_schema.go`) returns explicit invalid-type errors, so equivalent bad input is treated inconsistently depending on entry point."
+      ],
+      "suggestion": "Make `UrbitDocker.UnmarshalJSON` fail closed for type mismatches (field-scoped errors), or route decoding through a shared validation layer used by config patch parsing so both paths enforce the same error contract.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_input_validation_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "rectify_context_loss_on_returned_errors",
+      "summary": "Rectify reconciliation returns several raw errors without operation context while neighboring paths wrap context.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`StartramRetrieveReconciler.Reconcile` returns raw errors from `StartramSettingsSnapshot`, `GetStartramConfig`, and `UpdateConfig` (`return err`), but wraps other errors in the same function with descriptive context.",
+        "Other modules in the same batch consistently wrap boundary failures (`fmt.Errorf(\"...: %w\", err)` in subsystem health and WiFi runtime), so diagnostics differ for similarly critical failures."
+      ],
+      "suggestion": "Normalize reconcile error exits to wrapped forms that include operation and target context (e.g., snapshot source, patp/config action), and apply the same wrapping rule across reconcile helpers.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_error_wrapping_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "channel_backpressure_failure_modes_diverge",
+      "summary": "Internal event channels use conflicting overflow/failure semantics, yielding unpredictable behavior under load.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/broadcast/state.go",
+        "goseg/leak/broadcast.go"
+      ],
+      "evidence": [
+        "`PublishSchedulePack` uses non-blocking send and returns `errSchedulePackBusFull` when saturated.",
+        "`updateBroadcast` handles full client channels with non-blocking send and returns aggregated drop errors via `errors.Join`.",
+        "`dockerListenerWithContext` sends to `eventBus` without a default overflow path; when buffer fills, producer blocks until consumer drains or context is canceled, producing stall behavior instead of explicit saturation error."
+      ],
+      "suggestion": "Define one shared backpressure strategy for internal buses (drop+error, bounded retry, or blocking-with-timeout) and apply it consistently, including explicit error/metric reporting for saturation in Docker event flow.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_channel_backpressure_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "wifi_info_refresh_silent_noop_paths",
+      "summary": "WiFi info refresh path silently no-ops in states that peer APIs treat as explicit errors.",
+      "related_files": [
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "`ConstructWifiInfo` returns no error and exits early on several failure-like states (nil service/state, unresolved device), so callers cannot distinguish success from skipped refresh.",
+        "Adjacent APIs (`IsWifiEnabled`, `ListWifiSSIDs`, `ConnectToWifi`, `DisconnectWifi`, `ToggleDevice`) explicitly return wrapped errors for comparable runtime precondition failures."
+      ],
+      "suggestion": "Return an error from `ConstructWifiInfo` (or a status enum) and propagate device-resolution/runtime precondition failures so WiFi API callers observe a consistent failure contract.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mixed_explicit_vs_silent_failure_contracts"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single project-wide rule for when to wrap versus pass through errors.",
+      "Different ingestion paths (JSON decode vs patch schema) evolved with different strictness expectations.",
+      "Concurrency primitives (channels) use local conventions instead of shared failure semantics."
+    ],
+    "likely_symptoms": [
+      "rectify_context_loss_on_returned_errors",
+      "channel_backpressure_failure_modes_diverge",
+      "wifi_info_refresh_silent_noop_paths"
+    ],
+    "possible_false_positives": []
+  }
+}

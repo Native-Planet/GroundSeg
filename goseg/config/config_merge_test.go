@@ -7,55 +7,55 @@ import (
 
 func TestConfigMergeConfigMergeFileIsDirectlyTested(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
-	defaultCfg.Setup = "complete"
-	defaultCfg.GracefulExit = false
-	defaultCfg.EndpointUrl = "https://default.endpoint"
-	defaultCfg.ApiVersion = "v1"
-	defaultCfg.SwapVal = 64
-	defaultCfg.C2cInterval = 1200
-	defaultCfg.PenpaiCores = 2
-	defaultCfg.PenpaiModels = []structs.Penpai{{ModelName: "groundseg"}}
-	defaultCfg.PenpaiActive = "groundseg"
+	defaultCfg.Runtime.Setup = "complete"
+	defaultCfg.Runtime.GracefulExit = false
+	defaultCfg.Connectivity.EndpointUrl = "https://default.endpoint"
+	defaultCfg.Connectivity.ApiVersion = "v1"
+	defaultCfg.Runtime.SwapVal = 64
+	defaultCfg.Connectivity.C2cInterval = 1200
+	defaultCfg.Penpai.PenpaiCores = 2
+	defaultCfg.Penpai.PenpaiModels = []structs.Penpai{{ModelName: "groundseg"}}
+	defaultCfg.Penpai.PenpaiActive = "groundseg"
 
 	customCfg := structs.SysConfig{}
-	customCfg.PwHash = "existing-hash"
-	customCfg.SwapVal = 0
-	customCfg.GracefulExit = false
+	customCfg.AuthSession.PwHash = "existing-hash"
+	customCfg.Runtime.SwapVal = 0
+	customCfg.Runtime.GracefulExit = false
 
 	merged := MergeConfigs(defaultCfg, customCfg)
-	if merged.Setup != "complete" {
-		t.Fatalf("expected setup to stay as source setup, got %q", merged.Setup)
+	if merged.Runtime.Setup != "complete" {
+		t.Fatalf("expected setup to stay as source setup, got %q", merged.Runtime.Setup)
 	}
-	if merged.PwHash != customCfg.PwHash {
-		t.Fatalf("expected custom pw hash to override, got %q", merged.PwHash)
+	if merged.AuthSession.PwHash != customCfg.AuthSession.PwHash {
+		t.Fatalf("expected custom pw hash to override, got %q", merged.AuthSession.PwHash)
 	}
-	if merged.EndpointUrl != defaultCfg.EndpointUrl {
-		t.Fatalf("expected endpoint default fallback, got %q", merged.EndpointUrl)
+	if merged.Connectivity.EndpointUrl != defaultCfg.Connectivity.EndpointUrl {
+		t.Fatalf("expected endpoint default fallback, got %q", merged.Connectivity.EndpointUrl)
 	}
 }
 
 func TestMergeConfigsFallsBackToDefaultsWhenCustomMissing(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
-	defaultCfg.EndpointUrl = "https://default.endpoint"
-	defaultCfg.ApiVersion = "1.0"
-	defaultCfg.WgOn = true
-	defaultCfg.Piers = []string{"alpha"}
-	defaultCfg.PenpaiCores = 8
-	defaultCfg.PenpaiModels = []structs.Penpai{{ModelName: "model-a"}}
-	defaultCfg.PenpaiActive = "model-a"
+	defaultCfg.Connectivity.EndpointUrl = "https://default.endpoint"
+	defaultCfg.Connectivity.ApiVersion = "1.0"
+	defaultCfg.Connectivity.WgOn = true
+	defaultCfg.Connectivity.Piers = []string{"alpha"}
+	defaultCfg.Penpai.PenpaiCores = 8
+	defaultCfg.Penpai.PenpaiModels = []structs.Penpai{{ModelName: "model-a"}}
+	defaultCfg.Penpai.PenpaiActive = "model-a"
 	customCfg := structs.SysConfig{}
 
 	merged := MergeConfigs(defaultCfg, customCfg)
-	if merged.EndpointUrl != defaultCfg.EndpointUrl {
-		t.Fatalf("expected endpoint default fallback, got %q", merged.EndpointUrl)
+	if merged.Connectivity.EndpointUrl != defaultCfg.Connectivity.EndpointUrl {
+		t.Fatalf("expected endpoint default fallback, got %q", merged.Connectivity.EndpointUrl)
 	}
-	if merged.ApiVersion != defaultCfg.ApiVersion {
-		t.Fatalf("expected version fallback, got %q", merged.ApiVersion)
+	if merged.Connectivity.ApiVersion != defaultCfg.Connectivity.ApiVersion {
+		t.Fatalf("expected version fallback, got %q", merged.Connectivity.ApiVersion)
 	}
-	if merged.PenpaiActive != defaultCfg.PenpaiActive {
-		t.Fatalf("expected active model fallback, got %q", merged.PenpaiActive)
+	if merged.Penpai.PenpaiActive != defaultCfg.Penpai.PenpaiActive {
+		t.Fatalf("expected active model fallback, got %q", merged.Penpai.PenpaiActive)
 	}
-	if merged.PenpaiCores != defaultCfg.PenpaiCores {
-		t.Fatalf("expected penpai cores fallback, got %d", merged.PenpaiCores)
+	if merged.Penpai.PenpaiCores != defaultCfg.Penpai.PenpaiCores {
+		t.Fatalf("expected penpai cores fallback, got %d", merged.Penpai.PenpaiCores)
 	}
 }

@@ -98,12 +98,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	MuCon.Write(respJson)
 	if isC2C {
 		// send setup broadcast if we're not done setting up
-	} else if conf.Setup != "complete" {
+	} else if conf.Runtime.Setup != "complete" {
 		resp := structs.SetupBroadcast{
 			Type:      "structure",
 			AuthLevel: "setup",
-			Stage:     conf.Setup,
-			Page:      setup.Stages[conf.Setup],
+			Stage:     conf.Runtime.Setup,
+			Page:      setup.Stages[conf.Runtime.Setup],
 			Regions:   startram.RegionsSnapshot(),
 		}
 		respJSON, err := json.Marshal(resp)
@@ -190,7 +190,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			MuCon.Write(resp)
 			continue
 		}
-		if authed || conf.Setup != "complete" {
+			if authed || conf.Runtime.Setup != "complete" {
 			switch msgType.Payload.Type {
 			case "dev":
 				if err = devsvc.DevHandler(msg); err != nil {
@@ -271,14 +271,14 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			case "verify":
 				zap.L().Debug("Handling verify for auth")
 				authed := true
-				if conf.Setup != "complete" {
+				if conf.Runtime.Setup != "complete" {
 					authed = false
 				}
 				if err := authsession.AddToAuthMap(conn, token, authed); err != nil {
 					zap.L().Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
-				if !authed && conf.Setup == "complete" {
+				if !authed && conf.Runtime.Setup == "complete" {
 					zap.L().Debug("Not authed in auth flow")
 					resp, err := authsvc.UnauthHandler()
 					if err != nil {
@@ -303,12 +303,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				ack = "nack"
 			}
-			if conf.Setup != "complete" {
-				resp := structs.SetupBroadcast{
-					Type:      "structure",
-					AuthLevel: "setup",
-					Stage:     conf.Setup,
-					Page:      setup.Stages[conf.Setup],
+				if conf.Runtime.Setup != "complete" {
+					resp := structs.SetupBroadcast{
+						Type:      "structure",
+						AuthLevel: "setup",
+						Stage:     conf.Runtime.Setup,
+						Page:      setup.Stages[conf.Runtime.Setup],
 					Regions:   startram.RegionsSnapshot(),
 				}
 				respJSON, err := json.Marshal(resp)

@@ -6,7 +6,6 @@ import (
 	"groundseg/broadcast"
 	"groundseg/click"
 	"groundseg/docker"
-	dockerOrchestration "groundseg/docker/orchestration"
 	"groundseg/exporter"
 	"groundseg/shipcleanup"
 	"groundseg/startram"
@@ -97,7 +96,7 @@ func buildExportShipSteps(patp string, payload structs.WsUrbitPayload) []transit
 	return []transitionStep[string]{
 		{
 			Run: func() error {
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+				if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "noboot"
 					return nil
 				}); err != nil {

@@ -1,0 +1,91 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 76.4
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Section mutation APIs rely on runtime type assertions with `any` in both system and urbit config paths (`goseg/structs/configs.go` `UpdateSection` and `goseg/config/urbit.go` `UpdateUrbitSectionConfig`/`UrbitSectionMutator`), which shifts contract checks from compile-time to runtime.",
+        "Runtime dependency seams are split into many overlapping op structs (`RuntimeStartupOps`, `RuntimeConfigOps`, `RuntimeLoadOps`, `RuntimeServiceOps`) with repeated fields in `goseg/docker/orchestration/runtime_ops.go`, increasing drift risk when runtime capabilities change.",
+        "Connection/session registry logic duplicates auth-vs-unauth traversal and mutation patterns (`findMuConn`, `removeConnectionByConn`, `removeClientFromOtherBucket`) while a generic bucket helper already exists, indicating unresolved structural duplication in `goseg/session/connection_registry.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "untyped_section_mutation_contracts",
+      "summary": "Config section mutation contracts are encoded as `any` + runtime casts instead of typed APIs.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/structs/configs.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`UpdateUrbitSectionConfig` accepts `mutateFn any` and `UrbitSectionMutator` validates by type assertion and stringly expected-type metadata.",
+        "`SysConfig.UpdateSection` stores `mutate func(*SysConfig, any) error` and casts `mutateFn.(func(*Section))` at runtime.",
+        "Runtime seam types continue propagating this shape via `UpdateUrbitSectionFn func(..., mutateFn any) error`, spreading dynamic mutation contracts across module boundaries."
+      ],
+      "suggestion": "Replace `any` section mutators with typed per-section methods or a generic API exposed at compile-time boundaries (for example, explicit `UpdateUrbitRuntime`, `UpdateUrbitNetwork`, and typed `UpdateSection[T]` wrappers) and remove string-based expected-type checks.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "typed_mutation_boundary_drift"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_ops_interface_fragmentation",
+      "summary": "Runtime seam design is fragmented into overlapping bundles that duplicate capability declarations.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/startram_lifecycle_runtime.go"
+      ],
+      "evidence": [
+        "`RuntimeStartupOps` defines config/load/service callbacks, while `RuntimeConfigOps`, `RuntimeLoadOps`, and `RuntimeServiceOps` repeat subsets of the same callbacks.",
+        "Consumers like startram lifecycle flows require mixed capabilities (`UpdateConfTypedFn`, `StartContainerFn`, `LoadMCFn`, `SvcDeleteFn`), which are sourced from multiple partially-overlapping seam structs.",
+        "This creates multiple places to update when adding/changing one runtime operation and makes seam composition rules implicit rather than explicit."
+      ],
+      "suggestion": "Collapse overlapping op structs into a small number of cohesive capability interfaces (or one canonical runtime dependency object with focused sub-interfaces) and enforce composition through explicit constructor contracts used by workflow consumers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_model_oversegmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dual_bucket_registry_duplication",
+      "summary": "Auth/unauth connection handling duplicates traversal logic, increasing inconsistency risk.",
+      "related_files": [
+        "goseg/session/connection_registry.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`ConnectionRegistry` repeats almost identical loops for both auth and unauth maps in multiple methods (`findMuConn`, `removeConnectionByConn`, `hasAuthSession`).",
+        "`removeClientFromOtherBucket` initializes `sourceMap` then conditionally reassigns it, reflecting brittle branch-oriented duplication around two bucket variants.",
+        "Session store code shows a similar repeated pattern for parallel collections (sys/docker copy/update paths), suggesting normalization helpers are underused."
+      ],
+      "suggestion": "Refactor registry operations to one bucket-iterator abstraction (built around `clientBuckets()`/`bucket(targetAuth)`) so lookup, cleanup, and removal use shared primitives; mirror that approach in session-store collection copy/update helpers to reduce branch duplication.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "parallel_collection_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Type-safe domain mutations were abstracted through dynamic function bags, creating runtime-validated contracts instead of compile-time boundaries.",
+      "Dependency injection seams evolved by accretion, producing overlapping capability structs rather than stable ownership-oriented interfaces.",
+      "Two-track state models (auth/unauth, sys/docker) are managed with repeated imperative loops instead of shared collection operations."
+    ],
+    "likely_symptoms": [
+      "runtime_ops_interface_fragmentation",
+      "dual_bucket_registry_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

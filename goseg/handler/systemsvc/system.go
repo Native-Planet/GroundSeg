@@ -61,7 +61,7 @@ func HandleSystem(msg []byte, deps SystemDependencies) error {
 	switch systemPayload.Payload.Action {
 	case "toggle-penpai-feature":
 		conf := deps.Conf()
-		if conf.PenpaiAllow {
+		if conf.Penpai.PenpaiAllow {
 			if err := deps.StopContainerByName("llama-gpt-api"); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to stop Llama API: %v", err))
 			}
@@ -134,7 +134,7 @@ func HandleSystem(msg []byte, deps SystemDependencies) error {
 	case "modify-swap":
 		zap.L().Info(fmt.Sprintf("Updating swap with value %v", systemPayload.Payload.Value))
 		conf := deps.Conf()
-		file := conf.SwapFile
+		file := conf.Runtime.SwapFile
 		if err := deps.ConfigureSwap(file, systemPayload.Payload.Value); err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to set swap: %v", err))
 			return fmt.Errorf("Unable to set swap: %v", err)
@@ -183,7 +183,7 @@ func HandlePenpai(msg []byte, deps PenpaiDependencies) error {
 	switch penpaiPayload.Payload.Action {
 	case "toggle":
 		running := false
-		if conf.PenpaiRunning {
+		if conf.Penpai.PenpaiRunning {
 			if err := deps.StopContainerByName("llama-gpt-api"); err != nil {
 				return fmt.Errorf("Failed to stop Llama API: %v", err)
 			}
@@ -210,7 +210,7 @@ func HandlePenpai(msg []byte, deps PenpaiDependencies) error {
 		if err := deps.DeleteContainer("llama-gpt-api"); err != nil {
 			return fmt.Errorf("Failed to delete container: %v", err)
 		}
-		if conf.PenpaiRunning {
+		if conf.Penpai.PenpaiRunning {
 			if _, err := deps.StartContainerByName("llama-gpt-api", "llama-api"); err != nil {
 				return fmt.Errorf("Couldn't start Llama API: %v", err)
 			}
@@ -229,7 +229,7 @@ func HandlePenpai(msg []byte, deps PenpaiDependencies) error {
 		if err := deps.DeleteContainer("llama-gpt-api"); err != nil {
 			return fmt.Errorf("Failed to delete container: %v", err)
 		}
-		if conf.PenpaiRunning {
+		if conf.Penpai.PenpaiRunning {
 			if _, err := deps.StartContainerByName("llama-gpt-api", "llama-api"); err != nil {
 				return fmt.Errorf("Couldn't start Llama API: %v", err)
 			}

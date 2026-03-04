@@ -2,12 +2,14 @@ package container
 
 import (
 	"fmt"
+	"groundseg/config"
 	"groundseg/defaults"
 	"groundseg/docker/orchestration/internal/artifactwriter"
 	"groundseg/docker/registry"
-	"groundseg/structs"
 	"os"
 	"path/filepath"
+
+	"groundseg/structs"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -16,31 +18,33 @@ import (
 )
 
 type LlamaRuntime struct {
-	ConfFn                    func() structs.SysConfig
-	StopContainerByNameFn     func(string) error
-	StartContainerFn          func(string, string) (structs.ContainerState, error)
-	UpdateContainerStateFn    func(string, structs.ContainerState)
-	GetLatestContainerImageFn func(string) (string, error)
-	VolumeExistsFn            func(string) (bool, error)
-	CreateVolumeFn            func(string) error
-	AddOrGetNetworkFn         func(string) (string, error)
-	WriteFileFn               func(string, []byte, os.FileMode) error
-	VolumeDirFn               func() string
-	DockerDirFn               func() string
-	UrbitsConfigFn            func() map[string]structs.UrbitDocker
+	PenpaiSettingsSnapshotFn   func() config.PenpaiSettings
+	StartramSettingsSnapshotFn func() config.StartramSettings
+	ShipSettingsSnapshotFn     func() config.ShipSettings
+	StopContainerByNameFn      func(string) error
+	StartContainerFn           func(string, string) (structs.ContainerState, error)
+	UpdateContainerStateFn     func(string, structs.ContainerState)
+	GetLatestContainerImageFn  func(string) (string, error)
+	VolumeExistsFn             func(string) (bool, error)
+	CreateVolumeFn             func(string) error
+	AddOrGetNetworkFn          func(string) (string, error)
+	WriteFileFn                func(string, []byte, os.FileMode) error
+	VolumeDirFn                func() string
+	DockerDirFn                func() string
+	UrbitsConfigFn             func() map[string]structs.UrbitDocker
 }
 
 func LoadLlamaWithRuntime(rt LlamaRuntime) error {
-	if rt.ConfFn == nil {
-		return fmt.Errorf("llama runtime requires ConfFn")
+	if rt.PenpaiSettingsSnapshotFn == nil {
+		return fmt.Errorf("llama runtime requires penpai settings snapshot callback")
 	}
-	conf := rt.ConfFn()
-	if !conf.PenpaiAllow {
+	conf := rt.PenpaiSettingsSnapshotFn()
+	if !conf.Allowed {
 		zap.L().Info("Llama GPT disabled")
 		return nil
 	}
 	zap.L().Info("Loading Llama GPT")
-	if !conf.PenpaiRunning && rt.StopContainerByNameFn != nil {
+	if !conf.Running && rt.StopContainerByNameFn != nil {
 		if err := rt.StopContainerByNameFn("llama-gpt-api"); err != nil {
 			zap.L().Warn(fmt.Sprintf("Failed to kill Llama API: %v", err))
 		}
@@ -59,10 +63,11 @@ func LoadLlamaWithRuntime(rt LlamaRuntime) error {
 }
 
 func LlamaContainerConfWithRuntime(rt LlamaRuntime) (container.Config, container.HostConfig, error) {
-	if rt.ConfFn == nil {
-		return container.Config{}, container.HostConfig{}, fmt.Errorf("llama runtime requires ConfFn")
+	if rt.PenpaiSettingsSnapshotFn == nil || rt.ShipSettingsSnapshotFn == nil {
+		return container.Config{}, container.HostConfig{}, fmt.Errorf("llama runtime requires settings snapshot callbacks")
 	}
-	conf := rt.ConfFn()
+	penpaiSettings := rt.PenpaiSettingsSnapshotFn()
+	shipSettings := rt.ShipSettingsSnapshotFn()
 	if rt.VolumeDirFn == nil {
 		return container.Config{}, container.HostConfig{}, fmt.Errorf("missing volume dir runtime")
 	}
@@ -101,14 +106,14 @@ func LlamaContainerConfWithRuntime(rt LlamaRuntime) (container.Config, container
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
 	var found *structs.Penpai
-	for _, item := range conf.PenpaiModels {
-		if item.ModelName == conf.PenpaiActive {
+	for _, item := range penpaiSettings.Models {
+		if item.ModelName == penpaiSettings.ActiveModel {
 			found = &item
 			break
 		}
 	}
 	if found == nil {
-		return containerConfig, hostConfig, fmt.Errorf("active penpai model %q not found", conf.PenpaiActive)
+		return containerConfig, hostConfig, fmt.Errorf("active penpai model %q not found", penpaiSettings.ActiveModel)
 	}
 	containerConfig = container.Config{
 		Image:    desiredImage,
@@ -126,7 +131,7 @@ func LlamaContainerConfWithRuntime(rt LlamaRuntime) (container.Config, container
 		},
 	}
 	var piers []string
-	for _, pier := range conf.Piers {
+	for _, pier := range shipSettings.Piers {
 		if rt.UrbitsConfigFn()[pier].BootStatus == "boot" {
 			piers = append(piers, pier)
 		}

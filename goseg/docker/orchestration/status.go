@@ -13,7 +13,7 @@ const (
 
 var (
 	shipExitPollInterval = 1 * time.Second
-	getShipStatusForWait = lifecycle.DefaultRuntime.GetShipStatus
+	getShipStatusForWait = lifecycle.DefaultRuntime().GetShipStatus
 	nowForShipExit       = time.Now
 	sleepForShipExit     = time.Sleep
 )

@@ -1,0 +1,110 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/rectify/rectify_services.go calls startram.SvcCreate(...) twice during reconciliation and ignores both returned errors, while related lifecycle paths aggregate and return startram operation errors.",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go reads from Docker event/error channels without checking channel-closure ok flags, causing nil-error continuation and ambiguous failure handling.",
+        "goseg/session/logstream_session_store.go publishes to a bounded channel with a blocking send and no error/timeout path, unlike goseg/docker/events/events.go which explicitly returns ErrTransitionBusFull/ErrTransitionPublishTimeout.",
+        "goseg/startuporchestrator/startup_orchestrator.go defines a required configure-swap startup step but silently returns nil when ConfigureSwapFn is unset."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_startram_service_create_errors",
+      "summary": "Startram service creation failures are silently dropped during rectify reconciliation.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/shipworkflow/startram_lifecycle_runtime.go"
+      ],
+      "evidence": [
+        "In Reconcile(), missing service recovery calls startram.SvcCreate(patp, \"urbit\") and startram.SvcCreate(\"s3.\"+patp, \"minio\") without checking returned error values.",
+        "In startram lifecycle runtime, similar startram operations are error-checked and accumulated (e.g., cancelErrs with wrapped errors), showing inconsistent failure propagation for comparable external API calls."
+      ],
+      "suggestion": "Capture both SvcCreate errors, wrap with patp/service context, and join into reconcileErr so callers get deterministic failure signals; keep broadcast-state updates separate from API mutation outcomes.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "silent_failure_paths"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "docker_event_channel_close_ambiguity",
+      "summary": "Docker listener treats closed event/error channels as normal flow, masking producer failure states.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "dockerListenerWithContext uses `case event := <-messages` and `case err := <-errs` without `ok` checks; closed channels can yield zero-values repeatedly.",
+        "When `errs` channel yields nil, code continues instead of treating channel closure as terminal, which can create ambiguous non-failing loops instead of explicit error propagation.",
+        "events package establishes explicit publish failure semantics (ErrTransitionPublishTimeout/ErrTransitionBusFull), highlighting inconsistency in subsystem event-stream failure handling."
+      ],
+      "suggestion": "Switch to `event, ok := <-messages` and `err, ok := <-errs`; on `!ok`, return a wrapped terminal error (or context-aware nil when shutting down) so stream teardown is explicit and consistent.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "channel_lifecycle_handling"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "log_publish_backpressure_has_no_error_contract",
+      "summary": "System log publish path blocks indefinitely under backpressure instead of surfacing a structured failure.",
+      "related_files": [
+        "goseg/session/logstream_session_store.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "PublishSystemLog performs `messageBus <- logData` on a bounded channel with no select/context/timeout and no returned error.",
+        "SysLogStreamerWithRuntime can skip/slow processing (parse failures, websocket write failures, connection churn), making channel saturation plausible under load.",
+        "Elsewhere, event publication has explicit overflow/timeout errors; log publication currently has a silent blocking failure mode."
+      ],
+      "suggestion": "Define a publish contract similar to transition events: return an error on full/canceled publish (or add context-aware non-blocking API) and let callers decide drop/retry behavior.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_failure_paths"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "required_startup_step_missing_callback_silenced",
+      "summary": "A required startup step can succeed with missing callback, creating inconsistent startup failure behavior.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "In startupInitRuntime.initSubsystems(), `configure swap` is marked required, but closure returns nil when `runtime.ConfigureSwapFn == nil`.",
+        "runStartupSubsystem enforces missing-callback errors for required steps generally, so this step bypasses the expected error strategy.",
+        "Current startup tests exercise required callback validation broadly but do not cover this specific required-step bypass."
+      ],
+      "suggestion": "When swap is configured (`SwapFile` and `SwapVal` set), return a missing-runtime-dependency error if ConfigureSwapFn is nil; add a test that fails bootstrap for this case.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_failure_paths"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Multiple subsystems implement ad-hoc error boundaries (drop/log/continue) instead of a shared contract for recoverable vs terminal failures.",
+      "Channel-based runtimes lack consistent lifecycle semantics (full, closed, canceled) across modules."
+    ],
+    "likely_symptoms": [
+      "ignored_startram_service_create_errors",
+      "log_publish_backpressure_has_no_error_contract",
+      "required_startup_step_missing_callback_silenced"
+    ],
+    "possible_false_positives": []
+  }
+}

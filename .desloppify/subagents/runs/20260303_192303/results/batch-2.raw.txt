@@ -1,0 +1,136 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 73.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Section-scoped mutation APIs rely on `any` and runtime casting across config and orchestration boundaries (`structs.SysConfig.UpdateSection`, `config.UpdateUrbitSectionConfig`, `RuntimeUrbitOps.UpdateUrbitSectionFn`).",
+        "Parallel registry/mapping tables encode overlapping section/domain wiring in multiple places (`SysConfigSectionDescriptors`, `sysConfigSectionPatchSpecs` + `confPatchFieldsForSection` switch, and orchestration section aliases), increasing drift risk.",
+        "Transition handlers in shipworkflow combine policy decisions, external side effects, and persistence updates in single functions (e.g., startram toggle/endpoint/minio-link flows), reducing separable ownership.",
+        "Session lifecycle state is split into multiple mutable collections that require manual synchronization (`authClients`/`authTokens`, `sysLogSessions`/`sysSessionsToClear`) with cleanup paths that do not enforce strong invariants."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "untyped_section_mutator_contracts",
+      "summary": "Section mutation contracts are untyped across module boundaries, forcing runtime checks and silent mismatch paths.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/urbit.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`SysConfig.UpdateSection(section, mutateFn any)` dispatches via descriptor `mutate` functions that type-assert and no-op on mismatch.",
+        "`UpdateUrbitSectionConfig` and `UrbitSectionMutator` accept `mutateFn any` and only validate shape at runtime.",
+        "`RuntimeUrbitOps.UpdateUrbitSectionFn` propagates this `any` contract into orchestration APIs."
+      ],
+      "suggestion": "Replace `any` mutator plumbing with typed section-specific interfaces or a generic `UpdateSection[T]` API returning explicit errors on type mismatch; keep one typed adapter at boundary edges instead of propagating dynamic typing through core runtime structs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "dynamic_section_dispatch"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "mirrored_section_registry_drift",
+      "summary": "Config section/domain wiring is duplicated across independent registries, creating coherence drift risk.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`SysConfigSectionDescriptors` defines section access/mutation in `structs`.",
+        "`sysConfigSectionPatchSpecs` plus `confPatchFieldsForSection` separately map section-to-patch behavior.",
+        "Orchestration re-exports Urbit section constants and wires section update callbacks again, adding another mapping surface."
+      ],
+      "suggestion": "Introduce a single canonical section manifest (section id, typed accessor, patch fields, runtime exposure) and generate/construct per-layer adapters from that manifest so new sections cannot be added in one layer without compile-time breakage in others.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "dynamic_section_dispatch"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_handlers_mix_layers",
+      "summary": "Startram/Urbit transition functions mix orchestration policy, side effects, and persistence in monolithic flows.",
+      "related_files": [
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`runStartramToggleWithRuntime` decides policy (enable/disable), manipulates containers, dispatches ship payloads, and schedules rebuild/load steps in one routine.",
+        "`runStartramEndpointWithRuntime` combines stop/unregister/key rotation/config writes in one transition chain.",
+        "Urbit operations (e.g., boot/minio toggles) similarly combine config reads, external calls, and persistence in per-command handlers."
+      ],
+      "suggestion": "Split transition handlers into composable use-cases: pure state-transition planning (policy), side-effect executors (docker/startram/click), and persistence adapters. Keep handlers as thin orchestrators over these components to reduce responsibility mixing and enable focused testing.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "workflow_orchestration_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_state_split_brain",
+      "summary": "Session management duplicates authority across parallel collections, making lifecycle invariants easy to violate.",
+      "related_files": [
+        "goseg/session/connection_registry.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`ConnectionRegistry` stores both client buckets and token sets; `removeConnectionByConn` updates buckets but does not reconcile token sets.",
+        "Auth checks use different authorities (`hasAuthToken` token map vs `hasAuthSession` active client scan), so state can diverge.",
+        "`logstreamSessionStore` uses separate active and pending-removal slices requiring two-phase calls (`AddSysSessionToRemove` then `RemoveSysLogSessions`)."
+      ],
+      "suggestion": "Define one authoritative session model per subsystem and derive secondary views on read. Centralize cleanup transitions in a single mutation path that enforces invariants (e.g., remove connection => recompute token presence atomically).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "state_duplication_without_invariants"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_fixture_construction_sprawl",
+      "summary": "Large hand-built fixtures are repeated across tests, coupling tests to full config/runtime shape rather than intent-level helpers.",
+      "related_files": [
+        "goseg/config/config_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "`config_test.go` repeatedly constructs very large `defaultCfg/customCfg` objects via long field-by-field assignment blocks.",
+        "`startup_orchestrator_test.go` manually assembles nested runtime callback structs in many tests.",
+        "`importer_test.go` includes multiple ad-hoc runtime/config helper patterns (`importerRuntimeWith`, `authorizeTokenIDsForTest`, reset/setup helpers), indicating fixture logic spread."
+      ],
+      "suggestion": "Create shared test builders (e.g., `NewSysConfigFixture().With...`, `NewStartupRuntimeFixture()`) with sensible defaults and narrow override methods, then reuse across modules to keep tests focused on behavior instead of structural assembly.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fixture_abstraction_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Dynamic (`any`-based) dispatch used as a cross-layer integration strategy instead of typed contracts.",
+      "Repeated hand-maintained registries/mappings for the same domain concepts.",
+      "Operational workflows encoded directly in handler functions without a separated planning/execution boundary.",
+      "State represented in multiple mutable stores without centralized invariant enforcement."
+    ],
+    "likely_symptoms": [
+      "mirrored_section_registry_drift",
+      "transition_handlers_mix_layers",
+      "session_state_split_brain",
+      "test_fixture_construction_sprawl"
+    ],
+    "possible_false_positives": []
+  }
+}

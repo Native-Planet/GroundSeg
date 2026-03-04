@@ -1,0 +1,109 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/shipworkflow/operations_runtime.go:164 discards `resolveWorkflowRuntime` error (`resolvedRuntime, _ := ...`) before emitting transitions, while sibling path `dispatchUploadImport` in the same file returns runtime-resolution errors.",
+        "goseg/broadcast/loop.go:143 ignores `runBroadcastTickWithRuntime` return value completely, but the looped path in the same file conditionally routes tick errors via `tickErrorFn`.",
+        "goseg/startuporchestrator/startup_orchestrator.go:176 emits `network reachability check failed` without underlying cause, and the injected callback type used by startup/main is `func(string) bool`, preventing causal error propagation at this boundary.",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go:100-104 logs recovery errors and clears strike state, while `subsystem_events.go:149` escalates repeated transition errors to a returned error; subsystem failure handling policy is inconsistent."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "runtime_resolution_errors_suppressed",
+      "summary": "Runtime validation failures are silently dropped in transition paths, creating hidden misconfiguration failures.",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "operations_runtime.go:164 ignores `resolveWorkflowRuntime` error with `_`, then continues with potentially zero-value runtime for transition emission.",
+        "operations_runtime.go:181-184 in the same module falls back to default runtime on resolution error, again without surfacing the validation failure to callers.",
+        "broadcast/loop.go:143 drops tick errors (`_ = runBroadcastTickWithRuntime(...)`) while the looping path at 131-135 can forward errors through `tickErrorFn`."
+      ],
+      "suggestion": "Standardize runtime-resolution behavior: return or wrap runtime validation errors from both transition emission and tick entrypoints, and only use best-effort mode when explicitly selected by policy. Add a shared helper that requires an explicit `critical|non_critical` error policy at each callsite.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_best_effort_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "reachability_cause_dropped_at_boundary",
+      "summary": "Network reachability failures lose root-cause context due to boolean callback contracts and generic error messages.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "startup_orchestrator.go:173-176 uses `NetworkReachabilityFn(cloudCheckHost) bool` and returns a generic `network reachability check failed` error with no causal detail.",
+        "main.go:159 and startup_orchestrator.go:224 both model reachability as `func(string) bool`, so upstream layers cannot wrap DNS/socket/timeouts with `%w`."
+      ],
+      "suggestion": "Change reachability seams to `func(string) error` (or `(bool, error)`), then wrap failures with operation/context (`fmt.Errorf(\"network reachability %s: %w\", host, err)`) so startup callers can distinguish transient network failures from runtime misconfiguration.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "lossy_error_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "panic_to_error_conversion_loses_diagnostics",
+      "summary": "Recovered panics are flattened into string errors without stack/type context, reducing failure diagnosability compared to normal wrapped errors.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "startup_orchestrator.go:675 converts panic payload via `%v` into `error` text (`background service panic: %v`) and drops stack trace and panic type.",
+        "In the same startup path, normal failures are wrapped with `%w` at 679, so panic failures and non-panic failures produce different fidelity and comparability.",
+        "subsystem_events.go uses returned wrapped errors (e.g., `docker event error: %w` at 114), highlighting inconsistent diagnostic depth across long-running orchestration loops."
+      ],
+      "suggestion": "Introduce a shared panic-to-error adapter that captures stack (`debug.Stack()`), preserves panic type/value, and returns a structured wrapped error type so orchestration supervisors can handle panic and non-panic failures uniformly.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "lossy_error_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "subsystem_recovery_escalation_policy_mismatch",
+      "summary": "Docker subsystem loops apply conflicting escalation policies for repeated failures, causing unpredictable operator-facing failure modes.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "subsystem_health.go:100-104 logs wireguard recovery failure and always clears the strike counter (`delete(status, pier)`), effectively suppressing repeated failure escalation for that path.",
+        "subsystem_events.go:145-150 increments failure count and returns hard error after threshold, terminating subsystem path on repeated failures.",
+        "Both are long-running docker subsystem loops, but one is fail-open and one is fail-fast without a shared policy contract."
+      ],
+      "suggestion": "Define a unified subsystem error policy (max retries/window + escalation target) and apply it to both health and event loops. Keep counters when recovery fails, and emit structured escalation errors once threshold is exceeded.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_best_effort_policy"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Several runtime seams encode failure as booleans or fallback defaults, preventing consistent propagation of causal errors.",
+      "Best-effort behavior is often implicit (ignored return, log-and-continue) instead of being enforced by explicit error policy contracts."
+    ],
+    "likely_symptoms": [
+      "runtime_resolution_errors_suppressed",
+      "reachability_cause_dropped_at_boundary",
+      "subsystem_recovery_escalation_policy_mismatch"
+    ],
+    "possible_false_positives": []
+  }
+}

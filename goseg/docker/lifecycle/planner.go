@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -60,22 +61,29 @@ func recreateContainerIfImageChanged(ctx context.Context, cli *client.Client, pl
 	if currentDigest == plan.ImageInfo["hash"] {
 		return nil
 	}
+
+	var recreateErrs []error
 	if plan.Type == "vere" {
 		gracefulTimeout := 60
 		stopOpts := container.StopOptions{Timeout: &gracefulTimeout}
 		zap.L().Info(fmt.Sprintf("Gracefully stopping %s (60s timeout) before update", plan.Name))
 		if err := cli.ContainerStop(ctx, plan.Name, stopOpts); err != nil {
 			zap.L().Warn(fmt.Sprintf("Graceful stop failed for %s: %v, forcing removal", plan.Name, err))
+			recreateErrs = append(recreateErrs, fmt.Errorf("graceful stop container %s: %w", plan.Name, err))
 		}
 	}
 	if err := cli.ContainerRemove(ctx, plan.Name, container.RemoveOptions{Force: true}); err != nil {
 		zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet): %v", plan.Name, err))
+		recreateErrs = append(recreateErrs, fmt.Errorf("remove container %s: %w", plan.Name, err))
 	}
 	if err := createAndStartContainer(ctx, cli, plan); err != nil {
-		return fmt.Errorf("recreate container %s: %w", plan.Name, err)
+		recreateErrs = append(recreateErrs, fmt.Errorf("recreate container %s: %w", plan.Name, err))
 	}
-	zap.L().Info(fmt.Sprintf("Restarted %s with image %s", plan.Name, plan.DesiredImage))
-	return nil
+	if len(recreateErrs) == 0 {
+		zap.L().Info(fmt.Sprintf("Restarted %s with image %s", plan.Name, plan.DesiredImage))
+		return nil
+	}
+	return errors.Join(recreateErrs...)
 }
 
 func ensureRunningContainer(runtime *Runtime, ctx context.Context, cli *client.Client, plan containerPlan) error {

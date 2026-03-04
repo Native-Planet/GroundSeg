@@ -81,10 +81,10 @@ func ProvisionShip(patp string, shipPayload structs.WsNewShipPayload, customDriv
 	config.UpdateContainerState(patp, info)
 
 	conf := config.Conf()
-	if conf.WgRegistered {
+	if conf.Connectivity.WgRegistered {
 		go RegisterNewShipServices(patp)
 	}
-	if conf.PenpaiAllow {
+	if conf.Penpai.PenpaiAllow {
 		if err := orchestration.StopContainerByName("llama"); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't stop Llama: %v", err))
 		}
@@ -107,7 +107,7 @@ func waitForNewShipReady(shipPayload structs.WsNewShipPayload, customDrive strin
 	WaitForBootCode(patp, 1*time.Second)
 
 	conf := config.Conf()
-	if conf.WgRegistered && conf.WgOn && remote {
+	if conf.Connectivity.WgRegistered && conf.Connectivity.WgOn && remote {
 		events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "remote"})
 		WaitForRemoteReady(patp, 1*time.Second)
 		if err := SwitchShipToWireguard(patp, false); err != nil {
@@ -120,7 +120,7 @@ func waitForNewShipReady(shipPayload structs.WsNewShipPayload, customDrive strin
 
 	startram.SyncRetrieve()
 	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "completed"})
-	if conf.PenpaiAllow {
+	if conf.Penpai.PenpaiAllow {
 		orchestration.StartContainer("llama-gpt-api", "llama-api")
 	}
 }

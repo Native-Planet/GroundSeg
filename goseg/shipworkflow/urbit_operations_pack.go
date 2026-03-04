@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"groundseg/click"
 	"groundseg/docker"
-	dockerOrchestration "groundseg/docker/orchestration"
 	"groundseg/structs"
 	"groundseg/transition"
 	"strconv"
@@ -80,7 +79,7 @@ func buildPackSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[stri
 						updateContainerStateFn(patp, containerState)
 					}
 					// switch boot status to pack
-					err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+					err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 						conf.BootStatus = "pack"
 						return nil
 					})
@@ -90,7 +89,7 @@ func buildPackSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[stri
 				}
 				// set last meld
 				now := time.Now().Unix()
-				err = persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionSchedule, func(conf *structs.UrbitScheduleConfig) error {
+				err = persistShipUrbitScheduleConfig(patp, func(conf *structs.UrbitScheduleConfig) error {
 					conf.MeldLast = strconv.FormatInt(now, 10)
 					return nil
 				})
@@ -147,7 +146,7 @@ func buildPackMeldSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[
 			Run: func() error {
 				// start ship as pack
 				zap.L().Info(fmt.Sprintf("Attempting to urth pack %s", patp))
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+				if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "pack"
 					return nil
 				}); err != nil {
@@ -170,7 +169,7 @@ func buildPackMeldSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[
 			Run: func() error {
 				// start ship as meld
 				zap.L().Info(fmt.Sprintf("Attempting to urth meld %s", patp))
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+				if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "meld"
 					return nil
 				}); err != nil {
@@ -199,7 +198,7 @@ func buildPackMeldSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[
 					containerState.DesiredStatus = "running"
 					updateContainerStateFn(patp, containerState)
 				}
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+				if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "boot"
 					return nil
 				}); err != nil {
@@ -254,7 +253,7 @@ func buildRollChopSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[
 			Run: func() error {
 				// start ship as roll
 				zap.L().Info(fmt.Sprintf("Attempting to roll %s", patp))
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+				if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "roll"
 					return nil
 				}); err != nil {
@@ -276,7 +275,7 @@ func buildRollChopSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[
 			Run: func() error {
 				// start ship as chop
 				zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+				if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "chop"
 					return nil
 				}); err != nil {
@@ -299,7 +298,7 @@ func buildRollChopSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[
 				return isRunning
 			},
 			Run: func() error {
-				if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+				if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "boot"
 					return nil
 				}); err != nil {

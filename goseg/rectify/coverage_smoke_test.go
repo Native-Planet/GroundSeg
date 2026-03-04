@@ -7,5 +7,5 @@ import (
 )
 
 func TestCoverageImportSmoke(t *testing.T) {
-	_ = pkg.ImportShipTransitionHandler
+	_ = pkg.ImportShipTransitionHandlerWithContextAndRuntime
 }

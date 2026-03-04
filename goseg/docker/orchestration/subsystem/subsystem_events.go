@@ -17,6 +17,7 @@ import (
 var (
 	eventBus           = make(chan structs.Event, 100)
 	DisableShipRestart = false
+	errEventBusFull    = fmt.Errorf("docker event bus is full")
 	dockerHealthLoopMu sync.Mutex
 	healthLoopRunning  bool
 	healthLoopStopFn   context.CancelFunc
@@ -94,8 +95,11 @@ func dockerListenerWithContext(ctx context.Context) error {
 			// Convert the Docker event to our custom event and send it to the EventBus.
 			select {
 			case eventBus <- structs.Event{Type: string(event.Action), Data: event}:
+				continue
 			case <-ctx.Done():
 				return nil
+			default:
+				return fmt.Errorf("docker event bus saturated: %w", errEventBusFull)
 			}
 		case err := <-errs:
 			if err == nil {

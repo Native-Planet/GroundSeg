@@ -1,0 +1,103 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 62.5
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_ops.go` defines many callback-only runtime structs (`RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeStartupOps`, etc.) and then composes them via `defaultRuntime*` functions without adding domain behavior.",
+        "`goseg/importer/importer.go` uses a very wide `importerRuntime` callback bag with grouped validation (`importer-core`, `importer-upload`, `importer-provision`) and multiple resolver layers before each operation.",
+        "`goseg/startuporchestrator/startup_orchestrator.go` models startup as large callback bundles (`startupInitRuntime`, `startBackgroundServicesRuntime`) and `goseg/startuporchestrator/startup_orchestrator_test.go` needs extensive helper-switch wiring to override individual callbacks.",
+        "`goseg/structs/configs.go` exposes dynamic section APIs (`Section`, `UpdateSection`) using `any`, while `goseg/config/config_update_registry.go` maintains large manual field registries to map/merge sections."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 46.0,
+        "interface_honesty": 54.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_overgrowth",
+      "summary": "Large callback-bag runtimes are being used as surrogate module APIs, adding indirection without proportional leverage.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`Runtime*Ops` types in `runtime_ops.go` split behavior into many function fields and recombine them via `defaultRuntime*` composition rather than stable cohesive interfaces.",
+        "`importerRuntime` in `importer.go` contains many unrelated responsibilities (filesystem, upload auth, workflow orchestration, docker, ship config) and requires group-based callback validation before use.",
+        "`workflowRuntime` in `operations_runtime.go` repeats the same callback-bag pattern for transition emission, urbit updates, container ops, and upload coordination.",
+        "`startup_orchestrator.go` contains broad runtime bundles and policy wrappers; tests in `startup_orchestrator_test.go` require helper switch logic just to patch one callback at a time."
+      ],
+      "suggestion": "Replace wide callback bags with smaller role-focused interfaces (for example, transition publisher, ship config store, container lifecycle service) and inject only the minimal interface each workflow step needs; keep one composition root per subsystem.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "constructor_resolver_chain_indirection",
+      "summary": "Repeated new/default/resolve/withDefaults chains create call-depth and validation churn without meaningful policy separation.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/main.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`rectify.go` has `newRectifyRuntime` -> `NewRectifyRuntime` -> `NewRectifyRuntimeWithDependencies` -> `withDefaultsRectifyRuntime` -> `resolveRectifyRuntime` -> `resolveRectifyRuntimeWithDefaults` before handlers run.",
+        "`operations_runtime.go` re-resolves runtime in multiple helper paths (`resolveWorkflowRuntime`, `resolveWorkflowRuntimeWithDefaults`, `emitWorkflowTransition`, `publishTransition`) even after a runtime is already built.",
+        "`main.go` introduces wrapper methods (`bootstrapRuntimeWith`, `resolveBootstrapRuntime`, `withDefaults`, and thin `bootstrap/startServer/runC2cCheck` methods) primarily for callback forwarding and nil checks.",
+        "`wifi_runtime_api.go` similarly layers default and override construction (`NewWiFiRuntime`, `NewWiFiRuntimeWith`, service constructor checks) while most methods directly forward into runtime methods."
+      ],
+      "suggestion": "Collapse each subsystem to one explicit runtime builder plus one validation boundary; pass fully-built runtimes downward and avoid re-resolving in leaf helpers.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "sysconfig_any_section_leak",
+      "summary": "The `SysConfig` section abstraction relies on `any`-typed mutation and a large registry, which weakens interface honesty and obscures domain boundaries.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/defaults/defaults.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`SysConfig.Section` and `SysConfig.UpdateSection` in `configs.go` expose dynamic access/mutation via `any` and descriptor dispatch rather than typed contracts.",
+        "`config_update_registry.go` compensates with extensive manual patch field specs and merge rules per section, indicating abstraction friction at the update boundary.",
+        "`defaults.go` constructs a large monolithic `SysConfig`, while consumers like `main.go` and other runtimes repeatedly snapshot individual slices of config, signaling that the top-level abstraction is too coarse.",
+        "Typed convenience wrappers (`UpdateConnectivityConfig`, `UpdateRuntimeConfig`, etc.) coexist with dynamic `any` mutation, showing split abstraction direction."
+      ],
+      "suggestion": "Introduce typed section stores/services (for example `ConnectivityStore`, `RuntimeStore`, `AuthSessionStore`) and replace `any` section mutation with compile-time typed patch/update APIs; generate repetitive mapping where necessary.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_boundary_monolith"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Test-seam strategy expanded into production-facing API design, causing callback-bag abstractions to become first-class architecture.",
+      "Configuration is modeled as a monolith with dynamic mutation points, forcing large registries and repeated local snapshot adapters."
+    ],
+    "likely_symptoms": [
+      "constructor_resolver_chain_indirection"
+    ],
+    "possible_false_positives": []
+  }
+}

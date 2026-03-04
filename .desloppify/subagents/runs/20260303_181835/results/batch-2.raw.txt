@@ -1,0 +1,107 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 72.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Config patching logic is split between `config_update_registry.go` and `config_update_schema.go`, where field bindings are declared with string keys (`patchField`) and then resolved via reflection (`FieldByName`) in `getConfigPatchValueByName`/`setConfigPatchValueByName`.",
+        "`runtime_ops.go` co-locates many distinct responsibilities (container ops, urbit ops, startup ops, wireguard/netdata/minio ops, seam registry wiring, and default factories), creating a single high-churn coordination file.",
+        "`urbit_operations_runtime.go` and `startram_lifecycle_runtime.go` both encode repetitive transition orchestration patterns through many near-template functions and step builders rather than a shared declarative transition model.",
+        "Session management logic in `connection_registry.go` and `logstream_session_store.go` repeats slice/map bucket mutation, copy, and removal patterns across multiple methods with only container-type variation."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_stringly_reflection_bridge",
+      "summary": "Config patch registry relies on string field names plus reflection, creating a brittle cross-file contract instead of a coherent typed boundary.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`configPatchFieldFromSpec` definitions pass `patchField` strings (for example in `runtimePatchFields` and other domain field lists), then `patchFieldRefByName` resolves values indirectly.",
+        "`getConfigPatchValueByName` and `setConfigPatchValueByName` use `reflect.ValueOf(...).Elem().FieldByName(field)`, so compile-time renames of `ConfPatch` fields do not fail at compile time and can silently change behavior."
+      ],
+      "suggestion": "Replace string-based field resolution with typed accessors for every patch field (using `confPatchPointerRef`/`confPatchValueAccessor` only), and remove `FieldByName` usage so schema and registry remain compile-time linked.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_typed_update_plumbing"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_ops_god_module",
+      "summary": "The orchestration runtime ops module mixes many unrelated seam domains and default wiring paths in one file, reducing cohesion and increasing change coupling.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many operation structs (`RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeStartupOps`, `RuntimeWireguardOps`, `RuntimeNetdataOps`, `RuntimeMinioOps`, etc.) plus seam registry and default constructors in one place.",
+        "The same file also performs environment wiring (`network.NewNetworkRuntime`, config/click/startram function binding), while other runtime services such as `WiFiRuntimeService` in `wifi_runtime_api.go` independently implement separate runtime wrapper composition patterns."
+      ],
+      "suggestion": "Split orchestration runtime seams by concern (container/urbit/startup/network/security), and introduce a shared runtime-construction pattern used across modules so service runtime APIs are structured consistently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_wiring_centralization"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_flow_pattern_duplication",
+      "summary": "Shipworkflow transition handlers repeat orchestration scaffolding across many functions, indicating missing declarative transition composition.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/shipworkflow/startram_lifecycle_runtime.go"
+      ],
+      "evidence": [
+        "`urbit_operations_runtime.go` contains many thin wrappers (`setUrbitDomain`, `setMinIODomain`, `toggleChopOnVereUpdate`, `togglePower`, `toggleDevMode`, `toggleNetwork`, etc.) and many per-action step-builder functions with similar `persist -> clean -> restart/event` flow.",
+        "`startram_lifecycle_runtime.go` repeats the same event-template orchestration pattern (`run...WithRuntime`, transition template config, step list assembly, runtime callback invocations) for restart/toggle/endpoint/cancel/reminder flows."
+      ],
+      "suggestion": "Introduce a table-driven transition catalog (action -> transition type, preconditions, emitted events, step pipeline) and run a single generic executor to reduce near-duplicate handler/step boilerplate.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "imperative_transition_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_store_bucket_logic_repetition",
+      "summary": "Session tracking duplicates low-level bucket/slice mutation logic across registry and logstream stores instead of sharing focused collection primitives.",
+      "related_files": [
+        "goseg/session/connection_registry.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`connection_registry.go` repeats bucket traversal/filter logic (`removeConnectionByConn`, `cleanupStaleBucket`, `removeClientFromOtherBucket`, `snapshot`) with similar map+slice manipulation patterns.",
+        "`logstream_session_store.go` repeats similar copy/filter/remove patterns for system and docker session collections (`SysLogSessions`, `SetSysLogSessions`, `RemoveSysLogSessions`, `DockerLogSessions`, `SetDockerLogSessions`, `RemoveDockerLogSession`)."
+      ],
+      "suggestion": "Extract shared session-collection helpers (copy/filter/remove/set semantics with explicit invariants) and use them in both registry and logstream stores to reduce parallel mutation implementations.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "state_bucket_pattern_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "String-keyed indirection layers were introduced for flexibility, but now hide compile-time contracts.",
+      "Runtime dependency wiring favored centralization over bounded modules, causing large mixed-responsibility files.",
+      "Transition workflows evolved action-by-action without a unifying declarative model."
+    ],
+    "likely_symptoms": [
+      "runtime_ops_god_module",
+      "transition_flow_pattern_duplication",
+      "session_store_bucket_logic_repetition"
+    ],
+    "possible_false_positives": []
+  }
+}

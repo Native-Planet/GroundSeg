@@ -9,7 +9,10 @@ import (
 func TestProtocolContractCatalogSpecsAreSelfConsistent(t *testing.T) {
 	t.Helper()
 
-	entries := protocolContractCatalogEntries()
+	entries, ok := contractCatalogEntriesForFamily(contractCatalogFamilyProtocol)
+	if !ok {
+		t.Fatal("protocol contract catalog family not registered")
+	}
 	if len(entries) == 0 {
 		t.Fatal("expected protocol contract catalog entries")
 	}
@@ -77,7 +80,10 @@ func TestProtocolContractCatalogSpecsAreSelfConsistent(t *testing.T) {
 }
 
 func TestProtocolContractCatalogEntriesAreSnapshots(t *testing.T) {
-	original := protocolContractCatalogEntries()
+	original, ok := contractCatalogEntriesForFamily(contractCatalogFamilyProtocol)
+	if !ok {
+		t.Fatal("protocol contract catalog family not registered")
+	}
 	if len(original) == 0 {
 		t.Fatal("expected protocol contract catalog entries")
 	}
@@ -85,14 +91,20 @@ func TestProtocolContractCatalogEntriesAreSnapshots(t *testing.T) {
 	baseline := original[0]
 	original[0].ID = ContractID("protocol.actions.broken.suffix")
 
-	refreshed := protocolContractCatalogEntries()
+	refreshed, ok := contractCatalogEntriesForFamily(contractCatalogFamilyProtocol)
+	if !ok {
+		t.Fatal("protocol contract catalog family not registered")
+	}
 	if refreshed[0].ID != baseline.ID {
 		t.Fatalf("protocol contract catalog entries should not be affected by caller mutation")
 	}
 }
 
 func TestProtocolContractCatalogSnapshotAreSnapshots(t *testing.T) {
-	original := protocolContractCatalogEntriesSnapshot()
+	original, ok := contractCatalogEntriesForFamilySnapshot(contractCatalogFamilyProtocol)
+	if !ok {
+		t.Fatal("protocol contract catalog family not registered")
+	}
 	if len(original) == 0 {
 		t.Fatal("expected protocol contract snapshot entries")
 	}
@@ -102,7 +114,10 @@ func TestProtocolContractCatalogSnapshotAreSnapshots(t *testing.T) {
 	original[0].Namespace = ActionNamespace("mutated")
 	original[0].Descriptor.IntroducedIn = "1900.01.01"
 
-	refreshed := protocolContractCatalogEntriesSnapshot()
+	refreshed, ok := contractCatalogEntriesForFamilySnapshot(contractCatalogFamilyProtocol)
+	if !ok {
+		t.Fatal("protocol contract catalog family not registered")
+	}
 	if refreshed[0].Action != baseline.Action {
 		t.Fatalf("protocol contract snapshot should preserve action")
 	}

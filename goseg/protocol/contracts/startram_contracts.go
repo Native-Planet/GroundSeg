@@ -1,39 +1,23 @@
 package contracts
 
 const (
-	startramApiConnectionErrorContractID                          = ContractID("startram.errors.api-connection")
-	startramApiConnectionErrorName                                = "APIConnectionError"
-	startramApiConnectionErrorDescription                         = "Masks transport detail when the StarTram API is unavailable or unreachable."
-	startramApiConnectionErrorMessage                             = "Unable to connect to API server"
-	startramApiConnectionErrorIntroducedIn                        = "2026.01.20"
-	startramApiConnectionErrorCompatibility ContractCompatibility = CompatibilityBackwardSafe
+	// APIConnectionError is the canonical StarTram API connectivity contract id.
+	APIConnectionError                    ContractID = "startram.errors.api-connection"
+	startramAPIConnectionErrorName                   = "APIConnectionError"
+	startramAPIConnectionErrorDescription            = "Masks transport detail when the StarTram API is unavailable or unreachable."
+	startramAPIConnectionErrorMessage                = "Unable to connect to API server"
 )
 
-var (
-	startramApiConnectionErrorContract = contractCatalogEntry{
-		ID: startramApiConnectionErrorContractID,
-		Descriptor: ContractDescriptor{
-			Name:        startramApiConnectionErrorName,
-			Description: startramApiConnectionErrorDescription,
-			ContractMetadata: ContractMetadata{
-				IntroducedIn:  startramApiConnectionErrorIntroducedIn,
-				Compatibility: startramApiConnectionErrorCompatibility,
+func startramContractCatalogSpecs() []contractCatalogEntry {
+	return []contractCatalogEntry{
+		{
+			ID: APIConnectionError,
+			Descriptor: ContractDescriptor{
+				Name:             startramAPIConnectionErrorName,
+				Description:      startramAPIConnectionErrorDescription,
+				ContractMetadata: contractMetadataFor(APIConnectionError),
+				Message:          startramAPIConnectionErrorMessage,
 			},
-			Message: startramApiConnectionErrorMessage,
 		},
 	}
-)
-
-const APIConnectionError ContractID = startramApiConnectionErrorContractID
-
-var startramContractCatalogSpecs = []contractCatalogEntry{
-	startramApiConnectionErrorContract,
-}
-
-func startramContractCatalogEntries() []contractCatalogEntry {
-	return catalogEntries(startramContractCatalogSpecs)
-}
-
-func startramContractCatalogEntriesSnapshot() []contractCatalogEntry {
-	return catalogEntriesSnapshot(startramContractCatalogSpecs)
 }

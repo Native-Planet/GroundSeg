@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"groundseg/config"
 	"groundseg/structs"
 )
 
@@ -27,7 +28,9 @@ func testLlamaRuntime(dockerDir string) dockerRuntime {
 			AddOrGetNetworkFn:      func(string) (string, error) { return "default", nil },
 		},
 		configOps: RuntimeSnapshotOps{
-			ConfFn: func() structs.SysConfig { return structs.SysConfig{} },
+			StartramSettingsSnapshotFn: func() config.StartramSettings { return config.StartramSettings{} },
+			PenpaiSettingsSnapshotFn:   func() config.PenpaiSettings { return config.PenpaiSettings{} },
+			ShipSettingsSnapshotFn:     func() config.ShipSettings { return config.ShipSettings{} },
 		},
 		urbitOps: RuntimeUrbitOps{
 			UrbitConfAllFn: func() map[string]structs.UrbitDocker { return map[string]structs.UrbitDocker{} },
@@ -43,8 +46,8 @@ func TestLoadLlamaDisabledNoop(t *testing.T) {
 	var stopped, started, updated bool
 
 	rt := testLlamaRuntime(t.TempDir())
-	rt.configOps.ConfFn = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: false}}
+	rt.configOps.PenpaiSettingsSnapshotFn = func() config.PenpaiSettings {
+		return config.PenpaiSettings{Allowed: false}
 	}
 	rt.containerOps.StopContainerByNameFn = func(string) error {
 		stopped = true
@@ -73,12 +76,10 @@ func TestLoadLlamaStartsAndUpdatesState(t *testing.T) {
 	var updatedState structs.ContainerState
 
 	rt := testLlamaRuntime(t.TempDir())
-	rt.configOps.ConfFn = func() structs.SysConfig {
-		return structs.SysConfig{
-			PenpaiConfig: structs.PenpaiConfig{
-				PenpaiAllow:   true,
-				PenpaiRunning: false,
-			},
+	rt.configOps.PenpaiSettingsSnapshotFn = func() config.PenpaiSettings {
+		return config.PenpaiSettings{
+			Allowed: true,
+			Running: false,
 		}
 	}
 	rt.containerOps.StopContainerByNameFn = func(name string) error {
@@ -110,12 +111,10 @@ func TestLoadLlamaStartsAndUpdatesState(t *testing.T) {
 
 func TestLoadLlamaStartError(t *testing.T) {
 	rt := testLlamaRuntime(t.TempDir())
-	rt.configOps.ConfFn = func() structs.SysConfig {
-		return structs.SysConfig{
-			PenpaiConfig: structs.PenpaiConfig{
-				PenpaiAllow:   true,
-				PenpaiRunning: true,
-			},
+	rt.configOps.PenpaiSettingsSnapshotFn = func() config.PenpaiSettings {
+		return config.PenpaiSettings{
+			Allowed: true,
+			Running: true,
 		}
 	}
 	rt.containerOps.StartContainerFn = func(string, string) (structs.ContainerState, error) {
@@ -166,16 +165,14 @@ func TestLlamaApiContainerConfBuildsExpectedConfig(t *testing.T) {
 		return nil
 	}
 
-	rt.configOps.ConfFn = func() structs.SysConfig {
-		return structs.SysConfig{
-			ConnectivityConfig: structs.ConnectivityConfig{
-				Piers: []string{"~zod", "~bus"},
-			},
-			PenpaiConfig: structs.PenpaiConfig{
-				PenpaiActive: "phi.gguf",
-				PenpaiModels: []structs.Penpai{
-					{ModelName: "phi.gguf", ModelUrl: "https://models.example/phi.gguf"},
-				},
+	rt.configOps.ShipSettingsSnapshotFn = func() config.ShipSettings {
+		return config.ShipSettings{Piers: []string{"~zod", "~bus"}}
+	}
+	rt.configOps.PenpaiSettingsSnapshotFn = func() config.PenpaiSettings {
+		return config.PenpaiSettings{
+			ActiveModel: "phi.gguf",
+			Models: []structs.Penpai{
+				{ModelName: "phi.gguf", ModelUrl: "https://models.example/phi.gguf"},
 			},
 		}
 	}
@@ -214,13 +211,14 @@ func TestLlamaApiContainerConfErrorsWhenActiveModelMissing(t *testing.T) {
 	rt.volumeOps.VolumeExistsFn = func(string) (bool, error) { return true, nil }
 	rt.containerOps.AddOrGetNetworkFn = func(string) (string, error) { return "llama-net", nil }
 	rt.fileOps.WriteFileFn = func(string, []byte, os.FileMode) error { return nil }
-	rt.configOps.ConfFn = func() structs.SysConfig {
-		return structs.SysConfig{
-			PenpaiConfig: structs.PenpaiConfig{
-				PenpaiActive: "missing-model",
-				PenpaiModels: []structs.Penpai{{ModelName: "other-model", ModelUrl: "url"}},
-			},
+	rt.configOps.PenpaiSettingsSnapshotFn = func() config.PenpaiSettings {
+		return config.PenpaiSettings{
+			ActiveModel: "missing-model",
+			Models:      []structs.Penpai{{ModelName: "other-model", ModelUrl: "url"}},
 		}
+	}
+	rt.configOps.ShipSettingsSnapshotFn = func() config.ShipSettings {
+		return config.ShipSettings{Piers: []string{"~zod"}}
 	}
 
 	_, _, err := llamaApiContainerConfWithRuntime(llamaRuntimeFromDocker(rt))

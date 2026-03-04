@@ -46,14 +46,14 @@ var (
 func defaultC2CModeDependencies() c2cModeDependencies {
 	return c2cModeDependencies{
 		c2cModeServiceDependencies: c2cModeServiceDependencies{
-			radio:          newWiFiRadioService(DefaultWiFiRuntime()),
+				radio:          newWiFiRadioService(NewWiFiRuntime()),
 			accessPoint:    defaultAccessPointLifecycle,
 			getStoredSSIDs: func(ssids []string) { C2CStoredSSIDs = ssids },
 		},
 		c2cModeLifecycleDependencies: c2cModeLifecycleDependencies{
-			startResolved:   func() error { return runSystemdResolvedForRuntime(DefaultWiFiRuntime(), "start") },
-			stopResolved:    func() error { return runSystemdResolvedForRuntime(DefaultWiFiRuntime(), "stop") },
-			rebootSystem:    func() error { return runRebootCommandForRuntime(DefaultWiFiRuntime()) },
+			startResolved:   func() error { return runSystemdResolvedForRuntime(NewWiFiRuntime(), "start") },
+			stopResolved:    func() error { return runSystemdResolvedForRuntime(NewWiFiRuntime(), "stop") },
+			rebootSystem:    func() error { return runRebootCommandForRuntime(NewWiFiRuntime()) },
 			pause:           func(d time.Duration) { time.Sleep(d) },
 			publishInterval: func(event string) { ConfChannel() <- event },
 		},
@@ -198,7 +198,7 @@ func runSystemdResolvedForRuntime(runtime wifiRuntime, mode string) error {
 
 // EnableResolved starts the systemd-resolved service for default runtime operations.
 func EnableResolved() error {
-	_, err := DefaultWiFiRuntime().RunCommand("systemctl", "start", "systemd-resolved")
+	_, err := NewWiFiRuntime().RunCommand("systemctl", "start", "systemd-resolved")
 	if err != nil {
 		return fmt.Errorf("failed to start systemd-resolved: %w", err)
 	}

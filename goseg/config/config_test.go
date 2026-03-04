@@ -41,72 +41,72 @@ func TestGetSHA256(t *testing.T) {
 
 func TestMergeConfigsNewInstallSetupAndSalt(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
-	defaultCfg.Setup = "complete"
-	defaultCfg.EndpointUrl = "default.endpoint"
+	defaultCfg.Runtime.Setup = "complete"
+	defaultCfg.Connectivity.EndpointUrl = "default.endpoint"
 	customCfg := structs.SysConfig{}
-	customCfg.PwHash = ""
+	customCfg.AuthSession.PwHash = ""
 
 	merged := mergeConfigs(defaultCfg, customCfg)
-	if merged.Setup != "start" {
-		t.Fatalf("expected setup=start for new install, got %q", merged.Setup)
+	if merged.Runtime.Setup != "start" {
+		t.Fatalf("expected setup=start for new install, got %q", merged.Runtime.Setup)
 	}
-	if merged.Salt == "" {
+	if merged.AuthSession.Salt == "" {
 		t.Fatal("expected salt to be generated for new install")
 	}
 }
 
 func TestMergeConfigsPrefersCustomEndpoint(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
-	defaultCfg.EndpointUrl = "default.endpoint"
+	defaultCfg.Connectivity.EndpointUrl = "default.endpoint"
 	customCfg := structs.SysConfig{}
-	customCfg.EndpointUrl = "custom.endpoint"
-	customCfg.PwHash = "hash"
+	customCfg.Connectivity.EndpointUrl = "custom.endpoint"
+	customCfg.AuthSession.PwHash = "hash"
 
 	merged := mergeConfigs(defaultCfg, customCfg)
-	if merged.EndpointUrl != "custom.endpoint" {
-		t.Fatalf("expected custom endpoint to win, got %q", merged.EndpointUrl)
+	if merged.Connectivity.EndpointUrl != "custom.endpoint" {
+		t.Fatalf("expected custom endpoint to win, got %q", merged.Connectivity.EndpointUrl)
 	}
 }
 
 func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
-	defaultCfg.GracefulExit = true
-	defaultCfg.Setup = "complete"
-	defaultCfg.LastKnownMDNS = "default-mdns"
-	defaultCfg.EndpointUrl = "https://default.endpoint"
-	defaultCfg.ApiVersion = "v2"
-	defaultCfg.NetCheck = "default-netcheck"
-	defaultCfg.UpdateMode = "default-mode"
-	defaultCfg.UpdateUrl = "https://default-update"
-	defaultCfg.UpdateBranch = "main"
-	defaultCfg.SwapVal = 99
-	defaultCfg.SwapFile = "/default/swap"
-	defaultCfg.KeyFile = "/default/key"
-	defaultCfg.DockerData = "/default/docker-data"
-	defaultCfg.WgOn = true
-	defaultCfg.WgRegistered = true
-	defaultCfg.UpdateInterval = 15
-	defaultCfg.C2cInterval = 2000
-	defaultCfg.GsVersion = "v2.0"
-	defaultCfg.CfgDir = "/default/cfg"
-	defaultCfg.BinHash = "bin-default"
-	defaultCfg.Pubkey = "default-pub"
-	defaultCfg.Privkey = "default-priv"
-	defaultCfg.PwHash = "old-hash"
-	defaultCfg.DiskWarning = map[string]structs.DiskWarning{
+	defaultCfg.Runtime.GracefulExit = true
+	defaultCfg.Runtime.Setup = "complete"
+	defaultCfg.Runtime.LastKnownMDNS = "default-mdns"
+	defaultCfg.Connectivity.EndpointUrl = "https://default.endpoint"
+	defaultCfg.Connectivity.ApiVersion = "v2"
+	defaultCfg.Connectivity.NetCheck = "default-netcheck"
+	defaultCfg.Connectivity.UpdateMode = "default-mode"
+	defaultCfg.Connectivity.UpdateUrl = "https://default-update"
+	defaultCfg.Connectivity.UpdateBranch = "main"
+	defaultCfg.Runtime.SwapVal = 99
+	defaultCfg.Runtime.SwapFile = "/default/swap"
+	defaultCfg.AuthSession.KeyFile = "/default/key"
+	defaultCfg.Runtime.DockerData = "/default/docker-data"
+	defaultCfg.Connectivity.WgOn = true
+	defaultCfg.Connectivity.WgRegistered = true
+	defaultCfg.Runtime.UpdateInterval = 15
+	defaultCfg.Connectivity.C2cInterval = 2000
+	defaultCfg.Runtime.GsVersion = "v2.0"
+	defaultCfg.Runtime.CfgDir = "/default/cfg"
+	defaultCfg.Runtime.BinHash = "bin-default"
+	defaultCfg.Startram.Pubkey = "default-pub"
+	defaultCfg.Startram.Privkey = "default-priv"
+	defaultCfg.AuthSession.PwHash = "old-hash"
+	defaultCfg.Connectivity.DiskWarning = map[string]structs.DiskWarning{
 		"data": {Eighty: true},
 	}
-	defaultCfg.PenpaiModels = []structs.Penpai{
+	defaultCfg.Penpai.PenpaiModels = []structs.Penpai{
 		{ModelName: "default-a"},
 		{ModelName: "default-b"},
 	}
-	defaultCfg.PenpaiActive = "default-a"
-	defaultCfg.Disable502 = true
-	defaultCfg.SnapTime = 14
-	defaultCfg.PenpaiAllow = true
-	defaultCfg.PenpaiRunning = true
-	defaultCfg.PenpaiCores = 8
-	defaultCfg.StartramSetReminder = struct {
+	defaultCfg.Penpai.PenpaiActive = "default-a"
+	defaultCfg.Runtime.Disable502 = true
+	defaultCfg.Runtime.SnapTime = 14
+	defaultCfg.Penpai.PenpaiAllow = true
+	defaultCfg.Penpai.PenpaiRunning = true
+	defaultCfg.Penpai.PenpaiCores = 8
+	defaultCfg.Startram.StartramSetReminder = struct {
 		One   bool `json:"one"`
 		Three bool `json:"three"`
 		Seven bool `json:"seven"`
@@ -115,14 +115,14 @@ func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing
 		Three: true,
 		Seven: true,
 	}
-	defaultCfg.Sessions = struct {
+	defaultCfg.AuthSession.Sessions = struct {
 		Authorized   map[string]structs.SessionInfo `json:"authorized"`
 		Unauthorized map[string]structs.SessionInfo `json:"unauthorized"`
 	}{
 		Authorized:   map[string]structs.SessionInfo{"default": {Hash: "authorized-default"}},
 		Unauthorized: map[string]structs.SessionInfo{"default": {Hash: "unauthorized-default"}},
 	}
-	defaultCfg.LinuxUpdates = struct {
+	defaultCfg.Runtime.LinuxUpdates = struct {
 		Value    int    `json:"value"`
 		Interval string `json:"interval"`
 	}{
@@ -132,91 +132,91 @@ func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing
 
 	// Ensure migration path is exercised and defaults are selected for empty custom fields.
 	customCfg := structs.SysConfig{}
-	customCfg.PwHash = "legacy-pwhash"
-	customCfg.Salt = "custom-salt"
+	customCfg.AuthSession.PwHash = "legacy-pwhash"
+	customCfg.AuthSession.Salt = "custom-salt"
 
 	merged := MergeConfigs(defaultCfg, customCfg)
-	if merged.Setup != "complete" {
-		t.Fatalf("expected setup=complete for migration path, got %q", merged.Setup)
+	if merged.Runtime.Setup != "complete" {
+		t.Fatalf("expected setup=complete for migration path, got %q", merged.Runtime.Setup)
 	}
-	if merged.LastKnownMDNS != defaultCfg.LastKnownMDNS {
+	if merged.Runtime.LastKnownMDNS != defaultCfg.Runtime.LastKnownMDNS {
 		t.Fatalf("expected last known mdns to use default when custom is empty")
 	}
-	if merged.EndpointUrl != defaultCfg.EndpointUrl || merged.ApiVersion != defaultCfg.ApiVersion {
+	if merged.Connectivity.EndpointUrl != defaultCfg.Connectivity.EndpointUrl || merged.Connectivity.ApiVersion != defaultCfg.Connectivity.ApiVersion {
 		t.Fatalf("expected defaults for empty custom scalar fields")
 	}
-	if merged.PwHash != customCfg.PwHash {
+	if merged.AuthSession.PwHash != customCfg.AuthSession.PwHash {
 		t.Fatalf("expected custom pwhash to be preserved when provided")
 	}
-	if merged.StartramSetReminder != defaultCfg.StartramSetReminder {
+	if merged.Startram.StartramSetReminder != defaultCfg.Startram.StartramSetReminder {
 		t.Fatalf("expected startram reminders to merge using OR semantics")
 	}
-	if merged.Sessions.Authorized == nil || merged.Sessions.Unauthorized == nil {
+	if merged.AuthSession.Sessions.Authorized == nil || merged.AuthSession.Sessions.Unauthorized == nil {
 		t.Fatalf("expected session maps to fall back to defaults when custom is nil")
 	}
-	if merged.CfgDir != defaultCfg.CfgDir || merged.BinHash != defaultCfg.BinHash {
+	if merged.Runtime.CfgDir != defaultCfg.Runtime.CfgDir || merged.Runtime.BinHash != defaultCfg.Runtime.BinHash {
 		t.Fatalf("expected default config values when custom values are empty")
 	}
-	if merged.Disable502 != defaultCfg.Disable502 {
+	if merged.Runtime.Disable502 != defaultCfg.Runtime.Disable502 {
 		t.Fatalf("expected default Disable502 when custom is false")
 	}
-	if merged.PenpaiAllow != true {
+	if merged.Penpai.PenpaiAllow != true {
 		t.Fatalf("expected custom false penpai allow to inherit from default true")
 	}
-	if merged.PenpaiRunning != false {
+	if merged.Penpai.PenpaiRunning != false {
 		t.Fatalf("expected custom false penpai running to remain false")
 	}
-	if merged.PenpaiCores != defaultCfg.PenpaiCores {
+	if merged.Penpai.PenpaiCores != defaultCfg.Penpai.PenpaiCores {
 		t.Fatalf("expected default penpai cores when custom is zero")
 	}
-	if merged.PenpaiActive != defaultCfg.PenpaiActive {
+	if merged.Penpai.PenpaiActive != defaultCfg.Penpai.PenpaiActive {
 		t.Fatalf("expected default penpai active when custom value empty")
 	}
-	if merged.DiskWarning != nil {
+	if merged.Connectivity.DiskWarning != nil {
 		t.Fatalf("expected custom nil disk warning to be assigned as-is")
 	}
-	if merged.PenpaiModels == nil || len(merged.PenpaiModels) != len(defaultCfg.PenpaiModels) {
+	if merged.Penpai.PenpaiModels == nil || len(merged.Penpai.PenpaiModels) != len(defaultCfg.Penpai.PenpaiModels) {
 		t.Fatalf("expected latest penpai model list to come from default config")
 	}
-	if merged.Salt != customCfg.Salt {
+	if merged.AuthSession.Salt != customCfg.AuthSession.Salt {
 		t.Fatalf("expected custom salt to be propagated when default salt is not set and pwhash present")
 	}
 }
 
 func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
-	defaultCfg.GracefulExit = true
-	defaultCfg.LastKnownMDNS = "default-mdns"
-	defaultCfg.Setup = "default-setup"
-	defaultCfg.EndpointUrl = "https://default.endpoint"
-	defaultCfg.ApiVersion = "v2"
-	defaultCfg.Piers = []string{"default"}
-	defaultCfg.NetCheck = "default-netcheck"
-	defaultCfg.UpdateMode = "default-mode"
-	defaultCfg.UpdateUrl = "https://default-update"
-	defaultCfg.UpdateBranch = "default"
-	defaultCfg.SwapVal = 10
-	defaultCfg.SwapFile = "/default/swap"
-	defaultCfg.KeyFile = "/default/key"
-	defaultCfg.DockerData = "/default/docker"
-	defaultCfg.WgOn = true
-	defaultCfg.WgRegistered = true
-	defaultCfg.C2cInterval = 1200
-	defaultCfg.GsVersion = "default-gs"
-	defaultCfg.CfgDir = "/default/cfg"
-	defaultCfg.UpdateInterval = 30
-	defaultCfg.BinHash = "default-bin"
-	defaultCfg.Pubkey = "default-pub"
-	defaultCfg.Privkey = "default-priv"
-	defaultCfg.PenpaiModels = []structs.Penpai{
+	defaultCfg.Runtime.GracefulExit = true
+	defaultCfg.Runtime.LastKnownMDNS = "default-mdns"
+	defaultCfg.Runtime.Setup = "default-setup"
+	defaultCfg.Connectivity.EndpointUrl = "https://default.endpoint"
+	defaultCfg.Connectivity.ApiVersion = "v2"
+	defaultCfg.Connectivity.Piers = []string{"default"}
+	defaultCfg.Connectivity.NetCheck = "default-netcheck"
+	defaultCfg.Connectivity.UpdateMode = "default-mode"
+	defaultCfg.Connectivity.UpdateUrl = "https://default-update"
+	defaultCfg.Connectivity.UpdateBranch = "default"
+	defaultCfg.Runtime.SwapVal = 10
+	defaultCfg.Runtime.SwapFile = "/default/swap"
+	defaultCfg.AuthSession.KeyFile = "/default/key"
+	defaultCfg.Runtime.DockerData = "/default/docker"
+	defaultCfg.Connectivity.WgOn = true
+	defaultCfg.Connectivity.WgRegistered = true
+	defaultCfg.Connectivity.C2cInterval = 1200
+	defaultCfg.Runtime.GsVersion = "default-gs"
+	defaultCfg.Runtime.CfgDir = "/default/cfg"
+	defaultCfg.Runtime.UpdateInterval = 30
+	defaultCfg.Runtime.BinHash = "default-bin"
+	defaultCfg.Startram.Pubkey = "default-pub"
+	defaultCfg.Startram.Privkey = "default-priv"
+	defaultCfg.Penpai.PenpaiModels = []structs.Penpai{
 		{ModelName: "alpha"},
 		{ModelName: "beta"},
 	}
-	defaultCfg.PenpaiActive = "alpha"
-	defaultCfg.Disable502 = false
-	defaultCfg.SnapTime = 7
-	defaultCfg.PenpaiAllow = true
-	defaultCfg.StartramSetReminder = struct {
+	defaultCfg.Penpai.PenpaiActive = "alpha"
+	defaultCfg.Runtime.Disable502 = false
+	defaultCfg.Runtime.SnapTime = 7
+	defaultCfg.Penpai.PenpaiAllow = true
+	defaultCfg.Startram.StartramSetReminder = struct {
 		One   bool `json:"one"`
 		Three bool `json:"three"`
 		Seven bool `json:"seven"`
@@ -225,17 +225,17 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 		Three: true,
 		Seven: true,
 	}
-	defaultCfg.DiskWarning = map[string]structs.DiskWarning{
+	defaultCfg.Connectivity.DiskWarning = map[string]structs.DiskWarning{
 		"default": {Eighty: true},
 	}
-	defaultCfg.Sessions = struct {
+	defaultCfg.AuthSession.Sessions = struct {
 		Authorized   map[string]structs.SessionInfo `json:"authorized"`
 		Unauthorized map[string]structs.SessionInfo `json:"unauthorized"`
 	}{
 		Authorized:   map[string]structs.SessionInfo{"default": {Hash: "default-auth"}},
 		Unauthorized: map[string]structs.SessionInfo{"default": {Hash: "default-unauth"}},
 	}
-	defaultCfg.LinuxUpdates = struct {
+	defaultCfg.Runtime.LinuxUpdates = struct {
 		Value    int    `json:"value"`
 		Interval string `json:"interval"`
 	}{
@@ -244,89 +244,89 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	}
 
 	customCfg := structs.SysConfig{}
-	customCfg.GracefulExit = false
-	customCfg.LastKnownMDNS = "custom-mdns"
-	customCfg.Setup = "custom-setup"
-	customCfg.PwHash = "present"
-	customCfg.EndpointUrl = "https://custom.endpoint"
-	customCfg.ApiVersion = "v10"
-	customCfg.Piers = []string{"a", "b", "c"}
-	customCfg.NetCheck = "custom-netcheck"
-	customCfg.UpdateMode = "poll"
-	customCfg.UpdateUrl = "https://custom-update"
-	customCfg.UpdateBranch = "stable"
-	customCfg.SwapVal = 20
-	customCfg.SwapFile = "/custom/swap"
-	customCfg.KeyFile = "/custom/key"
-	customCfg.DockerData = "/custom/docker"
-	customCfg.WgOn = false
-	customCfg.WgRegistered = false
-	customCfg.Sessions = structs.AuthSessionBag{
+	customCfg.Runtime.GracefulExit = false
+	customCfg.Runtime.LastKnownMDNS = "custom-mdns"
+	customCfg.Runtime.Setup = "custom-setup"
+	customCfg.AuthSession.PwHash = "present"
+	customCfg.Connectivity.EndpointUrl = "https://custom.endpoint"
+	customCfg.Connectivity.ApiVersion = "v10"
+	customCfg.Connectivity.Piers = []string{"a", "b", "c"}
+	customCfg.Connectivity.NetCheck = "custom-netcheck"
+	customCfg.Connectivity.UpdateMode = "poll"
+	customCfg.Connectivity.UpdateUrl = "https://custom-update"
+	customCfg.Connectivity.UpdateBranch = "stable"
+	customCfg.Runtime.SwapVal = 20
+	customCfg.Runtime.SwapFile = "/custom/swap"
+	customCfg.AuthSession.KeyFile = "/custom/key"
+	customCfg.Runtime.DockerData = "/custom/docker"
+	customCfg.Connectivity.WgOn = false
+	customCfg.Connectivity.WgRegistered = false
+	customCfg.AuthSession.Sessions = structs.AuthSessionBag{
 		Authorized:   map[string]structs.SessionInfo{"custom": {Hash: "auth"}},
 		Unauthorized: map[string]structs.SessionInfo{"custom": {Hash: "unauth"}},
 	}
-	customCfg.LinuxUpdates = struct {
+	customCfg.Runtime.LinuxUpdates = struct {
 		Value    int    `json:"value"`
 		Interval string `json:"interval"`
 	}{
 		Value:    2,
 		Interval: "3m",
 	}
-	customCfg.C2cInterval = 3000
-	customCfg.GsVersion = "v10"
-	customCfg.CfgDir = "/custom/cfg"
-	customCfg.UpdateInterval = 60
-	customCfg.BinHash = "custom-bin"
-	customCfg.Pubkey = "custom-pub"
-	customCfg.Privkey = "custom-priv"
-	customCfg.PenpaiRunning = true
-	customCfg.PenpaiCores = 4
-	customCfg.Salt = "custom-salt"
-	customCfg.PenpaiAllow = true
-	customCfg.PenpaiActive = "beta"
-	customCfg.Disable502 = true
-	customCfg.SnapTime = 42
-	customCfg.RemoteBackupPassword = "rpw"
+	customCfg.Connectivity.C2cInterval = 3000
+	customCfg.Runtime.GsVersion = "v10"
+	customCfg.Runtime.CfgDir = "/custom/cfg"
+	customCfg.Runtime.UpdateInterval = 60
+	customCfg.Runtime.BinHash = "custom-bin"
+	customCfg.Startram.Pubkey = "custom-pub"
+	customCfg.Startram.Privkey = "custom-priv"
+	customCfg.Penpai.PenpaiRunning = true
+	customCfg.Penpai.PenpaiCores = 4
+	customCfg.AuthSession.Salt = "custom-salt"
+	customCfg.Penpai.PenpaiAllow = true
+	customCfg.Penpai.PenpaiActive = "beta"
+	customCfg.Runtime.Disable502 = true
+	customCfg.Runtime.SnapTime = 42
+	customCfg.Connectivity.RemoteBackupPassword = "rpw"
 
 	merged := MergeConfigs(defaultCfg, customCfg)
 
-	if !merged.GracefulExit {
+	if !merged.Runtime.GracefulExit {
 		t.Fatal("expected merged graceful exit from custom false or default true to be true")
 	}
-	if merged.LastKnownMDNS != customCfg.LastKnownMDNS || merged.EndpointUrl != customCfg.EndpointUrl {
+	if merged.Runtime.LastKnownMDNS != customCfg.Runtime.LastKnownMDNS || merged.Connectivity.EndpointUrl != customCfg.Connectivity.EndpointUrl {
 		t.Fatalf("expected non-empty custom string fields to override defaults")
 	}
-	if !reflect.DeepEqual(merged.Piers, customCfg.Piers) {
+	if !reflect.DeepEqual(merged.Connectivity.Piers, customCfg.Connectivity.Piers) {
 		t.Fatalf("expected custom piers to override defaults")
 	}
-	if merged.SwapVal != customCfg.SwapVal || merged.SwapFile != customCfg.SwapFile {
+	if merged.Runtime.SwapVal != customCfg.Runtime.SwapVal || merged.Runtime.SwapFile != customCfg.Runtime.SwapFile {
 		t.Fatalf("expected custom swap fields to override defaults")
 	}
-	if merged.StartramSetReminder != defaultCfg.StartramSetReminder {
+	if merged.Startram.StartramSetReminder != defaultCfg.Startram.StartramSetReminder {
 		t.Fatal("expected startram reminders to keep default false/true semantics with fallback")
 	}
-	if !reflect.DeepEqual(merged.Sessions.Authorized, customCfg.Sessions.Authorized) {
+	if !reflect.DeepEqual(merged.AuthSession.Sessions.Authorized, customCfg.AuthSession.Sessions.Authorized) {
 		t.Fatalf("expected custom session maps to override defaults")
 	}
-	if !reflect.DeepEqual(merged.LinuxUpdates, customCfg.LinuxUpdates) {
+	if !reflect.DeepEqual(merged.Runtime.LinuxUpdates, customCfg.Runtime.LinuxUpdates) {
 		t.Fatalf("expected custom linux update settings to override defaults")
 	}
-	if merged.PenpaiCores != customCfg.PenpaiCores {
+	if merged.Penpai.PenpaiCores != customCfg.Penpai.PenpaiCores {
 		t.Fatalf("expected non-zero custom penpai cores to override default")
 	}
-	if merged.PenpaiModels[0].ModelName != defaultCfg.PenpaiModels[0].ModelName {
+	if merged.Penpai.PenpaiModels[0].ModelName != defaultCfg.Penpai.PenpaiModels[0].ModelName {
 		t.Fatalf("expected default penpai models to remain source of truth")
 	}
-	if merged.PenpaiActive != customCfg.PenpaiActive {
+	if merged.Penpai.PenpaiActive != customCfg.Penpai.PenpaiActive {
 		t.Fatalf("expected valid custom active penpai model to be selected")
 	}
-	if merged.PwHash != customCfg.PwHash || merged.CfgDir != customCfg.CfgDir {
+	if merged.AuthSession.PwHash != customCfg.AuthSession.PwHash || merged.Runtime.CfgDir != customCfg.Runtime.CfgDir {
 		t.Fatalf("expected custom scalar overrides to propagate")
 	}
-	if merged.Disable502 != customCfg.Disable502 || merged.SnapTime != customCfg.SnapTime {
+	if merged.Runtime.Disable502 != customCfg.Runtime.Disable502 || merged.Runtime.SnapTime != customCfg.Runtime.SnapTime {
 		t.Fatalf("expected custom booleans and snap time to propagate when set")
 	}
-	if merged.RemoteBackupPassword != customCfg.RemoteBackupPassword {
+	if merged.Connectivity.RemoteBackupPassword != customCfg.Connectivity.RemoteBackupPassword {
 		t.Fatalf("expected remote backup password to propagate")
 	}
 }
@@ -391,7 +391,7 @@ type countingMerger struct {
 func (m *countingMerger) Merge(_ structs.SysConfig, _ structs.SysConfig) structs.SysConfig {
 	m.configMerged = true
 	cfg := structs.SysConfig{}
-	cfg.Setup = "counted"
+	cfg.Runtime.Setup = "counted"
 	return cfg
 }
 
@@ -407,8 +407,8 @@ func TestMergeConfigsDelegatesToConfiguredMerger(t *testing.T) {
 	if !merger.configMerged {
 		t.Fatalf("expected custom merger to be invoked")
 	}
-	if merged.Setup != "counted" {
-		t.Fatalf("unexpected merged config: got %q", merged.Setup)
+	if merged.Runtime.Setup != "counted" {
+		t.Fatalf("unexpected merged config: got %q", merged.Runtime.Setup)
 	}
 }
 
@@ -433,83 +433,83 @@ func TestMergeConfigsFallbackWhenMergerNilUsesDefaultMerger(t *testing.T) {
 	configMerger = nil
 
 	defaultConfig := structs.SysConfig{}
-	defaultConfig.GracefulExit = true
-	defaultConfig.LastKnownMDNS = "default.mdns"
-	defaultConfig.Setup = "complete"
-	defaultConfig.PwHash = "default-hash"
-	defaultConfig.EndpointUrl = "https://default"
-	defaultConfig.UpdateMode = "poll"
-	defaultConfig.PenpaiModels = []structs.Penpai{{ModelName: "default-a"}}
-	defaultConfig.PenpaiActive = "default-a"
-	defaultConfig.Sessions.Authorized = map[string]structs.SessionInfo{"default": {Hash: "hash"}}
-	defaultConfig.Sessions.Unauthorized = map[string]structs.SessionInfo{"default-unauth": {Hash: "hash"}}
+	defaultConfig.Runtime.GracefulExit = true
+	defaultConfig.Runtime.LastKnownMDNS = "default.mdns"
+	defaultConfig.Runtime.Setup = "complete"
+	defaultConfig.AuthSession.PwHash = "default-hash"
+	defaultConfig.Connectivity.EndpointUrl = "https://default"
+	defaultConfig.Connectivity.UpdateMode = "poll"
+	defaultConfig.Penpai.PenpaiModels = []structs.Penpai{{ModelName: "default-a"}}
+	defaultConfig.Penpai.PenpaiActive = "default-a"
+	defaultConfig.AuthSession.Sessions.Authorized = map[string]structs.SessionInfo{"default": {Hash: "hash"}}
+	defaultConfig.AuthSession.Sessions.Unauthorized = map[string]structs.SessionInfo{"default-unauth": {Hash: "hash"}}
 
 	customConfig := structs.SysConfig{}
-	customConfig.GracefulExit = false
-	customConfig.UpdateMode = ""
-	customConfig.PwHash = ""
+	customConfig.Runtime.GracefulExit = false
+	customConfig.Connectivity.UpdateMode = ""
+	customConfig.AuthSession.PwHash = ""
 
 	merged := MergeConfigs(defaultConfig, customConfig)
-	if merged.GracefulExit != true {
+	if merged.Runtime.GracefulExit != true {
 		t.Fatalf("expected graceful exit to keep default true")
 	}
-	if merged.LastKnownMDNS != defaultConfig.LastKnownMDNS {
+	if merged.Runtime.LastKnownMDNS != defaultConfig.Runtime.LastKnownMDNS {
 		t.Fatalf("expected default mdns when custom value missing")
 	}
-	if merged.EndpointUrl != defaultConfig.EndpointUrl {
+	if merged.Connectivity.EndpointUrl != defaultConfig.Connectivity.EndpointUrl {
 		t.Fatalf("expected default endpoint when custom missing")
 	}
-	if merged.Salt == "" {
+	if merged.AuthSession.Salt == "" {
 		t.Fatalf("expected generated salt when default config has empty salt and custom pw hash is empty")
 	}
 }
 
 func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 	defaultConfig := structs.SysConfig{}
-	defaultConfig.GracefulExit = false
-	defaultConfig.LastKnownMDNS = "default-mdns"
-	defaultConfig.Setup = "migrated"
-	defaultConfig.PwHash = "default-hash"
-	defaultConfig.EndpointUrl = "https://default-endpoint"
-	defaultConfig.ApiVersion = "1.0"
-	defaultConfig.Piers = []string{"default-pier"}
-	defaultConfig.NetCheck = "default-netcheck"
-	defaultConfig.UpdateMode = "default"
-	defaultConfig.UpdateUrl = "https://updates.example.com"
-	defaultConfig.UpdateBranch = "main"
-	defaultConfig.SwapVal = 1
-	defaultConfig.SwapFile = "/tmp/default-swap"
-	defaultConfig.KeyFile = "/tmp/default-key"
-	defaultConfig.DockerData = "default-docker"
-	defaultConfig.WgOn = false
-	defaultConfig.WgRegistered = false
-	defaultConfig.DiskWarning = map[string]structs.DiskWarning{"default": {Eighty: true}}
-	defaultConfig.C2cInterval = 1000
-	defaultConfig.GsVersion = "v1"
-	defaultConfig.CfgDir = "/default/cfg"
-	defaultConfig.UpdateInterval = 20
-	defaultConfig.BinHash = "default-bin"
-	defaultConfig.Pubkey = "default-pub"
-	defaultConfig.Privkey = "default-priv"
-	defaultConfig.Salt = "default-salt"
-	defaultConfig.PenpaiAllow = true
-	defaultConfig.PenpaiRunning = false
-	defaultConfig.PenpaiCores = 4
-	defaultConfig.PenpaiModels = []structs.Penpai{{ModelName: "mymodel"}}
-	defaultConfig.PenpaiActive = "mymodel"
-	defaultConfig.DisableSlsa = true
-	defaultConfig.Disable502 = true
-	defaultConfig.SnapTime = 12
-	defaultConfig.Sessions.Authorized = map[string]structs.SessionInfo{"user": {Hash: "old"}}
-	defaultConfig.Sessions.Unauthorized = map[string]structs.SessionInfo{"anon": {Hash: "anon-old"}}
-	defaultConfig.LinuxUpdates = struct {
+	defaultConfig.Runtime.GracefulExit = false
+	defaultConfig.Runtime.LastKnownMDNS = "default-mdns"
+	defaultConfig.Runtime.Setup = "migrated"
+	defaultConfig.AuthSession.PwHash = "default-hash"
+	defaultConfig.Connectivity.EndpointUrl = "https://default-endpoint"
+	defaultConfig.Connectivity.ApiVersion = "1.0"
+	defaultConfig.Connectivity.Piers = []string{"default-pier"}
+	defaultConfig.Connectivity.NetCheck = "default-netcheck"
+	defaultConfig.Connectivity.UpdateMode = "default"
+	defaultConfig.Connectivity.UpdateUrl = "https://updates.example.com"
+	defaultConfig.Connectivity.UpdateBranch = "main"
+	defaultConfig.Runtime.SwapVal = 1
+	defaultConfig.Runtime.SwapFile = "/tmp/default-swap"
+	defaultConfig.AuthSession.KeyFile = "/tmp/default-key"
+	defaultConfig.Runtime.DockerData = "default-docker"
+	defaultConfig.Connectivity.WgOn = false
+	defaultConfig.Connectivity.WgRegistered = false
+	defaultConfig.Connectivity.DiskWarning = map[string]structs.DiskWarning{"default": {Eighty: true}}
+	defaultConfig.Connectivity.C2cInterval = 1000
+	defaultConfig.Runtime.GsVersion = "v1"
+	defaultConfig.Runtime.CfgDir = "/default/cfg"
+	defaultConfig.Runtime.UpdateInterval = 20
+	defaultConfig.Runtime.BinHash = "default-bin"
+	defaultConfig.Startram.Pubkey = "default-pub"
+	defaultConfig.Startram.Privkey = "default-priv"
+	defaultConfig.AuthSession.Salt = "default-salt"
+	defaultConfig.Penpai.PenpaiAllow = true
+	defaultConfig.Penpai.PenpaiRunning = false
+	defaultConfig.Penpai.PenpaiCores = 4
+	defaultConfig.Penpai.PenpaiModels = []structs.Penpai{{ModelName: "mymodel"}}
+	defaultConfig.Penpai.PenpaiActive = "mymodel"
+	defaultConfig.Startram.DisableSlsa = true
+	defaultConfig.Runtime.Disable502 = true
+	defaultConfig.Runtime.SnapTime = 12
+	defaultConfig.AuthSession.Sessions.Authorized = map[string]structs.SessionInfo{"user": {Hash: "old"}}
+	defaultConfig.AuthSession.Sessions.Unauthorized = map[string]structs.SessionInfo{"anon": {Hash: "anon-old"}}
+	defaultConfig.Runtime.LinuxUpdates = struct {
 		Value    int    `json:"value"`
 		Interval string `json:"interval"`
 	}{
 		Value:    1,
 		Interval: "2m",
 	}
-	defaultConfig.StartramSetReminder = struct {
+	defaultConfig.Startram.StartramSetReminder = struct {
 		One   bool `json:"one"`
 		Three bool `json:"three"`
 		Seven bool `json:"seven"`
@@ -520,21 +520,21 @@ func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 	}
 
 	customConfig := structs.SysConfig{}
-	customConfig.GracefulExit = true
-	customConfig.LastKnownMDNS = "" // force default
-	customConfig.EndpointUrl = "https://custom-endpoint"
-	customConfig.PwHash = "" // triggers new install logic
-	customConfig.SwapVal = 0 // fallback to default
-	customConfig.WgOn = true
-	customConfig.WgRegistered = true
-	customConfig.DiskWarning = map[string]structs.DiskWarning{"custom": {}}
-	customConfig.PenpaiAllow = true
-	customConfig.PenpaiRunning = true
-	customConfig.PenpaiCores = 0          // fallback
-	customConfig.PenpaiModels = nil       // ignored
-	customConfig.PenpaiActive = "invalid" // should fallback
-	customConfig.Disable502 = false       // default should stay true
-	customConfig.StartramSetReminder = struct {
+	customConfig.Runtime.GracefulExit = true
+	customConfig.Runtime.LastKnownMDNS = "" // force default
+	customConfig.Connectivity.EndpointUrl = "https://custom-endpoint"
+	customConfig.AuthSession.PwHash = "" // triggers new install logic
+	customConfig.Runtime.SwapVal = 0 // fallback to default
+	customConfig.Connectivity.WgOn = true
+	customConfig.Connectivity.WgRegistered = true
+	customConfig.Connectivity.DiskWarning = map[string]structs.DiskWarning{"custom": {}}
+	customConfig.Penpai.PenpaiAllow = true
+	customConfig.Penpai.PenpaiRunning = true
+	customConfig.Penpai.PenpaiCores = 0          // fallback
+	customConfig.Penpai.PenpaiModels = nil       // ignored
+	customConfig.Penpai.PenpaiActive = "invalid" // should fallback
+	customConfig.Runtime.Disable502 = false       // default should stay true
+	customConfig.Startram.StartramSetReminder = struct {
 		One   bool `json:"one"`
 		Three bool `json:"three"`
 		Seven bool `json:"seven"`
@@ -543,70 +543,70 @@ func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 		Three: true,
 		Seven: false,
 	}
-	customConfig.Sessions.Unauthorized = map[string]structs.SessionInfo{"new": {Hash: "new"}}
+	customConfig.AuthSession.Sessions.Unauthorized = map[string]structs.SessionInfo{"new": {Hash: "new"}}
 
 	merged := mergeConfigs(defaultConfig, customConfig)
-	if merged.GracefulExit != true {
+	if merged.Runtime.GracefulExit != true {
 		t.Fatalf("expected merged graceful exit true")
 	}
-	if merged.LastKnownMDNS != defaultConfig.LastKnownMDNS {
+	if merged.Runtime.LastKnownMDNS != defaultConfig.Runtime.LastKnownMDNS {
 		t.Fatalf("expected default mdns on empty custom value")
 	}
-	if merged.EndpointUrl != customConfig.EndpointUrl {
+	if merged.Connectivity.EndpointUrl != customConfig.Connectivity.EndpointUrl {
 		t.Fatalf("expected custom endpoint to win")
 	}
-	if merged.ApiVersion != defaultConfig.ApiVersion {
+	if merged.Connectivity.ApiVersion != defaultConfig.Connectivity.ApiVersion {
 		t.Fatalf("expected default API version when custom empty")
 	}
-	if merged.Piers[0] != defaultConfig.Piers[0] {
+	if merged.Connectivity.Piers[0] != defaultConfig.Connectivity.Piers[0] {
 		t.Fatalf("expected default piers for empty custom list")
 	}
-	if merged.NetCheck != defaultConfig.NetCheck {
+	if merged.Connectivity.NetCheck != defaultConfig.Connectivity.NetCheck {
 		t.Fatalf("expected default netcheck when custom empty")
 	}
-	if !merged.WgOn || !merged.WgRegistered {
+	if !merged.Connectivity.WgOn || !merged.Connectivity.WgRegistered {
 		t.Fatalf("expected bool-or flags to include custom true values")
 	}
-	if merged.StartramSetReminder.One != true || !merged.StartramSetReminder.Three || merged.StartramSetReminder.Seven {
+	if merged.Startram.StartramSetReminder.One != true || !merged.Startram.StartramSetReminder.Three || merged.Startram.StartramSetReminder.Seven {
 		t.Fatalf("unexpected startram reminder merge state")
 	}
-	if merged.PenpaiCores != defaultConfig.PenpaiCores {
+	if merged.Penpai.PenpaiCores != defaultConfig.Penpai.PenpaiCores {
 		t.Fatalf("expected default penpai cores when custom is zero")
 	}
-	if merged.PenpaiActive != defaultConfig.PenpaiActive {
+	if merged.Penpai.PenpaiActive != defaultConfig.Penpai.PenpaiActive {
 		t.Fatalf("expected default penpai active when custom active is invalid")
 	}
-	if merged.Disable502 != true {
+	if merged.Runtime.Disable502 != true {
 		t.Fatalf("expected default disable502 when custom is false")
 	}
-	if merged.Setup != "start" {
+	if merged.Runtime.Setup != "start" {
 		t.Fatalf("expected setup=start when custom pw hash is missing")
 	}
-	if merged.PwHash != defaultConfig.PwHash {
+	if merged.AuthSession.PwHash != defaultConfig.AuthSession.PwHash {
 		t.Fatalf("expected default pwhash when custom missing")
 	}
-	if merged.Salt == "" {
+	if merged.AuthSession.Salt == "" {
 		t.Fatalf("expected generated salt when starting setup")
 	}
-	if !merged.PenpaiAllow {
+	if !merged.Penpai.PenpaiAllow {
 		t.Fatalf("expected penpai allow true due custom override")
 	}
-	if !merged.PenpaiRunning {
+	if !merged.Penpai.PenpaiRunning {
 		t.Fatalf("expected penpai running from custom")
 	}
-	if len(merged.PenpaiModels) != len(defaultConfig.PenpaiModels) || merged.PenpaiModels[0].ModelName != defaultConfig.PenpaiModels[0].ModelName {
+	if len(merged.Penpai.PenpaiModels) != len(defaultConfig.Penpai.PenpaiModels) || merged.Penpai.PenpaiModels[0].ModelName != defaultConfig.Penpai.PenpaiModels[0].ModelName {
 		t.Fatalf("expected default penpai models")
 	}
-	if !reflect.DeepEqual(merged.Sessions.Unauthorized, customConfig.Sessions.Unauthorized) {
+	if !reflect.DeepEqual(merged.AuthSession.Sessions.Unauthorized, customConfig.AuthSession.Sessions.Unauthorized) {
 		t.Fatalf("expected custom unauthorized sessions")
 	}
-	if !reflect.DeepEqual(merged.Sessions.Authorized, defaultConfig.Sessions.Authorized) {
+	if !reflect.DeepEqual(merged.AuthSession.Sessions.Authorized, defaultConfig.AuthSession.Sessions.Authorized) {
 		t.Fatalf("expected default authorized sessions")
 	}
-	if !reflect.DeepEqual(merged.DiskWarning, customConfig.DiskWarning) {
+	if !reflect.DeepEqual(merged.Connectivity.DiskWarning, customConfig.Connectivity.DiskWarning) {
 		t.Fatalf("expected custom disk warning")
 	}
-	if merged.C2cInterval != defaultConfig.C2cInterval || merged.GsVersion != defaultConfig.GsVersion || merged.CfgDir != defaultConfig.CfgDir {
+	if merged.Connectivity.C2cInterval != defaultConfig.Connectivity.C2cInterval || merged.Runtime.GsVersion != defaultConfig.Runtime.GsVersion || merged.Runtime.CfgDir != defaultConfig.Runtime.CfgDir {
 		t.Fatalf("expected default scalar fields when custom zero/empty")
 	}
 }

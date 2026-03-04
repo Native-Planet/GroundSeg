@@ -47,7 +47,7 @@ func TestPenpaiHandlerValidationAndToggle(t *testing.T) {
 	}
 
 	confForPenpai = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: false}}
+		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: false}}
 	}
 	started := false
 	startContainerForPenpai = func(name, typ string) (structs.ContainerState, error) {
@@ -75,7 +75,7 @@ func TestPenpaiHandlerValidationAndToggle(t *testing.T) {
 	}
 
 	confForPenpai = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 	}
 	stopped := map[string]int{}
 	stopContainerByNameForPenpai = func(name string) error {
@@ -94,7 +94,7 @@ func TestPenpaiHandlerSetModelAndSetCores(t *testing.T) {
 	t.Cleanup(resetPenpaiSeams)
 
 	confForPenpai = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 	}
 	updateConfCalls := 0
 	updateConfTypedForPenpai = func(...config.ConfUpdateOption) error {
@@ -142,7 +142,7 @@ func TestPenpaiHandlerSetModelAndSetCores(t *testing.T) {
 func TestPenpaiHandlerPropagatesOperationalErrors(t *testing.T) {
 	t.Cleanup(resetPenpaiSeams)
 	confForPenpai = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 	}
 
 	stopContainerByNameForPenpai = func(string) error { return errors.New("stop failed") }

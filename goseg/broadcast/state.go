@@ -33,6 +33,73 @@ type broadcastStateRuntime struct {
 	startramCollector collectors.BroadcastStartramCollectorContract
 }
 
+func (runtime *broadcastStateRuntime) GetState() structs.AuthBroadcast {
+	if runtime == nil {
+		runtime = resolveDefaultBroadcastStateRuntime()
+	}
+	runtime.RLock()
+	defer runtime.RUnlock()
+	return cloneBroadcastState(runtime.broadcastState)
+}
+
+func (runtime *broadcastStateRuntime) UpdateBroadcast(next structs.AuthBroadcast) {
+	if runtime == nil {
+		runtime = resolveDefaultBroadcastStateRuntime()
+	}
+	runtime.Lock()
+	defer runtime.Unlock()
+	runtime.broadcastState = next
+}
+
+func (runtime *broadcastStateRuntime) GetScheduledPack(patp string) time.Time {
+	if runtime == nil {
+		runtime = resolveDefaultBroadcastStateRuntime()
+	}
+	runtime.packMu.RLock()
+	defer runtime.packMu.RUnlock()
+	nextPack, exists := runtime.scheduledPacks[patp]
+	if !exists {
+		return time.Time{}
+	}
+	return nextPack
+}
+
+func (runtime *broadcastStateRuntime) UpdateScheduledPack(patp string, meldNext time.Time) error {
+	if runtime == nil {
+		runtime = resolveDefaultBroadcastStateRuntime()
+	}
+	runtime.packMu.Lock()
+	defer runtime.packMu.Unlock()
+	runtime.scheduledPacks[patp] = meldNext
+	return nil
+}
+
+func (runtime *broadcastStateRuntime) PublishSchedulePack(reason string) error {
+	if runtime == nil {
+		runtime = resolveDefaultBroadcastStateRuntime()
+	}
+	select {
+	case runtime.schedulePackBus <- reason:
+		return nil
+	default:
+		return errSchedulePackBusFull
+	}
+}
+
+func (runtime *broadcastStateRuntime) SchedulePackEvents() <-chan string {
+	if runtime == nil {
+		runtime = resolveDefaultBroadcastStateRuntime()
+	}
+	return runtime.schedulePackBus
+}
+
+func (runtime *broadcastStateRuntime) BroadcastToClients() error {
+	if runtime == nil {
+		runtime = resolveDefaultBroadcastStateRuntime()
+	}
+	return broadcastToClientsWithRuntime(runtime)
+}
+
 var errSchedulePackBusFull = errors.New("broadcast schedule bus is full")
 
 func NewBroadcastStateRuntime() *broadcastStateRuntime {
@@ -55,25 +122,11 @@ func resolveDefaultBroadcastStateRuntime() *broadcastStateRuntime {
 	return defaultBroadcastStateRuntime
 }
 
-func PublishSchedulePack(reason string, runtime ...*broadcastStateRuntime) error {
-	resolved := resolveBroadcastStateRuntime(runtime...)
-	select {
-	case resolved.schedulePackBus <- reason:
-		return nil
-	default:
-		return errSchedulePackBusFull
-	}
-}
-
 func resolveBroadcastStateRuntime(runtime ...*broadcastStateRuntime) *broadcastStateRuntime {
 	if len(runtime) > 0 && runtime[0] != nil {
 		return runtime[0]
 	}
 	return resolveDefaultBroadcastStateRuntime()
-}
-
-func SchedulePackEvents(runtime ...*broadcastStateRuntime) <-chan string {
-	return resolveBroadcastStateRuntime(runtime...).schedulePackBus
 }
 
 // take in config file and addt'l info to initialize broadcast
@@ -82,8 +135,8 @@ func bootstrapBroadcastState(runtime ...*broadcastStateRuntime) error {
 	// this returns a map of ship:running status
 	zap.L().Info("Resolving pier status")
 	resolved := resolveBroadcastStateRuntime(runtime...)
-	state := GetState()
-	urbits, err := constructPierInfoWithRuntime(resolved, state.Urbits, GetScheduledPack)
+	state := resolved.GetState()
+	urbits, err := constructPierInfoWithRuntime(resolved, state.Urbits, resolved.GetScheduledPack)
 	if err != nil {
 		return fmt.Errorf("bootstrap broadcast state: %w", err)
 	}
@@ -101,11 +154,6 @@ func bootstrapBroadcastState(runtime ...*broadcastStateRuntime) error {
 	return nil
 }
 
-// put startram regions into broadcast struct
-func LoadStartramRegions() error {
-	return LoadStartramRegionsWithRuntime()
-}
-
 func LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime) error {
 	resolved := resolveBroadcastStateRuntime(runtime...)
 	zap.L().Info("Retrieving StarTram region info")
@@ -117,27 +165,6 @@ func LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime) error {
 	resolved.broadcastState.Profile.Startram.Info.Regions = regions
 	resolved.Unlock()
 	return nil
-}
-
-// this is for building the broadcast objects describing piers
-func ConstructPierInfo() (map[string]structs.Urbit, error) {
-	state := GetState()
-	return constructPierInfoWithRuntime(resolveBroadcastStateRuntime(), state.Urbits, GetScheduledPack)
-}
-
-// Return a clone of apps info built from config state.
-func constructAppsInfo() structs.Apps {
-	return constructAppsInfoWithRuntime(resolveBroadcastStateRuntime())
-}
-
-func constructProfileInfo() structs.Profile {
-	state := GetState()
-	return constructProfileInfoWithRuntime(resolveBroadcastStateRuntime(), state.Profile.Startram.Info.Regions)
-}
-
-// put together the system[usage] subobject
-func constructSystemInfo() structs.System {
-	return constructSystemInfoWithRuntime(resolveBroadcastStateRuntime())
 }
 
 func broadcastPierCollectorContract(runtime *broadcastStateRuntime) collectors.BroadcastPierCollectorContract {
@@ -175,41 +202,6 @@ func constructProfileInfoWithRuntime(runtime *broadcastStateRuntime, regions map
 
 func constructSystemInfoWithRuntime(runtime *broadcastStateRuntime) structs.System {
 	return broadcastInfoCollectorContract(runtime).CollectSystemInfo()
-}
-
-func UpdateScheduledPack(patp string, meldNext time.Time) error {
-	resolved := resolveBroadcastStateRuntime()
-	resolved.packMu.Lock()
-	defer resolved.packMu.Unlock()
-	resolved.scheduledPacks[patp] = meldNext
-	return nil
-}
-
-func GetScheduledPack(patp string) time.Time {
-	resolved := resolveBroadcastStateRuntime()
-	resolved.packMu.RLock()
-	defer resolved.packMu.RUnlock()
-	nextPack, exists := resolved.scheduledPacks[patp]
-	if !exists {
-		return time.Time{}
-	}
-	return nextPack
-}
-
-// stupid update method instead of psychotic recursion
-func UpdateBroadcast(broadcast structs.AuthBroadcast) {
-	resolved := resolveBroadcastStateRuntime()
-	resolved.Lock()
-	defer resolved.Unlock()
-	resolved.broadcastState = broadcast
-}
-
-// return broadcast state
-func GetState() structs.AuthBroadcast {
-	resolved := resolveBroadcastStateRuntime()
-	resolved.RLock()
-	defer resolved.RUnlock()
-	return cloneBroadcastState(resolved.broadcastState)
 }
 
 func cloneBroadcastState(in structs.AuthBroadcast) structs.AuthBroadcast {
@@ -264,7 +256,7 @@ func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 func ReloadUrbits() error {
 	zap.L().Info("Reloading ships in broadcast")
 	resolved := resolveBroadcastStateRuntime()
-	urbits, err := constructPierInfoWithRuntime(resolved, GetState().Urbits, GetScheduledPack)
+	urbits, err := constructPierInfoWithRuntime(resolved, resolved.GetState().Urbits, resolved.GetScheduledPack)
 	if err != nil {
 		return fmt.Errorf("reload urbit states for broadcast: %w", err)
 	}

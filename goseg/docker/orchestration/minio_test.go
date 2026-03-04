@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"errors"
+	"groundseg/config"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
@@ -36,7 +37,9 @@ func testMinIORuntime() dockerRuntime {
 		},
 	}
 	rt.configOps = RuntimeSnapshotOps{
-		ConfFn: func() structs.SysConfig { return structs.SysConfig{} },
+		StartramSettingsSnapshotFn: func() config.StartramSettings { return config.StartramSettings{} },
+		ShipSettingsSnapshotFn:     func() config.ShipSettings { return config.ShipSettings{} },
+		PenpaiSettingsSnapshotFn:   func() config.PenpaiSettings { return config.PenpaiSettings{} },
 	}
 	rt.urbitOps = RuntimeUrbitOps{
 		LoadUrbitConfigFn: func(string) error { return nil },
@@ -87,9 +90,10 @@ func TestGetPatpFromMinIOName(t *testing.T) {
 func TestLoadMCStartsContainerWhenRegistered(t *testing.T) {
 	rt := testMinIORuntime()
 	rt.configOps = RuntimeSnapshotOps{
-		ConfFn: func() structs.SysConfig {
-			return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{WgRegistered: true}}
+		StartramSettingsSnapshotFn: func() config.StartramSettings {
+			return config.StartramSettings{WgRegistered: true}
 		},
+		ShipSettingsSnapshotFn: func() config.ShipSettings { return config.ShipSettings{} },
 	}
 	rt.fileOps = RuntimeFileOps{
 		OpenFn:      func(string) (*os.File, error) { return nil, os.ErrNotExist },
@@ -133,8 +137,11 @@ func TestLoadMCStartsContainerWhenRegistered(t *testing.T) {
 func TestLoadMinIOsStartsPerPier(t *testing.T) {
 	rt := testMinIORuntime()
 	rt.configOps = RuntimeSnapshotOps{
-		ConfFn: func() structs.SysConfig {
-			return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{WgRegistered: true, Piers: []string{"~zod", "~bus"}}}
+		StartramSettingsSnapshotFn: func() config.StartramSettings {
+			return config.StartramSettings{WgRegistered: true}
+		},
+		ShipSettingsSnapshotFn: func() config.ShipSettings {
+			return config.ShipSettings{Piers: []string{"~zod", "~bus"}}
 		},
 	}
 	var started []string

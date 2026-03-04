@@ -1,0 +1,939 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg/goseg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/goseg/.desloppify/subagents/runs/20260303_185609/results/batch-3.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg/goseg
+Blind packet: /Users/chuah/NP/GroundSeg/goseg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Cross-cutting Sweep
+Batch dimensions: error_consistency
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- broadcast/state.go
+- broadcast/state_test.go
+- broadcast/loop_test.go
+- rectify/rectify_services.go
+- defaults/defaults.go
+- leak/broadcast_test.go
+- rectify/rectify_test.go
+- docker/orchestration/wireguard_test.go
+- docker/orchestration/subsystem/docker_test.go
+- leak/broadcast.go
+- docker/orchestration/wireguard.go
+- system/wifi_runtime_methods.go
+- leak/leak_test.go
+- broadcast/transitions.go
+- structs/configs.go
+- config/config_test.go
+- config/config_merge.go
+- importer/importer.go
+- defaults/version.go
+- accesspoint/accesspoint_test.go
+- startuporchestrator/startup_orchestrator.go
+- main.go
+- config/config_update_registry.go
+- docker/orchestration/runtime_ops.go
+- startuporchestrator/startup_orchestrator_test.go
+- main_test.go
+- routines/version.go
+- routines/logstream/logs.go
+- rectify/rectify.go
+- handler/systemsvc/system_test.go
+- docker/events/events.go
+- docker/orchestration/subsystem/subsystem_events.go
+- docker/lifecycle/planner.go
+- routines/system/system.go
+- docker/network/network.go
+- shipworkflow/operations_runtime.go
+- docker/orchestration/subsystem/subsystem_health.go
+- system/wifi_runtime_api.go
+- exporter/exporter_test.go
+- config/config_update_schema.go
+- config/urbit.go
+- docker/lifecycle/lifecycle_full_test.go
+- handler/ship/urbit_test.go
+- importer/extract_test.go
+- importer/importer_test.go
+- leak/handler_test.go
+- logger/logger_test.go
+- protocol/actions/actions_test.go
+- protocol/contracts/contracts_test.go
+- session/connection_registry.go
+- session/logstream_session_store.go
+- shipworkflow/startram_lifecycle_runtime.go
+- shipworkflow/urbit_operations_runtime.go
+- startram/backup_runtime_test.go
+- startram/state_sync_test.go
+- system/disk_test.go
+- system/metrics/metrics_test.go
+- system/storage/storage_test.go
+- system/wifi_test.go
+- uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "main.go killSwitchWithMode calls subsystem.GracefulShipExit() and ignores the returned error before forcing reboot, while adjacent paths in runServer and C2cCheckWith return/propagate errors.",
+        "shipworkflow/startram_lifecycle_runtime.go has multiple SvcDeleteFn failures that are only logged and then returns nil, so transitions can report success after partial unregister failure.",
+        "importer/importer.go configureUploadedPier defers cleanupMultipartFn without checking/reporting its error, unlike surrounding workflow steps that wrap and return errors.",
+        "config/config_update_registry.go uses panic when apply handler is missing, whereas config patch parsing/application in config/config_update_schema.go is otherwise error-return based."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_graceful_exit_failure_before_reboot",
+      "summary": "Kill-switch reboot path drops graceful-exit errors and proceeds as if shutdown succeeded.",
+      "related_files": [
+        "main.go",
+        "docker/orchestration/subsystem/subsystem_health.go"
+      ],
+      "evidence": [
+        "main.go:370 calls subsystem.GracefulShipExit() without checking error, then immediately executes reboot.",
+        "docker/orchestration/subsystem/subsystem_health.go:123-185 gracefulShipExit constructs and returns detailed wrapped errors for stop/poll failures, but that contract is discarded by caller.",
+        "This makes failure handling depend on call site instead of function contract, producing inconsistent behavior across shutdown paths."
+      ],
+      "suggestion": "Capture and handle the GracefulShipExit error in killSwitchWithMode: either abort reboot on failure, or proceed only after logging a structured warning and explicitly marking reboot as forced. Keep one documented policy for all graceful shutdown callers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "workflow_steps_log_and_continue_on_mutation_failures",
+      "summary": "State-mutating workflow steps inconsistently swallow errors, yielding false-success transitions.",
+      "related_files": [
+        "shipworkflow/startram_lifecycle_runtime.go",
+        "importer/importer.go"
+      ],
+      "evidence": [
+        "shipworkflow/startram_lifecycle_runtime.go:183-191 and 225-230 logs SvcDeleteFn failures and still returns nil from transition steps.",
+        "importer/importer.go:1094 defers cleanupMultipartFn(tempDir) and discards cleanup failure entirely.",
+        "In the same files, many neighboring operations use wrapped returned errors (e.g., stop wireguard, workflow/post-workflow runs), so similar failure types have different propagation semantics."
+      ],
+      "suggestion": "Define explicit error policy per step category (critical, compensating, best-effort) and encode it consistently: aggregate best-effort failures with errors.Join into final transition/import result, or emit explicit 'partial success' status instead of returning nil.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "panic_used_for_runtime_config_validation",
+      "summary": "Config patch registry uses panic for missing apply handlers while sibling config code uses error returns.",
+      "related_files": [
+        "config/config_update_registry.go",
+        "config/config_update_schema.go"
+      ],
+      "evidence": [
+        "config/config_update_registry.go:29-31 panics when spec.apply is nil.",
+        "config/config_update_schema.go parse/apply paths are designed around returning errors (e.g., parsePatch and unsupportedConfPatchField).",
+        "This introduces a different failure mode (process crash) for configuration mistakes in an otherwise recoverable error surface."
+      ],
+      "suggestion": "Replace panic with returned configuration-construction error and fail initialization through existing error-return paths; if compile-time guard is desired, enforce via typed constructors/tests rather than runtime panic.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single enforced policy for when workflow/transition errors must be propagated vs logged-and-continued.",
+      "Mixed defensive strategy in config/runtime setup (panic for programmer errors, returned errors for runtime errors) without a uniform boundary."
+    ],
+    "likely_symptoms": [
+      "ignored_graceful_exit_failure_before_reboot",
+      "workflow_steps_log_and_continue_on_mutation_failures"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg/goseg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cb50e-c97d-7121-980e-8b51cf095d55
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg/goseg
+Blind packet: /Users/chuah/NP/GroundSeg/goseg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Cross-cutting Sweep
+Batch dimensions: error_consistency
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- broadcast/state.go
+- broadcast/state_test.go
+- broadcast/loop_test.go
+- rectify/rectify_services.go
+- defaults/defaults.go
+- leak/broadcast_test.go
+- rectify/rectify_test.go
+- docker/orchestration/wireguard_test.go
+- docker/orchestration/subsystem/docker_test.go
+- leak/broadcast.go
+- docker/orchestration/wireguard.go
+- system/wifi_runtime_methods.go
+- leak/leak_test.go
+- broadcast/transitions.go
+- structs/configs.go
+- config/config_test.go
+- config/config_merge.go
+- importer/importer.go
+- defaults/version.go
+- accesspoint/accesspoint_test.go
+- startuporchestrator/startup_orchestrator.go
+- main.go
+- config/config_update_registry.go
+- docker/orchestration/runtime_ops.go
+- startuporchestrator/startup_orchestrator_test.go
+- main_test.go
+- routines/version.go
+- routines/logstream/logs.go
+- rectify/rectify.go
+- handler/systemsvc/system_test.go
+- docker/events/events.go
+- docker/orchestration/subsystem/subsystem_events.go
+- docker/lifecycle/planner.go
+- routines/system/system.go
+- docker/network/network.go
+- shipworkflow/operations_runtime.go
+- docker/orchestration/subsystem/subsystem_health.go
+- system/wifi_runtime_api.go
+- exporter/exporter_test.go
+- config/config_update_schema.go
+- config/urbit.go
+- docker/lifecycle/lifecycle_full_test.go
+- handler/ship/urbit_test.go
+- importer/extract_test.go
+- importer/importer_test.go
+- leak/handler_test.go
+- logger/logger_test.go
+- protocol/actions/actions_test.go
+- protocol/contracts/contracts_test.go
+- session/connection_registry.go
+- session/logstream_session_store.go
+- shipworkflow/startram_lifecycle_runtime.go
+- shipworkflow/urbit_operations_runtime.go
+- startram/backup_runtime_test.go
+- startram/state_sync_test.go
+- system/disk_test.go
+- system/metrics/metrics_test.go
+- system/storage/storage_test.go
+- system/wifi_test.go
+- uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll load the blind review packet first, then inspect the listed files specifically for `error_consistency` issues and produce the JSON assessment without modifying code.
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg/goseg && cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg/gosegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg/goseg && rg --files | wc -l' in /Users/chuah/NP/GroundSeg/goseg succeeded in 51ms:
+Total output lines: 5679
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "abstraction_fitness",
+    "design_coherence",
+    "error_consistency"
+  ],
+  "dimension_prompts": {
+    "abstraction_fitness": {
+      "description": "Abstractions that pay for themselves with real leverage",
+      "look_for": [
+        "Pass-through wrappers or interfaces that add no behavior, policy, or translation",
+        "Cross-cutting wrapper chains where call depth increases without added value",
+        "Interface/protocol families where most declared contracts have only one implementation",
+        "Systemic util/helper dumping grounds that create low cohesion across modules",
+        "Leaky abstractions: callers consistently bypass intended interfaces",
+ succeeded in 51ms:
+     582
+codex
+I’ve extracted the packet constraints; next I’m scanning only the assigned files for error-handling patterns (`err` checks, wrapping, swallowed errors, and inconsistent return behavior) to collect concrete evidence.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && files='broadcast/state.go broadcast/state_test.go broadcast/loop_test.go rectify/rectify_services.go defaults/defaults.go leak/broadcast_test.go rectify/rectify_test.go docker/orchestration/wireguard_test.go docker/orchestration/subsystem/docker_test.go leak/broadcast.go docker/orchestration/wireguard.go system/wifi_runtime_methods.go leak/leak_test.go broadcast/transitions.go structs/configs.go config/config_test.go config/config_merge.go importer/importer.go defaults/version.go accesspoint/accesspoint_test.go startuporchestrator/startup_orchestrator.go main.go config/config_update_registry.go docker/orchestration/runtime_ops.go startuporchestrator/startup_orchestrator_test.go main_test.go routines/version.go routines/logstream/logs.go rectify/rectify.go handler/systemsvc/system_test.go docker/events/events.go docker/orchestration/subsystem/subsystem_events.go docker/lifecycle/planner.go routines/system/system.go docker/network/network.go shipworkflow/operations_runtime.go docker/orchestration/subsystem/subsystem_health.go system/wifi_runtime_api.go exporter/exporter_test.go config/config_update_schema.go config/urbit.go docker/lifecycle/lifecycle_full_test.go handler/ship/urbit_test.go importer/extract_test.go importer/importer_test.go leak/handler_test.go logger/logger_test.go protocol/actions/actions_test.go protocol/contracts/contracts_test.go session/connection_registry.go session/logstream_session_store.go shipworkflow/startram_lifecycle_runtime.go shipworkflow/urbit_operations_runtime.go startram/backup_runtime_test.go startram/state_sync_test.go system/disk_test.go system/metrics/metrics_test.go system/storage/storage_test.go system/wifi_test.go uploadsvc/service_test.go'; rg -n \"(err\\s*:=|if err "'!= nil|return nil|fmt'"\\.Errorf\\(|errors\\.New\\(|panic\\(|log\\.Print|logger\\.Logger\\.(Error|Warn)|_\\s*=\\s*.*err|os\\.(ReadFile|WriteFile)|json\\.(Unmarshal|Marshal))\" "'$files' in /Users/chuah/NP/GroundSeg/goseg exited 2 in 51ms:
+rg: broadcast/state.go broadcast/state_test.go broadcast/loop_test.go rectify/rectify_services.go defaults/defaults.go leak/broadcast_test.go rectify/rectify_test.go docker/orchestration/wireguard_test.go docker/orchestration/subsystem/docker_test.go leak/broadcast.go docker/orchestration/wireguard.go system/wifi_runtime_methods.go leak/leak_test.go broadcast/transitions.go structs/configs.go config/config_test.go config/config_merge.go importer/importer.go defaults/version.go accesspoint/accesspoint_test.go startuporchestrator/startup_orchestrator.go main.go config/config_update_registry.go docker/orchestration/runtime_ops.go startuporchestrator/startup_orchestrator_test.go main_test.go routines/version.go routines/logstream/logs.go rectify/rectify.go handler/systemsvc/system_test.go docker/events/events.go docker/orchestration/subsystem/subsystem_events.go docker/lifecycle/planner.go routines/system/system.go docker/network/network.go shipworkflow/operations_runtime.go docker/orchestration/subsystem/subsystem_health.go system/wifi_runtime_api.go exporter/exporter_test.go config/config_update_schema.go config/urbit.go docker/lifecycle/lifecycle_full_test.go handler/ship/urbit_test.go importer/extract_test.go importer/importer_test.go leak/handler_test.go logger/logger_test.go protocol/actions/actions_test.go protocol/contracts/contracts_test.go session/connection_registry.go session/logstream_session_store.go shipworkflow/startram_lifecycle_runtime.go shipworkflow/urbit_operations_runtime.go startram/backup_runtime_test.go startram/state_sync_test.go system/disk_test.go system/metrics/metrics_test.go system/storage/storage_test.go system/wifi_test.go uploadsvc/service_test.go: IO error for operation on broadcast/state.go broadcast/state_test.go broadcast/loop_test.go rectify/rectify_services.go defaults/defaults.go leak/broadcast_test.go rectify/rectify_test.go docker/orchestration/wireguard_test.go docker/orchestration/subsystem/docker_test.go leak/broadcast.go docker/orchestration/wireguard.go system/wifi_runtime_methods.go leak/leak_test.go broadcast/transitions.go structs/configs.go config/config_test.go config/config_merge.go importer/importer.go defaults/version.go accesspoint/accesspoint_test.go startuporchestrator/startup_orchestrator.go main.go config/config_update_registry.go docker/orchestration/runtime_ops.go startuporchestrator/startup_orchestrator_test.go main_test.go routines/version.go routines/logstream/logs.go rectify/rectify.go handler/systemsvc/system_test.go docker/events/events.go docker/orchestration/subsystem/subsystem_events.go docker/lifecycle/planner.go routines/system/system.go docker/network/network.go shipworkflow/operations_runtime.go docker/orchestration/subsystem/subsystem_health.go system/wifi_runtime_api.go exporter/exporter_test.go config/config_update_schema.go config/urbit.go docker/lifecycle/lifecycle_full_test.go handler/ship/urbit_test.go importer/extract_test.go importer/importer_test.go leak/handler_test.go logger/logger_test.go protocol/actions/actions_test.go protocol/contracts/contracts_test.go session/connection_registry.go session/logstream_session_store.go shipworkflow/startram_lifecycle_runtime.go shipworkflow/urbit_operations_runtime.go startram/backup_runtime_test.go startram/state_sync_test.go system/disk_test.go system/metrics/metrics_test.go system/storage/storage_test.go system/wifi_test.go uploadsvc/service_test.go: File name too long (os error 63)
+codex
+The first grep pass failed because the file list was passed as one long argument; I’m re-running with `xargs` so each path is scanned correctly.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && cat > /tmp/batch3_files.txt <<'EOF'
+broadcast/state.go
+broadcast/state_test.go
+broadcast/loop_test.go
+rectify/rectify_services.go
+defaults/defaults.go
+leak/broadcast_test.go
+rectify/rectify_test.go
+docker/orchestration/wireguard_test.go
+docker/orchestration/subsystem/docker_test.go
+leak/broadcast.go
+docker/orchestration/wireguard.go
+system/wifi_runtime_methods.go
+leak/leak_test.go
+broadcast/transitions.go
+structs/configs.go
+config/config_test.go
+config/config_merge.go
+importer/importer.go
+defaults/version.go
+accesspoint/accesspoint_test.go
+startuporchestrator/startup_orchestrator.go
+main.go
+config/config_update_registry.go
+docker/orchestration/runtime_ops.go
+startuporchestrator/startup_orchestrator_test.go
+main_test.go
+routines/version.go
+routines/logstream/logs.go
+rectify/rectify.go
+handler/systemsvc/system_test.go
+docker/events/events.go
+docker/orchestration/subsystem/subsystem_events.go
+docker/lifecycle/planner.go
+routines/system/system.go
+docker/network/network.go
+shipworkflow/operations_runtime.go
+docker/orchestration/subsystem/subsystem_health.go
+system/wifi_runtime_api.go
+exporter/exporter_test.go
+config/config_update_schema.go
+config/urbit.go
+docker/lifecycle/lifecycle_full_test.go
+handler/ship/urbit_test.go
+importer/extract_test.go
+importer/importer_test.go
+leak/handler_test.go
+logger/logger_test.go
+protocol/actions/actions_test.go
+protocol/contracts/contracts_test.go
+session/connection_registry.go
+session/logstream_session_store.go
+shipworkflow/startram_lifecycle_runtime.go
+shipworkflow/urbit_operations_runtime.go
+startram/backup_runtime_test.go
+startram/state_sync_test.go
+system/disk_test.go
+system/metrics/metrics_test.go
+system/storage/storage_test.go
+system/wifi_test.go
+uploadsvc/service_test.go
+EOF
+xargs -a /tmp/batch3_files.txt rg -n \"(err\\s*:=|if err "'!= nil|fmt'"\\.Errorf\\(|errors\\.New\\(|panic\\(|_\\s*=\\s*.*err|json\\.(Unmarshal|Marshal)|os\\.(ReadFile|WriteFile)|exec\\.Command\\()\"" in /Users/chuah/NP/GroundSeg/goseg exited 1 in 52ms:
+xargs: invalid option -- a
+usage: xargs [-0opt] [-E eofstr] [-I replstr [-R replacements] [-S replsize]]
+             [-J replstr] [-L number] [-n number [-x]] [-P maxprocs]
+             [-s size] [utility [argument ...]]
+codex
+I’m on BSD `xargs` here, so I’ll pipe the file list into `xargs` and continue the targeted scan.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && cat /tmp/batch3_files.txt | xargs rg -n \"(err\\s*:=|if err "'!= nil|fmt'"\\.Errorf\\(|errors\\.New\\(|panic\\(|_\\s*=\\s*.*err|json\\.(Unmarshal|Marshal)|os\\.(ReadFile|WriteFile)|exec\\.Command\\()\"" in /Users/chuah/NP/GroundSeg/goseg succeeded in 51ms:
+Total output lines: 1679
+
+system/wifi_runtime_methods.go:43:	out, err := runtime.RunCommand("nmcli", "radio", "wifi")
+system/wifi_runtime_methods.go:44:	if err != nil {
+system/wifi_runtime_methods.go:46:		return false, fmt.Errorf("couldn't check interface: %w", err)
+system/wifi_runtime_methods.go:53:	out, err := runtime.ExecCommand("sh", "-c", cmd).Output()
+system/wifi_runtime_methods.go:54:	if err != nil {
+system/wifi_runtime_methods.go:55:		return nil, fmt.Errorf("couldn't read wifi devices: %w", err)
+system/wifi_runtime_methods.go:72:	devices, err := runtime.wifiDevices()
+system/wifi_runtime_methods.go:73:	if err != nil {
+system/wifi_runtime_methods.go:74:		return "", fmt.Errorf("failed to retrieve wifi devices: %w", err)
+system/wifi_runtime_methods.go:83:	out, err := runtime.RunCommand("nmcli", "-t", "dev", "wifi", "list", "ifname", dev)
+system/wifi_runtime_methods.go:84:	if err != nil {
+system/wifi_runtime_methods.go:85:		return nil, fmt.Errorf("couldn't gather wifi networks: %w", err)
+system/wifi_runtime_methods.go:99:	interfaces, err := runtime.ClientInterfacesFn(client)
+system/wifi_runtime_methods.go:100:	if err != nil {
+system/wifi_runtime_methods.go:102:		return "", fmt.Errorf("couldn't get devices: %w", err)
+system/wifi_runtime_methods.go:106:			bss, err := runtime.ClientBSSFn(client, iface)
+system/wifi_runtime_methods.go:107:			if err != nil {
+system/wifi_runtime_methods.go:108:				return "", fmt.Errorf("failed to get BSS for %s: %w", dev, err)
+codex
+I now have hotspots; I’m opening the production files with the strongest signals to verify material inconsistencies (especially swallowed errors and missing context) before scoring.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '1,260p' leak/broadcast.go" in /Users/chuah/NP/GroundSeg/goseg succeeded in 51ms:
+package leak
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"groundseg/structs"
+	"io"
+	"net"
+	"reflect"
+
+	"github.com/stevelacy/go-urbit/noun"
+	"go.uber.org/zap"
+)
+
+func listener(patp string, conn net.Conn, info LickStatus) {
+	lickMu.Lock()
+	BytesChan[patp] = make(chan string)
+	readChan := make(chan []byte)
+	// put in status map
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '1,260p' docker/orchestration/subsystem/subsystem_health.go" in /Users/chuah/NP/GroundSeg/gosegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '1,320p' main.go" in /Users/chuah/NP/GroundSeg/goseg succeeded in 51ms:
+package main
+
+// NativePlanet GroundSeg: Go Edition (goseg)
+// 🄯 2023 ~nallux-dozryl & ~sitful-hatred
+// This is a Golang rewrite of GroundSeg that serves the v2 json
+// object via websocket.
+// The v2 rewrite decouples the frontend and backend, which makes it
+// straightforward to implement alternative backends.
+//
+// Under development: reimplementing all pyseg functionality.
+// Advantages:
+// - Really, really fast
+// - Event-driven
+// - First-class support for concurrent operations
+// - Very good golang Docker libraries
+
+import (
+	"context"
+	"embed"
+	"errors"
+ succeeded in 51ms:
+package subsystem
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"groundseg/config"
+	"groundseg/internal/workflow"
+	"groundseg/logger"
+	"groundseg/transition"
+)
+
+// loop to make sure ships are reachable
+// if 502 2x in 2 min, restart wg container
+func Check502Loop(ctx context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '320,700p' main.go" in /Users/chuah/NP/GroundSeg/goseg succeeded in 52ms:
+			logger.Info("GroundSeg is in C2C Mode")
+			if err := runtime.mode.setC2cMode(true); err != nil {
+				return fmt.Errorf("unable to set C2C mode: %w", err)
+			}
+			// start killswitch timer in another routine if c2cInterval in system.json is greater than 0
+			if connectivity.C2cInterval > 0 {
+				go runtime.mode.startKillSwitch(ctx, runtime.connectivity.settingsSnap)
+			}
+		}
+	}
+	return nil
+}
+
+func init() {
+	var err error
+	webContent, err = fs.Sub(content, "web")
+	if err != nil {
+		initWebErr = err
+		return
+	}
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '1,220p' config/config_update_registry.go && sed -n '1,260p' config/config_update_schema.go && sed -n '1,260p' config/config_merge.go && sed -n '1,240p' docker/events/events.go" in /Users/chuah/NP/GroundSeg/goseg succeeded in 52ms:
+package config
+
+import (
+	"groundseg/structs"
+	"reflect"
+)
+
+type confPatchFieldSpec[T any] struct {
+	key        string
+	patchField string
+	parse      confPatchValueParser[T]
+	apply      confPatchApplyValueFn[T]
+	hasUpdates func(T) bool
+}
+
+func patchFieldRefByName[T any](field string) confPatchValueRef[T] {
+	return confPatchValueRef[T]{
+		getValue: func(patch *ConfPatch) (T, bool) {
+			return getConfigPatchValueByName[T](patch, field)
+		},
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '1,340p' importer/importer.go" in /Users/chuah/NP/GroundSeg/goseg succeeded in 52ms:
+package importer
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"github.com/docker/docker/errdefs"
+	"groundseg/auth"
+	"groundseg/auth/tokens"
+	"groundseg/click/acme"
+	"groundseg/config"
+	"groundseg/docker/events"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/driveresolver"
+	"groundseg/internal/resource"
+	"groundseg/internal/seams"
+	"groundseg/lifecycle"
+	"groundseg/logger"
+	workflowOrchestration "groundseg/orchestration"
+	"groundseg/shipcleanup"
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '340,760p' importer/importer.go" in /Users/chuah/NP/GroundSeg/goseg succeeded in 51ms:
+	}
+	if err := resolvedRuntime.initOps.createDirFn(tempDir, 0755); err != nil {
+		return fmt.Errorf("create temp directory %q: %w", tempDir, err)
+	}
+	return nil
+}
+
+func resolveImporterRuntime(overrides ...importerRuntime) importerRuntime {
+	if len(overrides) > 0 {
+		return withDefaultsImporterRuntime(overrides[0])
+	}
+	return defaultImporterRuntime()
+}
+
+func resolveImporterRuntimeWithDefaults(overrides ...importerRuntime) (importerRuntime, error) {
+	runtime := resolveImporterRuntime(overrides...)
+	return runtime, nil
+}
+
+func resolveImporterRuntimeForWorkflow(overrides ...importerRuntime) (importerRuntime, error) {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '760,1180p' importer/importer.go" in /Users/chuah/NP/GroundSeg/goseg succeeded in 52ms:
+	// Set timeouts on the request context
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	r = r.WithContext(ctx)
+
+	validated, err := validateUploadRequest(r, uploadSession, patp)
+	if err != nil {
+		if err := failUploadRequest(w, http.StatusUnauthorized, err.Error()); err != nil {
+			logger.Errorf("failed to write upload failure response: %v", err)
+			http.Error(w, "failed to write upload response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	chunk, err := readUploadChunk(r)
+	if err != nil {
+		if err := failUploadRequest(w, http.StatusBadRequest, err.Error()); err != nil {
+			logger.Errorf("failed to write upload failure response: %v", err)
+			http.Error(w, "failed to write upload response", http.StatusInternalServerError)
+		}
+codex
+I’ve identified a few likely consistency defects and I’m validating them in adjacent orchestration/startup files to ensure they are real cross-cutting patterns, not isolated choices.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '1,320p' startuporchestrator/startup_orchestrator.go" in /Users/chuah/NP/GroundSeg/gosegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '1,320p' shipworkflow/urbit_operations_runtime.go" in /Users/chuah/NP/GroundSeg/gosegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && sed -n '1,320p' shipworkflow/startram_lifecycle_runtime.go" in /Users/chuah/NP/GroundSeg/goseg succeeded in 50ms:
+package shipworkflow
+
+import (
+	"fmt"
+	"time"
+
+	"groundseg/config"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/internal/workflow"
+	"groundseg/structs"
+	"groundseg/transition"
+	"groundseg/startram"
+
+	"go.uber.org/zap"
+)
+
+func HandleStartramRestart() error {
+	return runStartramRestartWithRuntime(defaultStartramRuntime())
+}
+
+ succeeded in 52ms:
+package startuporchestrator
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/config"
+	"groundseg/docker/orchestration/subsystem"
+	"groundseg/exporter"
+	"groundseg/handler/router"
+	groundSystem "groundseg/handler/system"
+	"groundseg/importer"
+	"groundseg/leak"
+	"groundseg/logger"
+	"groundseg/rectify"
+	"groundseg/routines"
+	"groundseg/routines/logstream"
+	"groundseg/session"
+	"groundseg/startram"
+ succeeded in 51ms:
+package shipworkflow
+
+import (
+	"fmt"
+	"strings"
+
+	"groundseg/broadcast"
+	"groundseg/click"
+	"groundseg/docker"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/logger"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/transition"
+)
+
+var runTransitionedOperationFn = RunTransitionedOperation
+
+var urbitTransitionRunners = UrbitTransitionRunners()
+
+codex
+I confirmed a stronger cross-file pattern: several runtime workflows log failures and continue, while sibling flows return wrapped errors. I’ll collect exact line evidence from those files and finalize the structured findings.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && nl -ba importer/importer.go | sed -n '1080,1145p'" in /Users/chuah/NP/GroundSeg/gosegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && nl -ba main.go | sed -n '350,390p'" in /Users/chuah/NP/GroundSeg/gosegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && nl -ba shipworkflow/startram_lifecycle_runtime.go | sed -n '140,260p'" in /Users/chuah/NP/GroundSeg/goseg succeeded in 52ms:
+   350			ctx = context.Background()
+   351		}
+   352		if connectivitySnapshot == nil {
+   353			connectivitySnapshot = config.ConnectivitySettingsSnapshot
+   354		}
+   355		if isDebugMode != nil && isDebugMode() {
+   356			logger.Debug("Debug mode enabled; skipping killswitch reboot path")
+   357			return
+   358		}
+   359		for {
+   360			connectivity := connectivitySnapshot()
+   361			delay := time.Duration(connectivity.C2cInterval) * time.Second
+   362			timer := time.NewTimer(delay)
+   363			select {
+   364			case <-timer.C:
+   365			case <-ctx.Done():
+   366				timer.Stop()
+   367				return
+   368			}
+   369			logger.Info("Graceful reboot from C2C mode...")
+ succeeded in 52ms:
+  1080			if err := os.Remove(partFilePath); err != nil {
+  1081				logger.Warn(fmt.Sprintf("failed to remove chunk file %s: %v", partFilePath, err))
+  1082				// Continue despite error removing the file
+  1083			}
+  1084		}
+  1085	
+  1086		return nil
+  1087	}
+  1088	
+  1089	func configureUploadedPier(ctx context.Context, cmd shipworkflow.UploadImportCommand, runtime ...importerRuntime) error {
+  1090		resolvedRuntime, err := resolveImporterRuntimeForWorkflow(runtime...)
+  1091		if err != nil {
+  1092			return fmt.Errorf("prepare importer workflow runtime: %w", err)
+  1093		}
+  1094		defer resolvedRuntime.provisionOps.cleanupMultipartFn(tempDir)
+  1095		pierCtx, err := newImportedPierContext(ctx, resolvedRuntime, cmd)
+  1096		if err != nil {
+  1097			return fmt.Errorf("build imported pier context: %w", err)
+  1098		}
+  1099		if err := resolvedRuntime.provisionOps.runImportedPierWorkflowFn(pierCtx, resolvedRuntime); err != nil {
+ succeeded in 52ms:
+   140					})
+   141					if joinedErr := runOrchestrationSteps(steps, "startram toggle"); joinedErr != nil {
+   142						return joinedErr
+   143					}
+   144					return nil
+   145				},
+   146			},
+   147		)
+   148	}
+   149	
+   150	func HandleStartramEndpoint(endpoint string) error {
+   151		return runStartramEndpointWithRuntime(defaultStartramRuntime(), endpoint)
+   152	}
+   153	
+   154	func runStartramEndpointWithRuntime(runtime startramRuntime, endpoint string) error {
+   155		runtime = resolveStartramRuntime(runtime)
+   156		settings := runtime.StartramSettingsSnapshotFn()
+   157		return runStartramTransitionTemplate(runtime, startramTransitionTemplate{
+   158			transitionType: transition.StartramTransitionEndpoint,
+   159			startEvent:     startramEvent(transition.StartramTransitionEndpoint, transition.StartramTransitionInit),
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg/goseg && nl -ba config/config_update_registry.go | sed -n '20,60p' && nl -ba config/config_update_schema.go | sed -n '90,150p'" in /Users/chuah/NP/GroundSeg/goseg succeeded in 50ms:
+    20			},
+    21			setValue: func(patch *ConfPatch, value T) {
+    22				setConfigPatchValueByName(patch, field, value)
+    23			},
+    24		}
+    25	}
+    26	
+    27	func configPatchFieldFromSpec[T any](spec confPatchFieldSpec[T]) confPatchField {
+    28		apply := spec.apply
+    29		if apply == nil {
+    30			panic("patch field spec requires explicit apply handler")
+    31		}
+    32		return newConfPatchField(
+    33			spec.key,
+    34			spec.patchField,
+    35			spec.parse,
+    36			patchFieldRefByName[T](spec.patchField),
+    37			apply,
+    38			spec.hasUpdates,
+    39		)
+codex
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "main.go killSwitchWithMode calls subsystem.GracefulShipExit() and ignores the returned error before forcing reboot, while adjacent paths in runServer and C2cCheckWith return/propagate errors.",
+        "shipworkflow/startram_lifecycle_runtime.go has multiple SvcDeleteFn failures that are only logged and then returns nil, so transitions can report success after partial unregister failure.",
+        "importer/importer.go configureUploadedPier defers cleanupMultipartFn without checking/reporting its error, unlike surrounding workflow steps that wrap and return errors.",
+        "config/config_update_registry.go uses panic when apply handler is missing, whereas config patch parsing/application in config/config_update_schema.go is otherwise error-return based."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_graceful_exit_failure_before_reboot",
+      "summary": "Kill-switch reboot path drops graceful-exit errors and proceeds as if shutdown succeeded.",
+      "related_files": [
+        "main.go",
+        "docker/orchestration/subsystem/subsystem_health.go"
+      ],
+      "evidence": [
+        "main.go:370 calls subsystem.GracefulShipExit() without checking error, then immediately executes reboot.",
+        "docker/orchestration/subsystem/subsystem_health.go:123-185 gracefulShipExit constructs and returns detailed wrapped errors for stop/poll failures, but that contract is discarded by caller.",
+        "This makes failure handling depend on call site instead of function contract, producing inconsistent behavior across shutdown paths."
+      ],
+      "suggestion": "Capture and handle the GracefulShipExit error in killSwitchWithMode: either abort reboot on failure, or proceed only after logging a structured warning and explicitly marking reboot as forced. Keep one documented policy for all graceful shutdown callers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "workflow_steps_log_and_continue_on_mutation_failures",
+      "summary": "State-mutating workflow steps inconsistently swallow errors, yielding false-success transitions.",
+      "related_files": [
+        "shipworkflow/startram_lifecycle_runtime.go",
+        "importer/importer.go"
+      ],
+      "evidence": [
+        "shipworkflow/startram_lifecycle_runtime.go:183-191 and 225-230 logs SvcDeleteFn failures and still returns nil from transition steps.",
+        "importer/importer.go:1094 defers cleanupMultipartFn(tempDir) and discards cleanup failure entirely.",
+        "In the same files, many neighboring operations use wrapped returned errors (e.g., stop wireguard, workflow/post-workflow runs), so similar failure types have different propagation semantics."
+      ],
+      "suggestion": "Define explicit error policy per step category (critical, compensating, best-effort) and encode it consistently: aggregate best-effort failures with errors.Join into final transition/import result, or emit explicit 'partial success' status instead of returning nil.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "panic_used_for_runtime_config_validation",
+      "summary": "Config patch registry uses panic for missing apply handlers while sibling config code uses error returns.",
+      "related_files": [
+        "config/config_update_registry.go",
+        "config/config_update_schema.go"
+      ],
+      "evidence": [
+        "config/config_update_registry.go:29-31 panics when spec.apply is nil.",
+        "config/config_update_schema.go parse/apply paths are designed around returning errors (e.g., parsePatch and unsupportedConfPatchField).",
+        "This introduces a different failure mode (process crash) for configuration mistakes in an otherwise recoverable error surface."
+      ],
+      "suggestion": "Replace panic with returned configuration-construction error and fail initialization through existing error-return paths; if compile-time guard is desired, enforce via typed constructors/tests rather than runtime panic.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single enforced policy for when workflow/transition errors must be propagated vs logged-and-continued.",
+      "Mixed defensive strategy in config/runtime setup (panic for programmer errors, returned errors for runtime errors) without a uniform boundary."
+    ],
+    "likely_symptoms": [
+      "ignored_graceful_exit_failure_before_reboot",
+      "workflow_steps_log_and_continue_on_mutation_failures"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+75,747
+

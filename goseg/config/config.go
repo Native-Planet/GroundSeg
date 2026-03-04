@@ -4,7 +4,7 @@ package config
 
 import (
 	"groundseg/defaults"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"groundseg/structs"
@@ -89,23 +89,32 @@ type RuntimeContext struct {
 }
 
 var (
-	runtimeContextMu sync.RWMutex
-	runtimeContext   = RuntimeContext{}
+	basePathDefault     = getBasePath
+	architectureDefault = getArchitecture
+	defaultDebugMode    = func() bool { return false }
+	dockerDirDefault    = func() string { return defaults.DockerData("volumes") + "/" }
+	runtimeContextValue atomic.Pointer[RuntimeContext]
 )
 
 // RuntimeContextSnapshot returns an immutable runtime context for the current
 // process state. Callers should pass this into orchestration boundaries instead
 // of reaching into package-level mutable config state.
 func RuntimeContextSnapshot() RuntimeContext {
-	runtimeContextMu.RLock()
-	defer runtimeContextMu.RUnlock()
-	return runtimeContext
+	ctx := runtimeContextValue.Load()
+	if ctx == nil {
+		return RuntimeContext{
+			BasePath:     basePathDefault(),
+			Architecture: architectureDefault(),
+			DebugMode:    defaultDebugMode(),
+			DockerDir:    dockerDirDefault(),
+		}
+	}
+	return *ctx
 }
 
 func applyRuntimeContext(context RuntimeContext) {
-	runtimeContextMu.Lock()
-	runtimeContext = context
-	runtimeContextMu.Unlock()
+	updated := context
+	runtimeContextValue.Store(&updated)
 }
 
 func setRuntimeContext(context RuntimeContext) {

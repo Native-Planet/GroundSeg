@@ -16,7 +16,9 @@ func defaultStartramRuntime() startramRuntime {
 	return resolveStartramRuntime(orchestration.NewStartramRuntime(
 		orchestration.WithStartramServiceLoaders(
 			broadcast.GetStartramServices,
-			broadcast.LoadStartramRegions,
+			func() error {
+				return broadcast.LoadStartramRegionsWithRuntime()
+			},
 		),
 	))
 }

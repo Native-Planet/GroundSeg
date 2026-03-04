@@ -24,10 +24,10 @@ var (
 	stopContainerByNameFn       = orchestration.StopContainerByName
 	startContainerFn            = orchestration.StartContainer
 	forceUpdateContainerStatsFn = orchestration.ForceUpdateContainerStats
-	persistShipRuntimeConfigFn = func(patp string, update func(*structs.UrbitRuntimeConfig) error) error {
-		return config.UpdateUrbitSectionConfig(patp, config.UrbitConfigSectionRuntime, update)
+	persistShipRuntimeConfigFn  = func(patp string, update func(*structs.UrbitRuntimeConfig) error) error {
+		return config.UpdateUrbitRuntimeConfig(patp, update)
 	}
-	waitCompleteFn              = func(patp string) error {
+	waitCompleteFn = func(patp string) error {
 		return WaitComplete(patp)
 	}
 	sleepFn              = time.Sleep

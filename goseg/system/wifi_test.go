@@ -1,6 +1,7 @@
 package system
 
 import (
+	"context"
 	"errors"
 	"os/exec"
 	"reflect"
@@ -461,6 +462,115 @@ func TestC2CActionBindingsCoverKnownActions(t *testing.T) {
 	}
 	if !foundConnect {
 		t.Fatalf("expected connect action binding")
+	}
+}
+
+func TestConstructWifiInfoNilReceiverNoPanic(t *testing.T) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			t.Fatalf("construct wifi info should not panic on nil receiver, got: %v", rec)
+		}
+	}()
+	var service *WiFiRuntimeService
+	if err := service.ConstructWifiInfo(""); err == nil {
+		t.Fatal("expected nil receiver error")
+	}
+}
+
+func TestStartWiFiInfoLoopNilReceiverReturnsError(t *testing.T) {
+	var service *WiFiRuntimeService
+	if err := service.StartWiFiInfoLoop(context.Background()); err == nil {
+		t.Fatal("expected StartWiFiInfoLoop to return nil receiver error")
+	}
+}
+
+func TestStartWiFiInfoLoopStateNilInitializesAndCanStop(t *testing.T) {
+	service := &WiFiRuntimeService{
+		runtime: NewWiFiRuntimeWith(wifiRuntime{
+			ExecCommand: func(name string, args ...string) *exec.Cmd {
+				return exec.Command("sh", "-c", "printf 'wlan0\\n'")
+			},
+			RunCommand: func(command string, args ...string) (string, error) {
+				if command == "nmcli" && len(args) == 2 && args[0] == "radio" && args[1] == "wifi" {
+					return "disabled\n", nil
+				}
+				return "", nil
+			},
+		}),
+	}
+	if err := service.StartWiFiInfoLoop(context.Background()); err != nil {
+		t.Fatalf("expected StartWiFiInfoLoop to succeed with nil state, got: %v", err)
+	}
+	if service.state == nil {
+		t.Fatal("expected service state to be initialized when nil")
+	}
+	service.StopWiFiInfoLoop()
+}
+
+func TestStopWiFiInfoLoopNilReceiverDoesNotPanic(t *testing.T) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			t.Fatalf("expected stop wifi loop to ignore nil receiver, got: %v", rec)
+		}
+	}()
+	var service *WiFiRuntimeService
+	service.StopWiFiInfoLoop()
+}
+
+func TestConstructWifiInfoInitializesRuntimeAndState(t *testing.T) {
+	service := &WiFiRuntimeService{
+		state: &wifiRuntimeState{},
+	}
+	if err := service.ConstructWifiInfo(""); err == nil {
+		t.Fatal("expected construct wifi info to fail when device is unresolved")
+	}
+	if service.state == nil {
+		t.Fatal("expected service state to be initialized")
+	}
+	if service.runtime.RunCommand == nil {
+		t.Fatal("expected service runtime to be initialized from defaults")
+	}
+}
+
+func TestConstructWifiInfoRefreshesWithCustomRuntime(t *testing.T) {
+	state := &wifiRuntimeState{}
+	setWiFiDevice("wlan0", state)
+	runtime := NewWiFiRuntimeWith(wifiRuntime{
+		RunCommand: func(command string, args ...string) (string, error) {
+			switch {
+			case command == "nmcli" && strings.Join(args, " ") == "radio wifi":
+				return "enabled", nil
+			case command == "nmcli" && strings.Contains(strings.Join(args, " "), "dev wifi list ifname wlan0"):
+				return "a:b:c:d:e:f:g:HomeWiFi", nil
+			}
+			return "", errors.New("unexpected command")
+		},
+		NewWifiClient: func() (*wifi.Client, error) {
+			return &wifi.Client{}, nil
+		},
+		ClientInterfacesFn: func(*wifi.Client) ([]*wifi.Interface, error) {
+			return []*wifi.Interface{{Name: "wlan0", Type: wifi.InterfaceTypeStation}}, nil
+		},
+		ClientBSSFn: func(*wifi.Client, *wifi.Interface) (*wifi.BSS, error) {
+			return &wifi.BSS{SSID: "HomeWiFi"}, nil
+		},
+	})
+	service := &WiFiRuntimeService{
+		runtime: runtime,
+		state:   state,
+	}
+	if err := service.ConstructWifiInfo(""); err != nil {
+		t.Fatalf("expected construct info to succeed: %v", err)
+	}
+	info := WifiInfoSnapshot(state)
+	if !info.Status {
+		t.Fatalf("expected refreshed status to be true, got %v", info.Status)
+	}
+	if info.Active != "HomeWiFi" {
+		t.Fatalf("expected active SSID to be HomeWiFi, got %q", info.Active)
+	}
+	if len(info.Networks) == 0 || info.Networks[0] != "HomeWiFi" {
+		t.Fatalf("expected networks to include HomeWiFi, got %v", info.Networks)
 	}
 }
 

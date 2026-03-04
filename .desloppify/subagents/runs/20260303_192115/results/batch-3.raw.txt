@@ -1,0 +1,117 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {
+    "design_coherence": 72.8
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Configuration domain fields are declared in multiple parallel representations: `ConnectivityPatch/RuntimePatch/...` in `goseg/config/config_update_schema.go` lines 12-79, mirrored again as patch field registry entries in `goseg/config/config_update_registry.go` lines 163-260+, and mirrored in persisted domain structs in `goseg/structs/configs.go` lines 143-194.",
+        "Runtime seam wiring is fragmented into many overlapping operation structs in `goseg/docker/orchestration/runtime_ops.go` (e.g., `RuntimeStartupOps` lines 60-70 vs `RuntimeConfigOps` lines 145-150, `RuntimeLoadOps` lines 154-159, `RuntimeServiceOps` lines 161-163), then reassembled in `defaultRuntimeStartupOps` lines 286-301.",
+        "Test files reveal repeated setup-heavy scenario definitions instead of shared behavioral harnesses: nearly identical extraction assertions across zip/tar/tar.gz in `goseg/importer/extract_test.go` lines 184-319, and repeated version-file/basepath setup blocks across three tests in `goseg/startuporchestrator/startup_orchestrator_test.go` lines 224-326.",
+        "Lifecycle and state ownership contracts are inconsistent across runtime services: nil-guarded methods throughout `goseg/system/wifi_runtime_api.go` (e.g., lines 39-49, 139-143) but `StopWiFiInfoLoop` dereferences `service.state` without receiver/state checks (lines 128-133), while session store methods in `goseg/session/logstream_session_store.go` consistently guard nil receivers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_model_triplication",
+      "summary": "Configuration update logic is split across three manually synchronized schemas, creating structural drift risk.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`ConnectivityPatch` and related patch structs define a full field inventory in `config_update_schema.go` lines 12-79.",
+        "The same conceptual fields are re-encoded as registry specs in `config_update_registry.go` (e.g., `wgOn`, `endpointUrl`, `wgRegistered`, `apiVersion`, `c2cInterval`) lines 177-248.",
+        "Persisted domain structs repeat the same shape in `structs/configs.go` `ConnectivityConfig` and `RuntimeConfig` lines 143-175."
+      ],
+      "suggestion": "Generate patch schema/registry from a single canonical config descriptor (or annotate `SysConfig` domain structs and derive parser/apply bindings) so adding/removing a field is one edit with generated adapters.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "single_source_of_truth_missing"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_ops_fragmented_composition",
+      "summary": "Runtime dependency seams are over-segmented and recomposed, increasing indirection and obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/shipworkflow/startram_lifecycle_runtime.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many partially overlapping ops structs (`RuntimeStartupOps`, `RuntimeConfigOps`, `RuntimeLoadOps`, `RuntimeServiceOps`) and then reconstructs composites in `defaultRuntimeStartupOps` lines 286-301.",
+        "Startup tests must construct deep nested runtime scaffolding with many callbacks (`startup_orchestrator_test.go` lines 115-139), indicating high wiring burden for a single behavior path.",
+        "Workflow code consumes broad runtime surfaces for mixed concerns (config mutation, container lifecycle, startram actions) in `startram_lifecycle_runtime.go` `runStartramToggleWithRuntime` lines 66-143."
+      ],
+      "suggestion": "Refactor seams around cohesive capabilities (e.g., `ConfigGateway`, `ContainerGateway`, `StartramGateway`) with narrower constructor-level dependency bundles, and remove overlapping composite structs that simply re-export subsets.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "capability_boundary_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "scenario_test_duplication",
+      "summary": "High-volume test scenarios duplicate orchestration/setup logic instead of using reusable behavior contracts.",
+      "related_files": [
+        "goseg/importer/extract_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "Extraction tests repeat near-identical setup/assertion flow for zip, tar, and tar.gz (`extract_test.go` lines 184-319), differing mostly by archive constructor and expected payload string.",
+        "Version discovery tests repeat substantial base-path/settings file bootstrap in three adjacent tests (`startup_orchestrator_test.go` lines 224-326).",
+        "`importer_test.go` contains repeated command construction + expectation blocks for similar upload finalization/configuration paths (`importer_test.go` lines 612-699 and 701-794)."
+      ],
+      "suggestion": "Introduce shared scenario harness helpers (archive extraction contract runner, version-discovery fixture builder, upload completion table runner) to centralize setup and express behavior deltas declaratively.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_harness_underabstracted"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "inconsistent_state_guard_conventions",
+      "summary": "Service/state containers follow inconsistent nil-safety and initialization conventions, creating implicit lifecycle contracts.",
+      "related_files": [
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/session/logstream_session_store.go",
+        "goseg/session/connection_registry.go"
+      ],
+      "evidence": [
+        "Most WiFi service methods guard nil receiver/state (`wifi_runtime_api.go` lines 39-49, 139-143), but `StopWiFiInfoLoop` dereferences `service.state` immediately (lines 128-133).",
+        "`logstream_session_store.go` consistently handles nil receivers across methods (e.g., lines 40-44, 82-86, 199-203), signaling a defensive API style.",
+        "`connection_registry.go` has no receiver nil-guards and relies on external initialization discipline, despite having `ensureTargetsInitialized` helper (lines 25-41) that is not enforced by method boundaries."
+      ],
+      "suggestion": "Standardize lifecycle contract per service type: either enforce constructor-only validity and remove defensive checks, or consistently guard receiver/state and centralize initialization in one `ensureInitialized` gate called at method entry.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "service_lifecycle_contract_inconsistent"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Missing single-source metadata for config domains causes parallel hand-maintained schemas.",
+      "Dependency seams optimized for mocking evolved into overlapping capability slices without clear ownership.",
+      "Test growth favored local copy-and-adjust patterns over reusable scenario contracts.",
+      "No consistent project-wide convention for nil-safety versus constructor-enforced invariants."
+    ],
+    "likely_symptoms": [
+      "config_model_triplication",
+      "runtime_ops_fragmented_composition",
+      "scenario_test_duplication",
+      "inconsistent_state_guard_conventions"
+    ],
+    "possible_false_positives": []
+  }
+}

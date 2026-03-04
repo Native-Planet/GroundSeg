@@ -1,0 +1,424 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 48.0,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 68.0,
+        "Indirection Cost": 64.0,
+        "Interface Honesty": 76.0
+      }
+    },
+    "design_coherence": 50.7,
+    "error_consistency": 59.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime composition is repeatedly modeled as large function-pointer bags with thin pass-through methods and long nil-validation lists (for example `importerRuntime` + `validateImporterProvisionRuntime` in importer/importer.go, `workflowRuntime.validate` in shipworkflow/operations_runtime.go, and multiple `Runtime*Ops` structs in docker/orchestration/runtime_ops.go).",
+        "Several wrappers add one more indirection layer without adding domain policy/translation (for example bootstrap coordinator wrappers in main.go and many `RectifyRuntime` forwarding methods in rectify/rectify.go).",
+        "A very wide shared config object (`structs.SysConfig`) is consumed across unrelated subsystems (`startuporchestrator/startup_orchestrator.go`, `main.go`, `importer/importer.go`), which blurs bounded contexts and increases cross-module coupling."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 68.0,
+        "indirection_cost": 64.0,
+        "interface_honesty": 76.0
+      }
+    },
+    "design_coherence": {
+      "evidence": [
+        "docker/orchestration/runtime_ops.go defines many overlapping runtime seam structs (RuntimeStartupOps, RuntimeConfigOps, RuntimeLoadOps, RuntimeServiceOps, RuntimeSnapshotOps) plus multiple default builders that rewire similar callbacks, spreading one wiring concern across many partially duplicated types.",
+        "config/config_update_registry.go and config/config_update_schema.go split one config-patch registry mechanism across two large files with reflective field access by string names (getConfigPatchValueByName/setConfigPatchValueByName), combining parsing, mutation, and persistence-coupled mapping in one subsystem.",
+        "system/disk_test.go and system/storage/storage_test.go duplicate behavior-level tests for the same storage responsibilities (ListHardDisks, IsMountedMMC, RemoveMultipartFiles, SmartCheckAllDrives, fstab reconciliation), signaling unresolved boundary migration and parallel test scaffolds."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "main.go killSwitchWithMode calls subsystem.GracefulShipExit() and ignores the returned error before forcing reboot, while adjacent paths in runServer and C2cCheckWith return/propagate errors.",
+        "shipworkflow/startram_lifecycle_runtime.go has multiple SvcDeleteFn failures that are only logged and then returns nil, so transitions can report success after partial unregister failure.",
+        "importer/importer.go configureUploadedPier defers cleanupMultipartFn without checking/reporting its error, unlike surrounding workflow steps that wrap and return errors.",
+        "config/config_update_registry.go uses panic when apply handler is missing, whereas config patch parsing/application in config/config_update_schema.go is otherwise error-return based."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_sprawl",
+      "summary": "Large callback-bag runtimes create high indirection cost with little behavioral leverage.",
+      "related_files": [
+        "importer/importer.go",
+        "docker/orchestration/runtime_ops.go",
+        "shipworkflow/operations_runtime.go",
+        "rectify/rectify.go"
+      ],
+      "evidence": [
+        "`importerProvisionRuntime` defines many callback fields and `validateImporterProvisionRuntime` performs a long sequence of nil checks before use.",
+        "`docker/orchestration/runtime_ops.go` declares many sibling `Runtime*Ops` structs of function fields, spreading operational contracts into callback bags instead of focused interfaces.",
+        "`workflowRuntime.validate` in shipworkflow/operations_runtime.go and forwarding methods in rectify/rectify.go repeat the same callback presence checks and delegation pattern."
+      ],
+      "suggestion": "Replace callback bags with a smaller set of role-focused interfaces (for example `ContainerLifecycle`, `ConfigStore`, `ShipTransitionPublisher`) and pass concrete adapters per subsystem. Keep function-level seams only at module boundaries where tests need them, not across all runtime methods.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_wrapper_layers",
+      "summary": "Multiple wrapper layers mainly forward calls and nil-guards without new policy.",
+      "related_files": [
+        "main.go",
+        "rectify/rectify.go",
+        "docker/events/events.go"
+      ],
+      "evidence": [
+        "`bootstrapRuntime`/`bootstrapRuntimeFns` in main.go introduce coordinator wrappers whose methods mostly check nil and delegate to provided funcs.",
+        "Rectify runtime methods (`UpdateConfig`, `LoadUrbitConfig`, `UrbitConf`, `ShipSettingsSnapshot`, etc.) in rectify/rectify.go largely resolve runtime then forward to stored callbacks.",
+        "Event runtime in docker/events/events.go uses delegate forwarding for each publish/read method, creating another indirection layer with duplicated routing logic."
+      ],
+      "suggestion": "Collapse forwarding-only wrappers where possible: keep one runtime resolver per subsystem and expose direct dependencies through narrower interfaces. Where wrappers remain, centralize nil/default handling once (constructor-time) rather than on each method call.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "cross_domain_sysconfig_bag",
+      "summary": "A wide shared SysConfig acts as a cross-domain parameter bag that weakens boundaries.",
+      "related_files": [
+        "structs/configs.go",
+        "startuporchestrator/startup_orchestrator.go",
+        "main.go",
+        "importer/importer.go"
+      ],
+      "evidence": [
+        "`structs.SysConfig` aggregates connectivity, runtime, startram, auth session, and penpai domains into a single central shape used broadly.",
+        "`startupInitStorageSubsystemRuntime.SubsystemSteps` reads runtime swap settings from global config state, pulling storage bootstrap behavior through shared global config access.",
+        "main.go (`defaultC2cRuntimeContext`) and importer/importer.go default runtimes also pull multiple settings/snapshots from shared config APIs, reinforcing config-as-global-context across domains."
+      ],
+      "suggestion": "Introduce bounded config ports per subsystem (for example `StartupRuntimeSettings`, `ConnectivitySettings`, `StartramSettings`) and pass only those ports into orchestration/importer/bootstrap code. Keep `SysConfig` as persistence shape, not as the primary runtime dependency contract.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_config_as_context_bag"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_default_runtime_singletons",
+      "summary": "Global default runtimes/state create hidden dependencies that bypass explicit abstraction boundaries.",
+      "related_files": [
+        "broadcast/state.go",
+        "docker/events/events.go",
+        "rectify/rectify.go"
+      ],
+      "evidence": [
+        "broadcast/state.go relies on package-global `defaultBroadcastStateRuntime` and many operations resolve to it when no runtime is passed.",
+        "docker/events/events.go exposes `defaultEventRuntime` via `sync.OnceValue`, encouraging implicit shared broker usage.",
+        "rectify/rectify.go frequently calls `NewRectifyRuntime()`/`resolveRectifyRuntime(...)`, causing event handlers to depend on default globals unless explicitly overridden."
+      ],
+      "suggestion": "Move to explicit runtime ownership at subsystem entrypoints: construct shared runtime instances in startup wiring and inject them down, while keeping package-level defaults only for compatibility shims/tests.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_runtime_state"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_fragmentation",
+      "summary": "Runtime wiring is fragmented into overlapping seam structs and duplicated default constructors.",
+      "related_files": [
+        "docker/orchestration/runtime_ops.go",
+        "shipworkflow/startram_lifecycle_runtime.go",
+        "shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "runtime_ops.go declares many narrowly different seam structs and separate default constructors (`defaultRuntimeStartupOps`, `defaultRuntimeConfig`, `defaultRuntimeLoad`, `defaultRuntimeService`) that repeatedly map similar callbacks.",
+        "shipworkflow runtime entrypoints rely on broad callback bags (e.g., `runStartramToggleWithRuntime`) that combine transition logic, config mutation, and container operations, making seam shape growth drive workflow complexity."
+      ],
+      "suggestion": "Introduce a smaller set of cohesive runtime ports (for example: config port, container port, transition port), then have one assembler create them once and pass focused interfaces into shipworkflow handlers. Remove overlapping seam structs by composing these ports instead of re-declaring callback bundles.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_dependency_surface_sprawl"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "reflective_patch_registry_overreach",
+      "summary": "Config patch handling mixes registry, reflection, and domain update logic in one oversized mechanism.",
+      "related_files": [
+        "config/config_update_registry.go",
+        "config/config_update_schema.go",
+        "structs/configs.go"
+      ],
+      "evidence": [
+        "config_update_registry.go uses reflection and string field names (`FieldByName`) to read/write patch values generically, while also defining domain-specific apply wiring.",
+        "config_update_schema.go holds parser/accessor/application primitives plus patch struct definitions, so schema description and execution engine are tightly coupled in the same layer."
+      ],
+      "suggestion": "Split patch handling into explicit domain modules (connectivity/runtime/startram/etc.) with typed field accessors (no reflective string lookup), and keep a thin top-level registry that only aggregates domain patch handlers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_dependency_surface_sprawl"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "storage_test_layer_duplication",
+      "summary": "Two storage test suites validate nearly identical responsibilities through parallel APIs.",
+      "related_files": [
+        "system/disk_test.go",
+        "system/storage/storage_test.go"
+      ],
+      "evidence": [
+        "Both files test overlapping behaviors for disk listing, MMC mount detection, multipart cleanup, SMART checks, and fstab reconciliation with similar fixtures/assertions.",
+        "The overlap indicates mixed responsibility between legacy `system` disk utilities and `system/storage` seams-based utilities, increasing maintenance cost and ambiguity over canonical behavior."
+      ],
+      "suggestion": "Complete the storage boundary migration: pick one canonical API surface for disk/storage behavior, keep compatibility shims thin, and consolidate duplicated tests into shared table-driven suites targeting the canonical package.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "incomplete_boundary_migration"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_store_pattern_duplication",
+      "summary": "Session state management duplicates bucket mutation/snapshot patterns across two store types.",
+      "related_files": [
+        "session/connection_registry.go",
+        "session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "connection_registry.go and logstream_session_store.go both implement custom map/slice bucket lifecycle operations (snapshot/copy, append-if-missing style guards, remove-and-cleanup) with separate ad hoc concurrency/state rules.",
+        "Repeated low-level collection choreography in both files obscures higher-level session policies and makes behavior consistency dependent on manual duplication."
+      ],
+      "suggestion": "Extract shared session-bucket primitives (copy-on-read snapshots, remove-with-empty-bucket cleanup, dedupe append) into one internal helper and keep each store focused on policy differences (auth transitions vs logstream semantics).",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "incomplete_boundary_migration"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_graceful_exit_failure_before_reboot",
+      "summary": "Kill-switch reboot path drops graceful-exit errors and proceeds as if shutdown succeeded.",
+      "related_files": [
+        "main.go",
+        "docker/orchestration/subsystem/subsystem_health.go"
+      ],
+      "evidence": [
+        "main.go:370 calls subsystem.GracefulShipExit() without checking error, then immediately executes reboot.",
+        "docker/orchestration/subsystem/subsystem_health.go:123-185 gracefulShipExit constructs and returns detailed wrapped errors for stop/poll failures, but that contract is discarded by caller.",
+        "This makes failure handling depend on call site instead of function contract, producing inconsistent behavior across shutdown paths."
+      ],
+      "suggestion": "Capture and handle the GracefulShipExit error in killSwitchWithMode: either abort reboot on failure, or proceed only after logging a structured warning and explicitly marking reboot as forced. Keep one documented policy for all graceful shutdown callers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "workflow_steps_log_and_continue_on_mutation_failures",
+      "summary": "State-mutating workflow steps inconsistently swallow errors, yielding false-success transitions.",
+      "related_files": [
+        "shipworkflow/startram_lifecycle_runtime.go",
+        "importer/importer.go"
+      ],
+      "evidence": [
+        "shipworkflow/startram_lifecycle_runtime.go:183-191 and 225-230 logs SvcDeleteFn failures and still returns nil from transition steps.",
+        "importer/importer.go:1094 defers cleanupMultipartFn(tempDir) and discards cleanup failure entirely.",
+        "In the same files, many neighboring operations use wrapped returned errors (e.g., stop wireguard, workflow/post-workflow runs), so similar failure types have different propagation semantics."
+      ],
+      "suggestion": "Define explicit error policy per step category (critical, compensating, best-effort) and encode it consistently: aggregate best-effort failures with errors.Join into final transition/import result, or emit explicit 'partial success' status instead of returning nil.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "panic_used_for_runtime_config_validation",
+      "summary": "Config patch registry uses panic for missing apply handlers while sibling config code uses error returns.",
+      "related_files": [
+        "config/config_update_registry.go",
+        "config/config_update_schema.go"
+      ],
+      "evidence": [
+        "config/config_update_registry.go:29-31 panics when spec.apply is nil.",
+        "config/config_update_schema.go parse/apply paths are designed around returning errors (e.g., parsePatch and unsupportedConfPatchField).",
+        "This introduces a different failure mode (process crash) for configuration mistakes in an otherwise recoverable error surface."
+      ],
+      "suggestion": "Replace panic with returned configuration-construction error and fail initialization through existing error-return paths; if compile-time guard is desired, enforce via typed constructors/tests rather than runtime panic.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 3,
+    "dimension_coverage": 0.333,
+    "evidence_density": 0.944,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 26.698,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 60,
+    "successful_batch_count": 3,
+    "full_sweep_included": false,
+    "total_files": 569,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "broadcast/state.go",
+    "broadcast/state_test.go",
+    "broadcast/loop_test.go",
+    "rectify/rectify_services.go",
+    "defaults/defaults.go",
+    "leak/broadcast_test.go",
+    "rectify/rectify_test.go",
+    "docker/orchestration/wireguard_test.go",
+    "docker/orchestration/subsystem/docker_test.go",
+    "leak/broadcast.go",
+    "docker/orchestration/wireguard.go",
+    "system/wifi_runtime_methods.go",
+    "leak/leak_test.go",
+    "broadcast/transitions.go",
+    "structs/configs.go",
+    "config/config_test.go",
+    "config/config_merge.go",
+    "importer/importer.go",
+    "defaults/version.go",
+    "accesspoint/accesspoint_test.go",
+    "startuporchestrator/startup_orchestrator.go",
+    "main.go",
+    "config/config_update_registry.go",
+    "docker/orchestration/runtime_ops.go",
+    "startuporchestrator/startup_orchestrator_test.go",
+    "main_test.go",
+    "routines/version.go",
+    "routines/logstream/logs.go",
+    "rectify/rectify.go",
+    "handler/systemsvc/system_test.go",
+    "docker/events/events.go",
+    "docker/orchestration/subsystem/subsystem_events.go",
+    "docker/lifecycle/planner.go",
+    "routines/system/system.go",
+    "docker/network/network.go",
+    "shipworkflow/operations_runtime.go",
+    "docker/orchestration/subsystem/subsystem_health.go",
+    "system/wifi_runtime_api.go",
+    "exporter/exporter_test.go",
+    "config/config_update_schema.go",
+    "config/urbit.go",
+    "docker/lifecycle/lifecycle_full_test.go",
+    "handler/ship/urbit_test.go",
+    "importer/extract_test.go",
+    "importer/importer_test.go",
+    "leak/handler_test.go",
+    "logger/logger_test.go",
+    "protocol/actions/actions_test.go",
+    "protocol/contracts/contracts_test.go",
+    "session/connection_registry.go",
+    "session/logstream_session_store.go",
+    "shipworkflow/startram_lifecycle_runtime.go",
+    "shipworkflow/urbit_operations_runtime.go",
+    "startram/backup_runtime_test.go",
+    "startram/state_sync_test.go",
+    "system/disk_test.go",
+    "system/metrics/metrics_test.go",
+    "system/storage/storage_test.go",
+    "system/wifi_test.go",
+    "uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260303_185609",
+    "created_at": "2026-03-03T18:57:46+00:00",
+    "batch_count": 3,
+    "batch_indexes": [
+      1,
+      2,
+      3
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "a46eebeb0ac730f6b1000499306811880a8f5ec848e849535b413bc3a77bfc0b"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

@@ -102,15 +102,15 @@ func Handler(msg []byte, deps Dependencies) error {
 		}
 	case "backup-tlon":
 		conf := deps.Conf()
-		for _, patp := range conf.Piers {
+		for _, patp := range conf.Connectivity.Piers {
 			if err := deps.CreateLocalBackup(patp, deps.BackupDir); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to backup tlon for %v", err))
 			}
 		}
 	case "remote-backup-tlon":
 		conf := deps.Conf()
-		for _, patp := range conf.Piers {
-			if err := deps.UploadLatestBackup(patp, conf.RemoteBackupPassword, deps.BackupDir); err != nil {
+		for _, patp := range conf.Connectivity.Piers {
+			if err := deps.UploadLatestBackup(patp, conf.Connectivity.RemoteBackupPassword, deps.BackupDir); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to upload backup for %s: %v", patp, err))
 			}
 		}
@@ -132,7 +132,7 @@ func Handler(msg []byte, deps Dependencies) error {
 		}
 	case "startram-reminder":
 		conf := deps.Conf()
-		if !conf.WgRegistered {
+		if !conf.Connectivity.WgRegistered {
 			return fmt.Errorf("No startram registration")
 		}
 		retrieve, err := deps.Retrieve()
@@ -150,9 +150,9 @@ func Handler(msg []byte, deps Dependencies) error {
 		diff := expiryDate.Sub(currentTime).Hours() / 24
 		noti := structs.HarkNotification{Type: "startram-reminder", StartramDaysLeft: int(diff)}
 
-		rem := conf.StartramSetReminder
+		rem := conf.Startram.StartramSetReminder
 		if !rem.One || !rem.Three || !rem.Seven {
-			for _, patp := range conf.Piers {
+			for _, patp := range conf.Connectivity.Piers {
 				shipConf := deps.UrbitConf(patp)
 				if shipConf.StartramReminder == true {
 					if err := deps.SendNotification(patp, noti); err != nil {

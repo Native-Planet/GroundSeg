@@ -7,7 +7,6 @@ import (
 	"groundseg/config"
 	"groundseg/session"
 	"groundseg/structs"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -29,38 +28,37 @@ type sessionStore struct {
 	getClientManager    func() *structs.ClientManager
 }
 
-var activeSessionBoundary SessionBoundary = &sessionStore{
-	now:                 func() time.Time { return time.Now() },
-	hashToken:           defaultTokenHash,
-	persistAuthorized:   persistAuthorizedSession,
-	persistUnauthorized: persistUnauthorizedSession,
-	getClientManager:    session.GetClientManager,
-}
-
-var activeSessionBoundaryMu sync.RWMutex
-
-func activeBoundary() SessionBoundary {
-	activeSessionBoundaryMu.RLock()
-	defer activeSessionBoundaryMu.RUnlock()
-	return activeSessionBoundary
-}
-
-func SetSessionBoundary(boundary SessionBoundary) {
-	activeSessionBoundaryMu.Lock()
-	defer activeSessionBoundaryMu.Unlock()
-	if boundary == nil {
-		activeSessionBoundary = newSessionStore()
-		return
+func defaultSessionBoundary() SessionBoundary {
+	return &sessionStore{
+		now:                 func() time.Time { return time.Now() },
+		hashToken:           defaultTokenHash,
+		persistAuthorized:   persistAuthorizedSession,
+		persistUnauthorized: persistUnauthorizedSession,
+		getClientManager:    session.GetClientManager,
 	}
-	activeSessionBoundary = boundary
+}
+
+
+func AddToAuthMapWithBoundary(boundary SessionBoundary, conn *websocket.Conn, token map[string]string, authed bool) error {
+	if boundary == nil {
+		boundary = defaultSessionBoundary()
+	}
+	return boundary.AddToAuthMap(conn, token, authed)
+}
+
+func RemoveFromAuthMapWithBoundary(boundary SessionBoundary, tokenID string, fromAuthorized bool) {
+	if boundary == nil {
+		boundary = defaultSessionBoundary()
+	}
+	boundary.RemoveFromAuthMap(tokenID, fromAuthorized)
 }
 
 func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) error {
-	return activeBoundary().AddToAuthMap(conn, token, authed)
+	return AddToAuthMapWithBoundary(nil, conn, token, authed)
 }
 
 func RemoveFromAuthMap(tokenID string, fromAuthorized bool) {
-	activeBoundary().RemoveFromAuthMap(tokenID, fromAuthorized)
+	RemoveFromAuthMapWithBoundary(nil, tokenID, fromAuthorized)
 }
 
 func (store *sessionStore) AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) error {

@@ -26,36 +26,36 @@ func resetSystemSeamsForTest(t *testing.T) {
 
 func TestAptUpdateCheckIntervalUsesConfiguredCadence(t *testing.T) {
 	dayConf := structs.SysConfig{}
-	dayConf.LinuxUpdates.Interval = "day"
-	dayConf.LinuxUpdates.Value = 2
+	dayConf.Runtime.LinuxUpdates.Interval = "day"
+	dayConf.Runtime.LinuxUpdates.Value = 2
 	if got := aptUpdateCheckInterval(dayConf); got != 48*time.Hour {
 		t.Fatalf("unexpected day interval: got %v want %v", got, 48*time.Hour)
 	}
 
 	weekConf := structs.SysConfig{}
-	weekConf.LinuxUpdates.Interval = "week"
-	weekConf.LinuxUpdates.Value = 1
+	weekConf.Runtime.LinuxUpdates.Interval = "week"
+	weekConf.Runtime.LinuxUpdates.Value = 1
 	if got := aptUpdateCheckInterval(weekConf); got != 7*24*time.Hour {
 		t.Fatalf("unexpected week interval: got %v want %v", got, 7*24*time.Hour)
 	}
 
 	defaultConf := structs.SysConfig{}
-	defaultConf.LinuxUpdates.Interval = "month"
-	defaultConf.LinuxUpdates.Value = 3
+	defaultConf.Runtime.LinuxUpdates.Interval = "month"
+	defaultConf.Runtime.LinuxUpdates.Value = 3
 	if got := aptUpdateCheckInterval(defaultConf); got != 90*24*time.Hour {
 		t.Fatalf("unexpected default interval: got %v want %v", got, 90*24*time.Hour)
 	}
 
 	zeroConf := structs.SysConfig{}
-	zeroConf.LinuxUpdates.Interval = "day"
-	zeroConf.LinuxUpdates.Value = 0
+	zeroConf.Runtime.LinuxUpdates.Interval = "day"
+	zeroConf.Runtime.LinuxUpdates.Value = 0
 	if got := aptUpdateCheckInterval(zeroConf); got != 24*time.Hour {
 		t.Fatalf("expected zero interval to default to one multiplier: got %v want %v", got, 24*time.Hour)
 	}
 
 	negativeConf := structs.SysConfig{}
-	negativeConf.LinuxUpdates.Interval = "week"
-	negativeConf.LinuxUpdates.Value = -1
+	negativeConf.Runtime.LinuxUpdates.Interval = "week"
+	negativeConf.Runtime.LinuxUpdates.Value = -1
 	if got := aptUpdateCheckInterval(negativeConf); got != 7*24*time.Hour {
 		t.Fatalf("expected negative interval to default to one multiplier: got %v want %v", got, 7*24*time.Hour)
 	}

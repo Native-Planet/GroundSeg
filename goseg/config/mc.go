@@ -30,7 +30,7 @@ func UpdateMcConf() error {
 	versionInfo := getVersionChannelForMc()
 	newConfig := structs.McConfig{
 		McName:      "minio_client",
-		McVersion:   conf.UpdateBranch,
+		McVersion:   conf.Connectivity.UpdateBranch,
 		Repo:        versionInfo.Miniomc.Repo,
 		Amd64Sha256: versionInfo.Miniomc.Amd64Sha256,
 		Arm64Sha256: versionInfo.Miniomc.Arm64Sha256,

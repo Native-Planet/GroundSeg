@@ -1,0 +1,132 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 72.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Disk/storage behavior is tested twice with near-identical scenarios and assertions: `TestListHardDisks`, `TestIsMountedMMC`, `TestRemoveMultipartFiles`, and fstab reconciliation paths appear in both `goseg/system/disk_test.go` and `goseg/system/storage/storage_test.go`.",
+        "`goseg/shipworkflow/urbit_operations_runtime.go` combines command dispatch wrappers, transition construction, direct Docker calls, config mutation, and broadcast side effects in one file, with many one-line action wrappers and repeated transition-step scaffolding.",
+        "`goseg/docker/orchestration/runtime_ops.go` centralizes a very broad set of runtime seam structs and default builders (container, urbit, snapshot, startup, load, service, image, wireguard, minio, netdata), indicating a high-coupling assembly point.",
+        "Config section handling is replicated across multiple files: per-section accessors/updaters in `goseg/structs/configs.go`, per-section patch apply helpers and field registries in `goseg/config/config_update_registry.go`, and per-section mutator registration in `goseg/config/urbit.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_disk_storage_test_harness",
+      "summary": "System disk and storage test suites duplicate the same behavioral matrix, creating split ownership and high maintenance churn.",
+      "related_files": [
+        "goseg/system/disk_test.go",
+        "goseg/system/storage/storage_test.go"
+      ],
+      "evidence": [
+        "`goseg/system/disk_test.go` and `goseg/system/storage/storage_test.go` both define and assert `ListHardDisks` success/failure JSON parsing behavior.",
+        "Both suites test mmc mount detection with nearly the same partition fixtures (`TestIsMountedMMCUsesPartitionHierarchy` vs `TestIsMountedMMC`).",
+        "Both suites test multipart cleanup and fstab reconciliation idempotence/replacement flows with overlapping expected outputs."
+      ],
+      "suggestion": "Extract a shared table-driven contract test helper (or a shared test package) for disk/storage invariants, then keep only package-specific edge-case tests in each file to avoid mirrored test logic.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "storage_boundary_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "section_config_shotgun_surgery",
+      "summary": "Configuration section design requires synchronized edits across multiple registries and wrappers for every new field/section.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "`goseg/structs/configs.go` exposes per-section getters/updaters (`UpdateConnectivityConfig`, `UpdateStartramConfig`, etc.).",
+        "`goseg/config/config_update_registry.go` repeats per-section apply helpers (`applyConnectivityPatchValue`, `applyStartramPatchValue`, etc.) and section-specific field lists.",
+        "`goseg/config/urbit.go` keeps a separate per-section mutator map (`urbitSectionMutators`) with explicit registration for each section."
+      ],
+      "suggestion": "Introduce a single declarative section descriptor model (section id, accessor, mutator adapter, patch field map) used by all three paths so adding/changing sections is one-place metadata change.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_section_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_runtime_mixed_responsibilities",
+      "summary": "Urbit operations runtime file mixes command routing, domain policy, transition orchestration, and infrastructure side effects.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/shipworkflow/startram_lifecycle_runtime.go"
+      ],
+      "evidence": [
+        "`goseg/shipworkflow/urbit_operations_runtime.go` contains many wrapper actions (`togglePower`, `toggleDevMode`, `toggleNetwork`, etc.) plus low-level operations like Docker starts/deletes and config persistence in the same module.",
+        "The same file builds transition steps (`build*Steps`) while also performing direct side effects (`startram.AliasCreate`, `docker.StartContainer`, `broadcast.PublishSchedulePack`).",
+        "`goseg/shipworkflow/startram_lifecycle_runtime.go` repeats similar orchestration patterns (step assembly + config mutation + service operations), indicating duplicated orchestration style across workflows."
+      ],
+      "suggestion": "Split action-command mapping, transition step definitions, and infrastructure executors into separate components; keep runtime files as thin coordinators over reusable orchestration primitives.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "workflow_orchestration_conflation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_ops_god_assembly",
+      "summary": "A single runtime_ops assembly file aggregates too many unrelated seam definitions and default factories, weakening module boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_ops.go` defines numerous runtime structs and default builders across container, startup, startram, health, snapshot, config, service, image, wireguard, netdata, and minio concerns.",
+        "The same file mixes dependency schema and concrete production wiring (`buildRuntimeSeamBundle`, `defaultRuntime*`), making it both contract and composition root.",
+        "`goseg/system/wifi_runtime_api.go` follows a smaller runtime+state service pattern; the orchestration file does not maintain that separation and instead centralizes many concern families."
+      ],
+      "suggestion": "Split runtime seam contracts by concern into focused files/packages and move concrete wiring into a dedicated composition root; keep each runtime ops unit aligned to one subsystem boundary.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_composition_overload"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "manual_field_mapping_hotspot",
+      "summary": "Manual per-key JSON decoding and per-key patch field registration create parallel mapping surfaces that are easy to drift.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`goseg/structs/configs.go` has a large key-switch in `UrbitDocker.UnmarshalJSON` mapping many string literals to fields.",
+        "`goseg/config/config_update_registry.go` separately maps patch keys/fields with repeated literal names and typed parsers.",
+        "`goseg/config/config_update_schema.go` adds another patch-key map build path (`buildConfPatchByKey`) and type parse layer, increasing independent mapping points."
+      ],
+      "suggestion": "Adopt a shared metadata-driven field map (with key, target field accessor, parser/default behavior) reused for unmarshal and patch application to reduce drift and centralize schema evolution.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_section_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Configuration model evolution is distributed across multiple independently maintained mapping/adapter layers.",
+      "Workflow orchestration lacks a narrow composition boundary, so policy and infrastructure code accumulate in the same runtime files.",
+      "Test ownership boundaries between legacy `system` and newer `storage` paths are not cleanly separated."
+    ],
+    "likely_symptoms": [
+      "duplicated_disk_storage_test_harness",
+      "manual_field_mapping_hotspot",
+      "urbit_runtime_mixed_responsibilities"
+    ],
+    "possible_false_positives": []
+  }
+}

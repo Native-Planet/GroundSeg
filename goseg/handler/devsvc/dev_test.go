@@ -60,7 +60,7 @@ func TestDevHandlerPrintMountsAndBackupTlon(t *testing.T) {
 	backupRoot := t.TempDir()
 	backupDirFn = func() string { return backupRoot }
 	confForDev = func() structs.SysConfig {
-		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~zod"}}}
+		return structs.SysConfig{Connectivity: structs.ConnectivityConfig{Piers: []string{"~zod"}}}
 	}
 	called := false
 	createLocalBackupForDev = func(patp, path string) error {
@@ -93,7 +93,7 @@ func TestDevHandlerRemoteBackupAndRestore(t *testing.T) {
 	backupDirFn = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
 
 	confForDev = func() structs.SysConfig {
-		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{patp}, RemoteBackupPassword: "pw"}}
+		return structs.SysConfig{Connectivity: structs.ConnectivityConfig{Piers: []string{patp}, RemoteBackupPassword: "pw"}}
 	}
 	uploadedPath := ""
 	uploadLatestBackupForDev = func(ship, pw, backupRoot string) error {
@@ -129,14 +129,14 @@ func TestDevHandlerStartramReminderAndToggle(t *testing.T) {
 
 	confForDev = func() structs.SysConfig {
 		conf := structs.SysConfig{
-			ConnectivityConfig: structs.ConnectivityConfig{
+			Connectivity: structs.ConnectivityConfig{
 				WgRegistered: true,
 				Piers:        []string{"~zod", "~bus"},
 			},
 		}
-		conf.StartramSetReminder.One = false
-		conf.StartramSetReminder.Three = false
-		conf.StartramSetReminder.Seven = false
+		conf.Startram.StartramSetReminder.One = false
+		conf.Startram.StartramSetReminder.Three = false
+		conf.Startram.StartramSetReminder.Seven = false
 		return conf
 	}
 	retrieveStartramForDev = func() (structs.StartramRetrieve, error) {
@@ -174,7 +174,7 @@ func TestDevHandlerStartramReminderAndToggle(t *testing.T) {
 	}
 
 	confForDev = func() structs.SysConfig {
-		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{WgRegistered: false}}
+		return structs.SysConfig{Connectivity: structs.ConnectivityConfig{WgRegistered: false}}
 	}
 	if err := DevHandler(devMessage(t, "startram-reminder")); err == nil {
 		t.Fatalf("expected no startram registration error")

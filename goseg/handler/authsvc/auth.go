@@ -209,7 +209,7 @@ func PwHandler(msg []byte, urbitMode bool) error {
 	case "modify":
 		zap.L().Info("Setting new password")
 		conf := config.Conf()
-		if tokens.Hasher(pwPayload.Payload.Old) == conf.PwHash {
+		if tokens.Hasher(pwPayload.Payload.Old) == conf.AuthSession.PwHash {
 			if err := config.UpdateConfTyped(config.WithPwHash(tokens.Hasher(pwPayload.Payload.Password))); err != nil {
 				return fmt.Errorf("Unable to update password: %w", err)
 			}

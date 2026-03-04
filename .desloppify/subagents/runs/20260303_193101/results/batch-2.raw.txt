@@ -1,0 +1,114 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 72.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Config patch behavior is split across multiple manual registries: section definitions in goseg/structs/configs.go (SysConfigSectionDescriptorList), patch schema in goseg/config/config_update_schema.go (ConnectivityPatch/RuntimePatch/etc), and field-level parse/apply/merge entries in goseg/config/config_update_registry.go.",
+        "Urbit config parsing is centralized in a single large switch in goseg/structs/configs.go (UrbitDocker.UnmarshalJSON) while section mutation behavior is separately mapped in goseg/config/urbit.go (urbitSectionMutatorSpecs), creating parallel sources of truth for the same domain.",
+        "Workflow handlers in goseg/shipworkflow/startram_lifecycle_runtime.go and goseg/shipworkflow/urbit_operations_runtime.go combine transition orchestration, config mutation, and external side effects (container operations, startram API, click linking) inside single runtime functions."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_metadata_triplication",
+      "summary": "Config domain semantics are triplicated across schema, registry, and section-descriptor layers, increasing drift risk and making changes non-local.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "goseg/config/config_update_schema.go defines patch structs and field pointers (e.g., ConnectivityPatch, RuntimePatch), while goseg/config/config_update_registry.go separately redefines each key's parser/apply/merge behavior.",
+        "goseg/structs/configs.go independently defines SysConfigSectionDescriptorList and per-section mutate/access logic, duplicating section identity and mutation routing already encoded in patch services.",
+        "Adding/changing a field requires synchronized edits in multiple registries with no compile-time linkage between the metadata sets."
+      ],
+      "suggestion": "Introduce a single declarative config field catalog (section, key, parser, patch accessor, merge/apply rules) and generate or derive schema/registry/section mappings from it to make field evolution one-place and verifiable.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_metadata_models"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_json_parser_god_switch",
+      "summary": "Urbit JSON decoding uses a monolithic key-switch parser that mixes defaults, type coercion, and domain mapping in one function.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "goseg/structs/configs.go UnmarshalJSON for UrbitDocker spans many key cases and handles defaults plus per-field parsing manually.",
+        "goseg/config/urbit.go maintains separate section mutator descriptors for the same Urbit subdomains, so shape knowledge is split between decoding and mutation layers.",
+        "This structure makes extension error-prone because new fields must be manually threaded through large switch logic and separate section metadata."
+      ],
+      "suggestion": "Replace the manual key-switch with typed decode per embedded section (runtime/network/schedule/feature/web/backup) and centralize field defaults/validation in section-level constructors or validators reused by both load and mutation paths.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "parallel_metadata_models"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "workflow_handlers_mixed_side_effect_layers",
+      "summary": "Ship workflow runtime handlers mix orchestration control flow with direct infrastructure and external-service side effects, reducing separation of concerns.",
+      "related_files": [
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "runStartramToggleWithRuntime builds transition events while also mutating config, stopping/starting containers, dispatching urbit payloads, and rebuilding containers in one routine.",
+        "runStartramEndpointWithRuntime and runStartramCancelWithRuntime coordinate lifecycle events while directly invoking service deletion, subscription cancelation, and key cycling.",
+        "buildToggleMinIOLinkSteps in urbit_operations_runtime.go performs transition step composition alongside click API calls, MinIO account creation, and config writes."
+      ],
+      "suggestion": "Extract application-service commands for each workflow intent (toggle, endpoint change, minio link) and keep runtime handlers focused on transition orchestration by delegating side effects to cohesive command objects/use-cases.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "workflow_orchestration_coupling"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "monolithic_test_harness_patterns",
+      "summary": "Large test files bundle many behavioral concerns with repeated inline runtime wiring, making test intent and maintenance harder.",
+      "related_files": [
+        "goseg/handler/systemsvc/system_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "goseg/handler/systemsvc/system_test.go repeatedly constructs large dependency structs with overlapping defaults for different action paths.",
+        "goseg/importer/importer_test.go combines chunk I/O, import workflow orchestration, cleanup semantics, and readiness flows in one file with repeated setup scaffolding.",
+        "goseg/main_test.go mixes HTTP middleware tests, connectivity retry logic, bootstrap callback tests, and server lifecycle tests in one unit."
+      ],
+      "suggestion": "Split these into focused test modules by behavior slice and introduce shared builder helpers for default runtimes/dependencies so each test only overrides scenario-specific seams.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_structure_sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Parallel metadata definitions for the same domain concepts (sections/fields/mutators) instead of one canonical model.",
+      "Workflow layers conflate orchestration and effect execution, leading to broad function responsibilities.",
+      "Test organization favors file-level accumulation over behavior-focused partitioning."
+    ],
+    "likely_symptoms": [
+      "config_metadata_triplication",
+      "urbit_json_parser_god_switch",
+      "workflow_handlers_mixed_side_effect_layers",
+      "monolithic_test_harness_patterns"
+    ],
+    "possible_false_positives": []
+  }
+}

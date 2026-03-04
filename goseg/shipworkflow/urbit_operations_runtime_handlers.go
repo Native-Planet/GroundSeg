@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap"
 	"groundseg/click"
 	"groundseg/docker"
-	dockerOrchestration "groundseg/docker/orchestration"
 	"groundseg/structs"
 )
 
@@ -24,7 +23,7 @@ func runTogglePowerTransition(patp string) error {
 	isRunning := strings.Contains(status, "Up")
 
 	if shipConf.BootStatus == "noboot" {
-		if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+		if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 			conf.BootStatus = "boot"
 			return nil
 		}); err != nil {
@@ -42,7 +41,7 @@ func runTogglePowerTransition(patp string) error {
 			containerState.DesiredStatus = "stopped"
 			updateContainerStateFn(patp, containerState)
 		}
-		if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionRuntime, func(conf *structs.UrbitRuntimeConfig) error {
+		if err := persistShipUrbitRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 			conf.BootStatus = "noboot"
 			return nil
 		}); err != nil {
@@ -74,7 +73,7 @@ func runToggleNetworkTransition(patp string) error {
 
 	switch currentNetwork {
 	case "wireguard":
-		if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionNetwork, func(conf *structs.UrbitNetworkConfig) error {
+		if err := persistShipUrbitNetworkConfig(patp, func(conf *structs.UrbitNetworkConfig) error {
 			conf.Network = "bridge"
 			return nil
 		}); err != nil {
@@ -87,7 +86,7 @@ func runToggleNetworkTransition(patp string) error {
 		if !settings.WgRegistered {
 			return fmt.Errorf("No remote registration")
 		}
-		if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionNetwork, func(conf *structs.UrbitNetworkConfig) error {
+		if err := persistShipUrbitNetworkConfig(patp, func(conf *structs.UrbitNetworkConfig) error {
 			conf.Network = "wireguard"
 			return nil
 		}); err != nil {
@@ -100,7 +99,7 @@ func runToggleNetworkTransition(patp string) error {
 		if !settings.WgRegistered {
 			return fmt.Errorf("No remote registration")
 		}
-		if err := persistShipUrbitConfig(patp, dockerOrchestration.UrbitConfigSectionNetwork, func(conf *structs.UrbitNetworkConfig) error {
+		if err := persistShipUrbitNetworkConfig(patp, func(conf *structs.UrbitNetworkConfig) error {
 			conf.Network = "wireguard"
 			return nil
 		}); err != nil {

@@ -35,10 +35,6 @@ func DefaultEventRuntime() EventRuntime {
 	return defaultEventRuntime()
 }
 
-func NewDefaultEventRuntime() EventRuntime {
-	return DefaultEventRuntime()
-}
-
 func newEventRuntime() EventRuntime {
 	return newTransitionRuntime(100)
 }

@@ -10,67 +10,71 @@ import (
 	"testing"
 )
 
-func testWireguardRuntime() WireguardRuntime {
-	return WireguardRuntime{
-		RuntimeContextOps: RuntimeContextOps{
-			BasePathFn: func() string { return "/tmp" },
-			DockerDirFn: func() string {
-				return "/tmp/docker"
-			},
-		},
-		RuntimeFileOps: RuntimeFileOps{
-			OpenFn: func(string) (*os.File, error) {
-				return nil, nil
-			},
-			ReadFileFn: func(string) ([]byte, error) {
-				return nil, os.ErrNotExist
-			},
-			WriteFileFn: func(string, []byte, os.FileMode) error {
-				return nil
-			},
-			MkdirAllFn: func(string, os.FileMode) error {
-				return nil
-			},
-		},
-		RuntimeContainerOps: RuntimeContainerOps{
-			StartContainerFn: func(string, string) (structs.ContainerState, error) {
-				return structs.ContainerState{}, nil
-			},
-			UpdateContainerStateFn: func(string, structs.ContainerState) {},
-		},
-		RuntimeImageOps: RuntimeImageOps{
-			GetLatestContainerInfoFn: func(string) (map[string]string, error) {
-				return map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}, nil
-			},
-			GetLatestContainerImageFn: func(string) (string, error) {
-				return "wg:latest", nil
-			},
-		},
-		RuntimeWireguardOps: RuntimeWireguardOps{
-			CreateDefaultWGConfFn: func() error {
-				return nil
-			},
-			GetWgConfFn: func() (structs.WgConfig, error) {
-				return structs.WgConfig{}, nil
-			},
-			GetWgConfBlobFn: func() (string, error) {
-				return base64.StdEncoding.EncodeToString([]byte("blob")), nil
-			},
-			GetWgPrivkeyFn: func() string {
-				return "k1"
-			},
-			CopyFileToVolumeFn: func(string, string, string, string, volumeWriterImageSelector) error {
-				return nil
-			},
-		},
-		RuntimeVolumeOps: RuntimeVolumeOps{
-			VolumeExistsFn: func(string) (bool, error) {
-				return false, nil
-			},
-			CreateVolumeFn: func(string) error {
-				return nil
-			},
-		},
+type wireguardRuntimeOption func(*WireguardRuntime)
+
+func testWireguardRuntime(overrides ...wireguardRuntimeOption) WireguardRuntime {
+	runtime := newWireguardRuntimeForTests()
+	for _, apply := range overrides {
+		apply(&runtime)
+	}
+	return runtime
+}
+
+func withWireguardLatestContainerInfo(info map[string]string) wireguardRuntimeOption {
+	return func(runtime *WireguardRuntime) {
+		runtime.GetLatestContainerInfoFn = func(string) (map[string]string, error) {
+			return info, nil
+		}
+	}
+}
+
+func withWireguardWgConfBlob(blob string) wireguardRuntimeOption {
+	return func(runtime *WireguardRuntime) {
+		runtime.GetWgConfBlobFn = func() (string, error) {
+			return base64.StdEncoding.EncodeToString([]byte(blob)), nil
+		}
+	}
+}
+
+func withWireguardWgPrivateKey(privateKey string) wireguardRuntimeOption {
+	return func(runtime *WireguardRuntime) {
+		runtime.GetWgPrivkeyFn = func() string {
+			return privateKey
+		}
+	}
+}
+
+func withWireguardWgConfig(cfg structs.WgConfig) wireguardRuntimeOption {
+	return func(runtime *WireguardRuntime) {
+		runtime.GetWgConfFn = func() (structs.WgConfig, error) {
+			return cfg, nil
+		}
+	}
+}
+
+func withWireguardLatestImage(image string) wireguardRuntimeOption {
+	return func(runtime *WireguardRuntime) {
+		runtime.GetLatestContainerImageFn = func(string) (string, error) {
+			return image, nil
+		}
+	}
+}
+
+func withWireguardRuntimeFileOps(
+	readFn func(string) ([]byte, error),
+	writeFn func(string, []byte, os.FileMode) error,
+	mkdirFn func(string, os.FileMode) error,
+) wireguardRuntimeOption {
+	return func(runtime *WireguardRuntime) {
+		runtime.ReadFileFn = readFn
+		runtime.WriteFileFn = writeFn
+		runtime.MkdirAllFn = mkdirFn
+	}
+}
+
+func withWireguardDockerDir(dockerDir string) wireguardRuntimeOption {
+	return func(runtime *WireguardRuntime) {
+		runtime.DockerDirFn = func() string { return dockerDir }
 	}
 }
 
@@ -114,15 +118,12 @@ func TestLoadWireguardFlowAndStartError(t *testing.T) {
 }
 
 func TestWgContainerConfBuildsExpectedConfig(t *testing.T) {
-	rt := testWireguardRuntime()
-	rt.GetLatestContainerInfoFn = func(string) (map[string]string, error) {
-		return map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}, nil
-	}
-	rt.GetWgConfFn = func() (structs.WgConfig, error) {
-		cfg := structs.WgConfig{CapAdd: []string{"NET_ADMIN", "SYS_MODULE"}}
-		cfg.Sysctls.NetIpv4ConfAllSrcValidMark = 1
-		return cfg, nil
-	}
+	cfg := structs.WgConfig{CapAdd: []string{"NET_ADMIN", "SYS_MODULE"}}
+	cfg.Sysctls.NetIpv4ConfAllSrcValidMark = 1
+	rt := testWireguardRuntime(
+		withWireguardLatestContainerInfo(map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}),
+		withWireguardWgConfig(cfg),
+	)
 
 	containerCfg, hostCfg, err := rt.wgContainerConf()
 	if err != nil {
@@ -140,12 +141,10 @@ func TestWgContainerConfBuildsExpectedConfig(t *testing.T) {
 }
 
 func TestBuildWgConfDecodeAndReplace(t *testing.T) {
-	rt := testWireguardRuntime()
-	template := "PrivateKey = privkey\nAddress = 10.0.0.2/24\n"
-	rt.GetWgConfBlobFn = func() (string, error) {
-		return base64.StdEncoding.EncodeToString([]byte(template)), nil
-	}
-	rt.GetWgPrivkeyFn = func() string { return "actual-private-key" }
+	rt := testWireguardRuntime(
+		withWireguardWgConfBlob("PrivateKey = privkey\nAddress = 10.0.0.2/24\n"),
+		withWireguardWgPrivateKey("actual-private-key"),
+	)
 
 	rendered, err := rt.buildWgConf()
 	if err != nil {
@@ -155,25 +154,25 @@ func TestBuildWgConfDecodeAndReplace(t *testing.T) {
 		t.Fatalf("expected private key replacement, got %q", rendered)
 	}
 
-	rt.GetWgConfBlobFn = func() (string, error) { return "***invalid-base64***", nil }
+	rt = testWireguardRuntime(
+		withWireguardWgPrivateKey("actual-private-key"),
+	)
+	rt.GetWgConfBlobFn = func() (string, error) {
+		return "***invalid-base64***", nil
+	}
 	if _, err := rt.buildWgConf(); err == nil {
 		t.Fatalf("expected base64 decode error")
 	}
 }
 
 func TestWriteWgConfCreateAndUpdate(t *testing.T) {
-	rt := testWireguardRuntime()
 	tmpDockerDir := t.TempDir()
-	rt.DockerDirFn = func() string { return tmpDockerDir }
-	rt.GetWgConfBlobFn = func() (string, error) {
-		return base64.StdEncoding.EncodeToString([]byte("privkey")), nil
-	}
-	rt.GetWgConfFn = func() (structs.WgConfig, error) {
-		return structs.WgConfig{}, nil
-	}
-	rt.ReadFileFn = os.ReadFile
-	rt.WriteFileFn = os.WriteFile
-	rt.MkdirAllFn = os.MkdirAll
+	rt := testWireguardRuntime(
+		withWireguardDockerDir(tmpDockerDir),
+		withWireguardWgConfBlob("privkey"),
+		withWireguardWgConfig(structs.WgConfig{}),
+		withWireguardRuntimeFileOps(os.ReadFile, os.WriteFile, os.MkdirAll),
+	)
 
 	if err := rt.WriteWgConf(); err != nil {
 		t.Fatalf("writeWgConf failed: %v", err)
@@ -187,7 +186,13 @@ func TestWriteWgConfCreateAndUpdate(t *testing.T) {
 		t.Fatalf("unexpected first wg0.conf content: %q", string(first))
 	}
 
-	rt.GetWgPrivkeyFn = func() string { return "k2" }
+	rt = testWireguardRuntime(
+		withWireguardDockerDir(tmpDockerDir),
+		withWireguardWgConfBlob("privkey"),
+		withWireguardWgConfig(structs.WgConfig{}),
+		withWireguardRuntimeFileOps(os.ReadFile, os.WriteFile, os.MkdirAll),
+		withWireguardWgPrivateKey("k2"),
+	)
 	if err := rt.WriteWgConf(); err != nil {
 		t.Fatalf("writeWgConf update failed: %v", err)
 	}
@@ -201,18 +206,19 @@ func TestWriteWgConfCreateAndUpdate(t *testing.T) {
 }
 
 func TestWriteWgConfReturnsErrorOnReadFailure(t *testing.T) {
-	rt := testWireguardRuntime()
 	tmpDockerDir := t.TempDir()
-	rt.DockerDirFn = func() string { return tmpDockerDir }
-	rt.GetWgConfBlobFn = func() (string, error) {
-		return base64.StdEncoding.EncodeToString([]byte("privkey")), nil
-	}
 	readErr := errors.New("permission denied")
-	rt.ReadFileFn = func(string) ([]byte, error) {
-		return nil, readErr
-	}
-	rt.WriteFileFn = os.WriteFile
-	rt.MkdirAllFn = os.MkdirAll
+	rt := testWireguardRuntime(
+		withWireguardDockerDir(tmpDockerDir),
+		withWireguardWgConfBlob("privkey"),
+		withWireguardRuntimeFileOps(
+			func(string) ([]byte, error) {
+				return nil, readErr
+			},
+			os.WriteFile,
+			os.MkdirAll,
+		),
+	)
 
 	if err := rt.WriteWgConf(); err == nil {
 		t.Fatalf("expected writeWgConf to fail on read error")
@@ -220,13 +226,25 @@ func TestWriteWgConfReturnsErrorOnReadFailure(t *testing.T) {
 }
 
 func TestWriteWgConfToFileFallbackCopy(t *testing.T) {
-	rt := testWireguardRuntime()
 	writeAttempts := 0
-	rt.WriteFileFn = func(string, []byte, os.FileMode) error {
-		writeAttempts++
-		return errors.New("write fail")
-	}
-	rt.MkdirAllFn = os.MkdirAll
+	rt := testWireguardRuntime(
+		withWireguardRuntimeFileOps(
+			func(string) ([]byte, error) {
+				return nil, nil
+			},
+			func(string, []byte, os.FileMode) error {
+				writeAttempts++
+				return errors.New("write fail")
+			},
+			os.MkdirAll,
+		),
+		withWireguardLatestImage("wg:latest"),
+		withWireguardWgConfBlob("content"),
+		withWireguardDockerDir("/tmp/docker"),
+		withWireguardWgConfig(structs.WgConfig{}),
+		withWireguardWgPrivateKey("k1"),
+		withWireguardLatestContainerInfo(map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}),
+	)
 	copyCalled := false
 	rt.CopyFileToVolumeFn = func(filePath string, targetPath string, volumeName string, _ string, _ volumeWriterImageSelector) error {
 		copyCalled = true
@@ -245,8 +263,8 @@ func TestWriteWgConfToFileFallbackCopy(t *testing.T) {
 }
 
 func TestCopyWGFileToVolumeDelegates(t *testing.T) {
-	rt := testWireguardRuntime()
 	var gotPath, gotTarget, gotVolume, gotWriter, gotImage string
+	rt := testWireguardRuntime(withWireguardLatestImage("wg:latest"))
 	rt.CopyFileToVolumeFn = func(
 		filePath string,
 		targetPath string,
@@ -276,7 +294,7 @@ func TestCopyWGFileToVolumeDelegates(t *testing.T) {
 }
 
 func TestCopyWGFileToVolumeReturnsErrorWhenCopyRuntimeMissing(t *testing.T) {
-	rt := testWireguardRuntime()
+	rt := testWireguardRuntime(withWireguardLatestImage("wg:latest"))
 	rt.CopyFileToVolumeFn = nil
 
 	err := rt.copyWGFileToVolume("/tmp/wg0.conf", "/etc/wireguard/", "wireguard")

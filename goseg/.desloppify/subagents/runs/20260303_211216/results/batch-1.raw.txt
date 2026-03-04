@@ -1,0 +1,48 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 88.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files define independent catalog-spec producers (`protocolContractCatalogSpecs`, `startramContractCatalogSpecs`) that emit plain `[]contractCatalogEntry` values with no local invariant checks.",
+        "Contract identity is maintained by repeated literals/constants across modules (`ContractID`, name/description/message metadata), which creates drift risk as the catalog grows across files."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Catalog definitions are decentralized and rely on convention; there is no visible boundary-level guard in these modules for duplicate IDs or metadata drift across contract slices."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "decentralized_contract_catalog_invariants",
+      "summary": "Contract catalog slices are split across modules without explicit cross-slice invariants.",
+      "related_files": [
+        "protocol/contracts/protocol_contracts.go",
+        "protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` and `startram_contracts.go` each return independent `[]contractCatalogEntry` fragments.",
+        "Both modules encode contract identity and metadata via local constants/fields, but neither includes validation for uniqueness or completeness at module boundary level."
+      ],
+      "suggestion": "Introduce a central catalog assembly/validation path that enforces global invariants (e.g., unique `ContractID`, required descriptor fields), and keep per-module files as declarative inputs only; add a test that fails on duplicate IDs or missing descriptor metadata.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "catalog_governance_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance is convention-driven rather than enforced through a single architectural registration/validation boundary."
+    ],
+    "likely_symptoms": [
+      "decentralized_contract_catalog_invariants"
+    ],
+    "possible_false_positives": []
+  }
+}

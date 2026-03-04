@@ -1,0 +1,90 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 74.5
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "In `goseg/shipworkflow/startram_lifecycle_runtime.go`, `SvcDeleteFn` failures during endpoint/cancel cleanup are logged but not returned, while adjacent operations in the same transition path return wrapped errors and fail the transition.",
+        "In `goseg/importer/importer.go`, token-validation failures in `OpenUploadEndpoint` return generic `errors.New(...)` strings (`token mismatch`, `upload token id is not authorized`), but `validateUploadRequest` returns different wrapped/contextual errors for the same auth domain.",
+        "`goseg/docker/events/events.go` defines explicit publish failure contracts (`ErrTransitionPublishTimeout`, `ErrTransitionBusFull`), while `goseg/session/logstream_session_store.go` publishes via `messageBus <- logData` with no error return and blocking semantics."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "startram_cleanup_errors_swallowed",
+      "summary": "Startram transition cleanup logs delete failures but still reports success",
+      "related_files": [
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "In `runStartramEndpointWithRuntime`, failures from `SvcDeleteFn` for urbit/s3 anchors are logged (`zap.L().Error(...)`) and execution continues with `return nil` from the step.",
+        "In `runStartramCancelWithRuntime`, reset-mode service deletions also log-and-continue, but neighboring operations (`CancelSub`, `CycleWgKeyFn`) convert errors into returned `fmt.Errorf(...)`, creating mixed failure behavior in one workflow."
+      ],
+      "suggestion": "Make cleanup failure policy explicit and uniform: either aggregate cleanup errors with `errors.Join` and return them so the transition fails, or route all cleanup failures through a single best-effort helper that emits a typed non-fatal error event and marks the transition as degraded.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mixed_fatal_vs_best_effort_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "importer_auth_error_contract_drift",
+      "summary": "Importer auth paths emit incompatible error contracts for similar token failures",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "`OpenUploadEndpoint` returns plain string errors for auth failures (`errors.New(\"token mismatch\")`, `errors.New(\"upload token id is not authorized\")`).",
+        "`validateUploadRequest` in the same module returns different messages and wraps callback errors (`fmt.Errorf(\"upload token validation failed: %w\", authz.AuthorizationErr)`) for equivalent authorization failures, forcing callers/tests to branch on message text rather than stable typed errors."
+      ],
+      "suggestion": "Introduce typed/sentinel auth errors for importer token validation (e.g., token mismatch, unauthorized token, callback missing) and return them consistently from both endpoint-open and upload-validate paths, with `%w` wrapping only for lower-level causes.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mixed_fatal_vs_best_effort_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "event_publish_failure_semantics_diverge",
+      "summary": "Event publication uses conflicting failure semantics across transition and log buses",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/session/logstream_session_store.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`EventRuntime.publishDropOnFull` returns explicit publish errors for timeout/full bus conditions, giving callers a predictable failure contract.",
+        "`logstreamSessionStore.PublishSystemLog` writes directly to `messageBus <- logData` without context or error return; under pressure it can block producers and offers no failure signal to callers.",
+        "`LogstreamRuntime` consumers in `logs.go` are built around processing from this channel, but producers cannot observe/drop/report backpressure in the same way transition publishers can."
+      ],
+      "suggestion": "Unify publish APIs: add `PublishSystemLog(ctx, data) error` with non-blocking/backpressure behavior aligned to transition bus semantics (`timeout/full` typed errors), then update log producers/consumers to handle these errors consistently.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "mixed_fatal_vs_best_effort_policy"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single cross-cutting policy defines when errors are fatal, best-effort, or retryable.",
+      "Error contracts are encoded ad hoc per function instead of via shared typed domain errors.",
+      "Asynchronous pipelines use inconsistent backpressure/error-reporting designs."
+    ],
+    "likely_symptoms": [
+      "startram_cleanup_errors_swallowed",
+      "importer_auth_error_contract_drift",
+      "event_publish_failure_semantics_diverge"
+    ],
+    "possible_false_positives": []
+  }
+}

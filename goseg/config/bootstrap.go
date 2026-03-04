@@ -73,8 +73,8 @@ func initializeConfig() error {
 	}
 
 	cachedConfig = mergeConfigs(defaults.SysConfig(ctx.BasePath), cachedConfig)
-	cachedConfig.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
-	cachedConfig.BinHash = readCurrentBinaryHash()
+	cachedConfig.AuthSession.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
+	cachedConfig.Runtime.BinHash = readCurrentBinaryHash()
 
 	if err := persistConfig(cachedConfig); err != nil {
 		return fmt.Errorf("persist config: %w", err)
@@ -85,7 +85,7 @@ func initializeConfig() error {
 	}
 
 	currentConf := Conf()
-	if currentConf.KeyFile == "" {
+	if currentConf.AuthSession.KeyFile == "" {
 		keyPath := SessionKeyPath()
 		if err := ensureSessionKeyExists(); err != nil {
 			return fmt.Errorf("ensure session key: %w", err)
@@ -111,7 +111,7 @@ func Conf() structs.SysConfig {
 }
 
 func GetWgPrivkey() string {
-	return Conf().Privkey
+	return Conf().Startram.Privkey
 }
 
 // tell if we're amd64 or arm64

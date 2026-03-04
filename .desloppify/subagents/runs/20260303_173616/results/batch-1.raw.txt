@@ -1,0 +1,48 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 88.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files define package-level mutable catalog slices (`var protocolContractCatalogSpecs = []contractCatalogEntry{...}` and `var startramContractCatalogSpecs = []contractCatalogEntry{...}`) that are read by package functions.",
+        "Catalog entry accessors (`protocolContractCatalogEntries`, `startramContractCatalogEntries`) depend on these shared vars, so any same-package mutation in other files would silently alter cross-module contract registry behavior."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Contract catalogs rely on package-global mutable state, which weakens boundary trust and makes registry behavior vulnerable to intra-package coupling."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_catalog_globals_couple_contract_modules",
+      "summary": "Package-global mutable contract catalogs create hidden coupling across contract files.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocolContractCatalogSpecs` and `startramContractCatalogSpecs` are declared as `var` slices at package scope rather than immutable values.",
+        "Entry/snapshot functions in both files read those globals, so same-package code can mutate registry content without API-level controls."
+      ],
+      "suggestion": "Make catalog specs effectively immutable: store as fixed arrays or unexported constants of structs where possible, expose read-only accessors that always return copies, and centralize catalog assembly in one registry builder file to prevent per-file mutable globals.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shared_mutable_registry_state"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract registration is modeled as per-file package globals instead of a single immutable registry boundary."
+    ],
+    "likely_symptoms": [
+      "mutable_catalog_globals_couple_contract_modules"
+    ],
+    "possible_false_positives": []
+  }
+}

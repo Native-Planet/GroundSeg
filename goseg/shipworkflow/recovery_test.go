@@ -68,7 +68,7 @@ func (runtime testRecoveryRuntimeUrbit) runtimeOps() orchestration.RuntimeUrbitO
 			}
 			return runtime.urbitConfFn(patp)
 		},
-		UpdateUrbitFn: func(string, func(*structs.UrbitDocker) error) error { return nil },
+		UpdateUrbitFn:         func(string, func(*structs.UrbitDocker) error) error { return nil },
 		GetContainerNetworkFn: func(string) (string, error) { return "", nil },
 		GetLusCodeFn:          func(string) (string, error) { return "", nil },
 		ClearLusCodeFn:        func(string) {},
@@ -79,8 +79,8 @@ type testRecoveryRuntimeConfig struct {
 	barExitFn func(string) error
 }
 
-func (runtime testRecoveryRuntimeConfig) runtimeOps() orchestration.RuntimeConfigOps {
-	return orchestration.RuntimeConfigOps{
+func (runtime testRecoveryRuntimeConfig) runtimeOps() orchestration.RuntimeStartupOps {
+	return orchestration.RuntimeStartupOps{
 		UpdateConfTypedFn: func(...config.ConfUpdateOption) error { return nil },
 		WithWgOnFn:        func(enabled bool) config.ConfUpdateOption { return config.WithWgOn(enabled) },
 		CycleWgKeyFn:      func() error { return nil },
@@ -99,8 +99,8 @@ type testRecoveryRuntimeLoad struct {
 	loadMinIOsFn func() error
 }
 
-func (runtime testRecoveryRuntimeLoad) runtimeOps() orchestration.RuntimeLoadOps {
-	return orchestration.RuntimeLoadOps{
+func (runtime testRecoveryRuntimeLoad) runtimeOps() orchestration.RuntimeStartupOps {
+	return orchestration.RuntimeStartupOps{
 		LoadWireguardFn: func() error { return nil },
 		LoadMCFn: func() error {
 			if runtime.loadMCFn == nil {
@@ -162,13 +162,13 @@ func TestRecoverWireguardFleet(t *testing.T) {
 				}
 			},
 		}.runtimeOps()),
-		orchestration.WithConfigOps(testRecoveryRuntimeConfig{
+		orchestration.WithRuntimeStartupOps(testRecoveryRuntimeConfig{
 			barExitFn: func(patp string) error {
 				calls = append(calls, "bar-exit:"+patp)
 				return nil
 			},
 		}.runtimeOps()),
-		orchestration.WithLoadOps(testRecoveryRuntimeLoad{
+		orchestration.WithRuntimeStartupOps(testRecoveryRuntimeLoad{
 			loadUrbitsFn: func() error {
 				calls = append(calls, "load:urbits")
 				return nil
@@ -227,7 +227,7 @@ func TestRecoverWireguardFleetAggregatesErrors(t *testing.T) {
 				}
 			},
 		}.runtimeOps()),
-		orchestration.WithLoadOps(testRecoveryRuntimeLoad{
+		orchestration.WithRuntimeStartupOps(testRecoveryRuntimeLoad{
 			loadMinIOsFn: func() error {
 				calls = append(calls, "load-minios")
 				return nil

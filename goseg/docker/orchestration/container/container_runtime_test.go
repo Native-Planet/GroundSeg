@@ -1,11 +1,11 @@
 package container
 
 import (
+	"groundseg/config"
+	"groundseg/structs"
 	"os"
 	"strings"
 	"testing"
-
-	"groundseg/structs"
 )
 
 func TestLoadMCWithRuntimeRequiresConfFn(t *testing.T) {
@@ -13,7 +13,7 @@ func TestLoadMCWithRuntimeRequiresConfFn(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected missing runtime error")
 	}
-	if !strings.Contains(err.Error(), "minio runtime requires ConfFn") {
+	if !strings.Contains(err.Error(), "minio runtime requires settings snapshot callbacks") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -23,7 +23,7 @@ func TestLoadMinIOsWithRuntimeRequiresConfFn(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected missing runtime error")
 	}
-	if !strings.Contains(err.Error(), "minio runtime requires ConfFn") {
+	if !strings.Contains(err.Error(), "minio runtime requires settings snapshot callbacks") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -33,7 +33,7 @@ func TestLoadLlamaWithRuntimeRequiresConfFn(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected missing runtime error")
 	}
-	if !strings.Contains(err.Error(), "llama runtime requires ConfFn") {
+	if !strings.Contains(err.Error(), "llama runtime requires penpai settings snapshot callback") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -43,15 +43,13 @@ func TestLlamaContainerConfWithRuntimeRequiresConfFn(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected missing runtime error")
 	}
-	if !strings.Contains(err.Error(), "llama runtime requires ConfFn") {
+	if !strings.Contains(err.Error(), "llama runtime requires settings snapshot callbacks") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestMinioContainerConfWithRuntimeRejectsNilGetLatestContainerInfo(t *testing.T) {
-	rt := MinioRuntime{
-		ConfFn: func() structs.SysConfig { return structs.SysConfig{} },
-	}
+	rt := MinioRuntime{}
 	_, _, err := MinioContainerConfWithRuntime(rt, "minio")
 	if err == nil {
 		t.Fatalf("expected missing image runtime error")
@@ -63,15 +61,16 @@ func TestMinioContainerConfWithRuntimeRejectsNilGetLatestContainerInfo(t *testin
 
 func TestLlamaContainerConfWithRuntimeRejectsMissingRuntimeConfig(t *testing.T) {
 	_, _, err := LlamaContainerConfWithRuntime(LlamaRuntime{
-		ConfFn: func() structs.SysConfig {
-			return structs.SysConfig{
-				PenpaiConfig: structs.PenpaiConfig{
-					PenpaiActive: "phi.gguf",
-					PenpaiModels: []structs.Penpai{
-						{ModelName: "phi.gguf", ModelUrl: "https://example.invalid/model.gguf"},
-					},
+		PenpaiSettingsSnapshotFn: func() config.PenpaiSettings {
+			return config.PenpaiSettings{
+				ActiveModel: "phi.gguf",
+				Models: []structs.Penpai{
+					{ModelName: "phi.gguf", ModelUrl: "https://example.invalid/model.gguf"},
 				},
 			}
+		},
+		ShipSettingsSnapshotFn: func() config.ShipSettings {
+			return config.ShipSettings{}
 		},
 		VolumeDirFn:       func() string { return "/tmp/volumes" },
 		DockerDirFn:       func() string { return "/tmp/volumes" },

@@ -2,7 +2,6 @@ package subsystem
 
 import (
 	"errors"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -18,78 +17,90 @@ type dockerSystemOpsStub = dockerRoutineSystemOps
 type dockerHTTPOpsStub = dockerRoutineHTTPOps
 type dockerTimerStub = dockerRoutineTimer
 
-func testDockerRoutineRuntime() dockerRoutineRuntime {
-	rt := newDockerRoutineRuntime()
-	rt.GetContainerStateFn = func() map[string]structs.ContainerState { return map[string]structs.ContainerState{} }
-	rt.UpdateContainerStateFn = func(string, structs.ContainerState) {}
-	rt.StartContainerFn = func(string, string) (structs.ContainerState, error) {
-		return structs.ContainerState{}, nil
-	}
-	rt.GetContainerNetworkFn = func(string) (string, error) { return "default", nil }
-	rt.GetLusCodeFn = func(string) (string, error) { return "", nil }
-	rt.GetShipStatusFn = func([]string) (map[string]string, error) { return map[string]string{}, nil }
-	rt.LoadUrbitConfigFn = func(string) error { return nil }
-	rt.UrbitConfFn = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
-	rt.ClearLusCodeFn = func(string) {}
-	rt.ShipSettingsSnapshotFn = func() config.ShipSettings { return config.ShipSettings{} }
-	rt.Check502SettingsSnapshotFn = func() config.Check502Settings { return config.Check502Settings{} }
-	rt.broadcastOps = dockerBroadcastOpsStub{
-		getBroadcastStateFn: func() structs.AuthBroadcast { return structs.AuthBroadcast{} },
-		updateBroadcastFn:   func(structs.AuthBroadcast) {},
-		broadcastClientsFn:  func() error { return nil },
-		updateWgOnFn:        func(bool) error { return nil },
-	}
-	rt.wireguardOps = dockerWireguardOpsStub{
-		recoverWireguardFn: func([]string, bool) error { return nil },
-	}
-	rt.systemOps = dockerSystemOpsStub{
-		barExitFn: func(string) error { return nil },
-	}
-	rt.httpOps = dockerHTTPOpsStub{
-		getFn: func(string) (*http.Response, error) { return nil, nil },
-	}
-	rt.timer = dockerTimerStub{
-		sleepFn: func(time.Duration) {},
+type dockerRoutineRuntimeOption func(*dockerRoutineRuntime)
+
+func testDockerRoutineRuntime(overrides ...dockerRoutineRuntimeOption) dockerRoutineRuntime {
+	rt := newDockerRoutineRuntimeForTests()
+	for _, apply := range overrides {
+		apply(&rt)
 	}
 	return rt
 }
 
+func withDockerContainerState(state map[string]structs.ContainerState) dockerRoutineRuntimeOption {
+	return func(runtime *dockerRoutineRuntime) {
+		runtime.GetContainerStateFn = func() map[string]structs.ContainerState {
+			return state
+		}
+	}
+}
+
+func withDockerBroadcastOps(ops dockerBroadcastOpsStub) dockerRoutineRuntimeOption {
+	return func(runtime *dockerRoutineRuntime) {
+		runtime.broadcastOps = ops
+	}
+}
+
+func withDockerSystemOps(ops dockerSystemOpsStub) dockerRoutineRuntimeOption {
+	return func(runtime *dockerRoutineRuntime) {
+		runtime.systemOps = ops
+	}
+}
+
+func withDockerShipStatusFn(fn func([]string) (map[string]string, error)) dockerRoutineRuntimeOption {
+	return func(runtime *dockerRoutineRuntime) {
+		runtime.GetShipStatusFn = fn
+	}
+}
+
+func withDockerShipSettingsSnapshotFn(fn func() config.ShipSettings) dockerRoutineRuntimeOption {
+	return func(runtime *dockerRoutineRuntime) {
+		runtime.ShipSettingsSnapshotFn = fn
+	}
+}
+
+func withDockerTimerFn(sleepFn func(time.Duration)) dockerRoutineRuntimeOption {
+	return func(runtime *dockerRoutineRuntime) {
+		runtime.timer = dockerTimerStub{
+			sleepFn: sleepFn,
+		}
+	}
+}
+
 func TestMakeBroadcastWireguardStartTransitionUsesBroadcastTransition(t *testing.T) {
-	rt := testDockerRoutineRuntime()
 	state := structs.AuthBroadcast{}
 	wgOnUpdates := []bool{}
 	broadcastCalls := 0
-	rt.GetContainerStateFn = func() map[string]structs.ContainerState {
-		return map[string]structs.ContainerState{
+	rt := testDockerRoutineRuntime(
+		withDockerContainerState(map[string]structs.ContainerState{
 			"wireguard": {
 				Type: string(transition.ContainerTypeWireguard),
 			},
-		}
-	}
-	rt.UpdateContainerStateFn = func(string, structs.ContainerState) {}
-	rt.broadcastOps = dockerBroadcastOpsStub{
-		getBroadcastStateFn: func() structs.AuthBroadcast {
-			return state
-		},
-		updateBroadcastFn: func(next structs.AuthBroadcast) {
-			state = next
-		},
-		broadcastClientsFn: func() error {
-			broadcastCalls++
-			return nil
-		},
-		updateWgOnFn: func(wgOn bool) error {
-			wgOnUpdates = append(wgOnUpdates, wgOn)
-			return nil
-		},
-		setStartramRunningFn: func(running bool) error {
-			if state.Profile.Startram.Info.Running == running {
+		}),
+		withDockerBroadcastOps(dockerBroadcastOpsStub{
+			getBroadcastStateFn: func() structs.AuthBroadcast {
+				return state
+			},
+			updateBroadcastFn: func(next structs.AuthBroadcast) {
+				state = next
+			},
+			broadcastClientsFn: func() error {
+				broadcastCalls++
 				return nil
-			}
-			state.Profile.Startram.Info.Running = running
-			return nil
-		},
-	}
+			},
+			updateWgOnFn: func(wgOn bool) error {
+				wgOnUpdates = append(wgOnUpdates, wgOn)
+				return nil
+			},
+			setStartramRunningFn: func(running bool) error {
+				if state.Profile.Startram.Info.Running == running {
+					return nil
+				}
+				state.Profile.Startram.Info.Running = running
+				return nil
+			},
+		}),
+	)
 
 	if _, err := updateContainerTransition(rt, "wireguard", func(state *structs.ContainerState) error {
 		state.ActualStatus = string(transition.ContainerStatusRunning)
@@ -115,29 +126,27 @@ func TestMakeBroadcastWireguardStartTransitionUsesBroadcastTransition(t *testing
 }
 
 func TestMakeBroadcastNonWireguardOnlyBroadcasts(t *testing.T) {
-	rt := testDockerRoutineRuntime()
 	updateWgOnCalled := false
 	broadcastCalls := 0
-	rt.GetContainerStateFn = func() map[string]structs.ContainerState {
-		return map[string]structs.ContainerState{
+	rt := testDockerRoutineRuntime(
+		withDockerContainerState(map[string]structs.ContainerState{
 			"minio_zod": {
 				Type: "minio_zod",
 			},
-		}
-	}
-	rt.UpdateContainerStateFn = func(string, structs.ContainerState) {}
-	rt.broadcastOps = dockerBroadcastOpsStub{
-		getBroadcastStateFn: func() structs.AuthBroadcast { return structs.AuthBroadcast{} },
-		updateBroadcastFn:   func(structs.AuthBroadcast) {},
-		broadcastClientsFn: func() error {
-			broadcastCalls++
-			return nil
-		},
-		updateWgOnFn: func(bool) error {
-			updateWgOnCalled = true
-			return nil
-		},
-	}
+		}),
+		withDockerBroadcastOps(dockerBroadcastOpsStub{
+			getBroadcastStateFn: func() structs.AuthBroadcast { return structs.AuthBroadcast{} },
+			updateBroadcastFn:   func(structs.AuthBroadcast) {},
+			broadcastClientsFn: func() error {
+				broadcastCalls++
+				return nil
+			},
+			updateWgOnFn: func(bool) error {
+				updateWgOnCalled = true
+				return nil
+			},
+		}),
+	)
 
 	if _, err := updateContainerTransition(rt, "minio_zod", func(state *structs.ContainerState) error {
 		state.ActualStatus = string(transition.ContainerStatusRunning)
@@ -158,38 +167,37 @@ func TestMakeBroadcastNonWireguardOnlyBroadcasts(t *testing.T) {
 }
 
 func TestGracefulShipExitStopsRunningShips(t *testing.T) {
-	rt := testDockerRoutineRuntime()
 	zodStatusChecks := 0
-	rt.GetShipStatusFn = func(piers []string) (map[string]string, error) {
-		if len(piers) == 2 {
-			return map[string]string{
-				"zod": "Up 2 minutes",
-				"nec": "Exited",
-			}, nil
-		}
-		if len(piers) == 1 && piers[0] == "zod" {
-			zodStatusChecks++
-			if zodStatusChecks == 1 {
-				return map[string]string{"zod": "Up 1 second"}, nil
+	rt := testDockerRoutineRuntime(
+		withDockerShipStatusFn(func(piers []string) (map[string]string, error) {
+			if len(piers) == 2 {
+				return map[string]string{
+					"zod": "Up 2 minutes",
+					"nec": "Exited",
+				}, nil
 			}
-			return map[string]string{"zod": "Exited"}, nil
-		}
-		return map[string]string{}, nil
-	}
-	rt.ShipSettingsSnapshotFn = func() config.ShipSettings {
-		return config.ShipSettings{Piers: []string{"zod", "nec"}}
-	}
-	rt.systemOps = dockerSystemOpsStub{
-		barExitFn: func(patp string) error {
-			if patp != "zod" {
-				t.Fatalf("unexpected ship targeted for BarExit: %s", patp)
+			if len(piers) == 1 && piers[0] == "zod" {
+				zodStatusChecks++
+				if zodStatusChecks == 1 {
+					return map[string]string{"zod": "Up 1 second"}, nil
+				}
+				return map[string]string{"zod": "Exited"}, nil
 			}
-			return nil
-		},
-	}
-	rt.timer = dockerTimerStub{
-		sleepFn: func(time.Duration) {},
-	}
+			return map[string]string{}, nil
+		}),
+		withDockerShipSettingsSnapshotFn(func() config.ShipSettings {
+			return config.ShipSettings{Piers: []string{"zod", "nec"}}
+		}),
+		withDockerSystemOps(dockerSystemOpsStub{
+			barExitFn: func(patp string) error {
+				if patp != "zod" {
+					t.Fatalf("unexpected ship targeted for BarExit: %s", patp)
+				}
+				return nil
+			},
+		}),
+		withDockerTimerFn(func(time.Duration) {}),
+	)
 
 	err := gracefulShipExit(rt)
 	if err != nil {
@@ -201,22 +209,21 @@ func TestGracefulShipExitStopsRunningShips(t *testing.T) {
 }
 
 func TestGracefulShipExitReturnsErrorWhenBarExitFails(t *testing.T) {
-	rt := testDockerRoutineRuntime()
-	rt.GetShipStatusFn = func(piers []string) (map[string]string, error) {
-		if len(piers) == 1 {
-			return map[string]string{"zod": "Up"}, nil
-		}
-		return map[string]string{}, nil
-	}
-	rt.ShipSettingsSnapshotFn = func() config.ShipSettings {
-		return config.ShipSettings{Piers: []string{"zod"}}
-	}
-	rt.systemOps = dockerSystemOpsStub{
-		barExitFn: func(string) error { return errors.New("exit failed") },
-	}
-	rt.timer = dockerTimerStub{
-		sleepFn: func(time.Duration) {},
-	}
+	rt := testDockerRoutineRuntime(
+		withDockerShipStatusFn(func(piers []string) (map[string]string, error) {
+			if len(piers) == 1 {
+				return map[string]string{"zod": "Up"}, nil
+			}
+			return map[string]string{}, nil
+		}),
+		withDockerShipSettingsSnapshotFn(func() config.ShipSettings {
+			return config.ShipSettings{Piers: []string{"zod"}}
+		}),
+		withDockerSystemOps(dockerSystemOpsStub{
+			barExitFn: func(string) error { return errors.New("exit failed") },
+		}),
+		withDockerTimerFn(func(time.Duration) {}),
+	)
 
 	err := gracefulShipExit(rt)
 	if err == nil {
@@ -228,19 +235,18 @@ func TestGracefulShipExitReturnsErrorWhenBarExitFails(t *testing.T) {
 }
 
 func TestGracefulShipExitReturnsErrorOnInitialStatusFailure(t *testing.T) {
-	rt := testDockerRoutineRuntime()
-	rt.GetShipStatusFn = func([]string) (map[string]string, error) {
-		return nil, errors.New("docker unavailable")
-	}
-	rt.ShipSettingsSnapshotFn = func() config.ShipSettings {
-		return config.ShipSettings{Piers: []string{"zod"}}
-	}
-	rt.systemOps = dockerSystemOpsStub{
-		barExitFn: func(string) error { return nil },
-	}
-	rt.timer = dockerTimerStub{
-		sleepFn: func(time.Duration) {},
-	}
+	rt := testDockerRoutineRuntime(
+		withDockerShipStatusFn(func([]string) (map[string]string, error) {
+			return nil, errors.New("docker unavailable")
+		}),
+		withDockerShipSettingsSnapshotFn(func() config.ShipSettings {
+			return config.ShipSettings{Piers: []string{"zod"}}
+		}),
+		withDockerSystemOps(dockerSystemOpsStub{
+			barExitFn: func(string) error { return nil },
+		}),
+		withDockerTimerFn(func(time.Duration) {}),
+	)
 
 	err := gracefulShipExit(rt)
 	if err == nil {

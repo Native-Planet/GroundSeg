@@ -1,0 +1,122 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime callback bags are stacked and re-validated across modules (`startupInitRuntime`/`StartupRuntime`, `importerRuntime`, `workflowRuntime`, `RectifyRuntime`) with large `validate()` blocks enumerating missing callbacks instead of a smaller stable interface boundary.",
+        "Central orchestration seam structs in `goseg/docker/orchestration/runtime_ops.go` expose many broad function fields (`RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeSnapshotOps`, etc.), and downstream modules embed these large bags rather than depending on focused contracts.",
+        "Wrapper services add little policy beyond forwarding: `events.EventRuntime` delegate checks repeat per method; `WiFiRuntimeService` mostly proxies to `wifiRuntime` methods with repeated nil/default plumbing.",
+        "Patch registry is hand-expanded in `goseg/config/config_update_registry.go` with many near-identical field specs/merge wrappers, indicating low abstraction leverage and high indirection maintenance cost."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 68.0,
+        "indirection_cost": 76.0,
+        "interface_honesty": 72.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_sprawl",
+      "summary": "Large runtime callback-bag abstractions create high indirection without clear bounded contracts.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many broad seam structs with dozens of function fields; downstream modules embed these bags rather than small role-specific interfaces.",
+        "`importerRuntime`, `workflowRuntime`, and `RectifyRuntime` each include long manual callback presence checks, duplicating infrastructure logic and coupling behavior to field-name lists.",
+        "Runtime composition repeatedly uses default runtime + merge + validate patterns, increasing call-depth and cognitive overhead before domain logic executes."
+      ],
+      "suggestion": "Split seam bags into narrower domain ports (for example: transition publisher, config updater, ship state reader, urbit config store), make each module depend on only the minimal port set, and centralize callback validation in reusable constructors so modules stop maintaining bespoke callback inventories.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_indirection_overgrowth"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "thin_wrapper_delegate_layer",
+      "summary": "Event and WiFi service wrappers add a delegating layer with minimal policy, increasing indirection cost.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "`EventRuntime` repeats delegate-or-local forwarding across publish/read methods; behavior is mostly pass-through except selecting backing channel.",
+        "`WiFiRuntimeService` methods (`IsWifiEnabled`, `ListWifiSSIDs`, `ConnectToWifi`, `DisconnectWifi`, `ApplyCaptiveRules`) primarily relay to `wifiRuntime` with repeated nil/default checks.",
+        "The wrapper layer duplicates guard logic per method instead of expressing one clear boundary type with explicit lifecycle guarantees."
+      ],
+      "suggestion": "Either collapse these wrappers into direct runtime usage where no policy is added, or enforce a stronger service contract (single initialization path plus non-nil invariant) so wrappers provide substantive behavior (retry/policy/telemetry/error shaping) rather than repetitive forwarding.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_indirection_overgrowth"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_singleton_runtime_coupling",
+      "summary": "Default singleton runtimes and fallback resolvers leak hidden dependencies through ostensibly injectable APIs.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/transitions.go",
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`broadcast/state.go` uses package-level singleton `defaultBroadcastStateRuntime` and many helpers silently fall back to it via resolver functions.",
+        "`broadcast/transitions.go` accepts optional runtime overrides but defaults to global `DefaultBroadcastStateRuntime()`, preserving hidden shared state dependency.",
+        "`main.go` and startup bootstrapping rely on package-level function variables/snapshots (`runtimeContextSnapshotFn`, `connectivitySettingsSnapshot`, startup snapshot vars), which behave as ambient dependencies instead of explicit constructor inputs."
+      ],
+      "suggestion": "Move to explicit dependency injection at module boundaries (constructors for broadcast/startup/main orchestration), remove optional varargs fallback-to-global APIs, and keep a single composition root responsible for choosing production singletons vs test doubles.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_indirection_overgrowth"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_patch_registry_overgeneralized",
+      "summary": "Generic patch-field abstraction in config registry still requires repetitive per-field boilerplate, indicating weak leverage.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "`config_update_registry.go` contains a long sequence of near-identical `configPatchFieldFromSpec(...)` entries and merge helpers (`mergeStringSetIfNonEmpty`, `mergeIntSetIfNonZero`, etc.).",
+        "Despite generic helpers, each new setting still needs repeated parse/apply/merge wiring, so abstraction complexity remains while change cost stays high.",
+        "Tests in `config_test.go` exercise many merge-path combinations, reflecting how much behavior is encoded in this registry scaffolding."
+      ],
+      "suggestion": "Introduce schema-driven registration (table-generated parse/apply/merge policies per section) or code generation for patch descriptors so behavior is declared once and emitted consistently, reducing manual indirection and drift risk.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_indirection_overgrowth"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Over-reliance on function-field runtime bags as the default testability pattern.",
+      "Incremental wrapper layering added around existing globals instead of tightening dependency boundaries.",
+      "Generic helper abstractions introduced without reducing per-feature wiring volume."
+    ],
+    "likely_symptoms": [
+      "thin_wrapper_delegate_layer",
+      "global_singleton_runtime_coupling"
+    ],
+    "possible_false_positives": []
+  }
+}

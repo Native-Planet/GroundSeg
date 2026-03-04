@@ -30,17 +30,17 @@ func newVersionRuntime() versionRuntime {
 			debugModeFn: func() bool {
 				return config.RuntimeContextSnapshot().DebugMode
 			},
-			getShipStatusFn:            orchestration.GetShipStatus,
-			startContainerFn:           orchestration.StartContainer,
-			stopContainerFn:            orchestration.StopContainerByName,
-			loadUrbitConfigFn:          config.LoadUrbitConfig,
-			urbitConfFn:                config.UrbitConf,
+			getShipStatusFn:   orchestration.GetShipStatus,
+			startContainerFn:  orchestration.StartContainer,
+			stopContainerFn:   orchestration.StopContainerByName,
+			loadUrbitConfigFn: config.LoadUrbitConfig,
+			urbitConfFn:       config.UrbitConf,
 			updateUrbitRuntimeConfigFn: func(pier string, mutateFn func(*structs.UrbitRuntimeConfig) error) error {
-				return config.UpdateUrbitSectionConfig(pier, config.UrbitConfigSectionRuntime, mutateFn)
+				return config.UpdateUrbitRuntimeConfig(pier, mutateFn)
 			},
-			waitCompleteFn:             ship.WaitComplete,
-			chopPierFn:                 chopsvc.ChopPier,
-			updateUrbitFn:              config.UpdateUrbit,
+			waitCompleteFn: ship.WaitComplete,
+			chopPierFn:     chopsvc.ChopPier,
+			updateUrbitFn:  config.UpdateUrbit,
 		},
 		updateOps: versionUpdateOps{
 			updateDockerFn: updateDockerForRuntime,

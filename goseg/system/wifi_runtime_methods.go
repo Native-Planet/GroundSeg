@@ -35,10 +35,6 @@ func NewWiFiRuntime() wifiRuntime {
 	return newWiFiRuntime()
 }
 
-func DefaultWiFiRuntime() wifiRuntime {
-	return newWiFiRuntime()
-}
-
 func NewWiFiRuntimeWith(overrides wifiRuntime) wifiRuntime {
 	return seams.MergeAll(newWiFiRuntime(), overrides)
 }

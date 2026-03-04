@@ -108,7 +108,6 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 		clearLusCodeCalled        bool
 		startramSnapshotCalled    bool
 		shipSnapshotCalled        bool
-		getStartramConfigCalled   bool
 		check502SnapshotCalled    bool
 		updateConfCalled          bool
 		withWgOnCalled            bool
@@ -191,16 +190,12 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 				shipSnapshotCalled = true
 				return config.ShipSettings{}
 			},
-			GetStartramConfigFn: func() structs.StartramRetrieve {
-				getStartramConfigCalled = true
-				return structs.StartramRetrieve{}
-			},
 			Check502SettingsSnapshotFn: func() config.Check502Settings {
 				check502SnapshotCalled = true
 				return config.Check502Settings{}
 			},
 		}),
-		WithConfigOps(RuntimeConfigOps{
+		WithRuntimeStartupOps(RuntimeStartupOps{
 			UpdateConfTypedFn: func(...config.ConfUpdateOption) error {
 				updateConfCalled = true
 				return nil
@@ -218,7 +213,7 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 				return nil
 			},
 		}),
-		WithLoadOps(RuntimeLoadOps{
+		WithRuntimeStartupOps(RuntimeStartupOps{
 			LoadWireguardFn: func() error {
 				loadWireguardCalled = true
 				return nil
@@ -236,7 +231,7 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 				return nil
 			},
 		}),
-		WithServiceOps(RuntimeServiceOps{
+		WithRuntimeStartupOps(RuntimeStartupOps{
 			SvcDeleteFn: func(patp, kind string) error {
 				svcDeleteCalled = true
 				_, _ = patp, kind
@@ -288,9 +283,6 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 	}
 	if got := rt.ShipSettingsSnapshotFn(); !reflect.DeepEqual(got, config.ShipSettings{}) {
 		t.Fatalf("unexpected ship snapshot: %+v", got)
-	}
-	if got := rt.GetStartramConfigFn(); !reflect.DeepEqual(got, structs.StartramRetrieve{}) {
-		t.Fatalf("unexpected startram config: %+v", got)
 	}
 	if got := rt.Check502SettingsSnapshotFn(); !reflect.DeepEqual(got, config.Check502Settings{}) {
 		t.Fatalf("unexpected check502 snapshot: %+v", got)
@@ -344,7 +336,6 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 	assert(clearLusCodeCalled, "clear-lus")
 	assert(startramSnapshotCalled, "startram-snapshot")
 	assert(shipSnapshotCalled, "ship-snapshot")
-	assert(getStartramConfigCalled, "startram-config")
 	assert(check502SnapshotCalled, "check502")
 	assert(updateConfCalled, "update-conf")
 	assert(withWgOnCalled, "with-wg")
@@ -599,8 +590,9 @@ func TestMinioRuntimeFromDockerWiresRuntimeDependencies(t *testing.T) {
 		DockerDirFn: func() string { return "/tmp/docker" },
 	}
 	rt.configOps = RuntimeSnapshotOps{
-		ConfFn:                 func() structs.SysConfig { return structs.SysConfig{} },
-		ShipSettingsSnapshotFn: func() config.ShipSettings { return config.ShipSettings{} },
+		ShipSettingsSnapshotFn:     func() config.ShipSettings { return config.ShipSettings{} },
+		StartramSettingsSnapshotFn: func() config.StartramSettings { return config.StartramSettings{} },
+		PenpaiSettingsSnapshotFn:   func() config.PenpaiSettings { return config.PenpaiSettings{} },
 	}
 	rt.fileOps = RuntimeFileOps{
 		OpenFn:      func(string) (*os.File, error) { return nil, nil },

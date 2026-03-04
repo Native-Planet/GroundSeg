@@ -1,0 +1,119 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime composition is repeatedly modeled as large function-pointer bags with thin pass-through methods and long nil-validation lists (for example `importerRuntime` + `validateImporterProvisionRuntime` in importer/importer.go, `workflowRuntime.validate` in shipworkflow/operations_runtime.go, and multiple `Runtime*Ops` structs in docker/orchestration/runtime_ops.go).",
+        "Several wrappers add one more indirection layer without adding domain policy/translation (for example bootstrap coordinator wrappers in main.go and many `RectifyRuntime` forwarding methods in rectify/rectify.go).",
+        "A very wide shared config object (`structs.SysConfig`) is consumed across unrelated subsystems (`startuporchestrator/startup_orchestrator.go`, `main.go`, `importer/importer.go`), which blurs bounded contexts and increases cross-module coupling."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 68.0,
+        "indirection_cost": 64.0,
+        "interface_honesty": 76.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_sprawl",
+      "summary": "Large callback-bag runtimes create high indirection cost with little behavioral leverage.",
+      "related_files": [
+        "importer/importer.go",
+        "docker/orchestration/runtime_ops.go",
+        "shipworkflow/operations_runtime.go",
+        "rectify/rectify.go"
+      ],
+      "evidence": [
+        "`importerProvisionRuntime` defines many callback fields and `validateImporterProvisionRuntime` performs a long sequence of nil checks before use.",
+        "`docker/orchestration/runtime_ops.go` declares many sibling `Runtime*Ops` structs of function fields, spreading operational contracts into callback bags instead of focused interfaces.",
+        "`workflowRuntime.validate` in shipworkflow/operations_runtime.go and forwarding methods in rectify/rectify.go repeat the same callback presence checks and delegation pattern."
+      ],
+      "suggestion": "Replace callback bags with a smaller set of role-focused interfaces (for example `ContainerLifecycle`, `ConfigStore`, `ShipTransitionPublisher`) and pass concrete adapters per subsystem. Keep function-level seams only at module boundaries where tests need them, not across all runtime methods.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_wrapper_layers",
+      "summary": "Multiple wrapper layers mainly forward calls and nil-guards without new policy.",
+      "related_files": [
+        "main.go",
+        "rectify/rectify.go",
+        "docker/events/events.go"
+      ],
+      "evidence": [
+        "`bootstrapRuntime`/`bootstrapRuntimeFns` in main.go introduce coordinator wrappers whose methods mostly check nil and delegate to provided funcs.",
+        "Rectify runtime methods (`UpdateConfig`, `LoadUrbitConfig`, `UrbitConf`, `ShipSettingsSnapshot`, etc.) in rectify/rectify.go largely resolve runtime then forward to stored callbacks.",
+        "Event runtime in docker/events/events.go uses delegate forwarding for each publish/read method, creating another indirection layer with duplicated routing logic."
+      ],
+      "suggestion": "Collapse forwarding-only wrappers where possible: keep one runtime resolver per subsystem and expose direct dependencies through narrower interfaces. Where wrappers remain, centralize nil/default handling once (constructor-time) rather than on each method call.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overuse"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "cross_domain_sysconfig_bag",
+      "summary": "A wide shared SysConfig acts as a cross-domain parameter bag that weakens boundaries.",
+      "related_files": [
+        "structs/configs.go",
+        "startuporchestrator/startup_orchestrator.go",
+        "main.go",
+        "importer/importer.go"
+      ],
+      "evidence": [
+        "`structs.SysConfig` aggregates connectivity, runtime, startram, auth session, and penpai domains into a single central shape used broadly.",
+        "`startupInitStorageSubsystemRuntime.SubsystemSteps` reads runtime swap settings from global config state, pulling storage bootstrap behavior through shared global config access.",
+        "main.go (`defaultC2cRuntimeContext`) and importer/importer.go default runtimes also pull multiple settings/snapshots from shared config APIs, reinforcing config-as-global-context across domains."
+      ],
+      "suggestion": "Introduce bounded config ports per subsystem (for example `StartupRuntimeSettings`, `ConnectivitySettings`, `StartramSettings`) and pass only those ports into orchestration/importer/bootstrap code. Keep `SysConfig` as persistence shape, not as the primary runtime dependency contract.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_config_as_context_bag"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_default_runtime_singletons",
+      "summary": "Global default runtimes/state create hidden dependencies that bypass explicit abstraction boundaries.",
+      "related_files": [
+        "broadcast/state.go",
+        "docker/events/events.go",
+        "rectify/rectify.go"
+      ],
+      "evidence": [
+        "broadcast/state.go relies on package-global `defaultBroadcastStateRuntime` and many operations resolve to it when no runtime is passed.",
+        "docker/events/events.go exposes `defaultEventRuntime` via `sync.OnceValue`, encouraging implicit shared broker usage.",
+        "rectify/rectify.go frequently calls `NewRectifyRuntime()`/`resolveRectifyRuntime(...)`, causing event handlers to depend on default globals unless explicitly overridden."
+      ],
+      "suggestion": "Move to explicit runtime ownership at subsystem entrypoints: construct shared runtime instances in startup wiring and inject them down, while keeping package-level defaults only for compatibility shims/tests.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_runtime_state"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams were expanded into primary production abstraction style (function-pointer bags + forwarding wrappers).",
+      "Global singleton defaults and shared config aggregates became de facto dependency injection mechanism, weakening explicit boundaries."
+    ],
+    "likely_symptoms": [
+      "pass_through_wrapper_layers",
+      "global_default_runtime_singletons"
+    ],
+    "possible_false_positives": []
+  }
+}

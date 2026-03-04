@@ -1,0 +1,102 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime dependency injection is modeled as large callback bags in multiple modules (`importerRuntime`, `workflowRuntime`, `RectifyRuntime`, `RuntimeTransitionOps`) with many function fields and merge/validate scaffolding before business logic runs.",
+        "Startup orchestration adds multiple wrapper layers (`ServerBootstrap` -> `startupBootstrapRuntime` -> `startupBootstrapRuntimeFns`, plus `BackgroundServiceGroup` families) that primarily forward calls and duplicate missing-callback checks.",
+        "`rectify.newRectifyRuntime` adapts non-failing snapshot getters into error-returning callbacks by returning `(value, nil)`, while downstream services still branch on errors, creating interface contracts that imply failure modes the implementation cannot produce."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 70.0,
+        "indirection_cost": 60.0,
+        "interface_honesty": 74.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_sprawl",
+      "summary": "Core workflows depend on oversized callback-bag runtimes that add indirection cost and obscure module boundaries.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`importerRuntime` is split into nested ops structs with many function pointers and separate validation paths (`validateImporterConfigRuntime`, `validateImporterUploadRuntime`, `validateImporterProvisionRuntime`).",
+        "`workflowRuntime` mixes event publishing, transition policy, lifecycle operations, config operations, and upload orchestration callbacks in one injected runtime object.",
+        "`RectifyRuntime` carries multiple nested ops groups and custom merge/validate code to wire callbacks that mostly mirror orchestration runtime methods.",
+        "`RuntimeTransitionOps` and related runtime ops structs define broad function-field surfaces, then compose/merge defaults through helper constructors."
+      ],
+      "suggestion": "Replace broad callback-bag structs with narrower capability interfaces per use-case (for example: transition publisher, ship config store, container lifecycle gateway), then inject those interfaces directly into services; keep adapter constructors at module boundaries and remove per-function validation scaffolding from core logic.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overmodeling"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "startup_wrapper_chain_overhead",
+      "summary": "Startup flow uses stacked wrapper interfaces and forwarding structs that add call depth with little behavioral leverage.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`startup_orchestrator.go` defines `ServerBootstrap`, `startupBootstrapRuntime`, and `startupBootstrapRuntimeFns` where many methods are pass-through/guard wrappers plus repeated callback-missing validation logic.",
+        "Background startup also duplicates this pattern via `BackgroundServiceGroup` and multiple subsystem runtime structs that mostly map function fields into service specs.",
+        "`main.go` introduces another forwarding layer (`bootstrapCoordinator`, `bootstrapRuntime`, `bootstrapRuntimeFns`) around bootstrap/start-server/C2C calls before reaching concrete functions.",
+        "Tests repeatedly construct large runtime override structs, indicating high setup friction tied to abstraction layering rather than focused behavioral seams."
+      ],
+      "suggestion": "Collapse startup wrappers into a smaller orchestration API: one concrete startup coordinator with explicit dependency structs per phase, and test seams exposed at phase boundaries; remove intermediate forwarding types that only perform nil guards or method relays.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overmodeling"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "rectify_snapshot_interface_dishonesty",
+      "summary": "Rectify snapshot callbacks advertise errorful contracts but default adapters cannot fail, creating misleading interfaces.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/rectify/rectify_services.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "In `newRectifyRuntime`, snapshot callbacks wrap orchestration getters as closures returning `(value, nil)` for startram/check502/ship snapshots.",
+        "`rectify_services.go` consumes these callbacks with full error-handling branches (for example in `applyTransitionCompletion` and `Reconcile`), but default runtime path cannot produce those errors from the wrapped getters.",
+        "The abstraction therefore overstates failure semantics and forces defensive code paths that are mostly artifacts of the wrapper contract."
+      ],
+      "suggestion": "Split snapshot dependencies into honest contracts: use non-error getters for in-memory/config snapshot reads and reserve error-returning interfaces for genuinely fallible boundaries (I/O or external calls). Update rectify services to depend on the narrower truthful contracts.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overmodeling"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Test-seam design drifted into production APIs as generic callback-bag runtime structs.",
+      "Nil-guard and callback-validation concerns are repeated in each module instead of centralized at composition boundaries.",
+      "Contracts were widened (especially with error returns) to support genericity, reducing interface honesty."
+    ],
+    "likely_symptoms": [
+      "startup_wrapper_chain_overhead",
+      "rectify_snapshot_interface_dishonesty"
+    ],
+    "possible_false_positives": []
+  }
+}

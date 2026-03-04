@@ -1,0 +1,94 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Best-effort transition publishing is handled inconsistently: some paths propagate failure, while `schedulePack` (`goseg/shipworkflow/urbit_operations_runtime.go`) and importer/rectify publish helpers only log and return success.",
+        "Boundary error context is inconsistent: `NetworkRuntime.KillContainerUsingPort` (`goseg/docker/network/network.go`) returns raw Docker client construction errors, while neighboring methods in the same file wrap with operation context.",
+        "Log-and-return patterns are repeated across startup/runtime loops (`goseg/main.go`, `goseg/startuporchestrator/startup_orchestrator.go`, `goseg/routines/version.go`), causing duplicate reporting and uneven failure semantics."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "best_effort_publish_swallows_failure",
+      "summary": "Several state/transition publish paths swallow publish failures and report success, creating silent divergence between state changes and emitted events.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/importer/importer.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`schedulePack` persists schedule config, then if `broadcast.PublishSchedulePack(\"schedule\")` fails it only logs and still returns `nil`.",
+        "`publishImportTransition` logs warning on publish failure and does not propagate an error to caller paths handling upload lifecycle state.",
+        "`publishUrbitServiceRegistrationTransitionWithRuntime` logs apply-transition failure and returns nothing, so callers cannot react or retry."
+      ],
+      "suggestion": "Define one explicit policy for event-publish failures (strict, best-effort-with-retry, or best-effort-with-observable status) and return a typed outcome/error from these helpers so callers can decide whether to fail, retry, or mark degraded state consistently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "event_publish_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "boundary_error_context_drift",
+      "summary": "Error context is inconsistently preserved at I/O/runtime boundaries, leading to mixed opaque and actionable failures.",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/config/urbit.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`KillContainerUsingPort` returns raw `DockerClientNewFn` error (`return err`) while sibling methods in the same file wrap with operation-specific context.",
+        "`RemoveUrbitConfig` returns raw `os.Remove` error without path/pier context, unlike other config loaders/persistors that wrap with rich operation text.",
+        "`C2cCheckWith` logs activation failure and returns raw `err` from `isC2cMode`, while adjacent `setC2cMode` path wraps (`unable to set C2C mode: %w`)."
+      ],
+      "suggestion": "Adopt a single boundary rule: always wrap external dependency errors with operation + entity context (and preserve `%w`), enforced via shared helper or lint rule for raw `return err` at package boundaries.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_wrapping_convention_gap"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "log_and_return_double_reporting",
+      "summary": "Multiple flows both log errors and propagate them, producing duplicate error surfaces and inconsistent ownership of error reporting.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "`C2cCheckWith` logs `Error activating C2C mode` then returns the same error; upstream startup/main path also logs terminal errors.",
+        "`loadService` logs `failureMessage` and returns the same error, which higher-level orchestration can aggregate/log again.",
+        "`CheckVersionLoopWithContext` logs each updater failure, and outer subsystem starters also log when loop exits with error."
+      ],
+      "suggestion": "Enforce a single-owner logging contract (inner layers return wrapped errors; top-level boundary logs once). Remove intermediate error logs unless they add unique diagnostic context not available upstream.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "error_ownership_unclear"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No centralized error-policy contract for publish/transition helpers.",
+      "Inconsistent package-level convention for wrapping dependency errors before returning.",
+      "Unclear ownership boundary for logging versus propagation."
+    ],
+    "likely_symptoms": [
+      "best_effort_publish_swallows_failure",
+      "boundary_error_context_drift",
+      "log_and_return_double_reporting"
+    ],
+    "possible_false_positives": []
+  }
+}

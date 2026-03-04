@@ -75,6 +75,12 @@ func WithDockerPollInterval(interval time.Duration) RuntimeOption {
 	}
 }
 
+var defaultRuntime = NewRuntime()
+
+func DefaultRuntime() *Runtime {
+	return defaultRuntime
+}
+
 func NewRuntime(opts ...RuntimeOption) *Runtime {
 	rt := &Runtime{
 		dockerClientNew: dockerclient.New,
@@ -95,8 +101,6 @@ func NewRuntime(opts ...RuntimeOption) *Runtime {
 	}
 	return rt
 }
-
-var DefaultRuntime = NewRuntime()
 
 type containerConfigResolverFn func(string, string) (container.Config, container.HostConfig, error)
 

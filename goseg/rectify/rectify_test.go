@@ -49,7 +49,7 @@ func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 			"zod": {},
 		},
 	}
-	broadcast.UpdateBroadcast(current)
+	broadcast.DefaultBroadcastStateRuntime().UpdateBroadcast(current)
 
 	eventValue := "pack-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	rectifyTestRuntime.EventRuntime.PublishUrbitTransition(context.Background(), structs.UrbitTransition{
@@ -59,7 +59,7 @@ func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	})
 
 	testutil.WaitForCondition(t, func() bool {
-		state := broadcast.GetState()
+		state := broadcast.DefaultBroadcastStateRuntime().GetState()
 		return state.Urbits["zod"].Transition.Pack == eventValue
 	}, "urbit pack transition was not applied")
 }
@@ -74,14 +74,14 @@ func TestNewShipTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 		}()
 	})
 
-	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
+	broadcast.DefaultBroadcastStateRuntime().UpdateBroadcast(structs.AuthBroadcast{})
 	bootStage := "booting-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	patp := "~zod-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	rectifyTestRuntime.EventRuntime.PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: bootStage})
 	rectifyTestRuntime.EventRuntime.PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "patp", Event: patp})
 
 	testutil.WaitForCondition(t, func() bool {
-		state := broadcast.GetState()
+		state := broadcast.DefaultBroadcastStateRuntime().GetState()
 		return state.NewShip.Transition.BootStage == bootStage && state.NewShip.Transition.Patp == patp
 	}, "new ship transitions were not applied")
 }
@@ -96,12 +96,12 @@ func TestSystemTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 		}()
 	})
 
-	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
+	broadcast.DefaultBroadcastStateRuntime().UpdateBroadcast(structs.AuthBroadcast{})
 	event := "bug-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	rectifyTestRuntime.EventRuntime.PublishSystemTransition(context.Background(), structs.SystemTransition{Type: "bugReportError", Event: event})
 
 	testutil.WaitForCondition(t, func() bool {
-		state := broadcast.GetState()
+		state := broadcast.DefaultBroadcastStateRuntime().GetState()
 		return state.System.Transition.BugReportError == event
 	}, "system transition bugReportError was not applied")
 }
@@ -116,14 +116,14 @@ func TestRectifyUrbitAppliesStartramEvents(t *testing.T) {
 		}()
 	})
 
-	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
+	broadcast.DefaultBroadcastStateRuntime().UpdateBroadcast(structs.AuthBroadcast{})
 	restartValue := "restart-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	startram.PublishEvent(structs.Event{Type: "restart", Data: restartValue})
 	startram.PublishEvent(structs.Event{Type: "toggle", Data: "loading"})
 	startram.PublishEvent(structs.Event{Type: "endpoint", Data: nil})
 
 	testutil.WaitForCondition(t, func() bool {
-		state := broadcast.GetState()
+		state := broadcast.DefaultBroadcastStateRuntime().GetState()
 		return state.Profile.Startram.Transition.Restart == restartValue &&
 			state.Profile.Startram.Transition.Toggle == "loading" &&
 			state.Profile.Startram.Transition.Endpoint == ""

@@ -10,14 +10,14 @@ func TestSysConfigDefaults(t *testing.T) {
 	basePath := "/tmp/groundseg-test"
 	cfg := SysConfig(basePath)
 
-	if cfg.Setup != "start" {
-		t.Fatalf("expected default setup=start, got %q", cfg.Setup)
+	if cfg.Runtime.Setup != "start" {
+		t.Fatalf("expected default setup=start, got %q", cfg.Runtime.Setup)
 	}
-	if cfg.KeyFile != filepath.Join(basePath, "settings", "session.key") {
-		t.Fatalf("unexpected keyFile path: %q", cfg.KeyFile)
+	if cfg.AuthSession.KeyFile != filepath.Join(basePath, "settings", "session.key") {
+		t.Fatalf("unexpected keyFile path: %q", cfg.AuthSession.KeyFile)
 	}
-	if cfg.SwapFile != filepath.Join(basePath, "swapfile") {
-		t.Fatalf("unexpected swap file path: %q", cfg.SwapFile)
+	if cfg.Runtime.SwapFile != filepath.Join(basePath, "swapfile") {
+		t.Fatalf("unexpected swap file path: %q", cfg.Runtime.SwapFile)
 	}
 }
 

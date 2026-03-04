@@ -3,6 +3,7 @@ package container
 import (
 	"encoding/hex"
 	"fmt"
+	"groundseg/config"
 	"groundseg/docker/orchestration/internal/artifactwriter"
 	"groundseg/structs"
 	"os"
@@ -17,7 +18,8 @@ import (
 
 type MinioRuntime struct {
 	OpenFn                      func(string) (*os.File, error)
-	ConfFn                      func() structs.SysConfig
+	StartramSettingsSnapshotFn  func() config.StartramSettings
+	ShipSettingsSnapshotFn      func() config.ShipSettings
 	BasePathFn                  func() string
 	DockerDirFn                 func() string
 	ReadFileFn                  func(string) ([]byte, error)
@@ -45,11 +47,10 @@ type MinioRuntime struct {
 }
 
 func LoadMCWithRuntime(rt MinioRuntime) error {
-	if rt.ConfFn == nil {
-		return fmt.Errorf("minio runtime requires ConfFn")
+	if rt.StartramSettingsSnapshotFn == nil || rt.ShipSettingsSnapshotFn == nil {
+		return fmt.Errorf("minio runtime requires settings snapshot callbacks")
 	}
-	conf := rt.ConfFn()
-	if conf.WgRegistered {
+	if rt.StartramSettingsSnapshotFn().WgRegistered {
 		zap.L().Info("Loading MC container")
 		if rt.BasePathFn == nil {
 			return fmt.Errorf("missing base path getter")
@@ -74,16 +75,15 @@ func LoadMCWithRuntime(rt MinioRuntime) error {
 }
 
 func LoadMinIOsWithRuntime(rt MinioRuntime) error {
-	if rt.ConfFn == nil {
-		return fmt.Errorf("minio runtime requires ConfFn")
+	if rt.StartramSettingsSnapshotFn == nil || rt.ShipSettingsSnapshotFn == nil {
+		return fmt.Errorf("minio runtime requires settings snapshot callbacks")
 	}
-	conf := rt.ConfFn()
-	if conf.WgRegistered {
+	if rt.StartramSettingsSnapshotFn().WgRegistered {
 		zap.L().Info("Loading MinIO containers")
 		if rt.StartContainerFn == nil {
 			return fmt.Errorf("missing container runtime")
 		}
-		for _, pier := range conf.Piers {
+		for _, pier := range rt.ShipSettingsSnapshotFn().Piers {
 			label := "minio_" + pier
 			info, err := rt.StartContainerFn(label, "minio")
 			if err != nil {

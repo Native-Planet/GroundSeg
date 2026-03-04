@@ -1,0 +1,1002 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260303_211712/results/batch-1.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Design coherence — Mechanical Concern Signals
+Batch dimensions: design_coherence
+Batch rationale: mechanical detectors identified structural patterns needing judgment; concern types: design_concern, duplication_design, mixed_responsibilities, systemic_pattern
+
+Files assigned:
+- goseg/config/config_update_registry.go
+- goseg/exporter/exporter_test.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/config/config_test.go
+- goseg/config/config_update_schema.go
+- goseg/config/urbit.go
+- goseg/docker/lifecycle/lifecycle_full_test.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/handler/ship/urbit_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer_test.go
+- goseg/leak/broadcast_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger_test.go
+- goseg/main_test.go
+- goseg/protocol/actions/actions_test.go
+- goseg/protocol/contracts/contracts_test.go
+- goseg/session/connection_registry.go
+- goseg/session/logstream_session_store.go
+- goseg/shipworkflow/startram_lifecycle_runtime.go
+- goseg/shipworkflow/urbit_operations_runtime.go
+- goseg/startram/backup_runtime_test.go
+- goseg/startram/state_sync_test.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/structs/configs.go
+- goseg/system/metrics/metrics_test.go
+- goseg/system/storage/storage_test.go
+- goseg/system/wifi_runtime_api.go
+- goseg/system/wifi_test.go
+- goseg/uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Design coherence \u2014 Mechanical Concern Signals",
+  "batch_index": 1,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "`goseg/config/config_update_registry.go` defines very large per-field registries (`connectivityPatchFields`, `runtimePatchFields`, `penpaiPatchFields`) with repeated parse/apply/merge wiring, while `goseg/config/config_update_schema.go` separately defines generic patch plumbing and field behavior.",
+        "`goseg/shipworkflow/startram_lifecycle_runtime.go` and `goseg/shipworkflow/urbit_operations_runtime.go` combine transition orchestration, config mutation, network/container side effects, and event semantics in the same functions, creating broad change surfaces.",
+        "`goseg/system/wifi_runtime_api.go` repeats runtime/state lazy-init and nil-guard logic across multiple methods (`ConstructWifiInfo`, `StartWiFiInfoLoop`, `resolveDevice`, `ToggleDevice`) instead of enforcing stable service invariants once.",
+        "`goseg/session/connection_registry.go` and `goseg/session/logstream_session_store.go` both maintain manually synchronized mutable session collections with custom removal/snapshot logic, increasing drift risk."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_registry_ceremony",
+      "summary": "Config patching requires high-ceremony multi-layer edits that duplicate mapping logic and obscure ownership.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`config_update_registry.go` repeats near-identical `configPatchFieldFromSpec(...)` blocks per key across domain-specific functions (for example `connectivityPatchFields` and `runtimePatchFields`).",
+        "`config_update_schema.go` already centralizes generic parse/apply/has-update behavior (`newConfPatchField`, `confPatchValueRef`, `confPatchPointerRef`), but registry-level wrappers (`patchFieldPointer`, `patchFieldValue`, `parseXField`, `applyXPatchValue`) re-introduce another abstraction layer.",
+        "Adding or changing one config key requires coordinated edits across patch structs in `structs/configs.go`, key registration in registry, and parser/apply semantics, which spreads one concern across multiple files."
+      ],
+      "suggestion": "Collapse to a single schema source of truth: define a compact declarative field table with domain + type + getter/setter metadata and generate parse/apply/merge behavior from that table. Remove redundant wrapper layers and keep one place per key for semantics.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "declarative_registry_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_handlers_mixed_side_effects",
+      "summary": "Workflow handlers mix orchestration, infrastructure calls, and persistence updates in single blocks, weakening separation of concerns.",
+      "related_files": [
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`runStartramToggleWithRuntime` builds a dynamic workflow, mutates config, dispatches ship-level payloads, and runs container rebuild routines in one function.",
+        "`buildToggleMinIOLinkSteps` in `urbit_operations_runtime.go` performs state derivation, click API calls, docker service-account provisioning, and config writes inside one transition builder.",
+        "`runtime_ops.go` defines large runtime seam bundles and default operation wiring, indicating orchestration and infrastructure concerns are tightly interleaved around the same operational paths."
+      ],
+      "suggestion": "Extract dedicated transition use-cases with explicit ports (state read/write, infra actions, event publication). Keep transition functions focused on sequencing steps while delegating side effects to small collaborators.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "workflow_orchestration_boundary_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_service_invariant_scatter",
+      "summary": "WiFi runtime service relies on repeated defensive initialization paths instead of a coherent lifecycle contract.",
+      "related_files": [
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`ConstructWifiInfo` checks and initializes `state` and `runtime` internally, then later re-checks initialization success; `StartWiFiInfoLoop` repeats similar runtime/state fallback logic.",
+        "`resolveDevice`, `ToggleDevice`, and `DisconnectWifi` each contain overlapping device-resolution and nil-safety patterns, distributing lifecycle rules across methods.",
+        "Multiple tests (for example nil receiver/state initialization scenarios in `wifi_test.go`) validate these defensive branches, showing the design contract is method-local rather than constructor-enforced."
+      ],
+      "suggestion": "Enforce non-nil runtime/state at construction (or a single `ensureInitialized` path), then simplify method bodies to domain actions only. Centralize device resolution policy in one helper used by all public operations.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "service_lifecycle_contract_ambiguity"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_store_parallel_state_patterns",
+      "summary": "Session management is split across parallel mutable structures with duplicated collection logic instead of shared abstractions.",
+      "related_files": [
+        "goseg/session/connection_registry.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`connection_registry.go` has custom traversal/removal routines (`removeConnectionByConn`, `cleanupStaleBucket`, `removeClientFromOtherBucket`) over nested token->slice structures.",
+        "`logstream_session_store.go` separately implements copy/set/remove patterns for system and docker session collections with different container types and lock handling.",
+        "Both files encode similar responsibilities (track sessions, remove stale/targeted sessions, expose snapshots) without shared primitives, increasing inconsistency risk as behavior evolves."
+      ],
+      "suggestion": "Introduce shared session-collection primitives (token bucket ops, snapshot/remove helpers, concurrency wrapper) and compose both registries from those primitives to reduce drift and hidden behavioral differences.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "state_collection_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "command_flow_tests_overcoupled_to_impl",
+      "summary": "Large command-sequence tests are tightly coupled to shell-string implementation details, signaling missing behavioral abstraction seams.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/system/wifi_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`accesspoint_test.go` contains large table-driven blocks asserting exact shell command strings and branch-specific execution order across many cases.",
+        "`wifi_test.go` similarly relies on detailed command argument matching for runtime behavior and internal seam mechanics.",
+        "`main_test.go` and related runtime tests use extensive callback wiring patterns to validate orchestration internals, suggesting behavior is difficult to verify at cleaner domain boundaries."
+      ],
+      "suggestion": "Move shell command construction into dedicated command-planner units with stable typed outputs, then test planners exhaustively and keep integration tests focused on high-level outcomes rather than raw command strings.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_behavioral_ports"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Declarative configuration behavior is split across multiple partially overlapping abstraction layers.",
+      "Workflow modules own both orchestration and low-level effect execution, causing boundary blur.",
+      "State-heavy services rely on method-local defensive logic instead of stable constructor invariants."
+    ],
+    "likely_symptoms": [
+      "config_patch_registry_ceremony",
+      "transition_handlers_mixed_side_effects",
+      "command_flow_tests_overcoupled_to_impl"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cb58f-ebc4-74f1-8ae5-12631a2138df
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Design coherence — Mechanical Concern Signals
+Batch dimensions: design_coherence
+Batch rationale: mechanical detectors identified structural patterns needing judgment; concern types: design_concern, duplication_design, mixed_responsibilities, systemic_pattern
+
+Files assigned:
+- goseg/config/config_update_registry.go
+- goseg/exporter/exporter_test.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/config/config_test.go
+- goseg/config/config_update_schema.go
+- goseg/config/urbit.go
+- goseg/docker/lifecycle/lifecycle_full_test.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/handler/ship/urbit_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer_test.go
+- goseg/leak/broadcast_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger_test.go
+- goseg/main_test.go
+- goseg/protocol/actions/actions_test.go
+- goseg/protocol/contracts/contracts_test.go
+- goseg/session/connection_registry.go
+- goseg/session/logstream_session_store.go
+- goseg/shipworkflow/startram_lifecycle_runtime.go
+- goseg/shipworkflow/urbit_operations_runtime.go
+- goseg/startram/backup_runtime_test.go
+- goseg/startram/state_sync_test.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/structs/configs.go
+- goseg/system/metrics/metrics_test.go
+- goseg/system/storage/storage_test.go
+- goseg/system/wifi_runtime_api.go
+- goseg/system/wifi_test.go
+- goseg/uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll review the blind packet first to extract the exact scoring/format constraints, then inspect only the listed files for `design_coherence` findings and produce strict JSON output.
+exec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg --files goseg/config goseg/exporter goseg/accesspoint goseg/docker goseg/handler goseg/importer goseg/leak goseg/logger goseg/protocol goseg/session goseg/shipworkflow goseg/startram goseg/startuporchestrator goseg/structs goseg/system goseg/uploadsvc | wc -l' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 5834
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "design_coherence"
+  ],
+  "dimension_prompts": {
+    "design_coherence": {
+      "description": "Are structural design decisions sound \u2014 functions focused, abstractions earned, patterns consistent?",
+      "look_for": [
+        "Functions doing too many things \u2014 multiple distinct responsibilities in one body",
+        "Parameter lists that should be config/context objects \u2014 many related params passed together",
+        "Files accumulating issues across many dimensions \u2014 likely mixing unrelated concerns",
+        "Deep nesting that could be flattened with early returns or extraction",
+        "Repeated structural patterns that should be data-driven"
+      ],
+      "skip": [
+ succeeded in 53ms:
+     395
+codex
+I have the packet constraints and will now inspect the 31 assigned files for structural patterns (duplication, mixed responsibilities, inconsistent design seams), then distill supported findings only.
+exec
+/opt/homebrew/bin/zsh -lc "for f in goseg/config/config_update_registry.go goseg/exporter/exporter_test.go goseg/accesspoint/accesspoint_test.go goseg/config/config_test.go goseg/config/config_update_schema.go goseg/config/urbit.go goseg/docker/lifecycle/lifecycle_full_test.go goseg/docker/orchestration/runtime_ops.go goseg/handler/ship/urbit_test.go goseg/handler/systemsvc/system_test.go goseg/importer/extract_test.go goseg/importer/importer_test.go goseg/leak/broadcast_test.go goseg/leak/handler_test.go goseg/logger/logger_test.go goseg/main_test.go goseg/protocol/actions/actions_test.go goseg/protocol/contracts/contracts_test.go goseg/session/connection_registry.go goseg/session/logstream_session_store.go goseg/shipworkflow/startram_lifecycle_runtime.go goseg/shipworkflow/urbit_operations_runtime.go goseg/startram/backup_runtime_test.go goseg/startram/state_sync_test.go goseg/startuporchestrator/startup_orchestrator_test.go goseg/structs/configs.go goseg/system/metrics/metrics_test.go goseg/system/storage/storage_test.go goseg/system/wifi_runtime_api.go goseg/system/wifi_test.go goseg/uploadsvc/service_test.go; do printf \"\\n== %s ==\\n\" \""'$f"; wc -l "$f"; done' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+
+== goseg/config/config_update_registry.go ==
+     799 goseg/config/config_update_registry.go
+
+== goseg/exporter/exporter_test.go ==
+     377 goseg/exporter/exporter_test.go
+
+== goseg/accesspoint/accesspoint_test.go ==
+     943 goseg/accesspoint/accesspoint_test.go
+
+== goseg/config/config_test.go ==
+     612 goseg/config/config_test.go
+
+== goseg/config/config_update_schema.go ==
+     401 goseg/config/config_update_schema.go
+
+== goseg/config/urbit.go ==
+     245 goseg/config/urbit.go
+
+== goseg/docker/lifecycle/lifecycle_full_test.go ==
+exec
+/opt/homebrew/bin/zsh -lc 'rg -n "''^func" goseg/config/config_update_registry.go goseg/config/config_update_schema.go goseg/config/urbit.go goseg/docker/orchestration/runtime_ops.go goseg/session/connection_registry.go goseg/session/logstream_session_store.go goseg/shipworkflow/startram_lifecycle_runtime.go goseg/shipworkflow/urbit_operations_runtime.go goseg/structs/configs.go goseg/system/wifi_runtime_api.go' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/config/urbit.go:25:func (section UrbitConfigSection) String() string {
+goseg/config/urbit.go:50:func UrbitConf(pier string) structs.UrbitDocker {
+goseg/config/urbit.go:57:func GetMinIOLinkedStatus(patp string) bool {
+goseg/config/urbit.go:63:func UrbitConfAll() map[string]structs.UrbitDocker {
+goseg/config/urbit.go:74:func LoadUrbitConfig(pier string) error {
+goseg/config/urbit.go:86:func RemoveUrbitConfig(pier string) error {
+goseg/config/urbit.go:100:func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
+goseg/config/urbit.go:112:func UpdateUrbit(pier string, mutateFn func(*structs.UrbitDocker) error) error {
+goseg/config/urbit.go:133:func UpdateUrbitRuntimeConfig(pier string, mutateFn func(*structs.UrbitRuntimeConfig) error) error {
+goseg/config/urbit.go:143:func UpdateUrbitNetworkConfig(pier string, mutateFn func(*structs.UrbitNetworkConfig) error) error {
+goseg/config/urbit.go:153:func UpdateUrbitScheduleConfig(pier string, mutateFn func(*structs.UrbitScheduleConfig) error) error {
+goseg/config/urbit.go:163:func UpdateUrbitFeatureConfig(pier string, mutateFn func(*structs.UrbitFeatureConfig) error) error {
+goseg/config/urbit.go:172:func UpdateUrbitWebConfig(pier string, mutateFn func(*structs.UrbitWebConfig) error) error {
+goseg/config/urbit.go:181:func UpdateUrbitBackupConfig(pier string, mutateFn func(*structs.UrbitBackupConfig) error) error {
+goseg/config/urbit.go:190:func loadUrbitConfigFromDisk(pier string) (structs.UrbitDocker, error) {
+goseg/config/urbit.go:204:func normalizeUrbitConfig(conf *structs.UrbitDocker) {
+goseg/config/urbit.go:210:func persistUrbitConfigLocked(pier string, conf structs.UrbitDocker) error {
+goseg/docker/orchestration/runtime_ops.go:181:func runtimeSeams() runtimeSeamRegistry {
+goseg/docker/orchestration/runtime_ops.go:185:func buildRuntimeSeamBundle() runtimeSeamRegistry {
+goseg/docker/orchestration/runtime_ops.go:228:func defaultRuntimeTransitionOps() RuntimeTransitionOps {
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/config_update_registry.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '560,820p' goseg/config/config_update_registry.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '260,560p' goseg/config/config_update_registry.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+package config
+
+import (
+	"groundseg/structs"
+	"strings"
+)
+
+type confPatchFieldSpec[T any] struct {
+	key        string
+	patchField string
+	parse      confPatchValueParser[T]
+	target     confPatchValueRef[T]
+	apply      confPatchApplyValueFn[T]
+	hasUpdates func(T) bool
+	merge      confPatchMergeFn
+}
+
+func configPatchFieldFromSpec[T any](spec confPatchFieldSpec[T]) confPatchField {
+	apply := spec.apply
+	if apply == nil {
+ succeeded in 53ms:
+			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.DockerData = value }),
+			merge: mergeStringSetIfNonEmpty(func(cfg *structs.SysConfig) string { return cfg.Runtime.DockerData }, func(cfg *structs.SysConfig, value string) {
+				cfg.Runtime.DockerData = value
+			}),
+		}),
+		configPatchFieldFromSpec(confPatchFieldSpec[string]{
+			key:        "setup",
+			patchField: "Setup",
+			target:     patchFieldPointer(func(patch *ConfPatch) **string { return &patch.Setup }),
+			parse:      parseStringField("setup"),
+			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.Setup = value }),
+			merge:      mergeSetupFromConfig,
+		}),
+		configPatchFieldFromSpec(confPatchFieldSpec[string]{
+			key:        "cfgDir",
+			patchField: "CfgDir",
+			target:     patchFieldPointer(func(patch *ConfPatch) **string { return &patch.CfgDir }),
+			parse:      parseStringField("cfgDir"),
+			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.CfgDir = value }),
+			merge: mergeStringSetIfNonEmpty(func(cfg *structs.SysConfig) string { return cfg.Runtime.CfgDir }, func(cfg *structs.SysConfig, value string) {
+ succeeded in 52ms:
+		}
+		return target.UpdateRuntimeConfig(func(config *structs.RuntimeConfig) {
+			setter(config, value)
+		})
+	}
+}
+
+func applyPenpaiPatchValue[T any](setter func(*structs.PenpaiConfig, T)) confPatchApplyValueFn[T] {
+	return func(target confPatchApplyTarget, value T) error {
+		if target == nil {
+			return nil
+		}
+		return target.UpdatePenpaiConfig(func(config *structs.PenpaiConfig) {
+			setter(config, value)
+		})
+	}
+}
+
+func applyAuthSessionPatchValue[T any](setter func(*structs.AuthSessionConfig, T)) confPatchApplyValueFn[T] {
+	return func(target confPatchApplyTarget, value T) error {
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/shipworkflow/startram_lifecycle_runtime.go | sed -n '1,320p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/system/wifi_runtime_api.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/shipworkflow/urbit_operations_runtime.go | sed -n '1,460p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package shipworkflow
+     2	
+     3	import (
+     4		"errors"
+     5		"fmt"
+     6		"time"
+     7	
+     8		"groundseg/config"
+     9		"groundseg/internal/workflow"
+    10		"groundseg/startram"
+    11		"groundseg/structs"
+    12		"groundseg/transition"
+    13	
+    14		"go.uber.org/zap"
+    15	)
+    16	
+    17	func HandleStartramRestart() error {
+    18		return runStartramRestartWithRuntime(defaultStartramRuntime())
+    19	}
+    20	
+ succeeded in 52ms:
+     1	package system
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7		"strings"
+     8	)
+     9	
+    10	var ErrWifiInterfaceNotFound = errors.New("wifi interface not found")
+    11	
+    12	type WiFiRuntimeService struct {
+    13		runtime wifiRuntime
+    14		state   *wifiRuntimeState
+    15	}
+    16	
+    17	func resolveWiFiRuntime(overrides ...wifiRuntime) wifiRuntime {
+    18		if len(overrides) > 0 {
+    19			return NewWiFiRuntimeWith(overrides[0])
+    20		}
+ succeeded in 52ms:
+     1	package shipworkflow
+     2	
+     3	import (
+     4		"fmt"
+     5		"strings"
+     6	
+     7		"groundseg/broadcast"
+     8		"groundseg/click"
+     9		"groundseg/docker"
+    10		"groundseg/startram"
+    11		"groundseg/structs"
+    12		"groundseg/transition"
+    13	)
+    14	
+    15	var runTransitionedOperationFn = RunTransitionedOperation
+    16	
+    17	var urbitTransitionRunners = UrbitTransitionRunners()
+    18	
+    19	func runUrbitTransitionFromCommand(patp string, transitionType transition.UrbitTransitionType, payload structs.WsUrbitPayload) error {
+    20		runFn, ok := urbitTransitionRunners[transitionType]
+codex
+I’ve identified a few strong candidates in runtime files; next I’m validating whether similar structural patterns also appear in session/config/test areas so findings are cross-file and not one-off.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/config_update_schema.go | sed -n '1,430p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/session/logstream_session_store.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/session/connection_registry.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/urbit.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package session
+     2	
+     3	import (
+     4		"github.com/gorilla/websocket"
+     5		"sync"
+     6	)
+     7	
+     8	type LogstreamRuntime interface {
+     9		SysLogSessions() []*websocket.Conn
+    10		SetSysLogSessions([]*websocket.Conn)
+    11		SysSessionsToRemove() []*websocket.Conn
+    12		SetSysSessionsToRemove([]*websocket.Conn)
+    13		AddSysLogSession(*websocket.Conn)
+    14		RemoveSysLogSessions()
+    15		AddSysSessionToRemove(*websocket.Conn)
+    16		DockerLogSessions() map[string]map[*websocket.Conn]bool
+    17		SetDockerLogSessions(map[string]map[*websocket.Conn]bool)
+    18		SetDockerLogSession(string, *websocket.Conn, bool)
+    19		SetDockerLogSessionLive(string, *websocket.Conn, bool)
+    20		RemoveDockerLogSession(string, *websocket.Conn)
+ succeeded in 52ms:
+     1	package config
+     2	
+     3	// functions related to managing urbit config jsons & corresponding structs
+     4	
+     5	import (
+     6		"encoding/json"
+     7		"fmt"
+     8		"groundseg/structs"
+     9		"os"
+    10		"path/filepath"
+    11		"sync"
+    12	)
+    13	
+    14	type UrbitConfigSection int
+    15	
+    16	const (
+    17		UrbitConfigSectionRuntime UrbitConfigSection = iota
+    18		UrbitConfigSectionNetwork
+    19		UrbitConfigSectionSchedule
+    20		UrbitConfigSectionFeature
+ succeeded in 52ms:
+     1	package session
+     2	
+     3	import (
+     4		"time"
+     5	
+     6		"github.com/gorilla/websocket"
+     7	)
+     8	
+     9	type ConnectionRegistry struct {
+    10		authClients   map[string][]*MuConn
+    11		unauthClients map[string][]*MuConn
+    12		authTokens    map[string]struct{}
+    13		unauthTokens  map[string]struct{}
+    14	}
+    15	
+    16	func newConnectionRegistry(authClients, unauthClients map[string][]*MuConn) *ConnectionRegistry {
+    17		return &ConnectionRegistry{
+    18			authClients:   authClients,
+    19			unauthClients: unauthClients,
+    20			authTokens:    make(map[string]struct{}),
+ succeeded in 52ms:
+     1	package config
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6	
+     7		"groundseg/structs"
+     8	)
+     9	
+    10	type ConfUpdateOption func(*ConfPatch)
+    11	
+    12	type ConnectivityPatch struct {
+    13		Piers                *[]string
+    14		WgOn                 *bool
+    15		NetCheck             *string
+    16		UpdateMode           *string
+    17		UpdateUrl            *string
+    18		UpdateBranch         *string
+    19		RemoteBackupPassword *string
+    20		C2cInterval          *int
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"func (Test|test|newTest|setup|make|build)|type .*stub|type .*fake|httptest|t\\.Run\\(\" goseg/exporter/exporter_test.go goseg/accesspoint/accesspoint_test.go goseg/config/config_test.go goseg/docker/lifecycle/lifecycle_full_test.go goseg/handler/ship/urbit_test.go goseg/handler/systemsvc/system_test.go goseg/importer/extract_test.go goseg/importer/importer_test.go goseg/leak/broadcast_test.go goseg/leak/handler_test.go goseg/logger/logger_test.go goseg/main_test.go goseg/protocol/actions/actions_test.go goseg/protocol/contracts/contracts_test.go goseg/startram/backup_runtime_test.go goseg/startram/state_sync_test.go goseg/startuporchestrator/startup_orchestrator_test.go goseg/system/metrics/metrics_test.go goseg/system/storage/storage_test.go goseg/system/wifi_test.go goseg/uploadsvc/service_test.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/leak/broadcast_test.go:52:func TestUpdateBroadcastReturnsOriginalWhenUnchanged(t *testing.T) {
+goseg/leak/broadcast_test.go:80:func TestUpdateBroadcastSendsFullAndScopedPayloads(t *testing.T) {
+goseg/leak/broadcast_test.go:148:func TestUpdateBroadcastReturnsOldStateOnFullMarshalFailure(t *testing.T) {
+goseg/leak/broadcast_test.go:166:func TestUpdateBroadcastReturnsOldStateOnScopedMarshalFailure(t *testing.T) {
+goseg/leak/broadcast_test.go:215:func TestSendBroadcastNilConnectionIsNoop(t *testing.T) {
+goseg/leak/broadcast_test.go:225:func TestSendBroadcastWritesJammedPayload(t *testing.T) {
+goseg/leak/broadcast_test.go:269:func TestSendBroadcastReturnsErrorWhenConnectionWriteFails(t *testing.T) {
+goseg/leak/broadcast_test.go:282:func TestListenerCleansStateWhenConnectionCloses(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:14:type fakeCommand struct {
+goseg/handler/systemsvc/system_test.go:22:func TestHandleSystemMalformedPayload(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:28:func TestHandleSystemTogglePenpaiFeature(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:85:func TestHandleSystemGroundSegAndPower(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:139:func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:227:func TestHandleSystemUnrecognizedAction(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:246:func TestHandlePenpaiMalformedPayload(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:252:func TestHandlePenpaiToggle(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:311:func TestHandlePenpaiSetModel(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:361:func TestHandlePenpaiSetCoresValidation(t *testing.T) {
+goseg/handler/systemsvc/system_test.go:389:func TestHandlePenpaiUnrecognizedActionAndRemoveNoOp(t *testing.T) {
+goseg/importer/importer_test.go:8:	"net/http/httptest"
+codex
+I’ve found recurring structural duplication around config patch machinery and transition orchestration; I’m now confirming line-level evidence in `structs/configs.go` and a few representative tests to ensure each finding is materially supported.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/structs/configs.go | sed -n '240,460p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/accesspoint/accesspoint_test.go | sed -n '330,880p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/structs/configs.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/system/wifi_test.go | sed -n '430,590p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+   430		if err == nil {
+   431			t.Fatal("expected constructor to fail when restart callback is nil")
+   432		}
+   433	}
+   434	
+   435	func TestProcessC2CMessageForAdapterReportsMissingServiceOnConstructorFailure(t *testing.T) {
+   436		resetWifiSeamsForTest(t)
+   437	
+   438		msg := `{"type":"c2c","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}`
+   439		deps := c2cServiceDeps{
+   440			connectToWiFi: nil,
+   441		}
+   442	
+   443		err := processC2CMessageForAdapterWithDeps([]byte(msg), deps)
+   444		if err == nil {
+   445			t.Fatal("expected processC2CMessageForAdapter to fail when dependencies are nil")
+   446		}
+   447		if !strings.Contains(err.Error(), "c2c service is required") {
+   448			t.Fatalf("expected service requirement error, got %v", err)
+   449		}
+ succeeded in 53ms:
+     1	package structs
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"time"
+     7	)
+     8	
+     9	type DiskWarning struct {
+    10		// true if warning has been sent
+    11		// resets to false when disk goes below 80% usage
+    12		// 95% will send a recurring warning
+    13		Eighty     bool      `json:"eighty"`
+    14		Ninety     bool      `json:"ninety"`
+    15		NinetyFive time.Time `json:"ninetyFive"`
+    16	}
+    17	
+    18	// system.json config struct grouped by domain
+    19	type SysConfig struct {
+    20		Connectivity ConnectivityConfig `json:"-"`
+ succeeded in 53ms:
+   240		Created string `json:"created"`
+   241	}
+   242	
+   243	type UrbitRuntimeConfig struct {
+   244		PierName         string `json:"pier_name"`
+   245		HTTPPort         int    `json:"http_port"`
+   246		AmesPort         int    `json:"ames_port"`
+   247		LoomSize         int    `json:"loom_size"`
+   248		UrbitVersion     string `json:"urbit_version"`
+   249		MinioVersion     string `json:"minio_version"`
+   250		UrbitRepo        string `json:"urbit_repo"`
+   251		MinioRepo        string `json:"minio_repo"`
+   252		UrbitAmd64Sha256 string `json:"urbit_amd64_sha256"`
+   253		UrbitArm64Sha256 string `json:"urbit_arm64_sha256"`
+   254		MinioAmd64Sha256 string `json:"minio_amd64_sha256"`
+   255		MinioArm64Sha256 string `json:"minio_arm64_sha256"`
+   256		MinioPassword    string `json:"minio_password"`
+   257		BootStatus       string `json:"boot_status"`
+   258		SizeLimit        int    `json:"size_limit"`
+   259		SnapTime         int    `json:"snap_time"`
+ succeeded in 53ms:
+   330	
+   331	func TestPreStartPropagatesFailedCommandError(t *testing.T) {
+   332		resetRouterGlobalsForTest(t)
+   333	
+   334		executeRouterShellFn = func(cmd string) (string, error) {
+   335			if cmd == "rfkill unblock wlan" {
+   336				return "", errors.New("rfkill failed")
+   337			}
+   338			return "", nil
+   339		}
+   340	
+   341		err := preStart()
+   342		if err == nil {
+   343			t.Fatal("expected preStart to fail when rfkill fails")
+   344		}
+   345		if !strings.Contains(err.Error(), "unblock wlan interface") {
+   346			t.Fatalf("expected wrapped unblock error, got %v", err)
+   347		}
+   348	}
+   349	
+codex
+I now have enough evidence for a structural assessment. I’m doing one final pass on protocol/action test seams and config tests to avoid over-reporting and ensure findings reflect real design debt, not just file size.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/main_test.go | sed -n '240,360p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/config_test.go | sed -n '140,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/protocol/actions/actions_test.go | sed -n '240,420p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/protocol/contracts/contracts_test.go | sed -n '1,230p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+   140			t.Fatalf("expected setup=complete for migration path, got %q", merged.Runtime.Setup)
+   141		}
+   142		if merged.Runtime.LastKnownMDNS != defaultCfg.Runtime.LastKnownMDNS {
+   143			t.Fatalf("expected last known mdns to use default when custom is empty")
+   144		}
+   145		if merged.Connectivity.EndpointUrl != defaultCfg.Connectivity.EndpointUrl || merged.Connectivity.ApiVersion != defaultCfg.Connectivity.ApiVersion {
+   146			t.Fatalf("expected defaults for empty custom scalar fields")
+   147		}
+   148		if merged.AuthSession.PwHash != customCfg.AuthSession.PwHash {
+   149			t.Fatalf("expected custom pwhash to be preserved when provided")
+   150		}
+   151		if merged.Startram.StartramSetReminder != defaultCfg.Startram.StartramSetReminder {
+   152			t.Fatalf("expected startram reminders to merge using OR semantics")
+   153		}
+   154		if merged.AuthSession.Sessions.Authorized == nil || merged.AuthSession.Sessions.Unauthorized == nil {
+   155			t.Fatalf("expected session maps to fall back to defaults when custom is nil")
+   156		}
+   157		if merged.Runtime.CfgDir != defaultCfg.Runtime.CfgDir || merged.Runtime.BinHash != defaultCfg.Runtime.BinHash {
+   158			t.Fatalf("expected default config values when custom values are empty")
+   159		}
+ succeeded in 53ms:
+   240			config.SetDebugMode(originalDebugMode)
+   241		})
+   242	
+   243		ctx, cancel := context.WithCancel(context.Background())
+   244		cancel()
+   245	
+   246		done := make(chan struct{})
+   247		go func() {
+   248			killSwitch(ctx, config.ConnectivitySettingsSnapshot)
+   249			close(done)
+   250		}()
+   251	
+   252		select {
+   253		case <-done:
+   254		case <-time.After(200 * time.Millisecond):
+   255			t.Fatal("expected killSwitch to stop when context is done")
+   256		}
+   257	}
+   258	
+   259	func TestBootstrapSubsystemsForwardsCallbacks(t *testing.T) {
+ succeeded in 53ms:
+   240		if rechecked.Action != got[0].Action {
+   241			t.Fatalf("expected contract copy lookup to stay stable, got %q", rechecked.Action)
+   242		}
+   243	}
+   244	
+   245	func TestSupportedC2CActionsMatchesContract(t *testing.T) {
+   246		got := SupportedC2CActions()
+   247		expected := []Action{ActionC2CConnect}
+   248		if len(got) != len(expected) {
+   249			t.Fatalf("expected %d c2c actions, got %d", len(expected), len(got))
+   250		}
+   251		for i, action := range expected {
+   252			if got[i] != action {
+   253				t.Fatalf("expected c2c action %q at index %d, got %q", action, i, got[i])
+   254			}
+   255		}
+   256	}
+   257	
+   258	func TestUploadActionMetadataContainsLifecycle(t *testing.T) {
+   259		for _, action := range []Action{ActionUploadOpenEndpoint, ActionUploadReset} {
+ succeeded in 53ms:
+     1	package contracts
+     2	
+     3	import (
+     4		"testing"
+     5		"time"
+     6	)
+     7	
+     8	func mustLoadCatalog(t *testing.T) *ContractCatalog {
+     9		t.Helper()
+    10		catalog, err := LoadRegistry()
+    11		if err != nil {
+    12			t.Fatalf("failed to load contract catalog: %v", err)
+    13		}
+    14		return catalog
+    15	}
+    16	
+    17	func TestContractCatalogHasLifecycleMetadata(t *testing.T) {
+    18		catalog := mustLoadCatalog(t)
+    19		for id, descriptor := range catalog.ContractDescriptorsForDebug() {
+    20			if descriptor.Name == "" {
+codex
+{
+  "batch": "Design coherence \u2014 Mechanical Concern Signals",
+  "batch_index": 1,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "`goseg/config/config_update_registry.go` defines very large per-field registries (`connectivityPatchFields`, `runtimePatchFields`, `penpaiPatchFields`) with repeated parse/apply/merge wiring, while `goseg/config/config_update_schema.go` separately defines generic patch plumbing and field behavior.",
+        "`goseg/shipworkflow/startram_lifecycle_runtime.go` and `goseg/shipworkflow/urbit_operations_runtime.go` combine transition orchestration, config mutation, network/container side effects, and event semantics in the same functions, creating broad change surfaces.",
+        "`goseg/system/wifi_runtime_api.go` repeats runtime/state lazy-init and nil-guard logic across multiple methods (`ConstructWifiInfo`, `StartWiFiInfoLoop`, `resolveDevice`, `ToggleDevice`) instead of enforcing stable service invariants once.",
+        "`goseg/session/connection_registry.go` and `goseg/session/logstream_session_store.go` both maintain manually synchronized mutable session collections with custom removal/snapshot logic, increasing drift risk."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_registry_ceremony",
+      "summary": "Config patching requires high-ceremony multi-layer edits that duplicate mapping logic and obscure ownership.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`config_update_registry.go` repeats near-identical `configPatchFieldFromSpec(...)` blocks per key across domain-specific functions (for example `connectivityPatchFields` and `runtimePatchFields`).",
+        "`config_update_schema.go` already centralizes generic parse/apply/has-update behavior (`newConfPatchField`, `confPatchValueRef`, `confPatchPointerRef`), but registry-level wrappers (`patchFieldPointer`, `patchFieldValue`, `parseXField`, `applyXPatchValue`) re-introduce another abstraction layer.",
+        "Adding or changing one config key requires coordinated edits across patch structs in `structs/configs.go`, key registration in registry, and parser/apply semantics, which spreads one concern across multiple files."
+      ],
+      "suggestion": "Collapse to a single schema source of truth: define a compact declarative field table with domain + type + getter/setter metadata and generate parse/apply/merge behavior from that table. Remove redundant wrapper layers and keep one place per key for semantics.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "declarative_registry_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_handlers_mixed_side_effects",
+      "summary": "Workflow handlers mix orchestration, infrastructure calls, and persistence updates in single blocks, weakening separation of concerns.",
+      "related_files": [
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`runStartramToggleWithRuntime` builds a dynamic workflow, mutates config, dispatches ship-level payloads, and runs container rebuild routines in one function.",
+        "`buildToggleMinIOLinkSteps` in `urbit_operations_runtime.go` performs state derivation, click API calls, docker service-account provisioning, and config writes inside one transition builder.",
+        "`runtime_ops.go` defines large runtime seam bundles and default operation wiring, indicating orchestration and infrastructure concerns are tightly interleaved around the same operational paths."
+      ],
+      "suggestion": "Extract dedicated transition use-cases with explicit ports (state read/write, infra actions, event publication). Keep transition functions focused on sequencing steps while delegating side effects to small collaborators.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "workflow_orchestration_boundary_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_service_invariant_scatter",
+      "summary": "WiFi runtime service relies on repeated defensive initialization paths instead of a coherent lifecycle contract.",
+      "related_files": [
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`ConstructWifiInfo` checks and initializes `state` and `runtime` internally, then later re-checks initialization success; `StartWiFiInfoLoop` repeats similar runtime/state fallback logic.",
+        "`resolveDevice`, `ToggleDevice`, and `DisconnectWifi` each contain overlapping device-resolution and nil-safety patterns, distributing lifecycle rules across methods.",
+        "Multiple tests (for example nil receiver/state initialization scenarios in `wifi_test.go`) validate these defensive branches, showing the design contract is method-local rather than constructor-enforced."
+      ],
+      "suggestion": "Enforce non-nil runtime/state at construction (or a single `ensureInitialized` path), then simplify method bodies to domain actions only. Centralize device resolution policy in one helper used by all public operations.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "service_lifecycle_contract_ambiguity"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_store_parallel_state_patterns",
+      "summary": "Session management is split across parallel mutable structures with duplicated collection logic instead of shared abstractions.",
+      "related_files": [
+        "goseg/session/connection_registry.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`connection_registry.go` has custom traversal/removal routines (`removeConnectionByConn`, `cleanupStaleBucket`, `removeClientFromOtherBucket`) over nested token->slice structures.",
+        "`logstream_session_store.go` separately implements copy/set/remove patterns for system and docker session collections with different container types and lock handling.",
+        "Both files encode similar responsibilities (track sessions, remove stale/targeted sessions, expose snapshots) without shared primitives, increasing inconsistency risk as behavior evolves."
+      ],
+      "suggestion": "Introduce shared session-collection primitives (token bucket ops, snapshot/remove helpers, concurrency wrapper) and compose both registries from those primitives to reduce drift and hidden behavioral differences.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "state_collection_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "command_flow_tests_overcoupled_to_impl",
+      "summary": "Large command-sequence tests are tightly coupled to shell-string implementation details, signaling missing behavioral abstraction seams.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/system/wifi_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`accesspoint_test.go` contains large table-driven blocks asserting exact shell command strings and branch-specific execution order across many cases.",
+        "`wifi_test.go` similarly relies on detailed command argument matching for runtime behavior and internal seam mechanics.",
+        "`main_test.go` and related runtime tests use extensive callback wiring patterns to validate orchestration internals, suggesting behavior is difficult to verify at cleaner domain boundaries."
+      ],
+      "suggestion": "Move shell command construction into dedicated command-planner units with stable typed outputs, then test planners exhaustively and keep integration tests focused on high-level outcomes rather than raw command strings.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_behavioral_ports"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Declarative configuration behavior is split across multiple partially overlapping abstraction layers.",
+      "Workflow modules own both orchestration and low-level effect execution, causing boundary blur.",
+      "State-heavy services rely on method-local defensive logic instead of stable constructor invariants."
+    ],
+    "likely_symptoms": [
+      "config_patch_registry_ceremony",
+      "transition_handlers_mixed_side_effects",
+      "command_flow_tests_overcoupled_to_impl"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+91,428
+

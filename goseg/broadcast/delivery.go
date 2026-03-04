@@ -17,7 +17,14 @@ type authBroadcastEnvelope struct {
 
 // broadcast the global state to auth'd clients
 func BroadcastToClients() error {
-	bState := GetState()
+	return broadcastToClientsWithRuntime(DefaultBroadcastStateRuntime())
+}
+
+func broadcastToClientsWithRuntime(runtime *broadcastStateRuntime) error {
+	if runtime == nil {
+		runtime = DefaultBroadcastStateRuntime()
+	}
+	bState := runtime.GetState()
 	sent := false
 	for attempt := 0; attempt < 5; attempt++ {
 		select {

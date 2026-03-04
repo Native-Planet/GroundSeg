@@ -41,7 +41,7 @@ func NewNetworkRuntimeWith(overrides NetworkRuntime) NetworkRuntime {
 func (runtime NetworkRuntime) KillContainerUsingPort(port uint16) error {
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create docker client for port inspection when killing %d: %w", port, err)
 	}
 	defer cli.Close()
 

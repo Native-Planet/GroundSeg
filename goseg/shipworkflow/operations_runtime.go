@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"groundseg/click"
-	"groundseg/config"
 	"groundseg/docker/events"
 	dockerOrchestration "groundseg/docker/orchestration"
 	"groundseg/internal/seams"
+	"groundseg/internal/shipstatus"
 	"groundseg/internal/transitionlifecycle"
 	"groundseg/lifecycle"
 	"groundseg/structs"
@@ -21,14 +21,16 @@ import (
 )
 
 type workflowRuntime struct {
-	EventRuntime              events.EventBroker
-	TransitionEmitter         workflowTransitionFn
-	TransitionErrorPolicy     transition.TransitionPublishPolicy
-	Sleeper                  workflowSleeperFn
-	CNAMEResolver            workflowCNAMEResolverFn
-	BarExit                  workflowBarExitFn
-	dockerOrchestration.RuntimeTransitionOps
-	UploadImportCoordinator   workflowUploadImportCoordinatorFn
+	EventRuntime          events.EventBroker
+	TransitionEmitter     workflowTransitionFn               `runtime:"workflow" runtime_name:"transition emitter"`
+	TransitionErrorPolicy transition.TransitionPublishPolicy `runtime:"workflow" runtime_name:"transition error policy"`
+	Sleeper               workflowSleeperFn                  `runtime:"workflow" runtime_name:"sleeper"`
+	CNAMEResolver         workflowCNAMEResolverFn            `runtime:"workflow" runtime_name:"CNAME resolver"`
+	BarExit               workflowBarExitFn                  `runtime:"workflow" runtime_name:"bar exit callback"`
+	dockerOrchestration.RuntimeContainerOps
+	dockerOrchestration.RuntimeUrbitOps
+	dockerOrchestration.RuntimeSnapshotOps
+	UploadImportCoordinator workflowUploadImportCoordinatorFn `runtime:"workflow" runtime_name:"upload import coordinator"`
 }
 
 type workflowTransitionFn func(patp string, transitionType string, event string) error
@@ -42,7 +44,7 @@ type workflowBarExitFn func(patp string) error
 type workflowUploadImportCoordinatorFn func(context.Context, UploadImportCommand) error
 
 var errUploadImportCoordinatorUnconfigured = fmt.Errorf("workflow runtime upload import coordinator is not configured")
-var errShipStatusNotFound = errors.New("ship status doesn't exist")
+var errShipStatusNotFound = shipstatus.ErrShipStatusNotFound
 
 type workflowAliasLookupFn func(string) (string, error)
 
@@ -50,7 +52,7 @@ type transitionPlan[E comparable] = transitionlifecycle.LifecyclePlan[E]
 type transitionStep[E comparable] = transitionlifecycle.LifecycleStep[E]
 
 func runTransitionLifecycle[E comparable](runtime workflowRuntime, emit func(E) error, plan transitionPlan[E], steps ...transitionStep[E]) error {
-	resolvedRuntime, err := resolveWorkflowRuntimeWithDefaults(runtime)
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime)
 	if err != nil {
 		return err
 	}
@@ -87,14 +89,16 @@ func newWorkflowRuntime() workflowRuntime {
 	}
 	orchestrationRuntime := dockerOrchestration.NewRuntime()
 	return workflowRuntime{
-		EventRuntime:              defaultEventRuntime,
-		TransitionEmitter:         defaultEmit,
-		TransitionErrorPolicy:     transition.TransitionPublishStrict,
-		Sleeper:                  time.Sleep,
-		CNAMEResolver:            net.LookupCNAME,
-		BarExit:                  click.BarExit,
-		RuntimeTransitionOps:      orchestrationRuntime.RuntimeTransitionOps,
-		UploadImportCoordinator:   defaultDispatch,
+		EventRuntime:            defaultEventRuntime,
+		TransitionEmitter:       defaultEmit,
+		TransitionErrorPolicy:   transition.TransitionPolicyForCriticality(transition.TransitionPublishCritical),
+		Sleeper:                 time.Sleep,
+		CNAMEResolver:           net.LookupCNAME,
+		RuntimeSnapshotOps:      orchestrationRuntime.RuntimeSnapshotOps,
+		RuntimeContainerOps:     orchestrationRuntime.RuntimeContainerOps,
+		RuntimeUrbitOps:         orchestrationRuntime.RuntimeUrbitOps,
+		BarExit:                 click.BarExit,
+		UploadImportCoordinator: defaultDispatch,
 	}
 }
 
@@ -102,15 +106,11 @@ func defaultWorkflowRuntime() workflowRuntime {
 	return newWorkflowRuntime()
 }
 
-func resolveWorkflowRuntime(overrides ...workflowRuntime) workflowRuntime {
-	if len(overrides) == 0 {
-		return defaultWorkflowRuntime()
+func resolveWorkflowRuntime(overrides ...workflowRuntime) (workflowRuntime, error) {
+	runtime := defaultWorkflowRuntime()
+	if len(overrides) > 0 {
+		runtime = seams.Merge(runtime, overrides[0])
 	}
-	return withDefaultsWorkflowRuntime(overrides[0])
-}
-
-func resolveWorkflowRuntimeWithDefaults(overrides ...workflowRuntime) (workflowRuntime, error) {
-	runtime := resolveWorkflowRuntime(overrides...)
 	if err := runtime.validate(); err != nil {
 		return runtime, err
 	}
@@ -118,44 +118,10 @@ func resolveWorkflowRuntimeWithDefaults(overrides ...workflowRuntime) (workflowR
 }
 
 func (runtime workflowRuntime) validate() error {
-	missing := make([]string, 0, 8)
-	if runtime.TransitionEmitter == nil {
-		missing = append(missing, "transition emitter")
+	if err := seams.NewCallbackRequirementsWithGroups("workflow").ValidateCallbacks(runtime, "workflow runtime"); err != nil {
+		return seams.MissingRuntimeDependency("workflow runtime", err.Error())
 	}
-	if runtime.TransitionErrorPolicy == "" {
-		missing = append(missing, "transition error policy")
-	}
-	if runtime.Sleeper == nil {
-		missing = append(missing, "sleeper")
-	}
-	if runtime.CNAMEResolver == nil {
-		missing = append(missing, "CNAME resolver")
-	}
-	if runtime.BarExit == nil {
-		missing = append(missing, "bar exit callback")
-	}
-	if runtime.UploadImportCoordinator == nil {
-		missing = append(missing, "upload import coordinator")
-	}
-	if runtime.UpdateUrbitFn == nil {
-		missing = append(missing, "update urbit callback")
-	}
-	if runtime.UpdateUrbitSectionFn == nil {
-		missing = append(missing, "update urbit section callback")
-	}
-	if runtime.GetShipStatusFn == nil {
-		missing = append(missing, "ship status callback")
-	}
-	if runtime.DeleteContainerFn == nil {
-		missing = append(missing, "delete container callback")
-	}
-	if runtime.StopContainerByNameFn == nil {
-		missing = append(missing, "stop container callback")
-	}
-	if len(missing) == 0 {
-		return nil
-	}
-	return fmt.Errorf("workflow runtime missing required callbacks: %s", strings.Join(missing, ", "))
+	return nil
 }
 
 type UploadImportCommand struct {
@@ -186,21 +152,17 @@ func DispatchUploadImportWithCoordinator(coordinator UploadImportCoordinator, ct
 }
 
 func dispatchUploadImport(runtime workflowRuntime, ctx context.Context, cmd UploadImportCommand) error {
-	resolvedRuntime, err := resolveWorkflowRuntimeWithDefaults(runtime)
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime)
 	if err != nil {
 		return err
 	}
 	runtime = resolvedRuntime
-	if runtime.UploadImportCoordinator == nil {
-		return errUploadImportCoordinatorUnconfigured
-	}
 	return runtime.UploadImportCoordinator(ctx, cmd)
 }
 
 func emitWorkflowTransition(runtime workflowRuntime, patp, transitionType, event string) error {
-	if runtime.TransitionEmitter == nil {
-		return fmt.Errorf("workflow runtime transition emitter is not configured")
-	}
+	resolvedRuntime, _ := resolveWorkflowRuntime(runtime)
+	runtime = resolvedRuntime
 	if err := runtime.TransitionEmitter(patp, transitionType, event); err != nil {
 		return transition.HandleTransitionPublishError(
 			fmt.Sprintf("publish urbit transition for %s", patp),
@@ -216,7 +178,7 @@ func PublishTransitionWithPolicy[T any](publish func(T), event T, clear T, clear
 }
 
 func publishTransition[T any](runtime workflowRuntime, publish func(T), event T, clear T, clearDelay time.Duration) {
-	resolvedRuntime, err := resolveWorkflowRuntimeWithDefaults(runtime)
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime)
 	if err != nil {
 		resolvedRuntime = defaultWorkflowRuntime()
 	}
@@ -259,7 +221,7 @@ func runTransitionedOperationWithRuntime(
 	clearDelay time.Duration,
 	operation func() error,
 ) error {
-	runtime, err := resolveWorkflowRuntimeWithDefaults(runtime)
+	runtime, err := resolveWorkflowRuntime(runtime)
 	if err != nil {
 		return err
 	}
@@ -309,7 +271,7 @@ func runPhaseWorkflow(
 	clearDelay time.Duration,
 	steps ...lifecycle.Step,
 ) error {
-	runtime, err := resolveWorkflowRuntimeWithDefaults(defaultWorkflowRuntime())
+	runtime, err := resolveWorkflowRuntime(defaultWorkflowRuntime())
 	if err != nil {
 		return err
 	}
@@ -338,7 +300,7 @@ func runPhaseWorkflow(
 }
 
 func WaitComplete(patp string) error {
-	runtime, err := resolveWorkflowRuntimeWithDefaults(defaultWorkflowRuntime())
+	runtime, err := resolveWorkflowRuntime(defaultWorkflowRuntime())
 	if err != nil {
 		return err
 	}
@@ -348,19 +310,59 @@ func WaitComplete(patp string) error {
 }
 
 func persistShipConf(patp string, mutate func(*structs.UrbitDocker) error, runtime ...workflowRuntime) error {
-	resolvedRuntime, err := resolveWorkflowRuntimeWithDefaults(runtime...)
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime...)
 	if err != nil {
 		return err
 	}
 	return PersistUrbitConfig(patp, mutate, resolvedRuntime.UpdateUrbitFn)
 }
 
-func persistShipUrbitConfig[T any](patp string, section dockerOrchestration.UrbitConfigSection, mutate func(*T) error, runtime ...workflowRuntime) error {
-	resolvedRuntime, err := resolveWorkflowRuntimeWithDefaults(runtime...)
+func persistShipUrbitRuntimeConfig(patp string, mutate func(*structs.UrbitRuntimeConfig) error, runtime ...workflowRuntime) error {
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime...)
 	if err != nil {
 		return err
 	}
-	return resolvedRuntime.UpdateUrbitSectionFn(patp, section, any(mutate))
+	return resolvedRuntime.UpdateUrbitRuntimeConfigFn(patp, mutate)
+}
+
+func persistShipUrbitNetworkConfig(patp string, mutate func(*structs.UrbitNetworkConfig) error, runtime ...workflowRuntime) error {
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime...)
+	if err != nil {
+		return err
+	}
+	return resolvedRuntime.UpdateUrbitNetworkConfigFn(patp, mutate)
+}
+
+func persistShipUrbitScheduleConfig(patp string, mutate func(*structs.UrbitScheduleConfig) error, runtime ...workflowRuntime) error {
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime...)
+	if err != nil {
+		return err
+	}
+	return resolvedRuntime.UpdateUrbitScheduleConfigFn(patp, mutate)
+}
+
+func persistShipUrbitFeatureConfig(patp string, mutate func(*structs.UrbitFeatureConfig) error, runtime ...workflowRuntime) error {
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime...)
+	if err != nil {
+		return err
+	}
+	return resolvedRuntime.UpdateUrbitFeatureConfigFn(patp, mutate)
+}
+
+func persistShipUrbitWebConfig(patp string, mutate func(*structs.UrbitWebConfig) error, runtime ...workflowRuntime) error {
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime...)
+	if err != nil {
+		return err
+	}
+	return resolvedRuntime.UpdateUrbitWebConfigFn(patp, mutate)
+}
+
+func persistShipUrbitBackupConfig(patp string, mutate func(*structs.UrbitBackupConfig) error, runtime ...workflowRuntime) error {
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime...)
+	if err != nil {
+		return err
+	}
+	return resolvedRuntime.UpdateUrbitBackupConfigFn(patp, mutate)
 }
 
 func PersistUrbitConfigValue(patp string, mutate func(*structs.UrbitDocker) error) error {
@@ -368,7 +370,7 @@ func PersistUrbitConfigValue(patp string, mutate func(*structs.UrbitDocker) erro
 }
 
 func areSubdomainsAliases(domain1, domain2 string, runtime ...workflowRuntime) (bool, error) {
-	resolvedRuntime, err := resolveWorkflowRuntimeWithDefaults(runtime...)
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime...)
 	if err != nil {
 		return false, err
 	}
@@ -376,17 +378,17 @@ func areSubdomainsAliases(domain1, domain2 string, runtime ...workflowRuntime) (
 	if firstDot == -1 {
 		return false, fmt.Errorf("invalid subdomain")
 	}
-	if config.GetStartramConfig().Cname != "" && domain1[firstDot+1:] == config.GetStartramConfig().Cname {
+	if startramConfig := resolvedRuntime.GetStartramConfigFn(); startramConfig.Cname != "" && domain1[firstDot+1:] == startramConfig.Cname {
 		return true, nil
 	}
-		cname1, err := resolvedRuntime.CNAMEResolver(domain1)
-		if err != nil {
-			return false, fmt.Errorf("lookup CNAME for %s: %w", domain1, err)
-		}
-		cname2, err := resolvedRuntime.CNAMEResolver(domain2)
-		if err != nil {
-			return false, fmt.Errorf("lookup CNAME for %s: %w", domain2, err)
-		}
+	cname1, err := resolvedRuntime.CNAMEResolver(domain1)
+	if err != nil {
+		return false, fmt.Errorf("lookup CNAME for %s: %w", domain1, err)
+	}
+	cname2, err := resolvedRuntime.CNAMEResolver(domain2)
+	if err != nil {
+		return false, fmt.Errorf("lookup CNAME for %s: %w", domain2, err)
+	}
 	return cname1 == cname2, nil
 }
 
@@ -406,7 +408,7 @@ func AreSubdomainsAliasesWithLookup(
 }
 
 func urbitCleanDelete(patp string, runtime ...workflowRuntime) error {
-	resolvedRuntime, err := resolveWorkflowRuntimeWithDefaults(runtime...)
+	resolvedRuntime, err := resolveWorkflowRuntime(runtime...)
 	if err != nil {
 		return err
 	}
@@ -423,12 +425,12 @@ func urbitCleanDelete(patp string, runtime ...workflowRuntime) error {
 		return status, nil
 	}
 	status, err := getShipRunningStatus(patp)
-		if err == nil {
-			if strings.Contains(status, "Up") {
-				if err := resolvedRuntime.BarExit(patp); err != nil {
-					stopErrs = append(stopErrs, fmt.Errorf("failed to stop %s with |exit: %w", patp, err))
-					if err = resolvedRuntime.StopContainerByNameFn(patp); err != nil {
-						stopErrs = append(stopErrs, fmt.Errorf("failed to stop container %s by name: %w", patp, err))
+	if err == nil {
+		if strings.Contains(status, "Up") {
+			if err := resolvedRuntime.BarExit(patp); err != nil {
+				stopErrs = append(stopErrs, fmt.Errorf("failed to stop %s with |exit: %w", patp, err))
+				if err = resolvedRuntime.StopContainerByNameFn(patp); err != nil {
+					stopErrs = append(stopErrs, fmt.Errorf("failed to stop container %s by name: %w", patp, err))
 				}
 			}
 		}
@@ -438,12 +440,12 @@ func urbitCleanDelete(patp string, runtime ...workflowRuntime) error {
 				break
 			}
 			zap.L().Debug(fmt.Sprintf("%s", status))
-				if !strings.Contains(status, "Up") {
-					break
-				}
-				resolvedRuntime.Sleeper(1 * time.Second)
+			if !strings.Contains(status, "Up") {
+				break
 			}
+			resolvedRuntime.Sleeper(1 * time.Second)
 		}
+	}
 	deleteErr := resolvedRuntime.DeleteContainerFn(patp)
 	if len(stopErrs) == 0 {
 		return deleteErr
@@ -455,41 +457,8 @@ func urbitCleanDelete(patp string, runtime ...workflowRuntime) error {
 	return errors.Join(stopErr, fmt.Errorf("failed to delete ship container for %s: %w", patp, deleteErr))
 }
 
-func withDefaultsWorkflowRuntime(runtime workflowRuntime) workflowRuntime {
-	base := defaultWorkflowRuntime()
-	resolvedRuntime := seams.Merge(base, runtime)
-	if resolvedRuntime.UpdateUrbitFn == nil {
-		resolvedRuntime.UpdateUrbitFn = config.UpdateUrbit
-	}
-	if resolvedRuntime.UpdateUrbitSectionFn == nil {
-		resolvedRuntime.UpdateUrbitSectionFn = config.UpdateUrbitSectionConfig
-	}
-	if resolvedRuntime.TransitionEmitter == nil {
-		eventRuntime := resolvedRuntime.EventRuntime
-		resolvedRuntime.TransitionEmitter = workflowTransitionFn(func(patp, transitionType, event string) error {
-			return eventRuntime.PublishUrbitTransition(context.Background(), structs.UrbitTransition{Patp: patp, Type: transitionType, Event: event})
-		})
-	}
-	if resolvedRuntime.TransitionErrorPolicy == "" {
-		resolvedRuntime.TransitionErrorPolicy = transition.TransitionPublishStrict
-	}
-	if resolvedRuntime.Sleeper == nil {
-		resolvedRuntime.Sleeper = time.Sleep
-	}
-	if resolvedRuntime.CNAMEResolver == nil {
-		resolvedRuntime.CNAMEResolver = net.LookupCNAME
-	}
-	if resolvedRuntime.BarExit == nil {
-		resolvedRuntime.BarExit = click.BarExit
-	}
-	if resolvedRuntime.UploadImportCoordinator == nil {
-		resolvedRuntime.UploadImportCoordinator = unconfiguredUploadImportCoordinator
-	}
-	return resolvedRuntime
-}
-
 func shipStatusNotFoundErr(patp string) error {
-	return fmt.Errorf("%w: %s", errShipStatusNotFound, patp)
+	return shipstatus.NotFoundErr(patp)
 }
 
 func UrbitCleanDelete(patp string) error {

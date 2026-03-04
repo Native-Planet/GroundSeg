@@ -9,43 +9,39 @@ import (
 	"groundseg/docker/network"
 	"groundseg/docker/orchestration/container"
 	"groundseg/docker/registry"
-	"groundseg/internal/seams"
 	"groundseg/startram"
 	"groundseg/structs"
 	"os"
 	"time"
 )
 
-type RuntimeTransitionOps struct {
-	RuntimeContainerOps
-	RuntimeUrbitOps
-}
-
-
 type RuntimeContainerOps struct {
-	StartContainerFn      func(name string, ctype string) (structs.ContainerState, error)
-	StopContainerByNameFn func(name string) error
-	CreateContainerFn     func(name string, ctype string) (structs.ContainerState, error)
-	RestartContainerFn    func(name string) error
-	DeleteContainerFn     func(name string) error
-	GetContainerStateFn    func() map[string]structs.ContainerState
-	UpdateContainerStateFn func(name string, state structs.ContainerState)
-	AddOrGetNetworkFn func(networkName string) (string, error)
+	StartContainerFn            func(name string, ctype string) (structs.ContainerState, error) `runtime:"importer-provision,workflow,rectify" runtime_name:"start container callback"`
+	StopContainerByNameFn       func(name string) error                                         `runtime:"workflow" runtime_name:"stop container callback"`
+	CreateContainerFn           func(name string, ctype string) (structs.ContainerState, error)
+	RestartContainerFn          func(name string) error
+	DeleteContainerFn           func(name string) error                         `runtime:"importer-provision,workflow" runtime_name:"delete container callback"`
+	GetContainerStateFn         func() map[string]structs.ContainerState        `runtime:"rectify" runtime_name:"get container state callback"`
+	UpdateContainerStateFn      func(name string, state structs.ContainerState) `runtime:"importer-provision" runtime_name:"update container callback"`
+	AddOrGetNetworkFn           func(networkName string) (string, error)
 	GetContainerRunningStatusFn func(name string) (string, error)
-	GetShipStatusFn   func([]string) (map[string]string, error)
-	WaitForShipExitFn func(name string, timeout time.Duration) error
+	GetShipStatusFn             func([]string) (map[string]string, error) `runtime:"workflow" runtime_name:"get ship status callback"`
+	WaitForShipExitFn           func(name string, timeout time.Duration) error
 }
 
 type RuntimeSnapshotOps struct {
-	ConfFn                        func() structs.SysConfig
 	StartramSettingsSnapshotFn    func() config.StartramSettings
-	ShipSettingsSnapshotFn        func() config.ShipSettings
-	ShipRuntimeSettingsSnapshotFn func() config.ShipRuntimeSettings
-	GetStartramConfigFn           func() structs.StartramRetrieve
-	Check502SettingsSnapshotFn    func() config.Check502Settings
+	PenpaiSettingsSnapshotFn      func() config.PenpaiSettings
+	ShipSettingsSnapshotFn        func() config.ShipSettings        `runtime:"workflow,rectify" runtime_name:"ship settings snapshot callback"`
+	ShipRuntimeSettingsSnapshotFn func() config.ShipRuntimeSettings `runtime:"workflow,rectify" runtime_name:"ship runtime settings snapshot callback"`
+	GetStartramConfigFn           func() structs.StartramRetrieve   `runtime:"workflow,rectify" runtime_name:"startram config callback"`
+	Check502SettingsSnapshotFn    func() config.Check502Settings    `runtime:"workflow,rectify" runtime_name:"check 502 snapshot callback"`
 }
 
-type RuntimeHealthOps = RuntimeSnapshotOps
+type RuntimeHealthOps struct {
+	HealthCheck502SettingsSnapshotFn func() config.Check502Settings
+	HealthShipSettingsSnapshotFn     func() config.ShipSettings
+}
 
 type RuntimeStartramOps struct {
 	GetStartramServicesFn   func() error
@@ -56,7 +52,7 @@ type RuntimeStartramOps struct {
 }
 
 type RuntimeStartupOps struct {
-	UpdateConfTypedFn func(...config.ConfUpdateOption) error
+	UpdateConfTypedFn func(...config.ConfUpdateOption) error `runtime:"rectify" runtime_name:"update config callback"`
 	WithWgOnFn        func(bool) config.ConfUpdateOption
 	CycleWgKeyFn      func() error
 	BarExitFn         func(string) error
@@ -67,43 +63,20 @@ type RuntimeStartupOps struct {
 	SvcDeleteFn       func(patp string, kind string) error
 }
 
-func (ops RuntimeSnapshotOps) StartramSettingsSnapshot() (config.StartramSettings, error) {
-	if ops.StartramSettingsSnapshotFn == nil {
-		return config.StartramSettings{}, errors.New("runtime startram settings snapshot callback is not configured")
-	}
-	return ops.StartramSettingsSnapshotFn(), nil
-}
-
-func (ops RuntimeSnapshotOps) StartramConfig() (structs.StartramRetrieve, error) {
-	if ops.GetStartramConfigFn == nil {
-		return structs.StartramRetrieve{}, errors.New("runtime startram config snapshot callback is not configured")
-	}
-	return ops.GetStartramConfigFn(), nil
-}
-
-func (ops RuntimeSnapshotOps) Check502SettingsSnapshot() (config.Check502Settings, error) {
-	if ops.Check502SettingsSnapshotFn == nil {
-		return config.Check502Settings{}, errors.New("runtime check 502 settings snapshot callback is not configured")
-	}
-	return ops.Check502SettingsSnapshotFn(), nil
-}
-
-func (ops RuntimeSnapshotOps) ShipSettingsSnapshot() (config.ShipSettings, error) {
-	if ops.ShipSettingsSnapshotFn == nil {
-		return config.ShipSettings{}, errors.New("runtime ship settings snapshot callback is not configured")
-	}
-	return ops.ShipSettingsSnapshotFn(), nil
-}
-
 type RuntimeUrbitOps struct {
-	LoadUrbitConfigFn    func(string) error
-	UrbitConfFn          func(string) structs.UrbitDocker
-	UrbitConfAllFn       func() map[string]structs.UrbitDocker
-	UpdateUrbitFn        func(string, func(*structs.UrbitDocker) error) error
-	UpdateUrbitSectionFn func(patp string, section UrbitConfigSection, mutateFn any) error
-	GetContainerNetworkFn func(string) (string, error)
-	GetLusCodeFn          func(string) (string, error)
-	ClearLusCodeFn        func(string)
+	LoadUrbitConfigFn           func(string) error                                                         `runtime:"rectify" runtime_name:"load urbit config callback"`
+	UrbitConfFn                 func(string) structs.UrbitDocker                                           `runtime:"rectify" runtime_name:"urbit config callback"`
+	UrbitConfAllFn              func() map[string]structs.UrbitDocker                                      `runtime:"rectify" runtime_name:"urbit config all callback"`
+	UpdateUrbitFn               func(string, func(*structs.UrbitDocker) error) error                       `runtime:"workflow,rectify" runtime_name:"update urbit callback"`
+	UpdateUrbitRuntimeConfigFn  func(patp string, mutateFn func(*structs.UrbitRuntimeConfig) error) error  `runtime:"workflow,rectify" runtime_name:"update urbit runtime config callback"`
+	UpdateUrbitNetworkConfigFn  func(patp string, mutateFn func(*structs.UrbitNetworkConfig) error) error  `runtime:"workflow,rectify" runtime_name:"update urbit network config callback"`
+	UpdateUrbitScheduleConfigFn func(patp string, mutateFn func(*structs.UrbitScheduleConfig) error) error `runtime:"workflow,rectify" runtime_name:"update urbit schedule config callback"`
+	UpdateUrbitFeatureConfigFn  func(patp string, mutateFn func(*structs.UrbitFeatureConfig) error) error  `runtime:"workflow,rectify" runtime_name:"update urbit feature config callback"`
+	UpdateUrbitWebConfigFn      func(patp string, mutateFn func(*structs.UrbitWebConfig) error) error      `runtime:"workflow,rectify" runtime_name:"update urbit web config callback"`
+	UpdateUrbitBackupConfigFn   func(patp string, mutateFn func(*structs.UrbitBackupConfig) error) error   `runtime:"workflow,rectify" runtime_name:"update urbit backup config callback"`
+	GetContainerNetworkFn       func(string) (string, error)
+	GetLusCodeFn                func(string) (string, error) `runtime:"workflow" runtime_name:"LUS code callback"`
+	ClearLusCodeFn              func(string)
 }
 
 type UrbitConfigSection = config.UrbitConfigSection
@@ -168,41 +141,7 @@ type RuntimeMinioOps struct {
 	GetMinIOPasswordFn    func(string) (string, error)
 }
 
-type RuntimeConfigOps struct {
-	UpdateConfTypedFn func(...config.ConfUpdateOption) error
-	WithWgOnFn        func(bool) config.ConfUpdateOption
-	CycleWgKeyFn      func() error
-	BarExitFn         func(string) error
-}
-
-var (
-	errConfUpdateMissing = errors.New("orchestration config updater is not configured")
-)
-
-func (ops RuntimeConfigOps) UpdateConfig(opts ...config.ConfUpdateOption) error {
-	if ops.UpdateConfTypedFn == nil {
-		return errConfUpdateMissing
-	}
-	return ops.UpdateConfTypedFn(opts...)
-}
-
-func (ops RuntimeConfigOps) WithWgOn(enabled bool) config.ConfUpdateOption {
-	if ops.WithWgOnFn == nil {
-		return config.WithWgOn(enabled)
-	}
-	return ops.WithWgOnFn(enabled)
-}
-
-type RuntimeLoadOps struct {
-	LoadWireguardFn func() error
-	LoadMCFn        func() error
-	LoadMinIOsFn    func() error
-	LoadUrbitsFn    func() error
-}
-
-type RuntimeServiceOps struct {
-	SvcDeleteFn func(patp string, kind string) error
-}
+var errConfUpdateMissing = errors.New("orchestration config updater is not configured")
 
 type StartupBootstrapOps struct {
 	Initialize func() error
@@ -241,70 +180,75 @@ func runtimeSeams() runtimeSeamRegistry {
 func buildRuntimeSeamBundle() runtimeSeamRegistry {
 	networkRuntime := network.NewNetworkRuntime()
 	return runtimeSeamRegistry{
-		contextOps: RuntimeContextOps{
-			BasePathFn:     config.BasePath,
-			ArchitectureFn: config.Architecture,
-			DebugModeFn:    config.DebugMode,
-			DockerDirFn:    config.DockerDir,
-		},
-		fileOps: RuntimeFileOps{
-			OpenFn:      os.Open,
-			ReadFileFn:  os.ReadFile,
-			WriteFileFn: os.WriteFile,
-			MkdirAllFn:  os.MkdirAll,
-		},
-		imageOps: RuntimeImageOps{
-			GetLatestContainerInfoFn:  registry.GetLatestContainerInfo,
-			GetLatestContainerImageFn: latestContainerImage,
-		},
-		snapshotOps: defaultRuntimeSnapshot(),
-		urbitOps:    defaultRuntimeUrbit(),
-		wireguardOps: RuntimeWireguardOps{
-			CreateDefaultWGConfFn: config.CreateDefaultWGConf,
-			GetWgConfFn:           config.GetWgConf,
-			GetWgConfBlobFn:       getConfiguredStartramWGConfig,
-			GetWgPrivkeyFn:        config.GetWgPrivkey,
-			CopyFileToVolumeFn:    copyFileToVolumeWithTempContainer,
-		},
-		netdataOps: RuntimeNetdataOps{
-			CreateDefaultNetdataConfFn: config.CreateDefaultNetdataConf,
-		},
-		minioOps: RuntimeMinioOps{
-			CreateDefaultMcConfFn: config.CreateDefaultMcConf,
-			SetMinIOPasswordFn:    config.SetMinIOPassword,
-			GetMinIOPasswordFn:    config.GetMinIOPassword,
-		},
-		volumeOps: RuntimeVolumeOps{
-			VolumeExistsFn: networkRuntime.VolumeExists,
-			CreateVolumeFn: networkRuntime.CreateVolume,
-		},
+		contextOps:   runtimeContextOps(),
+		fileOps:      runtimeFileOps(),
+		imageOps:     runtimeImageOps(),
+		snapshotOps:  defaultRuntimeSnapshot(),
+		urbitOps:     defaultRuntimeUrbit(),
+		wireguardOps: runtimeWireguardOps(),
+		netdataOps:   runtimeNetdataOps(),
+		minioOps:     runtimeMinioOps(),
+		volumeOps:    runtimeVolumeOps(networkRuntime),
 	}
 }
 
-func defaultRuntimeTransitionOps() RuntimeTransitionOps {
-	return RuntimeTransitionOpsFromContainerOps(defaultRuntimeContainerOpsWithLifecycle(), RuntimeTransitionOpsFromUrbitOps(defaultRuntimeUrbit()))
-}
-
-func urbitConfigOps() RuntimeUrbitOps {
-	return RuntimeUrbitOps{
-		LoadUrbitConfigFn:    config.LoadUrbitConfig,
-		UrbitConfFn:          config.UrbitConf,
-		UrbitConfAllFn:       config.UrbitConfAll,
-		UpdateUrbitFn:        config.UpdateUrbit,
-		UpdateUrbitSectionFn: config.UpdateUrbitSectionConfig,
+func runtimeContextOps() RuntimeContextOps {
+	return RuntimeContextOps{
+		BasePathFn:     config.BasePath,
+		ArchitectureFn: config.Architecture,
+		DebugModeFn:    config.DebugMode,
+		DockerDirFn:    config.DockerDir,
 	}
 }
 
-func RuntimeTransitionOpsFromContainerOps(containerOps RuntimeContainerOps, overrides ...RuntimeTransitionOps) RuntimeTransitionOps {
-	return seams.MergeAll(RuntimeTransitionOps{
-		RuntimeContainerOps: containerOps,
-	}, overrides...)
+func runtimeFileOps() RuntimeFileOps {
+	return RuntimeFileOps{
+		OpenFn:      os.Open,
+		ReadFileFn:  os.ReadFile,
+		WriteFileFn: os.WriteFile,
+		MkdirAllFn:  os.MkdirAll,
+	}
 }
 
-func RuntimeTransitionOpsFromUrbitOps(urbitOps RuntimeUrbitOps, overrides ...RuntimeTransitionOps) RuntimeTransitionOps {
-	return seams.MergeAll(RuntimeTransitionOps{
-		RuntimeUrbitOps: urbitOps,
-	}, overrides...)
+func runtimeImageOps() RuntimeImageOps {
+	return RuntimeImageOps{
+		GetLatestContainerInfoFn:  registry.GetLatestContainerInfo,
+		GetLatestContainerImageFn: latestContainerImage,
+	}
+}
+
+func runtimeWireguardOps() RuntimeWireguardOps {
+	return RuntimeWireguardOps{
+		CreateDefaultWGConfFn: config.CreateDefaultWGConf,
+		GetWgConfFn:           config.GetWgConf,
+		GetWgConfBlobFn:       getConfiguredStartramWGConfig,
+		GetWgPrivkeyFn:        config.GetWgPrivkey,
+		CopyFileToVolumeFn:    copyFileToVolumeWithTempContainer,
+	}
+}
+
+func runtimeNetdataOps() RuntimeNetdataOps {
+	return RuntimeNetdataOps{
+		CreateDefaultNetdataConfFn: config.CreateDefaultNetdataConf,
+	}
+}
+
+func runtimeMinioOps() RuntimeMinioOps {
+	return RuntimeMinioOps{
+		CreateDefaultMcConfFn: config.CreateDefaultMcConf,
+		SetMinIOPasswordFn:    config.SetMinIOPassword,
+		GetMinIOPasswordFn:    config.GetMinIOPassword,
+	}
+}
+
+func runtimeVolumeOps(networkRuntime interface {
+	VolumeExists(string) (bool, error)
+	CreateVolume(string) error
+}) RuntimeVolumeOps {
+	return RuntimeVolumeOps{
+		VolumeExistsFn: networkRuntime.VolumeExists,
+		CreateVolumeFn: networkRuntime.CreateVolume,
+	}
 }
 
 func defaultRuntimeStartramOps() RuntimeStartramOps {
@@ -319,106 +263,71 @@ func defaultRuntimeStartramOps() RuntimeStartramOps {
 }
 
 func defaultRuntimeHealthOps() RuntimeHealthOps {
-	return RuntimeHealthOps(defaultRuntimeSnapshot())
+	return RuntimeHealthOps{
+		HealthShipSettingsSnapshotFn:     config.ShipSettingsSnapshot,
+		HealthCheck502SettingsSnapshotFn: config.Check502SettingsSnapshot,
+	}
 }
 
 func defaultRuntimeStartupOps() RuntimeStartupOps {
-	configOps := defaultRuntimeConfig()
-	loadOps := defaultRuntimeLoad()
-	serviceOps := defaultRuntimeService()
+	wireguardRuntime := newWireguardRuntime()
 	return RuntimeStartupOps{
-		UpdateConfTypedFn: configOps.UpdateConfTypedFn,
-		WithWgOnFn:        configOps.WithWgOnFn,
-		CycleWgKeyFn:      configOps.CycleWgKeyFn,
-		BarExitFn:         configOps.BarExitFn,
-		LoadWireguardFn:   loadOps.LoadWireguardFn,
-		LoadMCFn:          loadOps.LoadMCFn,
-		LoadMinIOsFn:      loadOps.LoadMinIOsFn,
-		LoadUrbitsFn:      loadOps.LoadUrbitsFn,
-		SvcDeleteFn:       serviceOps.SvcDeleteFn,
+		UpdateConfTypedFn: config.UpdateConfTyped,
+		WithWgOnFn:        config.WithWgOn,
+		CycleWgKeyFn:      config.CycleWgKey,
+		BarExitFn:         click.BarExit,
+		LoadWireguardFn:   wireguardRuntime.LoadWireguard,
+		LoadMCFn:          LoadMC,
+		LoadMinIOsFn:      LoadMinIOs,
+		LoadUrbitsFn:      LoadUrbits,
+		SvcDeleteFn:       startram.SvcDelete,
 	}
 }
 
 func defaultRuntimeContainerOps() RuntimeContainerOps {
 	networkRuntime := network.NewNetworkRuntime()
 	return RuntimeContainerOps{
-		StartContainerFn:             StartContainer,
-		StopContainerByNameFn:        StopContainerByName,
-		CreateContainerFn:            CreateContainer,
-		RestartContainerFn:           RestartContainer,
-		DeleteContainerFn:            DeleteContainer,
-		GetContainerStateFn:          config.GetContainerState,
-		UpdateContainerStateFn:       config.UpdateContainerState,
-		AddOrGetNetworkFn:            networkRuntime.AddOrGetNetwork,
-		GetContainerRunningStatusFn:  GetContainerRunningStatus,
-		GetShipStatusFn:              GetShipStatus,
-		WaitForShipExitFn:            WaitForShipExit,
-	}
-}
-
-func defaultRuntimeContainerOpsWithLifecycle() RuntimeContainerOps {
-	networkRuntime := network.NewNetworkRuntime()
-	return RuntimeContainerOps{
-		StartContainerFn:             StartContainer,
-		StopContainerByNameFn:        StopContainerByName,
-		CreateContainerFn:            CreateContainer,
-		RestartContainerFn:           RestartContainer,
-		DeleteContainerFn:            DeleteContainer,
-		GetContainerStateFn:          config.GetContainerState,
-		UpdateContainerStateFn:       config.UpdateContainerState,
-		AddOrGetNetworkFn:            networkRuntime.AddOrGetNetwork,
-		GetContainerRunningStatusFn:  GetContainerRunningStatus,
-		GetShipStatusFn:              GetShipStatus,
-		WaitForShipExitFn:            WaitForShipExit,
+		StartContainerFn:            StartContainer,
+		StopContainerByNameFn:       StopContainerByName,
+		CreateContainerFn:           CreateContainer,
+		RestartContainerFn:          RestartContainer,
+		DeleteContainerFn:           DeleteContainer,
+		GetContainerStateFn:         config.GetContainerState,
+		UpdateContainerStateFn:      config.UpdateContainerState,
+		AddOrGetNetworkFn:           networkRuntime.AddOrGetNetwork,
+		GetContainerRunningStatusFn: GetContainerRunningStatus,
+		GetShipStatusFn:             GetShipStatus,
+		WaitForShipExitFn:           WaitForShipExit,
 	}
 }
 
 func defaultRuntimeUrbit() RuntimeUrbitOps {
 	networkRuntime := network.NewNetworkRuntime()
 	return RuntimeUrbitOps{
-		LoadUrbitConfigFn:    config.LoadUrbitConfig,
-		UrbitConfFn:          config.UrbitConf,
-		UrbitConfAllFn:       config.UrbitConfAll,
-		UpdateUrbitFn:        config.UpdateUrbit,
-		UpdateUrbitSectionFn: config.UpdateUrbitSectionConfig,
-		GetContainerNetworkFn: networkRuntime.GetContainerNetwork,
-		GetLusCodeFn:          click.GetLusCode,
-		ClearLusCodeFn:        click.ClearLusCode,
+		LoadUrbitConfigFn:           config.LoadUrbitConfig,
+		UrbitConfFn:                 config.UrbitConf,
+		UrbitConfAllFn:              config.UrbitConfAll,
+		UpdateUrbitFn:               config.UpdateUrbit,
+		UpdateUrbitRuntimeConfigFn:  config.UpdateUrbitRuntimeConfig,
+		UpdateUrbitNetworkConfigFn:  config.UpdateUrbitNetworkConfig,
+		UpdateUrbitScheduleConfigFn: config.UpdateUrbitScheduleConfig,
+		UpdateUrbitFeatureConfigFn:  config.UpdateUrbitFeatureConfig,
+		UpdateUrbitWebConfigFn:      config.UpdateUrbitWebConfig,
+		UpdateUrbitBackupConfigFn:   config.UpdateUrbitBackupConfig,
+		GetContainerNetworkFn:       networkRuntime.GetContainerNetwork,
+		GetLusCodeFn:                click.GetLusCode,
+		ClearLusCodeFn:              click.ClearLusCode,
 	}
 }
 
 func defaultRuntimeSnapshot() RuntimeSnapshotOps {
 	return RuntimeSnapshotOps{
-		ConfFn:                        config.Conf,
 		StartramSettingsSnapshotFn:    config.StartramSettingsSnapshot,
+		PenpaiSettingsSnapshotFn:      config.PenpaiSettingsSnapshot,
 		ShipSettingsSnapshotFn:        config.ShipSettingsSnapshot,
 		ShipRuntimeSettingsSnapshotFn: config.ShipRuntimeSettingsSnapshot,
 		GetStartramConfigFn:           config.GetStartramConfig,
 		Check502SettingsSnapshotFn:    config.Check502SettingsSnapshot,
-	}
-}
-
-func defaultRuntimeConfig() RuntimeConfigOps {
-	return RuntimeConfigOps{
-		UpdateConfTypedFn: config.UpdateConfTyped,
-		WithWgOnFn:        config.WithWgOn,
-		CycleWgKeyFn:      config.CycleWgKey,
-		BarExitFn:         click.BarExit,
-	}
-}
-
-func defaultRuntimeLoad() RuntimeLoadOps {
-	return RuntimeLoadOps{
-		LoadWireguardFn: newWireguardRuntime().LoadWireguard,
-		LoadMCFn:        LoadMC,
-		LoadMinIOsFn:    LoadMinIOs,
-		LoadUrbitsFn:    LoadUrbits,
-	}
-}
-
-func defaultRuntimeService() RuntimeServiceOps {
-	return RuntimeServiceOps{
-		SvcDeleteFn: startram.SvcDelete,
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker/orchestration/subsystem"
+	"groundseg/internal/resource"
 	"groundseg/logger"
 	"groundseg/startuporchestrator"
 	"groundseg/system"
@@ -45,66 +46,95 @@ var (
 	//go:embed web/_app/immutable/chunks/_*
 	//go:embed web/_app/immutable/entry/_*
 	// we need to explicitly embed stuff starting with underscore
-	content       embed.FS
-	webContent    fs.FS
-	fileServer    http.Handler
-	capContent    embed.FS
-	capFs         = http.FS(capContent)
-	capFileServer = http.FileServer(capFs)
-	DevMode       = false
-	shutdownChan  = make(chan struct{})
-	HttpPort      = 80
-	initWebErr    error
+	content                      embed.FS
+	webContent                   fs.FS
+	fileServer                   http.Handler
+	capContent                   embed.FS
+	capFs                        = http.FS(capContent)
+	capFileServer                = http.FileServer(capFs)
+	DevMode                      = false
+	shutdownChan                 = make(chan struct{})
+	HttpPort                     = 80
+	initWebErr                   error
+	runtimeContextSnapshotFn     = config.RuntimeContextSnapshot
+	connectivitySettingsSnapshot = config.ConnectivitySettingsSnapshot
+	netCheckFn                   = config.NetCheck
+	debugModeFn                  = config.DebugMode
 )
 
-type bootstrapRuntime interface {
-	bootstrap(context.Context, startuporchestrator.StartupOptions) error
-	startServer(context.Context, int) error
-	runC2cCheck(context.Context) error
+type bootstrapRuntime struct {
+	BootstrapFn   func(context.Context, startuporchestrator.StartupOptions) error `runtime:"bootstrap"`
+	StartServerFn func(context.Context, int) error                                `runtime:"bootstrap"`
+	RunC2cCheckFn func(context.Context) error                                     `runtime:"bootstrap"`
 }
 
-type bootstrapRuntimeFns struct {
-	runBootstrapFn func(context.Context, startuporchestrator.StartupOptions) error
-	runServerFn    func(context.Context, int) error
-	runC2cCheckFn  func(context.Context) error
-}
-
-func (runtime bootstrapRuntimeFns) bootstrap(ctx context.Context, opts startuporchestrator.StartupOptions) error {
-	if runtime.runBootstrapFn == nil {
-		return startuporchestrator.Bootstrap(ctx, opts)
+func defaultBootstrapRuntime() bootstrapRuntime {
+	return bootstrapRuntime{
+		BootstrapFn: startuporchestrator.Bootstrap,
+		StartServerFn: func(ctx context.Context, httpPort int) error {
+			return runServer(ctx, httpPort, defaultServerRuntime())
+		},
+		RunC2cCheckFn: func(ctx context.Context) error {
+			return C2cCheckWith(ctx, defaultC2cRuntime())
+		},
 	}
-	return runtime.runBootstrapFn(ctx, opts)
 }
 
-func (runtime bootstrapRuntimeFns) startServer(ctx context.Context, httpPort int) error {
-	if runtime.runServerFn == nil {
-		return runServer(ctx, httpPort, defaultServerRuntime())
+func bootstrapRuntimeWith(
+	runBootstrapFn func(context.Context, startuporchestrator.StartupOptions) error,
+	runServerFn func(context.Context, int) error,
+	RunC2cCheckFn func(context.Context) error,
+) bootstrapRuntime {
+	runtime := defaultBootstrapRuntime()
+	if runBootstrapFn != nil {
+		runtime.BootstrapFn = runBootstrapFn
 	}
-	return runtime.runServerFn(ctx, httpPort)
+	if runServerFn != nil {
+		runtime.StartServerFn = runServerFn
+	}
+	if RunC2cCheckFn != nil {
+		runtime.RunC2cCheckFn = RunC2cCheckFn
+	}
+	return runtime
 }
 
-func (runtime bootstrapRuntimeFns) runC2cCheck(ctx context.Context) error {
-	if runtime.runC2cCheckFn == nil {
-		return C2cCheckWith(ctx, defaultC2cRuntime())
+func (runtime bootstrapRuntime) validate() error {
+	if runtime.BootstrapFn == nil {
+		return fmt.Errorf("bootstrap callback is required")
 	}
-	return runtime.runC2cCheckFn(ctx)
+	if runtime.StartServerFn == nil {
+		return fmt.Errorf("startServer callback is required")
+	}
+	if runtime.RunC2cCheckFn == nil {
+		return fmt.Errorf("runC2cCheck callback is required")
+	}
+	return nil
+}
+
+func (runtime bootstrapRuntime) bootstrap(ctx context.Context, opts startuporchestrator.StartupOptions) error {
+	if runtime.BootstrapFn == nil {
+		return fmt.Errorf("bootstrap callback is not configured")
+	}
+	return runtime.BootstrapFn(ctx, opts)
+}
+
+func (runtime bootstrapRuntime) startServer(ctx context.Context, httpPort int) error {
+	if runtime.StartServerFn == nil {
+		return fmt.Errorf("startServer callback is not configured")
+	}
+	return runtime.StartServerFn(ctx, httpPort)
+}
+
+func (runtime bootstrapRuntime) runC2cCheck(ctx context.Context) error {
+	if runtime.RunC2cCheckFn == nil {
+		return fmt.Errorf("runC2cCheck callback is not configured")
+	}
+	return runtime.RunC2cCheckFn(ctx)
 }
 
 type serverRuntime struct {
 	listenAndServe func(*http.Server) error
 	shutdown       func(context.Context, *http.Server) error
-}
-
-func bootstrapRuntimeWith(
-	runBootstrapFn func(context.Context, startuporchestrator.StartupOptions) error,
-	startServerFn func(context.Context, int) error,
-	runC2cCheckFn func(context.Context) error,
-) bootstrapRuntime {
-	return bootstrapRuntimeFns{
-		runBootstrapFn: runBootstrapFn,
-		runServerFn:    startServerFn,
-		runC2cCheckFn:  runC2cCheckFn,
-	}
 }
 
 func defaultServerRuntime() serverRuntime {
@@ -133,13 +163,13 @@ type c2cRuntimeContext struct {
 }
 
 func defaultC2cRuntimeContext() c2cRuntimeContext {
-	context := config.RuntimeContextSnapshot()
+	context := runtimeContextSnapshotFn()
 	return c2cRuntimeContext{
 		basePath:               context.BasePath,
-		netCheck:               config.NetCheck,
-		connectivitySnapshotFn: config.ConnectivitySettingsSnapshot,
+		netCheck:               netCheckFn,
+		connectivitySnapshotFn: connectivitySettingsSnapshot,
 		isNPBoxFn:              system.IsNPBox,
-		isDebugModeFn:          config.DebugMode,
+		isDebugModeFn:          debugModeFn,
 	}
 }
 
@@ -174,7 +204,7 @@ type c2cModeRuntime struct {
 
 func defaultConnectivityCheckRuntime(netCheck func(string) bool) connectivityCheckRuntime {
 	if netCheck == nil {
-		netCheck = config.NetCheck
+		netCheck = netCheckFn
 	}
 	return connectivityCheckRuntime{
 		netCheck: netCheck,
@@ -184,10 +214,7 @@ func defaultConnectivityCheckRuntime(netCheck func(string) bool) connectivityChe
 }
 
 func defaultC2cRuntime() c2cRuntime {
-	return defaultC2cRuntimeWithContext(defaultC2cRuntimeContext())
-}
-
-func defaultC2cRuntimeWithContext(runtimeContext c2cRuntimeContext) c2cRuntime {
+	runtimeContext := defaultC2cRuntimeContext()
 	return c2cRuntime{
 		connectivity: c2cConnectivityRuntime{
 			connCheck: func() bool {
@@ -208,7 +235,7 @@ func defaultC2cRuntimeWithContext(runtimeContext c2cRuntimeContext) c2cRuntime {
 				return runtimeContext.isNPBoxFn(runtimeContext.basePath)
 			},
 			hasDevice: system.HasWifiDevice,
-			wifiInfo:  system.DefaultWiFiRuntimeService().IsWifiEnabled,
+			wifiInfo:  system.NewWiFiRuntimeService().IsWifiEnabled,
 		},
 		mode: c2cModeRuntime{
 			isC2cMode:  func() error { return system.NewC2CModeFlow().EnterC2CMode() },
@@ -234,15 +261,14 @@ func C2cCheckWith(ctx context.Context, runtime c2cRuntime) error {
 			wifiEnabled, wifiErr = runtime.device.wifiInfo()
 			if wifiErr != nil {
 				logger.Warnf("Failed to read wifi radio state: %v", wifiErr)
-				return wifiErr
+				return fmt.Errorf("unable to read wifi radio state for C2C mode check: %w", wifiErr)
 			}
 		}
 		if !wifiEnabled {
 			return nil
 		}
 		if err := runtime.mode.isC2cMode(); err != nil {
-			logger.Errorf("Error activating C2C mode: %v", err)
-			return err
+			return fmt.Errorf("unable to detect/enter C2C mode: %w", err)
 		} else {
 			logger.Info("GroundSeg is in C2C Mode")
 			if err := runtime.mode.setC2cMode(true); err != nil {
@@ -269,7 +295,7 @@ func init() {
 
 // test for internet connectivity and interrupt ServerControl if we need to switch
 func killSwitch(ctx context.Context, connectivitySnapshot func() config.ConnectivitySettings) {
-	killSwitchWithMode(ctx, connectivitySnapshot, config.DebugMode)
+	killSwitchWithMode(ctx, connectivitySnapshot, debugModeFn)
 }
 
 func killSwitchWithMode(ctx context.Context, connectivitySnapshot func() config.ConnectivitySettings, isDebugMode func() bool) {
@@ -324,7 +350,7 @@ func connCheckWith(runtime connectivityCheckRuntime) bool {
 }
 
 func connCheck() bool {
-	return connCheckWith(defaultConnectivityCheckRuntime(config.NetCheck))
+	return connCheckWith(defaultConnectivityCheckRuntime(netCheckFn))
 }
 
 // autodetect mime type
@@ -447,7 +473,11 @@ func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
 		if err != nil {
 			r.URL.Path = "/index.html"
 		} else {
-			defer file.Close()
+			defer func() {
+				if closeErr := resource.JoinCloseError(nil, file, "close embedded static file"); closeErr != nil {
+					logger.Errorf("failed to close embedded static file: %v", closeErr)
+				}
+			}()
 		}
 		http.FileServer(fs).ServeHTTP(w, r)
 	}
@@ -497,8 +527,13 @@ func startDevMode(opts appStartupOptions) {
 }
 
 func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime bootstrapRuntime) error {
-	if runtime == nil {
-		runtime = bootstrapRuntimeWith(nil, nil, nil)
+	runtime = bootstrapRuntimeWith(
+		runtime.BootstrapFn,
+		runtime.StartServerFn,
+		runtime.RunC2cCheckFn,
+	)
+	if err := runtime.validate(); err != nil {
+		return err
 	}
 	return runtime.bootstrap(ctx, startuporchestrator.StartupOptions{
 		HTTPPort: opts.httpPort,

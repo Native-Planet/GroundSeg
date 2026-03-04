@@ -64,7 +64,7 @@ func TestRunRemoteBackupPassUploadsWhenScheduled(t *testing.T) {
 	}
 	ConfForRoutine = func() structs.SysConfig {
 		return structs.SysConfig{
-			ConnectivityConfig: structs.ConnectivityConfig{
+			Connectivity: structs.ConnectivityConfig{
 				Piers:                []string{"~zod"},
 				WgRegistered:         true,
 				RemoteBackupPassword: "pw",
@@ -98,7 +98,7 @@ func TestRunLocalBackupPassCreatesBackupForStaleSnapshot(t *testing.T) {
 
 	localBackupCalls := 0
 	ConfForRoutine = func() structs.SysConfig {
-		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~zod"}}}
+		return structs.SysConfig{Connectivity: structs.ConnectivityConfig{Piers: []string{"~zod"}}}
 	}
 	UrbitConfForRoutine = func(string) structs.UrbitDocker {
 		return structs.UrbitDocker{
@@ -130,7 +130,7 @@ func TestRunLocalBackupPassSkipsWhenRecent(t *testing.T) {
 
 	localBackupCalls := 0
 	ConfForRoutine = func() structs.SysConfig {
-		return structs.SysConfig{ConnectivityConfig: structs.ConnectivityConfig{Piers: []string{"~zod"}}}
+		return structs.SysConfig{Connectivity: structs.ConnectivityConfig{Piers: []string{"~zod"}}}
 	}
 	UrbitConfForRoutine = func(string) structs.UrbitDocker {
 		return structs.UrbitDocker{

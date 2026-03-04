@@ -1,0 +1,124 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules model dependencies as very large function-field seam structs plus manual nil-validation (e.g., `RectifyRuntime` + `mergeRectifyRuntime` + `validate` in `goseg/rectify/rectify.go`, `Runtime*Ops` families in `goseg/docker/orchestration/runtime_ops.go`, `importerRuntime` and `validateImporter*` in `goseg/importer/importer.go`).",
+        "The same seam-heavy shape propagates into tests as large setup/stub scaffolding (`testWireguardRuntime` in `goseg/docker/orchestration/wireguard_test.go`, `testDockerRoutineRuntime` in `goseg/docker/orchestration/subsystem/docker_test.go`, startup runtime builders in `goseg/startuporchestrator/startup_orchestrator_test.go`).",
+        "Config mutation is split across two parallel abstraction systems: field-by-field merger logic (`goseg/config/config_merge.go`) and generic patch registry (`goseg/config/config_update_registry.go`), both encoding overlapping domain fields and policies.",
+        "Broadcast mutation is represented by a transition abstraction (`BroadcastTransition`, `ApplyBroadcastTransition` in `goseg/broadcast/transitions.go`) but other paths mutate and publish state directly (`updateBroadcast` in `goseg/leak/broadcast.go`, direct state helpers in `goseg/broadcast/state.go`), weakening the abstraction boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 68.0,
+        "indirection_cost": 62.0,
+        "interface_honesty": 79.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_overfragmentation",
+      "summary": "Runtime dependency abstraction is over-fragmented into many callback bags, creating high indirection with limited behavioral leverage.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`RectifyRuntime` composes multiple nested ops structs and then uses long merge/validate chains (`mergeRectifyRuntime`, `validate`) instead of a smaller cohesive runtime contract.",
+        "`runtime_ops.go` declares many narrowly sliced ops structs (`RuntimeContainerOps`, `RuntimeSnapshotOps`, `RuntimeUrbitOps`, etc.), increasing seam surface and call indirection.",
+        "`importerRuntime` has three nested runtime groups with many function callbacks and dedicated validation errors for each missing seam, indicating seam-management overhead has become a primary concern.",
+        "`main.go` repeats similar callback-runtime wrappers (`bootstrapCoordinator`, `bootstrapRuntimeFns`, `bootstrapRuntime`) that mostly forward calls plus nil checks."
+      ],
+      "suggestion": "Collapse callback-bag seams into a smaller set of cohesive capability interfaces per workflow boundary (for example, startup orchestration, importer provisioning, rectify reconciliation), and keep function-field seams only where tests truly need per-function override. Prefer constructor-injected concrete adapters over per-call forwarding wrappers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_cost_visible_in_tests",
+      "summary": "Test harnesses mirror production seam fragmentation, requiring large synthetic runtimes that signal abstraction cost outweighs testability benefits.",
+      "related_files": [
+        "goseg/docker/orchestration/wireguard_test.go",
+        "goseg/docker/orchestration/subsystem/docker_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`testWireguardRuntime()` builds a broad runtime object with many nested callback groups before each behavior can be tested.",
+        "`testDockerRoutineRuntime()` in subsystem tests initializes a large set of function seams (container/network/http/timer/broadcast) even for focused behavior tests.",
+        "Startup tests rely on helper mutation of nested runtime internals (e.g., `unsetStartupInitConfig`) to exercise validation paths, indicating high ceremony around seam plumbing.",
+        "Main tests construct custom nested runtimes (`c2cRuntime` and bootstrap runtime wrappers) for unit scenarios that could be simpler with narrower ports."
+      ],
+      "suggestion": "Introduce task-focused test fixtures around narrower ports (for example, one interface per use-case) and reduce globally shared mega-runtime shapes. This will lower setup friction and make abstraction boundaries reflect behavior instead of callback inventory.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_mutation_split_abstraction",
+      "summary": "Configuration mutation logic is duplicated across two abstraction models, creating a split domain boundary and drift risk.",
+      "related_files": [
+        "goseg/config/config_merge.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "`config_merge.go` hardcodes per-field merge behavior across many `SysConfig` fields.",
+        "`config_update_registry.go` defines a generic field-spec registry for patch parsing/application over many of the same config domains.",
+        "Both files encode domain policy for overlapping fields (connectivity/runtime/startram/auth/penpai), but through different abstractions and code paths.",
+        "Large config tests in `config_test.go` validate many merge-policy branches, reflecting policy concentration in one path while registry path evolves separately."
+      ],
+      "suggestion": "Converge on a single configuration policy abstraction: either drive merge behavior from the registry metadata or define a single domain-policy layer that both patch application and merge operations call. Remove duplicate per-field policy encoding.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "broadcast_transition_boundary_leak",
+      "summary": "The broadcast transition abstraction is bypassed by direct state mutation/publish paths, making the intended abstraction non-authoritative.",
+      "related_files": [
+        "goseg/broadcast/transitions.go",
+        "goseg/broadcast/state.go",
+        "goseg/leak/broadcast.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/transitions.go` defines `BroadcastTransition` plus centralized apply helpers intended as mutation boundary.",
+        "`goseg/leak/broadcast.go` mutates outbound broadcast shape and publishes scoped/full payloads directly via channels, outside transition contracts.",
+        "`goseg/broadcast/state.go` exposes direct state update helpers (`UpdateBroadcast`, scheduling/state mutators), allowing mutation paths that bypass typed transitions.",
+        "`rectify_services.go` manipulates broadcast-related state and emits transition updates through service-specific logic, reinforcing multiple mutation pathways."
+      ],
+      "suggestion": "Make transition/mutation entrypoints authoritative by routing all broadcast state changes through a unified mutation API (typed transitions plus explicit mutation commands), and limit direct state setters to internal package scope where possible.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams were added incrementally as function callbacks, but without consolidation into stable domain ports.",
+      "Config and broadcast domains have parallel mutation paths, so abstractions no longer define a single source of truth."
+    ],
+    "likely_symptoms": [
+      "seam_cost_visible_in_tests"
+    ],
+    "possible_false_positives": []
+  }
+}

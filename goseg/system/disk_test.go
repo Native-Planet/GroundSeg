@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"groundseg/structs"
+	"groundseg/testutil/disktest"
 
 	"github.com/shirou/gopsutil/disk"
 )
@@ -62,39 +63,57 @@ func TestCreateGroundSegFilesystemPropagatesStatError(t *testing.T) {
 	}
 }
 
-func TestListHardDisksParsesJSON(t *testing.T) {
+func TestListHardDisksContractMatrix(t *testing.T) {
 	restore := resetDiskSeams()
 	t.Cleanup(restore)
 
-	runDiskCommandFn = func(string, ...string) (string, error) {
-		return `{"blockdevices":[{"name":"sda","mountpoints":["/"]}]}`, nil
-	}
-	devices, err := ListHardDisks()
-	if err != nil {
-		t.Fatalf("ListHardDisks returned error: %v", err)
-	}
-	if len(devices.BlockDevices) != 1 || devices.BlockDevices[0].Name != "sda" {
-		t.Fatalf("unexpected parsed devices: %+v", devices.BlockDevices)
-	}
-}
-
-func TestListHardDisksPropagatesErrors(t *testing.T) {
-	restore := resetDiskSeams()
-	t.Cleanup(restore)
-
-	runDiskCommandFn = func(string, ...string) (string, error) {
-		return "", errors.New("lsblk failed")
-	}
-	if _, err := ListHardDisks(); err == nil {
-		t.Fatal("expected command failure from ListHardDisks")
-	}
-
-	runDiskCommandFn = func(string, ...string) (string, error) {
-		return `{invalid-json`, nil
-	}
-	if _, err := ListHardDisks(); err == nil {
-		t.Fatal("expected json unmarshal failure from ListHardDisks")
-	}
+	disktest.RunListHardDisksContractMatrix(t, []disktest.ListHardDisksCase{
+		{
+			Name: "parses JSON payload",
+			Prepare: func() {
+				runDiskCommandFn = func(string, ...string) (string, error) {
+					return `{"blockdevices":[{"name":"sda","mountpoints":["/"]}]}`, nil
+				}
+			},
+			ListFunc: ListHardDisks,
+			Assert: func(t *testing.T, devices structs.LSBLKDevice, err error) {
+				if err != nil {
+					t.Fatalf("ListHardDisks returned error: %v", err)
+				}
+				if len(devices.BlockDevices) != 1 || devices.BlockDevices[0].Name != "sda" {
+					t.Fatalf("unexpected parsed devices: %+v", devices.BlockDevices)
+				}
+			},
+		},
+		{
+			Name: "propagates command failure",
+			Prepare: func() {
+				runDiskCommandFn = func(string, ...string) (string, error) {
+					return "", errors.New("lsblk failed")
+				}
+			},
+			ListFunc: ListHardDisks,
+			Assert: func(t *testing.T, _ structs.LSBLKDevice, err error) {
+				if err == nil {
+					t.Fatal("expected command failure from ListHardDisks")
+				}
+			},
+		},
+		{
+			Name: "propagates parse failure",
+			Prepare: func() {
+				runDiskCommandFn = func(string, ...string) (string, error) {
+					return `{invalid-json`, nil
+				}
+			},
+			ListFunc: ListHardDisks,
+			Assert: func(t *testing.T, _ structs.LSBLKDevice, err error) {
+				if err == nil {
+					t.Fatal("expected json unmarshal failure from ListHardDisks")
+				}
+			},
+		},
+	})
 }
 
 func TestRemoveMultipartFilesRemovesOnlyMultipartPrefix(t *testing.T) {
@@ -125,36 +144,39 @@ func TestRemoveMultipartFilesRemovesOnlyMultipartPrefix(t *testing.T) {
 	}
 }
 
-func TestIsMountedMMCUsesPartitionHierarchy(t *testing.T) {
+func TestIsMountedMMCContractMatrix(t *testing.T) {
 	restore := resetDiskSeams()
 	t.Cleanup(restore)
 
-	listPartitionsFn = func(bool) ([]disk.PartitionStat, error) {
-		return []disk.PartitionStat{
-			{Device: "/dev/mmcblk0p1", Mountpoint: "/media/data"},
-			{Device: "/dev/sda1", Mountpoint: "/"},
-		}, nil
-	}
-	mounted, err := IsMountedMMC("/media/data/tmp/child")
-	if err != nil {
-		t.Fatalf("IsMountedMMC returned error: %v", err)
-	}
-	if !mounted {
-		t.Fatal("expected true when parent mountpoint is mmc")
-	}
-
-	listPartitionsFn = func(bool) ([]disk.PartitionStat, error) {
-		return []disk.PartitionStat{
-			{Device: "/dev/sda1", Mountpoint: "/media/data"},
-		}, nil
-	}
-	mounted, err = IsMountedMMC("/media/data/tmp/child")
-	if err != nil {
-		t.Fatalf("IsMountedMMC returned error: %v", err)
-	}
-	if mounted {
-		t.Fatal("expected false for non-mmc partition")
-	}
+	disktest.RunMountedMMCMatrix(t, []disktest.IsMountedMMCCase{
+		{
+			Name: "true for mmc parent mount",
+			Prepare: func() {
+				listPartitionsFn = func(bool) ([]disk.PartitionStat, error) {
+					return []disk.PartitionStat{
+						{Device: "/dev/mmcblk0p1", Mountpoint: "/media/data"},
+						{Device: "/dev/sda1", Mountpoint: "/"},
+					}, nil
+				}
+			},
+			Path:       "/media/data/tmp/child",
+			MountedFn:  IsMountedMMC,
+			ExpectBool: true,
+		},
+		{
+			Name: "false for non-mmc parent mount",
+			Prepare: func() {
+				listPartitionsFn = func(bool) ([]disk.PartitionStat, error) {
+					return []disk.PartitionStat{
+						{Device: "/dev/sda1", Mountpoint: "/media/data"},
+					}, nil
+				}
+			},
+			Path:       "/media/data/tmp/child",
+			MountedFn:  IsMountedMMC,
+			ExpectBool: false,
+		},
+	})
 }
 
 func TestSmartCheckAllDrivesDelegatesByDeviceType(t *testing.T) {
@@ -224,61 +246,77 @@ func TestSmartCheckAllDrivesSkipsFailedChecks(t *testing.T) {
 	}
 }
 
-func TestParseFstabLineIgnoresCommentsAndBlankLines(t *testing.T) {
-	if _, ok := parseFstabLine("   # not a mount entry"); ok {
-		t.Fatal("expected comment line to be ignored")
-	}
-	if _, ok := parseFstabLine(""); ok {
-		t.Fatal("expected blank line to be ignored")
-	}
+func TestParseFstabLineContractMatrix(t *testing.T) {
+	disktest.RunFstabLineParseMatrix(t, []disktest.ParseBoolLineCase{
+		{
+			Name:      "ignores comment line",
+			Input:     "   # not a mount entry",
+			ParseFn:   func(raw string) bool { _, ok := parseFstabLine(raw); return ok },
+			ShouldHit: false,
+		},
+		{
+			Name:      "ignores blank line",
+			Input:     "",
+			ParseFn:   func(raw string) bool { _, ok := parseFstabLine(raw); return ok },
+			ShouldHit: false,
+		},
+	})
 }
 
-func TestReconcileFstabLinesIsIdempotent(t *testing.T) {
-	recorded := []string{
-		"UUID=abc123 /groundseg-1 ext4 defaults,nofail 0 2",
-		"tmpfs /run tmpfs defaults 0 0",
-	}
-	desired := fstabRecord{
-		Device:     "UUID=abc123",
-		MountPoint: "/groundseg-1",
-		FSType:     "ext4",
-		Options:    "defaults,nofail",
-		Dump:       "0",
-		Pass:       "2",
-	}
-
-	reconciled, changed := reconcileFstabLines(recorded, desired)
-	if changed {
-		t.Fatal("expected idempotent reconcile to report no changes")
-	}
-	if len(reconciled) != len(recorded) {
-		t.Fatalf("expected reconciled line count to remain %d, got %d", len(recorded), len(reconciled))
-	}
-}
-
-func TestReconcileFstabLinesReplacesExistingAndDedupes(t *testing.T) {
-	recorded := []string{
-		"UUID=abc123 /groundseg-1 ext4 defaults 0 0",
-		"UUID=abc123 /groundseg-1 ext4 defaults,nofail 0 2",
-		"tmpfs /run tmpfs defaults 0 0",
-	}
-	desired := fstabRecord{
-		Device:     "UUID=abc123",
-		MountPoint: "/groundseg-1",
-		FSType:     "ext4",
-		Options:    "defaults,nofail",
-		Dump:       "0",
-		Pass:       "2",
-	}
-
-	reconciled, changed := reconcileFstabLines(recorded, desired)
-	if !changed {
-		t.Fatal("expected reconcile to report changes")
-	}
-	if len(reconciled) != 2 {
-		t.Fatalf("expected duplicate entry to be removed, got %d lines", len(reconciled))
-	}
-	if reconciled[0] != desired.line() {
-		t.Fatalf("expected first reconciled line to be normalized desired entry, got %q", reconciled[0])
-	}
+func TestReconcileFstabLinesContractMatrix(t *testing.T) {
+	disktest.RunReconcileFstabMatrix(t, []disktest.ReconcileFstabCase{
+		{
+			Name: "is idempotent when no changes needed",
+			Run: func() ([]string, bool) {
+				recorded := []string{
+					"UUID=abc123 /groundseg-1 ext4 defaults,nofail 0 2",
+					"tmpfs /run tmpfs defaults 0 0",
+				}
+				desired := fstabRecord{
+					Device:     "UUID=abc123",
+					MountPoint: "/groundseg-1",
+					FSType:     "ext4",
+					Options:    "defaults,nofail",
+					Dump:       "0",
+					Pass:       "2",
+				}
+				return reconcileFstabLines(recorded, desired)
+			},
+			Assert: func(t *testing.T, reconciled []string, changed bool) {
+				if changed {
+					t.Fatal("expected idempotent reconcile to report no changes")
+				}
+				if len(reconciled) != 2 {
+					t.Fatalf("expected reconciled line count to remain 2, got %d", len(reconciled))
+				}
+			},
+		},
+		{
+			Name: "normalizes duplicate entries and dedupes",
+			Run: func() ([]string, bool) {
+				recorded := []string{
+					"UUID=abc123 /groundseg-1 ext4 defaults 0 0",
+					"UUID=abc123 /groundseg-1 ext4 defaults,nofail 0 2",
+					"tmpfs /run tmpfs defaults 0 0",
+				}
+				desired := fstabRecord{
+					Device:     "UUID=abc123",
+					MountPoint: "/groundseg-1",
+					FSType:     "ext4",
+					Options:    "defaults,nofail",
+					Dump:       "0",
+					Pass:       "2",
+				}
+				return reconcileFstabLines(recorded, desired)
+			},
+			Assert: func(t *testing.T, reconciled []string, changed bool) {
+				if !changed {
+					t.Fatal("expected reconcile to report changes")
+				}
+				if len(reconciled) != 2 {
+					t.Fatalf("expected duplicate entry to be removed, got %d lines", len(reconciled))
+				}
+			},
+		},
+	})
 }

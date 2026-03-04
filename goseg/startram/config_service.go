@@ -29,7 +29,7 @@ func (configService) StartramSettingsSnapshot() config.StartramSettings {
 }
 
 func (configService) IsWgRegistered() bool {
-	return config.Conf().WgRegistered
+	return config.Conf().Connectivity.WgRegistered
 }
 
 func (configService) SetWgRegistered(registered bool) error {

@@ -20,7 +20,7 @@ func newCaptiveTransportAdapter(deps c2cServiceDeps) *captiveTransportAdapter {
 		},
 	}
 	listSSIDs := func(dev string) ([]string, error) {
-		return DefaultWiFiRuntimeService().ListWifiSSIDs(dev)
+		return NewWiFiRuntimeService().ListWifiSSIDs(dev)
 	}
 	adapter.inner = transport.NewCaptiveTransportAdapter(listSSIDs, adapter.processMessage)
 	return adapter

@@ -7,6 +7,8 @@ import (
 
 	"groundseg/internal/seams"
 	"groundseg/structs"
+	
+	"groundseg/config"
 )
 
 import "groundseg/docker/orchestration/container"
@@ -14,7 +16,9 @@ import "groundseg/docker/orchestration/container"
 type netdataRuntimeOps = container.NetdataRuntime
 
 type dockerContainerRuntimeInputs struct {
-	confFn                      func() structs.SysConfig
+	shipSettingsSnapshotFn       func() config.ShipSettings
+	startramSettingsSnapshotFn   func() config.StartramSettings
+	penpaiSettingsSnapshotFn     func() config.PenpaiSettings
 	basePathFn                  func() string
 	dockerDirFn                 func() string
 	openFn                      func(string) (*os.File, error)
@@ -47,10 +51,12 @@ type dockerContainerRuntimeInputs struct {
 }
 
 func collectDockerContainerRuntimeInputs(rt dockerRuntime) dockerContainerRuntimeInputs {
-	return dockerContainerRuntimeInputs{
-		confFn:                      rt.configOps.ConfFn,
-		basePathFn:                  rt.contextOps.BasePathFn,
-		dockerDirFn:                 rt.contextOps.DockerDirFn,
+		return dockerContainerRuntimeInputs{
+			shipSettingsSnapshotFn:       rt.configOps.ShipSettingsSnapshotFn,
+			startramSettingsSnapshotFn:   rt.configOps.StartramSettingsSnapshotFn,
+			penpaiSettingsSnapshotFn:     rt.configOps.PenpaiSettingsSnapshotFn,
+			basePathFn:                  rt.contextOps.BasePathFn,
+			dockerDirFn:                 rt.contextOps.DockerDirFn,
 		openFn:                      rt.fileOps.OpenFn,
 		readFileFn:                  rt.fileOps.ReadFileFn,
 		writeFileFn:                 rt.fileOps.WriteFileFn,
@@ -87,7 +93,9 @@ func (inputs dockerContainerRuntimeInputs) applyLlamaRuntime(rt container.LlamaR
 
 func (inputs dockerContainerRuntimeInputs) llamaRuntimeTemplate() container.LlamaRuntime {
 	return container.LlamaRuntime{
-		ConfFn:                    inputs.confFn,
+		StartramSettingsSnapshotFn: inputs.startramSettingsSnapshotFn,
+		PenpaiSettingsSnapshotFn:   inputs.penpaiSettingsSnapshotFn,
+		ShipSettingsSnapshotFn:     inputs.shipSettingsSnapshotFn,
 		StopContainerByNameFn:     inputs.stopContainerByNameFn,
 		StartContainerFn:          inputs.startContainerFn,
 		UpdateContainerStateFn:    inputs.updateContainerStateFn,
@@ -133,7 +141,8 @@ func (inputs dockerContainerRuntimeInputs) applyNetdataRuntime(rt container.Netd
 
 func (inputs dockerContainerRuntimeInputs) minioRuntimeTemplate() container.MinioRuntime {
 	return container.MinioRuntime{
-		ConfFn:                      inputs.confFn,
+		StartramSettingsSnapshotFn:  inputs.startramSettingsSnapshotFn,
+		ShipSettingsSnapshotFn:      inputs.shipSettingsSnapshotFn,
 		BasePathFn:                  inputs.basePathFn,
 		DockerDirFn:                 inputs.dockerDirFn,
 		OpenFn:                      inputs.openFn,

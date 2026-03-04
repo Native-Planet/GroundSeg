@@ -104,7 +104,7 @@ func TestSchedulePackValidatesInputsAndPersistsSchedule(t *testing.T) {
 
 	reasonCh := make(chan string, 1)
 	go func() {
-		reasonCh <- <-broadcast.SchedulePackEvents()
+		reasonCh <- <-broadcast.DefaultBroadcastStateRuntime().SchedulePackEvents()
 	}()
 
 	payload := structs.WsUrbitPayload{

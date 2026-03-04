@@ -2,9 +2,12 @@ package orchestration
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker/registry"
+	"groundseg/structs"
+	"os"
 	"time"
 )
 
@@ -36,6 +39,32 @@ func newWireguardRuntime() WireguardRuntime {
 	runtime := wireguardRuntimeFromConfig()
 	runtime.StartContainerFn = StartContainer
 	runtime.UpdateContainerStateFn = config.UpdateContainerState
+	return runtime
+}
+
+func newWireguardRuntimeForTests() WireguardRuntime {
+	runtime := newWireguardRuntime()
+	runtime.BasePathFn = func() string { return "/tmp" }
+	runtime.DockerDirFn = func() string { return "/tmp/docker" }
+	runtime.OpenFn = func(string) (*os.File, error) { return nil, nil }
+	runtime.ReadFileFn = func(string) ([]byte, error) { return nil, os.ErrNotExist }
+	runtime.WriteFileFn = func(string, []byte, os.FileMode) error { return nil }
+	runtime.MkdirAllFn = func(string, os.FileMode) error { return nil }
+	runtime.StartContainerFn = func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil }
+	runtime.UpdateContainerStateFn = func(string, structs.ContainerState) {}
+	runtime.GetLatestContainerInfoFn = func(string) (map[string]string, error) {
+		return map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}, nil
+	}
+	runtime.GetLatestContainerImageFn = func(string) (string, error) { return "wg:latest", nil }
+	runtime.CreateDefaultWGConfFn = func() error { return nil }
+	runtime.GetWgConfFn = func() (structs.WgConfig, error) { return structs.WgConfig{}, nil }
+	runtime.GetWgConfBlobFn = func() (string, error) {
+		return base64.StdEncoding.EncodeToString([]byte("blob")), nil
+	}
+	runtime.GetWgPrivkeyFn = func() string { return "k1" }
+	runtime.CopyFileToVolumeFn = func(string, string, string, string, volumeWriterImageSelector) error { return nil }
+	runtime.VolumeExistsFn = func(string) (bool, error) { return false, nil }
+	runtime.CreateVolumeFn = func(string) error { return nil }
 	return runtime
 }
 

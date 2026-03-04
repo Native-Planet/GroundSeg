@@ -6,7 +6,9 @@ import (
 )
 
 type Runtime struct {
-	RuntimeTransitionOps
+	RuntimeContainerOps
+	RuntimeUrbitOps
+	RuntimeSnapshotOps
 	RuntimeHealthOps
 	RuntimeStartupOps
 	RuntimeStartramOps
@@ -43,56 +45,29 @@ type RuntimeOption func(*Runtime)
 
 func WithContainerOps(ops RuntimeContainerOps) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeTransitionOps = seams.Merge(runtime.RuntimeTransitionOps, RuntimeTransitionOpsFromContainerOps(ops))
+		runtime.RuntimeContainerOps = seams.Merge(runtime.RuntimeContainerOps, ops)
 	}
 }
 
 func WithUrbitOps(ops RuntimeUrbitOps) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeTransitionOps = seams.Merge(runtime.RuntimeTransitionOps, RuntimeTransitionOpsFromUrbitOps(ops))
+		runtime.RuntimeUrbitOps = seams.Merge(runtime.RuntimeUrbitOps, ops)
 	}
 }
 
 func WithSnapshotOps(ops RuntimeSnapshotOps) RuntimeOption {
 	return func(runtime *Runtime) {
+		runtime.RuntimeSnapshotOps = seams.Merge(runtime.RuntimeSnapshotOps, ops)
 		runtime.RuntimeHealthOps = seams.Merge(runtime.RuntimeHealthOps, RuntimeHealthOps{
-			ConfFn:                        ops.ConfFn,
-			StartramSettingsSnapshotFn:    ops.StartramSettingsSnapshotFn,
-			ShipSettingsSnapshotFn:        ops.ShipSettingsSnapshotFn,
-			ShipRuntimeSettingsSnapshotFn: ops.ShipRuntimeSettingsSnapshotFn,
-			GetStartramConfigFn:           ops.GetStartramConfigFn,
-			Check502SettingsSnapshotFn:    ops.Check502SettingsSnapshotFn,
+			HealthShipSettingsSnapshotFn:     ops.ShipSettingsSnapshotFn,
+			HealthCheck502SettingsSnapshotFn: ops.Check502SettingsSnapshotFn,
 		})
 	}
 }
 
-func WithConfigOps(ops RuntimeConfigOps) RuntimeOption {
+func WithRuntimeStartupOps(ops RuntimeStartupOps) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, RuntimeStartupOps{
-			UpdateConfTypedFn: ops.UpdateConfTypedFn,
-			WithWgOnFn:        ops.WithWgOnFn,
-			CycleWgKeyFn:      ops.CycleWgKeyFn,
-			BarExitFn:         ops.BarExitFn,
-		})
-	}
-}
-
-func WithLoadOps(ops RuntimeLoadOps) RuntimeOption {
-	return func(runtime *Runtime) {
-		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, RuntimeStartupOps{
-			LoadWireguardFn: ops.LoadWireguardFn,
-			LoadMCFn:        ops.LoadMCFn,
-			LoadMinIOsFn:    ops.LoadMinIOsFn,
-			LoadUrbitsFn:    ops.LoadUrbitsFn,
-		})
-	}
-}
-
-func WithServiceOps(ops RuntimeServiceOps) RuntimeOption {
-	return func(runtime *Runtime) {
-		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, RuntimeStartupOps{
-			SvcDeleteFn: ops.SvcDeleteFn,
-		})
+		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, ops)
 	}
 }
 
@@ -104,7 +79,9 @@ func WithStartramOps(ops RuntimeStartramOps) RuntimeOption {
 
 func WithRuntimeDependencies(dependencies Runtime) RuntimeOption {
 	return func(runtime *Runtime) {
-		runtime.RuntimeTransitionOps = seams.Merge(runtime.RuntimeTransitionOps, dependencies.RuntimeTransitionOps)
+		runtime.RuntimeContainerOps = seams.Merge(runtime.RuntimeContainerOps, dependencies.RuntimeContainerOps)
+		runtime.RuntimeUrbitOps = seams.Merge(runtime.RuntimeUrbitOps, dependencies.RuntimeUrbitOps)
+		runtime.RuntimeSnapshotOps = seams.Merge(runtime.RuntimeSnapshotOps, dependencies.RuntimeSnapshotOps)
 		runtime.RuntimeHealthOps = seams.Merge(runtime.RuntimeHealthOps, dependencies.RuntimeHealthOps)
 		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, dependencies.RuntimeStartupOps)
 		runtime.RuntimeStartramOps = seams.Merge(runtime.RuntimeStartramOps, dependencies.RuntimeStartramOps)
@@ -113,7 +90,9 @@ func WithRuntimeDependencies(dependencies Runtime) RuntimeOption {
 
 func NewRuntimeWithDependencies(overrides Runtime) Runtime {
 	return Runtime{
-		RuntimeTransitionOps: seams.Merge(defaultRuntimeTransitionOps(), overrides.RuntimeTransitionOps),
+		RuntimeContainerOps:  seams.Merge(defaultRuntimeContainerOps(), overrides.RuntimeContainerOps),
+		RuntimeUrbitOps:      seams.Merge(defaultRuntimeUrbit(), overrides.RuntimeUrbitOps),
+		RuntimeSnapshotOps:   seams.Merge(defaultRuntimeSnapshot(), overrides.RuntimeSnapshotOps),
 		RuntimeHealthOps:     seams.Merge(defaultRuntimeHealthOps(), overrides.RuntimeHealthOps),
 		RuntimeStartupOps:    seams.Merge(defaultRuntimeStartupOps(), overrides.RuntimeStartupOps),
 		RuntimeStartramOps:   seams.Merge(defaultRuntimeStartramOps(), overrides.RuntimeStartramOps),

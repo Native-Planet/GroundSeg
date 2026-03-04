@@ -52,11 +52,11 @@ func RunRemoteBackupPass() {
 	now := NowForRoutine()
 	if now.Equal(remoteBackupState.Time) || (now.After(remoteBackupState.Time) && now.Sub(remoteBackupState.Time) <= time.Hour) {
 		conf := ConfForRoutine()
-		if conf.RemoteBackupPassword != "" && conf.WgRegistered {
+		if conf.Connectivity.RemoteBackupPassword != "" && conf.Connectivity.WgRegistered {
 			zap.L().Info("Time to backup ships remotely")
-			for _, patp := range conf.Piers {
+			for _, patp := range conf.Connectivity.Piers {
 				zap.L().Info(fmt.Sprintf("Backing up %s", patp))
-				if err := UploadLatestBackupForRoutine(patp, conf.RemoteBackupPassword, BackupDir); err != nil {
+				if err := UploadLatestBackupForRoutine(patp, conf.Connectivity.RemoteBackupPassword, BackupDir); err != nil {
 					zap.L().Error(fmt.Sprintf("Failed to upload backup for %v: %v", patp, err))
 				}
 			}
@@ -67,7 +67,7 @@ func RunRemoteBackupPass() {
 func RunLocalBackupPass() {
 	zap.L().Info("Checking local backups")
 	conf := ConfForRoutine()
-	for _, patp := range conf.Piers {
+	for _, patp := range conf.Connectivity.Piers {
 		location := NowForRoutine().Location()
 		backupTime := time.Date(0, 1, 1, 0, 0, 0, 0, location)
 		shipConf := UrbitConfForRoutine(patp)

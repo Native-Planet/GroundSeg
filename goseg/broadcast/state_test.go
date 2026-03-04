@@ -102,9 +102,9 @@ func TestCloneBroadcastStateDeepCopiesMutableFields(t *testing.T) {
 }
 
 func TestGetStateReturnsClone(t *testing.T) {
-	original := GetState()
+	original := DefaultBroadcastStateRuntime().GetState()
 	t.Cleanup(func() {
-		UpdateBroadcast(original)
+		DefaultBroadcastStateRuntime().UpdateBroadcast(original)
 	})
 
 	state := structs.AuthBroadcast{
@@ -116,15 +116,15 @@ func TestGetStateReturnsClone(t *testing.T) {
 	urbit.Info.RemoteTlonBackups = []structs.BackupObject{{Timestamp: 1}}
 	state.Urbits["~zod"] = urbit
 	state.System.Info.Usage.RAM = []uint64{1}
-	UpdateBroadcast(state)
+	DefaultBroadcastStateRuntime().UpdateBroadcast(state)
 
-	copyOne := GetState()
+	copyOne := DefaultBroadcastStateRuntime().GetState()
 	mutated := copyOne.Urbits["~zod"]
 	mutated.Info.RemoteTlonBackups[0].Timestamp = 99
 	copyOne.Urbits["~zod"] = mutated
 	copyOne.System.Info.Usage.RAM[0] = 42
 
-	copyTwo := GetState()
+	copyTwo := DefaultBroadcastStateRuntime().GetState()
 	gotUrbit := copyTwo.Urbits["~zod"]
 	if gotUrbit.Info.RemoteTlonBackups[0].Timestamp != 1 {
 		t.Fatalf("expected stored state to remain unchanged, got %+v", gotUrbit.Info.RemoteTlonBackups)
@@ -174,19 +174,19 @@ func TestGetStateJsonReturnsContextualErrorOnMarshalFailure(t *testing.T) {
 }
 
 func TestSetStartramRunningUsesTransitionPath(t *testing.T) {
-	previousState := GetState()
+	previousState := DefaultBroadcastStateRuntime().GetState()
 	t.Cleanup(func() {
-		UpdateBroadcast(previousState)
+		DefaultBroadcastStateRuntime().UpdateBroadcast(previousState)
 	})
 
 	initial := structs.AuthBroadcast{}
 	initial.Profile.Startram.Info.Running = false
 	initial.Profile.Startram.Transition.Restart = "running"
-	UpdateBroadcast(initial)
+	DefaultBroadcastStateRuntime().UpdateBroadcast(initial)
 	if err := SetStartramRunning(true); err != nil {
 		t.Fatalf("SetStartramRunning returned error: %v", err)
 	}
-	got := GetState()
+	got := DefaultBroadcastStateRuntime().GetState()
 	if !got.Profile.Startram.Info.Running {
 		t.Fatal("expected startram running state to be true after transition")
 	}

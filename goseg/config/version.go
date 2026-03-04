@@ -188,7 +188,7 @@ func fetchVersionFromServer(conf structs.SysConfig) (structs.Version, error) {
 	if retries < 1 {
 		retries = 1
 	}
-	url := globalConfig.UpdateUrl
+	url := globalConfig.Connectivity.UpdateUrl
 	client := versionHTTPClientSnapshot()
 	if client == nil {
 		client = http.DefaultClient
@@ -199,7 +199,7 @@ func fetchVersionFromServer(conf structs.SysConfig) (structs.Version, error) {
 		if err != nil {
 			return structs.Version{}, err
 		}
-		userAgent := "NativePlanet.GroundSeg-" + conf.GsVersion
+		userAgent := "NativePlanet.GroundSeg-" + conf.Runtime.GsVersion
 		req.Header.Set("User-Agent", userAgent)
 
 		resp, err := client.Do(req)
@@ -251,7 +251,7 @@ func ResolveLatestChannel(conf structs.SysConfig) (structs.Version, structs.Chan
 	if err != nil {
 		return structs.Version{}, structs.Channel{}, err
 	}
-	channel, err := resolveVersionForConfiguredChannel(fetchedVersion, conf.UpdateBranch)
+	channel, err := resolveVersionForConfiguredChannel(fetchedVersion, conf.Connectivity.UpdateBranch)
 	if err != nil {
 		return structs.Version{}, structs.Channel{}, err
 	}

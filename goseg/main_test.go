@@ -18,6 +18,44 @@ import (
 	"groundseg/config"
 )
 
+type c2cRuntimeOption func(*c2cRuntime)
+
+func c2cTestRuntime(overrides ...c2cRuntimeOption) c2cRuntime {
+	runtime := defaultC2cRuntime()
+	for _, apply := range overrides {
+		apply(&runtime)
+	}
+	return runtime
+}
+
+func withC2cState(
+	connCheck func() bool,
+	settings func() config.ConnectivitySettings,
+	isNPBoxFn func() bool,
+	hasDeviceFn func() bool,
+	wifiInfoFn func() (bool, error),
+	isC2cModeFn func() error,
+	setC2cModeFn func(bool) error,
+	startKillSwitchFn func(context.Context, func() config.ConnectivitySettings),
+) c2cRuntimeOption {
+	return func(runtime *c2cRuntime) {
+		runtime.connectivity = c2cConnectivityRuntime{
+			connCheck:    connCheck,
+			settingsSnap: settings,
+		}
+		runtime.device = c2cDeviceRuntime{
+			isNPBox:   isNPBoxFn,
+			hasDevice: hasDeviceFn,
+			wifiInfo:  wifiInfoFn,
+		}
+		runtime.mode = c2cModeRuntime{
+			isC2cMode:       isC2cModeFn,
+			setC2cMode:      setC2cModeFn,
+			startKillSwitch: startKillSwitchFn,
+		}
+	}
+}
+
 func TestLoadServiceRunsFunction(t *testing.T) {
 	done := make(chan struct{}, 1)
 	loadService(func() error {
@@ -128,35 +166,27 @@ func TestC2cCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
 	setModeValue := false
 	killStarted := make(chan struct{}, 1)
 
-	runtime := c2cRuntime{
-		device: c2cDeviceRuntime{
-			isNPBox:   func() bool { return true },
-			hasDevice: func() bool { return true },
-			wifiInfo:  nil,
-		},
-		connectivity: c2cConnectivityRuntime{
-			connCheck: func() bool {
-				return false
-			},
-			settingsSnap: func() config.ConnectivitySettings {
-				return config.ConnectivitySettings{C2cInterval: 42}
-			},
-		},
-		mode: c2cModeRuntime{
-			isC2cMode: func() error {
+	runtime := c2cTestRuntime(
+		withC2cState(
+			func() bool { return false },
+			func() config.ConnectivitySettings { return config.ConnectivitySettings{C2cInterval: 42} },
+			func() bool { return true },
+			func() bool { return true },
+			nil,
+			func() error {
 				activated = true
 				return nil
 			},
-			setC2cMode: func(enabled bool) error {
+			func(enabled bool) error {
 				setModeCalled = true
 				setModeValue = enabled
 				return nil
 			},
-			startKillSwitch: func(context.Context, func() config.ConnectivitySettings) {
+			func(_ context.Context, _ func() config.ConnectivitySettings) {
 				killStarted <- struct{}{}
 			},
-		},
-	}
+		),
+	)
 
 	if err := C2cCheckWith(context.Background(), runtime); err != nil {
 		t.Fatalf("expected no error when enabling C2C mode, got %v", err)
@@ -177,29 +207,23 @@ func TestC2cCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
 
 func TestC2cCheckSkipsWhenOnline(t *testing.T) {
 	activated := false
-	runtime := c2cRuntime{
-		device: c2cDeviceRuntime{
-			isNPBox:   func() bool { return true },
-			hasDevice: func() bool { return true },
-			wifiInfo:  nil,
-		},
-		connectivity: c2cConnectivityRuntime{
-			connCheck: func() bool { return true },
-			settingsSnap: func() config.ConnectivitySettings {
-				return config.ConnectivitySettings{}
-			},
-		},
-		mode: c2cModeRuntime{
-			isC2cMode: func() error {
+	runtime := c2cTestRuntime(
+		withC2cState(
+			func() bool { return true },
+			func() config.ConnectivitySettings { return config.ConnectivitySettings{} },
+			func() bool { return true },
+			func() bool { return true },
+			nil,
+			func() error {
 				activated = true
 				return nil
 			},
-			setC2cMode: func(enabled bool) error { return nil },
-			startKillSwitch: func(context.Context, func() config.ConnectivitySettings) {
+			func(enabled bool) error { return nil },
+			func(_ context.Context, _ func() config.ConnectivitySettings) {
 				t.Fatal("killSwitch should not be started when internet is available")
 			},
-		},
-	}
+		),
+	)
 
 	if err := C2cCheckWith(context.Background(), runtime); err != nil {
 		t.Fatalf("expected online checks to skip C2C mode with no error, got %v", err)
@@ -286,7 +310,7 @@ func TestBootstrapSubsystemsPropagatesBootstrapError(t *testing.T) {
 	runtime := bootstrapRuntimeWith(
 		func(context.Context, startuporchestrator.StartupOptions) error { return expectedErr },
 		func(context.Context, int) error { return nil },
-		nil,
+		func(context.Context) error { return nil },
 	)
 
 	err := runBootstrapSubsystems(context.Background(), appStartupOptions{}, runtime)

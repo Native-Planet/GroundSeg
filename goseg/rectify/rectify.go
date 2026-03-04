@@ -6,124 +6,83 @@ package rectify
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/docker/events"
-	"groundseg/docker/orchestration"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/internal/seams"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/transition"
-
-	"go.uber.org/zap"
-)
-
-var (
-	errRectifyConfigUpdateMissing = errors.New("rectify runtime config update callback is not configured")
 )
 
 type RectifyRuntime struct {
-	EventRuntime         events.EventBroker
-	GetContainerStateFn  func() map[string]structs.ContainerState
-	UpdateConfigFn       func(...config.ConfUpdateOption) error
-	LoadUrbitConfigFn    func(string) error
-	UrbitConfFn          func(string) structs.UrbitDocker
-	UrbitConfAllFn       func() map[string]structs.UrbitDocker
-	UpdateUrbitSectionFn func(string, config.UrbitConfigSection, any) error
-	orchestration.RuntimeHealthOps
+	EventRuntime events.EventBroker
+	StateRuntime broadcast.BroadcastStore
+	dockerOrchestration.RuntimeContainerOps
+	dockerOrchestration.RuntimeUrbitOps
+	dockerOrchestration.RuntimeSnapshotOps
+	dockerOrchestration.RuntimeStartupOps
 }
 
 func newRectifyRuntime() RectifyRuntime {
-	orchestrationRuntime := orchestration.NewRuntime()
+	orchestrationRuntime := dockerOrchestration.NewRuntime()
 	return RectifyRuntime{
-		EventRuntime:         events.DefaultEventRuntime(),
-		GetContainerStateFn:  orchestrationRuntime.GetContainerStateFn,
-		UpdateConfigFn:       orchestrationRuntime.UpdateConfig,
-		LoadUrbitConfigFn:    orchestrationRuntime.LoadUrbitConfigFn,
-		UrbitConfFn:          orchestrationRuntime.UrbitConfFn,
-		UrbitConfAllFn:       orchestrationRuntime.UrbitConfAllFn,
-		UpdateUrbitSectionFn: orchestrationRuntime.UpdateUrbitSectionFn,
-		RuntimeHealthOps:     orchestrationRuntime.RuntimeHealthOps,
+		EventRuntime:        events.DefaultEventRuntime(),
+		StateRuntime:        broadcast.DefaultBroadcastStateRuntime(),
+		RuntimeContainerOps: orchestrationRuntime.RuntimeContainerOps,
+		RuntimeUrbitOps:     orchestrationRuntime.RuntimeUrbitOps,
+		RuntimeSnapshotOps:  orchestrationRuntime.RuntimeSnapshotOps,
+		RuntimeStartupOps: dockerOrchestration.RuntimeStartupOps{
+			UpdateConfTypedFn: orchestrationRuntime.RuntimeStartupOps.UpdateConfTypedFn,
+		},
 	}
 }
 
-func NewRectifyRuntime() RectifyRuntime {
-	return mergeRectifyRuntime(newRectifyRuntime(), RectifyRuntime{})
+func NewRectifyRuntime(overrides ...RectifyRuntime) RectifyRuntime {
+	runtime := newRectifyRuntime()
+	if len(overrides) == 0 {
+		return runtime
+	}
+	return seams.Merge(runtime, overrides[0])
 }
 
-func DefaultRectifyRuntime() RectifyRuntime {
-	return NewRectifyRuntime()
-}
-
-func NewRectifyRuntimeWithDependencies(overrides RectifyRuntime) RectifyRuntime {
-	return mergeRectifyRuntime(newRectifyRuntime(), overrides)
-}
-
-func mergeRectifyRuntime(defaults, overrides RectifyRuntime) RectifyRuntime {
-	if overrides.EventRuntime != nil {
-		defaults.EventRuntime = overrides.EventRuntime
+func resolveRectifyRuntime(overrides ...RectifyRuntime) (RectifyRuntime, error) {
+	runtime := NewRectifyRuntime(overrides...)
+	if err := runtime.validate(); err != nil {
+		return runtime, err
 	}
-	if overrides.GetContainerStateFn != nil {
-		defaults.GetContainerStateFn = overrides.GetContainerStateFn
-	}
-	if overrides.UpdateConfigFn != nil {
-		defaults.UpdateConfigFn = overrides.UpdateConfigFn
-	}
-	if overrides.LoadUrbitConfigFn != nil {
-		defaults.LoadUrbitConfigFn = overrides.LoadUrbitConfigFn
-	}
-	if overrides.UrbitConfFn != nil {
-		defaults.UrbitConfFn = overrides.UrbitConfFn
-	}
-	if overrides.UrbitConfAllFn != nil {
-		defaults.UrbitConfAllFn = overrides.UrbitConfAllFn
-	}
-	if overrides.UpdateUrbitSectionFn != nil {
-		defaults.UpdateUrbitSectionFn = overrides.UpdateUrbitSectionFn
-	}
-	if overrides.StartramSettingsSnapshotFn != nil {
-		defaults.RuntimeHealthOps.StartramSettingsSnapshotFn = overrides.StartramSettingsSnapshotFn
-	}
-	if overrides.GetStartramConfigFn != nil {
-		defaults.RuntimeHealthOps.GetStartramConfigFn = overrides.GetStartramConfigFn
-	}
-	if overrides.Check502SettingsSnapshotFn != nil {
-		defaults.RuntimeHealthOps.Check502SettingsSnapshotFn = overrides.Check502SettingsSnapshotFn
-	}
-	if overrides.ConfFn != nil {
-		defaults.RuntimeHealthOps.ConfFn = overrides.ConfFn
-	}
-	if overrides.ShipSettingsSnapshotFn != nil {
-		defaults.RuntimeHealthOps.ShipSettingsSnapshotFn = overrides.ShipSettingsSnapshotFn
-	}
-	if overrides.ShipRuntimeSettingsSnapshotFn != nil {
-		defaults.RuntimeHealthOps.ShipRuntimeSettingsSnapshotFn = overrides.ShipRuntimeSettingsSnapshotFn
-	}
-	return defaults
+	return runtime, nil
 }
 
 func (runtime RectifyRuntime) UpdateConfig(opts ...config.ConfUpdateOption) error {
-	if runtime.UpdateConfigFn == nil {
-		return errRectifyConfigUpdateMissing
+	if runtime.UpdateConfTypedFn == nil {
+		return fmt.Errorf("rectify runtime missing update config callback")
 	}
-	return runtime.UpdateConfigFn(opts...)
+	return runtime.UpdateConfTypedFn(opts...)
 }
 
-func resolveRectifyRuntime(overrides ...RectifyRuntime) RectifyRuntime {
-	if len(overrides) == 0 {
-		return DefaultRectifyRuntime()
+func (runtime RectifyRuntime) validate() error {
+	if runtime.StateRuntime == nil {
+		return seams.MissingRuntimeDependency("rectify runtime", "missing broadcast state")
 	}
-	return NewRectifyRuntimeWithDependencies(overrides[0])
-}
-
-func UrbitTransitionHandlerWithContext(ctx context.Context) error {
-	return UrbitTransitionHandlerWithContextAndRuntime(ctx, NewRectifyRuntime())
+	if runtime.EventRuntime == nil {
+		return seams.MissingRuntimeDependency("rectify runtime", "missing event runtime")
+	}
+	if err := seams.NewCallbackRequirementsWithGroups("rectify").ValidateCallbacks(runtime, "rectify runtime"); err != nil {
+		return seams.MissingRuntimeDependency("rectify runtime", err.Error())
+	}
+	return nil
 }
 
 func UrbitTransitionHandlerWithContextAndRuntime(ctx context.Context, runtime RectifyRuntime) error {
-	runtime = resolveRectifyRuntime(runtime)
+	runtimeResolved, err := resolveRectifyRuntime(runtime)
+	if err != nil {
+		return err
+	}
+	runtime = runtimeResolved
 	return runTransitionEventLoop(
 		ctx,
 		"urbit",
@@ -132,15 +91,16 @@ func UrbitTransitionHandlerWithContextAndRuntime(ctx context.Context, runtime Re
 		func(event structs.UrbitTransition) broadcast.BroadcastTransition {
 			return urbitTransitionCommand{event: event}
 		},
+		runtime.StateRuntime,
 	)
 }
 
-func NewShipTransitionHandlerWithContext(ctx context.Context) error {
-	return NewShipTransitionHandlerWithContextAndRuntime(ctx, NewRectifyRuntime())
-}
-
 func NewShipTransitionHandlerWithContextAndRuntime(ctx context.Context, runtime RectifyRuntime) error {
-	runtime = resolveRectifyRuntime(runtime)
+	runtimeResolved, err := resolveRectifyRuntime(runtime)
+	if err != nil {
+		return err
+	}
+	runtime = runtimeResolved
 	return runTransitionEventLoop(
 		ctx,
 		"new ship",
@@ -149,11 +109,17 @@ func NewShipTransitionHandlerWithContextAndRuntime(ctx context.Context, runtime 
 		func(event structs.NewShipTransition) broadcast.BroadcastTransition {
 			return newShipTransitionCommand{event: event}
 		},
+		runtime.StateRuntime,
 	)
 }
 
 func RectifyUrbitWithContext(ctx context.Context) error {
 	runtime := NewRectifyRuntime()
+	runtimeResolved, err := resolveRectifyRuntime(runtime)
+	if err != nil {
+		return err
+	}
+	runtime = runtimeResolved
 	return runTransitionEventLoop(
 		ctx,
 		"startram",
@@ -167,16 +133,15 @@ func RectifyUrbitWithContext(ctx context.Context) error {
 			}
 			return switcher(runtime, event)
 		},
+		runtime.StateRuntime,
 	)
 }
 
-func publishUrbitServiceRegistrationTransition(patp string, serviceCreated bool) {
-	if err := applyTransitionUpdate("urbit", urbitServiceRegistrationTransitionCommand{
+func publishUrbitServiceRegistrationTransitionWithRuntime(patp string, serviceCreated bool, runtime broadcast.BroadcastStore) error {
+	return applyTransitionUpdate("urbit", urbitServiceRegistrationTransitionCommand{
 		patp:          patp,
 		serviceStatus: serviceCreated,
-	}, transition.TransitionPublishBestEffort); err != nil {
-		zap.L().Warn(fmt.Sprintf("Failed to publish urbit service registration transition: %v", err))
-	}
+	}, transition.TransitionPublishBestEffort, runtime)
 }
 
 func publishUrbitServiceRegistrationTransitionWithCurrentState(current *structs.AuthBroadcast, patp string, serviceCreated bool) {
@@ -192,15 +157,14 @@ func publishUrbitServiceRegistrationTransitionWithCurrentState(current *structs.
 	current.Urbits[patp] = urbitStruct
 }
 
-func SystemTransitionHandlerWithContext(ctx context.Context) error {
-	runtime := NewRectifyRuntime()
-	return SystemTransitionHandlerWithContextAndRuntime(ctx, runtime)
-}
-
 func SystemTransitionHandlerWithContextAndRuntime(ctx context.Context, runtime RectifyRuntime) error {
-	runtime = resolveRectifyRuntime(runtime)
+	runtimeResolved, err := resolveRectifyRuntime(runtime)
+	if err != nil {
+		return err
+	}
+	runtime = runtimeResolved
 	publishPolicy := transition.TransitionPublishBestEffort
 	return runTransitionEventLoop(ctx, "system", publishPolicy, runtime.EventRuntime.SystemTransitions(), func(event structs.SystemTransition) broadcast.BroadcastTransition {
 		return systemTransitionCommand{event: event}
-	})
+	}, runtime.StateRuntime)
 }

@@ -18,11 +18,11 @@ func resolveWiFiRuntime(overrides ...wifiRuntime) wifiRuntime {
 	if len(overrides) > 0 {
 		return NewWiFiRuntimeWith(overrides[0])
 	}
-	return DefaultWiFiRuntime()
+	return NewWiFiRuntime()
 }
 
 func NewWiFiRuntimeService(runtime ...wifiRuntime) *WiFiRuntimeService {
-	runtimeInstance := DefaultWiFiRuntime()
+	runtimeInstance := NewWiFiRuntime()
 	if len(runtime) > 0 {
 		runtimeInstance = NewWiFiRuntimeWith(runtime[0])
 	}
@@ -32,114 +32,157 @@ func NewWiFiRuntimeService(runtime ...wifiRuntime) *WiFiRuntimeService {
 	}
 }
 
-func DefaultWiFiRuntimeService() *WiFiRuntimeService {
-	return NewWiFiRuntimeService()
+func (service *WiFiRuntimeService) prepareForUse() (wifiRuntime, *wifiRuntimeState, error) {
+	if service == nil {
+		return wifiRuntime{}, nil, fmt.Errorf("wifi runtime service is nil")
+	}
+
+	if service.runtime.RunCommand == nil {
+		service.runtime = NewWiFiRuntime()
+	}
+	if service.runtime.RunCommand == nil {
+		return wifiRuntime{}, nil, fmt.Errorf("wifi runtime failed to initialize")
+	}
+
+	if service.state == nil {
+		service.state = DefaultWiFiRuntimeState()
+	}
+	if service.state == nil {
+		return wifiRuntime{}, nil, fmt.Errorf("wifi runtime state failed to initialize")
+	}
+
+	return service.runtime, service.state, nil
 }
 
 func (service *WiFiRuntimeService) IsWifiEnabled() (bool, error) {
-	if service == nil {
-		return false, errors.New("wifi runtime service is nil")
+	runtime, _, err := service.prepareForUse()
+	if err != nil {
+		return false, err
 	}
-	return service.runtime.ifCheck()
+	return runtime.ifCheck()
 }
 
-func (service *WiFiRuntimeService) ConstructWifiInfo(dev string) {
+func (service *WiFiRuntimeService) ConstructWifiInfo(dev string) error {
+	runtime, state, err := service.prepareForUse()
+	if err != nil {
+		return err
+	}
+
 	device := strings.TrimSpace(dev)
 	if device == "" {
-		device = WiFiDevice(service.state)
+		device = WiFiDevice(state)
 	}
-	if device == "" || service == nil {
-		return
+	if device == "" {
+		return fmt.Errorf("wifi device could not be resolved")
 	}
-	newWiFiRadioService(service.runtime, service.state).RefreshInfo(device)
+
+	newWiFiRadioService(runtime, state).RefreshInfo(device)
+	return nil
 }
 
 func (service *WiFiRuntimeService) ListWifiSSIDs(dev string) ([]string, error) {
-	device, err := service.resolveDevice(dev)
+	runtime, state, err := service.prepareForUse()
+	if err != nil {
+		return nil, err
+	}
+
+	device, err := resolveDevice(dev, runtime, state)
 	if err != nil {
 		return nil, fmt.Errorf("resolve wifi device: %w", err)
 	}
-	return service.runtime.listSSIDs(device)
+	return runtime.listSSIDs(device)
 }
 
 func (service *WiFiRuntimeService) ConnectToWifi(ssid, password string) error {
+	runtime, _, err := service.prepareForUse()
+	if err != nil {
+		return err
+	}
+
 	ssid = strings.TrimSpace(ssid)
 	if ssid == "" {
 		return fmt.Errorf("ssid cannot be empty")
 	}
-	enabled, err := service.runtime.ifCheck()
+
+	enabled, err := runtime.ifCheck()
 	if err != nil {
 		return fmt.Errorf("check wifi radio before connect: %w", err)
 	}
 	if !enabled {
-		if err := service.runtime.toggleDevice(""); err != nil {
+		if err := runtime.toggleDevice(""); err != nil {
 			return fmt.Errorf("enable wifi radio before connect: %w", err)
 		}
 	}
-	return service.runtime.connect(ssid, password)
+	return runtime.connect(ssid, password)
 }
 
 func (service *WiFiRuntimeService) DisconnectWifi(ifaceName string) error {
-	device := strings.TrimSpace(ifaceName)
-	if device == "" {
-		var err error
-		device, err = service.runtime.primaryWifiDevice()
-		if err != nil {
-			return fmt.Errorf("resolve wifi device for disconnect: %w", err)
-		}
+	runtime, state, err := service.prepareForUse()
+	if err != nil {
+		return err
 	}
-	return service.runtime.disconnect(device)
+
+	device, err := resolveDevice(ifaceName, runtime, state)
+	if err != nil {
+		return fmt.Errorf("resolve wifi device for disconnect: %w", err)
+	}
+	return runtime.disconnect(device)
 }
 
 func (service *WiFiRuntimeService) ToggleDevice(dev string) error {
-	if service == nil {
-		return fmt.Errorf("wifi runtime service is nil")
+	runtime, state, err := service.prepareForUse()
+	if err != nil {
+		return err
 	}
-	target := strings.TrimSpace(dev)
-	_, err := service.runtime.primaryWifiDevice()
+
+	device, err := resolveDevice(dev, runtime, state)
 	if err != nil {
 		return fmt.Errorf("resolve wifi device for toggle: %w", err)
 	}
-	if target == "" {
-		target = WiFiDevice(service.state)
-	}
-	return service.runtime.toggleDevice(target)
+	return runtime.toggleDevice(device)
 }
 
 func (service *WiFiRuntimeService) StartWiFiInfoLoop(ctx context.Context) error {
-	return startWiFiInfoLoop(ctx, service.runtime, service.state)
+	runtime, state, err := service.prepareForUse()
+	if err != nil {
+		return err
+	}
+	return startWiFiInfoLoop(ctx, runtime, state)
 }
 
 func (service *WiFiRuntimeService) StopWiFiInfoLoop() {
-	state := service.state
+	_, state, err := service.prepareForUse()
+	if err != nil {
+		return
+	}
+
 	state.stopMu.Lock()
 	stop := state.wifiInfoLoopStop
 	state.wifiInfoLoopStop = nil
 	state.stopMu.Unlock()
+
 	if stop != nil {
 		stop()
 	}
 }
 
 func (service *WiFiRuntimeService) ApplyCaptiveRules() error {
-	if service == nil {
-		return fmt.Errorf("wifi runtime service is nil")
+	runtime, _, err := service.prepareForUse()
+	if err != nil {
+		return err
 	}
-	return service.runtime.applyCaptiveRules()
+	return runtime.applyCaptiveRules()
 }
 
-func (service *WiFiRuntimeService) resolveDevice(dev string) (string, error) {
+func resolveDevice(dev string, runtime wifiRuntime, state *wifiRuntimeState) (string, error) {
 	device := strings.TrimSpace(dev)
 	if device != "" {
 		return device, nil
 	}
-	if service == nil {
-		return "", fmt.Errorf("wifi runtime service is nil")
+	if WiFiDevice(state) != "" {
+		return WiFiDevice(state), nil
 	}
-	if WiFiDevice(service.state) != "" {
-		return WiFiDevice(service.state), nil
-	}
-	return service.runtime.primaryWifiDevice()
+	return runtime.primaryWifiDevice()
 }
 
 func connectInfoLoop(ctx context.Context, runtime wifiRuntime, radio wifiRadioService, state *wifiRuntimeState) error {

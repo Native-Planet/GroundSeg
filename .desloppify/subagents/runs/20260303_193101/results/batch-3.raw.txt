@@ -1,0 +1,105 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Config patch construction uses hard panics (`panic(\"patch field spec requires explicit apply handler\")`) in `goseg/config/config_update_registry.go`, while adjacent config patch parsing/execution paths are error-return based in `goseg/config/config_update_schema.go`.",
+        "Several orchestrator entry points forward raw errors without boundary context (`return err`) in `goseg/rectify/rectify.go` and `goseg/startuporchestrator/startup_orchestrator.go`, despite widespread contextual wrapping elsewhere.",
+        "State-changing startram flows log and suppress some failures (service deletion in `goseg/shipworkflow/startram_lifecycle_runtime.go`; best-effort transition publish in `goseg/rectify/rectify.go`), producing success paths after partial failure.",
+        "Background routine patterns are inconsistent: `goseg/routines/system/system.go` runs periodic jobs with `func()` signatures that cannot report errors, while `goseg/routines/logstream/logs.go` tracks failures and escalates after thresholds."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "panic_in_error_returning_config_pipeline",
+      "summary": "Config patch validation mixes panic and error-return strategies in the same pipeline.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`configPatchFieldFromSpec` panics for missing handlers/accessors in `config_update_registry.go`.",
+        "Patch parsing/apply flow in `config_update_schema.go` is built around recoverable `error` returns (`parsePatch`, `hasUpdates`, parser functions), so misconfiguration handling is inconsistent and crash-prone."
+      ],
+      "suggestion": "Replace panics with explicit validation errors returned from registry construction, and make callers fail startup/config init through normal error paths (with wrapped context) instead of process termination.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_error_boundary_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "missing_boundary_context_on_error_passthrough",
+      "summary": "Top-level orchestration functions return raw errors without boundary context.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "Multiple entry paths in `rectify.go` return raw `err` from dependency/runtime resolution (`return err`) without operation names.",
+        "`Bootstrap`, `init`, `start`, `health`, and task ordering paths in `startup_orchestrator.go` frequently forward raw errors from lower layers, unlike neighboring wrapped errors (e.g., `%s init failed: %w`)."
+      ],
+      "suggestion": "Standardize boundary wrapping at orchestrator entry points (for example: `fmt.Errorf(\"bootstrap startup runtime: %w\", err)`) so logs and callers can consistently trace failing phase/operation.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_error_boundary_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "partial_failure_logged_but_reported_as_success",
+      "summary": "Some state-mutating operations log failures and continue as if successful.",
+      "related_files": [
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "In startram lifecycle flows, failed `SvcDeleteFn` calls are logged but ignored, and the workflow continues to return success.",
+        "`publishUrbitServiceRegistrationTransition` logs publish failure and suppresses it, allowing callers to proceed without any error signal despite failed transition publication."
+      ],
+      "suggestion": "Aggregate these mutation/publish failures (for example via `errors.Join`) and return them to callers, or explicitly model tolerated failures with typed non-fatal errors so success vs partial-failure outcomes are distinguishable.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_failure_tolerance_without_contract"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "background_job_error_contracts_diverge",
+      "summary": "Background routine APIs use incompatible failure contracts across subsystems.",
+      "related_files": [
+        "goseg/routines/system/system.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`routines/system` periodic execution uses `func()` callbacks (`runRoutine`, `runRoutineWithContext`) so backup/chop failures cannot be propagated or counted.",
+        "`routines/logstream` uses `error`-returning loops with retry counters and terminal escalation after repeated failures."
+      ],
+      "suggestion": "Unify background-job contracts around `func(context.Context) error` (or equivalent) and apply a shared retry/escalation policy so periodic subsystem failures are consistently observable and actionable.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "silent_failure_tolerance_without_contract"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error semantics are not standardized at subsystem boundaries (panic vs error return vs log-and-continue).",
+      "Background and transition workflows lack a shared contract for non-fatal vs fatal failures."
+    ],
+    "likely_symptoms": [
+      "missing_boundary_context_on_error_passthrough",
+      "partial_failure_logged_but_reported_as_success"
+    ],
+    "possible_false_positives": []
+  }
+}

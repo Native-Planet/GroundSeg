@@ -291,8 +291,8 @@ func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (conta
 }
 
 func persistUrbitRuntimeConfig(containerName string, rt UrbitRuntime, mutate func(*structs.UrbitRuntimeConfig) error) error {
-	if rt.UpdateUrbitSectionFn != nil {
-		return rt.UpdateUrbitSectionFn(containerName, UrbitConfigSectionRuntime, mutate)
+	if rt.UpdateUrbitRuntimeConfigFn != nil {
+		return rt.UpdateUrbitRuntimeConfigFn(containerName, mutate)
 	}
 	if rt.UpdateUrbitFn == nil {
 		return fmt.Errorf("urbit runtime section update callback is not configured")

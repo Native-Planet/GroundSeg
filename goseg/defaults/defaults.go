@@ -132,7 +132,7 @@ func DockerData(pathType string) string {
 // this one needs params from config so we use a func
 func SysConfig(basePath string) structs.SysConfig {
 	sysConfig := structs.SysConfig{
-		ConnectivityConfig: structs.ConnectivityConfig{
+		Connectivity: structs.ConnectivityConfig{
 			Piers:                []string{},
 			WgOn:                 false,
 			NetCheck:             "1.1.1.1:53",
@@ -145,7 +145,7 @@ func SysConfig(basePath string) structs.SysConfig {
 			EndpointUrl:          "api.startram.io",
 			ApiVersion:           "v1",
 		},
-		RuntimeConfig: structs.RuntimeConfig{
+		Runtime: structs.RuntimeConfig{
 			GracefulExit:  false,
 			LastKnownMDNS: "",
 			Setup:         "start",
@@ -166,7 +166,7 @@ func SysConfig(basePath string) structs.SysConfig {
 			Disable502:     false,
 			SnapTime:       60,
 		},
-		AuthSessionConfig: structs.AuthSessionConfig{
+		AuthSession: structs.AuthSessionConfig{
 			PwHash:  "",
 			Salt:    "",
 			KeyFile: filepath.Join(basePath, "settings", "session.key"),
@@ -175,7 +175,7 @@ func SysConfig(basePath string) structs.SysConfig {
 				Unauthorized: make(map[string]structs.SessionInfo),
 			},
 		},
-		PenpaiConfig: structs.PenpaiConfig{
+		Penpai: structs.PenpaiConfig{
 			PenpaiAllow:   true,
 			PenpaiRunning: false,
 			PenpaiCores:   1,
@@ -223,7 +223,7 @@ func SysConfig(basePath string) structs.SysConfig {
 				},
 			},
 		},
-		StartramConfig: structs.StartramConfig{},
+		Startram: structs.StartramConfig{},
 	}
 	return sysConfig
 }

@@ -40,8 +40,8 @@ func AptUpdateLoopWithContext(ctx context.Context) error {
 	updateCheckForAptLoop()
 	conf := configForSystemRoutine()
 	checkInterval := aptUpdateCheckInterval(conf)
-	if len(conf.LastKnownMDNS) > 0 {
-		system.SetLocalUrl(conf.LastKnownMDNS)
+	if len(conf.Runtime.LastKnownMDNS) > 0 {
+		system.SetLocalUrl(conf.Runtime.LastKnownMDNS)
 	} else {
 		system.SetLocalUrl(LocalDomain)
 	}
@@ -58,12 +58,12 @@ func AptUpdateLoopWithContext(ctx context.Context) error {
 }
 
 func aptUpdateCheckInterval(conf structs.SysConfig) time.Duration {
-	val := time.Duration(conf.LinuxUpdates.Value)
+	val := time.Duration(conf.Runtime.LinuxUpdates.Value)
 	if val <= 0 {
 		val = 1
 	}
 	var interval time.Duration
-	if interv := conf.LinuxUpdates.Interval; interv == "week" {
+	if interv := conf.Runtime.LinuxUpdates.Interval; interv == "week" {
 		interval = 7 * (time.Hour * 24)
 	} else if interv == "day" {
 		interval = time.Hour * 24
@@ -75,8 +75,8 @@ func aptUpdateCheckInterval(conf structs.SysConfig) time.Duration {
 
 func mDNSServer() {
 	conf := config.Conf()
-	if !conf.GracefulExit && (len(conf.LastKnownMDNS) > 0) {
-		system.SetLocalUrl(conf.LastKnownMDNS)
+	if !conf.Runtime.GracefulExit && (len(conf.Runtime.LastKnownMDNS) > 0) {
+		system.SetLocalUrl(conf.Runtime.LastKnownMDNS)
 	} else {
 		domains, err := mDNSDiscovery()
 		if err != nil {

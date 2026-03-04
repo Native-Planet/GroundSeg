@@ -31,10 +31,10 @@ func resetSystemSeams() {
 	withSwapValForSystemHandler = config.WithSwapVal
 	runUpgradeForSystemHandler = system.RunUpgrade
 	toggleDeviceForSystemHandler = func(dev string) error {
-		return system.DefaultWiFiRuntimeService().ToggleDevice(dev)
+		return system.NewWiFiRuntimeService().ToggleDevice(dev)
 	}
 	connectToWifiForSystemHandler = func(ssid, password string) error {
-		return system.DefaultWiFiRuntimeService().ConnectToWifi(ssid, password)
+		return system.NewWiFiRuntimeService().ConnectToWifi(ssid, password)
 	}
 	publishSystemTransitionForSystemHandler = func(_ context.Context, transition structs.SystemTransition) error {
 		_ = events.DefaultEventRuntime().PublishSystemTransition(context.Background(), transition)
@@ -82,7 +82,7 @@ func TestSystemHandlerTogglePenpaiFeature(t *testing.T) {
 		return nil
 	}
 	confForSystemHandler = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: true}}
+		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiAllow: true}}
 	}
 	if err := SystemHandler(systemMessage(t, "toggle-penpai-feature")); err != nil {
 		t.Fatalf("toggle disable failed: %v", err)
@@ -94,7 +94,7 @@ func TestSystemHandlerTogglePenpaiFeature(t *testing.T) {
 	loadCalled := false
 	loadLlamaForSystemHandler = func() error { loadCalled = true; return nil }
 	confForSystemHandler = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: false}}
+		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiAllow: false}}
 	}
 	if err := SystemHandler(systemMessage(t, "toggle-penpai-feature")); err != nil {
 		t.Fatalf("toggle enable failed: %v", err)
@@ -138,7 +138,7 @@ func TestSystemHandlerGroundsegPowerAndSwap(t *testing.T) {
 	}
 
 	confForSystemHandler = func() structs.SysConfig {
-		return structs.SysConfig{RuntimeConfig: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
+		return structs.SysConfig{Runtime: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
 	}
 	configureCalled := false
 	configureSwapForSystemHandler = func(file string, value int) error {

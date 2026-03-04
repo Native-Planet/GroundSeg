@@ -39,7 +39,7 @@ func RunAtLimitPassWithDependencies(
 	bytesPerGiB int64,
 ) {
 	conf := confForChop()
-	for _, patp := range conf.Piers {
+	for _, patp := range conf.Connectivity.Piers {
 		urbConf := urbitConfForChop(patp)
 		if urbConf.SizeLimit == 0 {
 			continue

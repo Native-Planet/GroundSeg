@@ -42,7 +42,7 @@ func processConfEvent(event string) {
 		return
 	}
 	conf := Conf()
-	if conf.C2cInterval == 0 {
+	if conf.Connectivity.C2cInterval == 0 {
 		if err := UpdateConfTyped(WithC2cInterval(600)); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
 		}

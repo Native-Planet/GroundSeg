@@ -68,7 +68,7 @@ func TestFetchVersionFromServerRetriesThenSucceeds(t *testing.T) {
 		sleepCalls++
 	})
 	setVersionFetchPolicy(3, time.Millisecond)
-	globalConfig.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
 
 	client := &stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
@@ -79,7 +79,7 @@ func TestFetchVersionFromServerRetriesThenSucceeds(t *testing.T) {
 	setVersionHTTPClient(client)
 
 	conf := structs.SysConfig{}
-	conf.GsVersion = "1.0.0"
+	conf.Runtime.GsVersion = "1.0.0"
 	version, err := fetchVersionFromServer(conf)
 	if err != nil {
 		t.Fatalf("expected retry to succeed, got error: %v", err)
@@ -104,7 +104,7 @@ func TestFetchVersionFromServerFailsAfterRetryExhaustion(t *testing.T) {
 
 	setVersionFetchSleep(func(_ time.Duration) {})
 	setVersionFetchPolicy(2, time.Millisecond)
-	globalConfig.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
 	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{err: errors.New("network down")},
@@ -113,7 +113,7 @@ func TestFetchVersionFromServerFailsAfterRetryExhaustion(t *testing.T) {
 	})
 
 	conf := structs.SysConfig{}
-	conf.GsVersion = "1.0.0"
+	conf.Runtime.GsVersion = "1.0.0"
 	_, err := fetchVersionFromServer(conf)
 	if err == nil {
 		t.Fatal("expected error after retry exhaustion")

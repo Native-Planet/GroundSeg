@@ -3,6 +3,7 @@ package rectify
 import (
 	"context"
 	"fmt"
+
 	"groundseg/broadcast"
 	"groundseg/docker/events"
 	"groundseg/structs"
@@ -11,21 +12,22 @@ import (
 	"go.uber.org/zap"
 )
 
-func ImportShipTransitionHandler() {
-	if err := ImportShipTransitionHandlerWithContext(context.Background()); err != nil {
-		zap.L().Warn(fmt.Sprintf("import ship transition handler stopped with error: %v", err))
-	}
-}
-
-func ImportShipTransitionHandlerWithContext(ctx context.Context) error {
+func ImportShipTransitionHandlerWithContextAndRuntime(ctx context.Context, runtime broadcast.BroadcastStore, eventRuntime ...events.EventRuntime) error {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if runtime == nil {
+		runtime = broadcast.DefaultBroadcastStateRuntime()
+	}
+	eventBus := events.DefaultEventRuntime()
+	if len(eventRuntime) > 0 {
+		eventBus = eventRuntime[0]
 	}
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case event := <-events.DefaultEventRuntime().ImportShipTransitions():
+		case event := <-eventBus.ImportShipTransitions():
 			if err := broadcast.ApplyBroadcastMutation(true, func(current *structs.AuthBroadcast) {
 				uploadStruct := current.Upload
 				switch transition.UploadTransitionType(event.Type) {
@@ -49,7 +51,7 @@ func ImportShipTransitionHandlerWithContext(ctx context.Context) error {
 					return
 				}
 				current.Upload = uploadStruct
-			}); err != nil {
+			}, runtime); err != nil {
 				zap.L().Warn(fmt.Sprintf("Unable to publish upload transition update: %v", err))
 			}
 		}

@@ -73,7 +73,7 @@ func TestBuildConfigPatchSupportsKnownAndUnsupportedKeys(t *testing.T) {
 
 func TestApplyConfPatchMergesAuthorizedSessions(t *testing.T) {
 	initial := structs.SysConfig{}
-	initial.Sessions = structs.AuthSessionBag{
+	initial.AuthSession.Sessions = structs.AuthSessionBag{
 		Authorized: map[string]structs.SessionInfo{
 			"existing": {Hash: "existing"},
 		},
@@ -86,8 +86,10 @@ func TestApplyConfPatchMergesAuthorizedSessions(t *testing.T) {
 			},
 		},
 	}
-	applyConfPatch(&initial, patch)
-	if len(initial.Sessions.Authorized) != 2 {
-		t.Fatalf("expected merged authorized sessions, got %+v", initial.Sessions.Authorized)
+	if err := applyConfPatch(&initial, patch); err != nil {
+		t.Fatalf("applyConfPatch returned error: %v", err)
+	}
+	if len(initial.AuthSession.Sessions.Authorized) != 2 {
+		t.Fatalf("expected merged authorized sessions, got %+v", initial.AuthSession.Sessions.Authorized)
 	}
 }

@@ -7,9 +7,23 @@ import "fmt"
 type TransitionPublishPolicy string
 
 const (
-	TransitionPublishStrict    TransitionPublishPolicy = "strict"
+	TransitionPublishStrict     TransitionPublishPolicy = "strict"
 	TransitionPublishBestEffort TransitionPublishPolicy = "best_effort"
 )
+
+type TransitionPublishCriticality string
+
+const (
+	TransitionPublishCritical    TransitionPublishCriticality = "critical"
+	TransitionPublishNonCritical TransitionPublishCriticality = "non_critical"
+)
+
+func TransitionPolicyForCriticality(criticality TransitionPublishCriticality) TransitionPublishPolicy {
+	if criticality == TransitionPublishCritical {
+		return TransitionPublishStrict
+	}
+	return TransitionPublishBestEffort
+}
 
 func HandleTransitionPublishError(context string, err error, policy TransitionPublishPolicy) error {
 	if err == nil {

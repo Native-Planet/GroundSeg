@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"groundseg/config"
+	"groundseg/internal/shipstatus"
 	"groundseg/internal/workflow"
 	"groundseg/logger"
 	"groundseg/transition"
@@ -44,11 +44,7 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 			threshold = 1
 		}
 		settings := rt.Check502SettingsSnapshotFn()
-		settings = config.Check502Settings{
-			Piers:      append([]string(nil), settings.Piers...),
-			WgOn:       settings.WgOn,
-			Disable502: settings.Disable502,
-		}
+		settings.Piers = append([]string(nil), settings.Piers...)
 		pierStatus, err := rt.GetShipStatusFn(settings.Piers)
 		if err != nil {
 			logger.Errorf("Couldn't get pier status: %v", err)
@@ -143,7 +139,7 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 		}
 		status, exists := statuses[patp]
 		if !exists {
-			return "", fmt.Errorf("%s status doesn't exist", patp)
+			return "", shipstatus.NotFoundErr(patp)
 		}
 		return status, nil
 	}

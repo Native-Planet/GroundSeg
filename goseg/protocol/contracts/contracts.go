@@ -74,6 +74,11 @@ type actionContractBindingKey struct {
 	Action    ActionToken
 }
 
+type contractCatalogFamily struct {
+	name  string
+	specs func() []contractCatalogEntry
+}
+
 // ContractCatalog owns all contract descriptors and action-to-contract bindings.
 type ContractCatalog struct {
 	contractCatalog             map[ContractID]ContractDescriptor
@@ -81,9 +86,34 @@ type ContractCatalog struct {
 	actionContractBindingsByKey map[actionContractBindingKey]ContractID
 }
 
-var contractCatalogFragments = []func() []contractCatalogEntry{
-	protocolContractCatalogEntries,
-	startramContractCatalogEntries,
+var contractCatalogFamilySpecs = []contractCatalogFamily{
+	{name: "protocol", specs: protocolContractCatalogSpecs},
+	{name: "startram", specs: startramContractCatalogSpecs},
+}
+
+const (
+	contractCatalogFamilyProtocol = "protocol"
+	contractCatalogFamilyStartram = "startram"
+)
+
+func contractCatalogEntriesForFamily(name string) ([]contractCatalogEntry, bool) {
+	for _, family := range contractCatalogFamilySpecs {
+		if family.name != name {
+			continue
+		}
+		return catalogEntries(family.specs()), true
+	}
+	return nil, false
+}
+
+func contractCatalogEntriesForFamilySnapshot(name string) ([]contractCatalogEntry, bool) {
+	for _, family := range contractCatalogFamilySpecs {
+		if family.name != name {
+			continue
+		}
+		return catalogEntriesSnapshot(family.specs()), true
+	}
+	return nil, false
 }
 
 func catalogEntries(specs []contractCatalogEntry) []contractCatalogEntry {
@@ -99,8 +129,8 @@ func catalogEntriesSnapshot(specs []contractCatalogEntry) []contractCatalogEntry
 // ContractCatalogEntries returns the canonical catalog source list used by LoadRegistry.
 func ContractCatalogEntries() []ContractCatalogEntry {
 	entries := make([]ContractCatalogEntry, 0, 16)
-	for _, fragment := range contractCatalogFragments {
-		entries = append(entries, fragment()...)
+	for _, family := range contractCatalogFamilySpecs {
+		entries = append(entries, catalogEntries(family.specs())...)
 	}
 	return entries
 }

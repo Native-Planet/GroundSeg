@@ -1,0 +1,90 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "main.go killSwitchWithMode calls subsystem.GracefulShipExit() and ignores the returned error before forcing reboot, while adjacent paths in runServer and C2cCheckWith return/propagate errors.",
+        "shipworkflow/startram_lifecycle_runtime.go has multiple SvcDeleteFn failures that are only logged and then returns nil, so transitions can report success after partial unregister failure.",
+        "importer/importer.go configureUploadedPier defers cleanupMultipartFn without checking/reporting its error, unlike surrounding workflow steps that wrap and return errors.",
+        "config/config_update_registry.go uses panic when apply handler is missing, whereas config patch parsing/application in config/config_update_schema.go is otherwise error-return based."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_graceful_exit_failure_before_reboot",
+      "summary": "Kill-switch reboot path drops graceful-exit errors and proceeds as if shutdown succeeded.",
+      "related_files": [
+        "main.go",
+        "docker/orchestration/subsystem/subsystem_health.go"
+      ],
+      "evidence": [
+        "main.go:370 calls subsystem.GracefulShipExit() without checking error, then immediately executes reboot.",
+        "docker/orchestration/subsystem/subsystem_health.go:123-185 gracefulShipExit constructs and returns detailed wrapped errors for stop/poll failures, but that contract is discarded by caller.",
+        "This makes failure handling depend on call site instead of function contract, producing inconsistent behavior across shutdown paths."
+      ],
+      "suggestion": "Capture and handle the GracefulShipExit error in killSwitchWithMode: either abort reboot on failure, or proceed only after logging a structured warning and explicitly marking reboot as forced. Keep one documented policy for all graceful shutdown callers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "workflow_steps_log_and_continue_on_mutation_failures",
+      "summary": "State-mutating workflow steps inconsistently swallow errors, yielding false-success transitions.",
+      "related_files": [
+        "shipworkflow/startram_lifecycle_runtime.go",
+        "importer/importer.go"
+      ],
+      "evidence": [
+        "shipworkflow/startram_lifecycle_runtime.go:183-191 and 225-230 logs SvcDeleteFn failures and still returns nil from transition steps.",
+        "importer/importer.go:1094 defers cleanupMultipartFn(tempDir) and discards cleanup failure entirely.",
+        "In the same files, many neighboring operations use wrapped returned errors (e.g., stop wireguard, workflow/post-workflow runs), so similar failure types have different propagation semantics."
+      ],
+      "suggestion": "Define explicit error policy per step category (critical, compensating, best-effort) and encode it consistently: aggregate best-effort failures with errors.Join into final transition/import result, or emit explicit 'partial success' status instead of returning nil.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "panic_used_for_runtime_config_validation",
+      "summary": "Config patch registry uses panic for missing apply handlers while sibling config code uses error returns.",
+      "related_files": [
+        "config/config_update_registry.go",
+        "config/config_update_schema.go"
+      ],
+      "evidence": [
+        "config/config_update_registry.go:29-31 panics when spec.apply is nil.",
+        "config/config_update_schema.go parse/apply paths are designed around returning errors (e.g., parsePatch and unsupportedConfPatchField).",
+        "This introduces a different failure mode (process crash) for configuration mistakes in an otherwise recoverable error surface."
+      ],
+      "suggestion": "Replace panic with returned configuration-construction error and fail initialization through existing error-return paths; if compile-time guard is desired, enforce via typed constructors/tests rather than runtime panic.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "best_effort_vs_fail_fast_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single enforced policy for when workflow/transition errors must be propagated vs logged-and-continued.",
+      "Mixed defensive strategy in config/runtime setup (panic for programmer errors, returned errors for runtime errors) without a uniform boundary."
+    ],
+    "likely_symptoms": [
+      "ignored_graceful_exit_failure_before_reboot",
+      "workflow_steps_log_and_continue_on_mutation_failures"
+    ],
+    "possible_false_positives": []
+  }
+}

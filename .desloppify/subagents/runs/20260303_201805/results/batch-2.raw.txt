@@ -1,0 +1,116 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 72.4
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Config patch behavior is split across parallel representations: pointer-based patch structs in goseg/config/config_update_schema.go (ConnectivityPatch/RuntimePatch/etc), a separate per-field registry in goseg/config/config_update_registry.go (connectivityPatchFields/runtimePatchFields/etc), and section descriptors in goseg/structs/configs.go, requiring synchronized edits across files.",
+        "Urbit config mutation and decoding logic are distributed between large type-switch decoding in goseg/structs/configs.go (UrbitDocker.UnmarshalJSON) and section mutator registries in goseg/config/urbit.go, creating multiple structural control points for the same domain model.",
+        "Workflow runtime files combine transition orchestration, domain validation, config mutation, and infrastructure side effects in single functions (for example runStartramToggleWithRuntime in goseg/shipworkflow/startram_lifecycle_runtime.go and buildToggleMinIOLinkSteps/buildRuntimeConfigIntSteps in goseg/shipworkflow/urbit_operations_runtime.go).",
+        "Test suites repeatedly implement similar global-state and filesystem setup patterns (for example GS_BASE_PATH/base path swap and fixture creation in goseg/config/config_test.go and goseg/startuporchestrator/startup_orchestrator_test.go) rather than using shared scenario builders."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_definition_split",
+      "summary": "Config patch semantics are duplicated across schema structs, field registries, and section descriptors, creating a fragile multi-edit design.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "goseg/config/config_update_schema.go defines many patch fields (e.g., RuntimePatch.Setup/GSVersion/Disable502 and ConnectivityPatch.EndpointURL/WgRegistered) as one source of truth.",
+        "goseg/config/config_update_registry.go redefines the same field universe with per-field key/parse/apply/merge entries (for example runtimePatchFields and connectivityPatchFields), duplicating policy wiring for each field.",
+        "goseg/structs/configs.go separately defines mutable section descriptors and typed section update paths (SysConfigSectionDescriptorList + UpdateSection), adding another structural mapping layer that must remain in sync."
+      ],
+      "suggestion": "Introduce a single declarative field catalog (key, path, parse, merge strategy, section) and generate or derive schema/apply/merge behavior from it, so adding a field requires one edit instead of synchronized edits in multiple files.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "duplicated_domain_mapping"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_config_mapping_fragmentation",
+      "summary": "Urbit config decoding and mutation routing are split across separate large mapping constructs, increasing drift risk and maintenance overhead.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "goseg/structs/configs.go implements UrbitDocker.UnmarshalJSON as a long key switch assigning many fields manually (network/runtime/schedule/web/feature/backup concerns all in one method).",
+        "goseg/config/urbit.go defines a separate urbitSectionMutatorSpecs registry to map section enums to typed mutators; these sections mirror the embedded concerns of UrbitDocker.",
+        "Both files encode structural knowledge of Urbit subdomains independently, so introducing or reclassifying a field can require touching multiple mapping systems."
+      ],
+      "suggestion": "Centralize Urbit field/section metadata in one typed map (or generated descriptors) used by both decode and section mutation paths, and split concern-specific logic into smaller dedicated units.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplicated_domain_mapping"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "workflow_handlers_mix_orchestration_and_side_effects",
+      "summary": "Ship workflow runtime handlers mix transition composition with direct infrastructure and config side effects in the same routines.",
+      "related_files": [
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "runStartramToggleWithRuntime in goseg/shipworkflow/startram_lifecycle_runtime.go builds workflow steps while also making config decisions, container operations, dispatching payloads, and rebuild sequencing in one body.",
+        "buildToggleMinIOLinkSteps and buildRuntimeConfigIntSteps in goseg/shipworkflow/urbit_operations_runtime.go combine domain decisions, persistence updates, external click/docker calls, and transition emission concerns.",
+        "goseg/docker/orchestration/runtime_ops.go exposes broad operation bags (many function fields grouped by different concerns), which encourages high-coupling handler functions consuming wide runtimes."
+      ],
+      "suggestion": "Extract pure transition planning from effect execution: create narrow use-case services per operation (e.g., network toggle, minio link, startram toggle) and keep runtime handlers as thin adapters that only invoke those services.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "orchestration_concern_blending"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_harness_setup_duplication",
+      "summary": "Multiple test files repeat environment/base-path and fixture bootstrapping patterns instead of reusing shared harness utilities.",
+      "related_files": [
+        "goseg/config/config_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/logger/logger_test.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "goseg/config/config_test.go repeatedly saves/restores global path or env state (e.g., BasePath/GS_BASE_PATH and function seam resets) inline per test.",
+        "goseg/startuporchestrator/startup_orchestrator_test.go repeats nearly identical BasePath temp setup and version_info.json fixture creation across several tests.",
+        "goseg/logger/logger_test.go and goseg/importer/importer_test.go each implement local reset/setup helpers for global mutable state (init state/upload sessions/dirs) without a shared cross-package pattern."
+      ],
+      "suggestion": "Define reusable test harness packages for common global-state and filesystem scenario setup (base path, env restoration, fixture version files, mutable global reset) and migrate repeated inline setup blocks to those helpers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_setup_scattering"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Domain mappings are expressed in multiple hand-maintained registries instead of one canonical schema.",
+      "Workflow modules use broad runtime bags that blur boundaries between planning and execution concerns.",
+      "Test infrastructure ownership is distributed per package, leading to repeated setup idioms."
+    ],
+    "likely_symptoms": [
+      "config_patch_definition_split",
+      "urbit_config_mapping_fragmentation",
+      "workflow_handlers_mix_orchestration_and_side_effects",
+      "test_harness_setup_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

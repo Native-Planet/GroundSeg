@@ -8,7 +8,10 @@ import (
 func TestStartramContractCatalogSpecsAreSelfConsistent(t *testing.T) {
 	t.Helper()
 
-	entries := startramContractCatalogEntries()
+	entries, ok := contractCatalogEntriesForFamily(contractCatalogFamilyStartram)
+	if !ok {
+		t.Fatal("startram contract catalog family not registered")
+	}
 	if len(entries) == 0 {
 		t.Fatal("expected startram contract catalog entries")
 	}
@@ -65,7 +68,10 @@ func TestStartramContractCatalogSpecsAreSelfConsistent(t *testing.T) {
 }
 
 func TestStartramContractCatalogEntriesAreSnapshots(t *testing.T) {
-	original := startramContractCatalogEntries()
+	original, ok := contractCatalogEntriesForFamily(contractCatalogFamilyStartram)
+	if !ok {
+		t.Fatal("startram contract catalog family not registered")
+	}
 	if len(original) == 0 {
 		t.Fatal("expected startram contract catalog entries")
 	}
@@ -73,14 +79,20 @@ func TestStartramContractCatalogEntriesAreSnapshots(t *testing.T) {
 	baseline := original[0]
 	original[0].ID = ContractID("startram.errors.broken")
 
-	refreshed := startramContractCatalogEntries()
+	refreshed, ok := contractCatalogEntriesForFamily(contractCatalogFamilyStartram)
+	if !ok {
+		t.Fatal("startram contract catalog family not registered")
+	}
 	if refreshed[0].ID != baseline.ID {
 		t.Fatalf("startram contract catalog entries should not be affected by caller mutation")
 	}
 }
 
 func TestStartramContractCatalogSnapshotEntriesAreSnapshots(t *testing.T) {
-	original := startramContractCatalogEntriesSnapshot()
+	original, ok := contractCatalogEntriesForFamilySnapshot(contractCatalogFamilyStartram)
+	if !ok {
+		t.Fatal("startram contract catalog family not registered")
+	}
 	if len(original) == 0 {
 		t.Fatal("expected startram contract snapshot entries")
 	}
@@ -88,7 +100,10 @@ func TestStartramContractCatalogSnapshotEntriesAreSnapshots(t *testing.T) {
 	baseline := original[0]
 	original[0].Descriptor.Description = "mutated"
 
-	snapshot := startramContractCatalogEntriesSnapshot()
+	snapshot, ok := contractCatalogEntriesForFamilySnapshot(contractCatalogFamilyStartram)
+	if !ok {
+		t.Fatal("startram contract catalog family not registered")
+	}
 	if snapshot[0].Descriptor.Description != baseline.Descriptor.Description {
 		t.Fatalf("startram contract snapshot should preserve description")
 	}

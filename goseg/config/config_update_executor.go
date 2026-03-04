@@ -22,7 +22,9 @@ func updateConfFromPatch(patch *ConfPatch) error {
 		return fmt.Errorf("error decoding JSON: %w", err)
 	}
 
-	applyConfPatch(&configStruct, patch)
+	if err := applyConfPatch(&configStruct, patch); err != nil {
+		return err
+	}
 
 	if err := persistConfig(configStruct); err != nil {
 		return fmt.Errorf("unable to persist config update: %w", err)
@@ -30,8 +32,12 @@ func updateConfFromPatch(patch *ConfPatch) error {
 	return nil
 }
 
-func applyConfPatch(target confPatchApplyTarget, patch *ConfPatch) {
-	for _, service := range confPatchServices() {
-		service.apply(target, patch)
+func applyConfPatch(target confPatchApplyTarget, patch *ConfPatch) error {
+	for _, field := range allConfPatchFields() {
+		service := field
+		if err := service.apply(target, patch); err != nil {
+			return err
+		}
 	}
+	return nil
 }

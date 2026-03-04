@@ -7,86 +7,86 @@ import (
 func StartramSettingsSnapshot() StartramSettings {
 	conf := Conf()
 	return StartramSettings{
-		EndpointURL:          conf.EndpointUrl,
-		Pubkey:               conf.Pubkey,
-		RemoteBackupPassword: conf.RemoteBackupPassword,
-		WgRegistered:         conf.WgRegistered,
-		WgOn:                 conf.WgOn,
-		Piers:                copyStringSlice(conf.Piers),
+		EndpointURL:          conf.Connectivity.EndpointUrl,
+		Pubkey:               conf.Startram.Pubkey,
+		RemoteBackupPassword: conf.Connectivity.RemoteBackupPassword,
+		WgRegistered:         conf.Connectivity.WgRegistered,
+		WgOn:                 conf.Connectivity.WgOn,
+		Piers:                copyStringSlice(conf.Connectivity.Piers),
 	}
 }
 
 func AuthSettingsSnapshot() AuthSettings {
 	conf := Conf()
-	authorizedSessions := make(map[string]structs.SessionInfo, len(conf.Sessions.Authorized))
-	for tokenID, session := range conf.Sessions.Authorized {
+	authorizedSessions := make(map[string]structs.SessionInfo, len(conf.AuthSession.Sessions.Authorized))
+	for tokenID, session := range conf.AuthSession.Sessions.Authorized {
 		authorizedSessions[tokenID] = session
 	}
 	return AuthSettings{
-		KeyFile:            conf.KeyFile,
-		Salt:               conf.Salt,
-		PasswordHash:       conf.PwHash,
-		AuthorizedSessions: authorizedSessions,
-	}
+			KeyFile:            conf.AuthSession.KeyFile,
+			Salt:               conf.AuthSession.Salt,
+			PasswordHash:       conf.AuthSession.PwHash,
+			AuthorizedSessions: authorizedSessions,
+		}
 }
 
 func PenpaiSettingsSnapshot() PenpaiSettings {
 	conf := Conf()
 	return PenpaiSettings{
-		Models:      append([]structs.Penpai(nil), conf.PenpaiModels...),
-		Allowed:     conf.PenpaiAllow,
-		ActiveModel: conf.PenpaiActive,
-		Running:     conf.PenpaiRunning,
-		ActiveCores: conf.PenpaiCores,
+		Models:      append([]structs.Penpai(nil), conf.Penpai.PenpaiModels...),
+		Allowed:     conf.Penpai.PenpaiAllow,
+		ActiveModel: conf.Penpai.PenpaiActive,
+		Running:     conf.Penpai.PenpaiRunning,
+		ActiveCores: conf.Penpai.PenpaiCores,
 	}
 }
 
 func Check502SettingsSnapshot() Check502Settings {
 	conf := Conf()
 	return Check502Settings{
-		Piers:      copyStringSlice(conf.Piers),
-		WgOn:       conf.WgOn,
-		Disable502: conf.Disable502,
+		Piers:      copyStringSlice(conf.Connectivity.Piers),
+		WgOn:       conf.Connectivity.WgOn,
+		Disable502: conf.Runtime.Disable502,
 	}
 }
 
 func HealthCheckSettingsSnapshot() HealthCheckSettings {
 	conf := Conf()
 	return HealthCheckSettings{
-		Piers:        copyStringSlice(conf.Piers),
-		DiskWarnings: copyDiskWarnings(conf.DiskWarning),
+		Piers:        copyStringSlice(conf.Connectivity.Piers),
+		DiskWarnings: copyDiskWarnings(conf.Connectivity.DiskWarning),
 	}
 }
 
 func ShipSettingsSnapshot() ShipSettings {
 	conf := Conf()
-	return ShipSettings{Piers: copyStringSlice(conf.Piers)}
+	return ShipSettings{Piers: copyStringSlice(conf.Connectivity.Piers)}
 }
 
 func ConnectivitySettingsSnapshot() ConnectivitySettings {
 	conf := Conf()
-	return ConnectivitySettings{C2cInterval: conf.C2cInterval}
+	return ConnectivitySettings{C2cInterval: conf.Connectivity.C2cInterval}
 }
 
 func UpdateSettingsSnapshot() UpdateSettings {
 	conf := Conf()
 	return UpdateSettings{
-		UpdateMode:   conf.UpdateMode,
-		UpdateBranch: conf.UpdateBranch,
+		UpdateMode:   conf.Connectivity.UpdateMode,
+		UpdateBranch: conf.Connectivity.UpdateBranch,
 	}
 }
 
 func SwapSettingsSnapshot() SwapSettings {
 	conf := Conf()
 	return SwapSettings{
-		SwapFile: conf.SwapFile,
-		SwapVal:  conf.SwapVal,
+		SwapFile: conf.Runtime.SwapFile,
+		SwapVal:  conf.Runtime.SwapVal,
 	}
 }
 
 func ShipRuntimeSettingsSnapshot() ShipRuntimeSettings {
 	conf := Conf()
-	return ShipRuntimeSettings{SnapTime: conf.SnapTime}
+	return ShipRuntimeSettings{SnapTime: conf.Runtime.SnapTime}
 }
 
 func RuntimeSettingsSnapshot() RuntimeSettings {

@@ -1,0 +1,119 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules define large callback-bag runtimes with 10+ function fields plus custom defaulting/validation layers (goseg/startuporchestrator/startup_orchestrator.go, goseg/rectify/rectify.go, goseg/shipworkflow/operations_runtime.go, goseg/importer/importer.go).",
+        "The same runtime-shaping pattern is repeated manually: withDefaults/merge/validate and missing-callback string plumbing, indicating indirection growth without shared leverage.",
+        "Tests mirror this complexity by constructing many callback stubs just to reach behavior under test (goseg/startuporchestrator/startup_orchestrator_test.go, goseg/docker/orchestration/subsystem/docker_test.go).",
+        "Some abstractions are bypassed by concrete globals and concrete-only helper APIs, e.g. broadcast APIs mixing BroadcastStore with *broadcastStateRuntime-specific entry points (goseg/broadcast/transitions.go, goseg/broadcast/state.go)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 66.0,
+        "indirection_cost": 45.0,
+        "interface_honesty": 73.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_runtime_sprawl",
+      "summary": "Runtime dependency injection is implemented as repeated large callback bags, creating high indirection cost with low reuse.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "startupInitRuntime and startBackgroundServicesRuntime carry long function-field lists and manual withDefaults/validate plumbing (startup_orchestrator.go:117-274, 351-539).",
+        "RectifyRuntime repeats the same pattern with mergeRectifyRuntime + validate over many callbacks (rectify.go:24-182).",
+        "workflowRuntime repeats defaults/merge/validate for many function seams (operations_runtime.go:23-171).",
+        "importerRuntime follows the same callback-bag + segmented validators pattern (importer.go:104-260).",
+        "main.go introduces another runtime bag for bootstrap/c2c/server wiring (main.go:65-148, 172-263)."
+      ],
+      "suggestion": "Introduce a shared runtime-composition pattern per bounded context: group dependencies into smaller role interfaces (e.g., config, orchestration, transition-publish, filesystem), then compose a thin runtime from those interfaces. Replace repeated withDefaults/validate code with one generic dependency validator/helper used across modules.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "callback_bag_runtime"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_test_burden",
+      "summary": "Abstraction shape leaks into tests, requiring broad stub scaffolding to test narrow behaviors.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/docker/orchestration/subsystem/docker_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "startup_orchestrator_test constructs large runtime structs with many callbacks for single test scenarios (startup_orchestrator_test.go:109-127, 193-207).",
+        "subsystem docker tests require full test runtime population via testDockerRoutineRuntime before behavior assertions (docker_test.go:21-55).",
+        "main tests repeatedly build nested runtime structs (c2cRuntime/connectivity/device/mode) to isolate one branch (main_test.go:125-209)."
+      ],
+      "suggestion": "Define slimmer collaborator interfaces at call sites (per behavior path) and provide focused test doubles for those interfaces. Keep one integration-level runtime-bag test, but move most unit tests to small interface contracts.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "callback_bag_runtime"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "interface_honesty_error_wrappers",
+      "summary": "Several runtime seams force artificial error-wrapping closures for operations that are naturally non-erroring, weakening interface honesty.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "Rectify runtime wraps non-error snapshot getters into `(value, error)` closures that always return nil error (rectify.go:50-64).",
+        "Importer runtime wraps non-error operations in error-returning callbacks (e.g., updateContainerFn and wait-for-boot/remote wrappers) that always return nil except delegated branch (importer.go:154-171)."
+      ],
+      "suggestion": "Split read-only/value seams from failure-prone seams. Use plain value-returning function types where failures are impossible, and keep error-returning signatures only on true I/O/boundary operations.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "callback_bag_runtime"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "broadcast_store_concrete_leak",
+      "summary": "Broadcast abstractions expose both interface-based and concrete-runtime APIs, causing leaky boundaries.",
+      "related_files": [
+        "goseg/broadcast/transitions.go",
+        "goseg/broadcast/state.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "BroadcastStore interface exists for transition operations (transitions.go:15-21), but state helpers still accept/return concrete `*broadcastStateRuntime` (state.go:118-131, 134-195).",
+        "Rectify paths still directly reach default singleton broadcast runtime in helper flows (rectify.go:252-257), bypassing injected runtime in parts of the package."
+      ],
+      "suggestion": "Standardize broadcast access behind BroadcastStore (or a small pair of interfaces for state + schedule bus), and remove concrete pointer-based helper entry points from package-level APIs. Ensure helper paths accept injected runtime consistently instead of default singleton access.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "global_singleton_bypass"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Dependency injection evolved as per-file callback bags instead of shared role interfaces, creating repetitive abstraction scaffolding.",
+      "Global singleton access remains mixed with injected runtimes, so abstraction boundaries are not consistently enforced."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_test_burden",
+      "interface_honesty_error_wrappers"
+    ],
+    "possible_false_positives": []
+  }
+}

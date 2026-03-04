@@ -36,7 +36,7 @@ func CreateDefaultNetdataConf() error {
 // write a conf to disk from version server info
 func UpdateNetdataConf() error {
 	conf := confForNetdata()
-	releaseChannel := conf.UpdateBranch
+	releaseChannel := conf.Connectivity.UpdateBranch
 	versionInfo := getVersionChannelForNetdata()
 	netdataRepo := versionInfo.Netdata.Repo
 	amdHash := versionInfo.Netdata.Amd64Sha256

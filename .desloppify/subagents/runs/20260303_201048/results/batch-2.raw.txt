@@ -1,0 +1,119 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 61.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules use large callback-bag runtimes with manual defaulting/validation (`importerRuntime`, `startupInitRuntime`, `RectifyRuntime`) where significant code is wiring rather than domain behavior.",
+        "Mutation contracts are intentionally untyped (`mutateFn any`) across orchestration/workflow/config section updaters, and some mutation paths silently no-op on type mismatch instead of failing fast.",
+        "Runtime facade structs in orchestration duplicate each other (`RuntimeStartupOps` vs `RuntimeConfigOps` + `RuntimeLoadOps` + `RuntimeServiceOps`) and are reassembled through pass-through constructors, increasing call-surface area without clear policy gain."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 42.0,
+        "interface_honesty": 55.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_overgrowth",
+      "summary": "Large callback-bag runtime structs create high indirection cost and duplicated wiring logic across subsystems.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/rectify/rectify.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`importerRuntime` declares many function seams spanning unrelated concerns (upload, config, provisioning) and `withDefaultsImporterRuntime` manually copies each callback.",
+        "`startupInitRuntime` and `RectifyRuntime` repeat the same pattern (`withDefaults...`, `validate`) instead of reusing a smaller stable dependency interface per workflow.",
+        "`bootstrapRuntime` in `main.go` is another callback bag with pass-through methods (`bootstrap`, `startServer`, `runC2cCheck`) that mostly add nil checks and forwarding."
+      ],
+      "suggestion": "Split callback bags into smaller role-specific interfaces (for example config-store, container-ops, transition-publisher), inject concrete dependencies once via constructors, and remove repetitive per-field defaulting layers in favor of explicit composition at module boundaries.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "untyped_mutation_contracts",
+      "summary": "Core mutation abstractions rely on `any` callbacks, weakening interface honesty and making misuse silently possible.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/structs/configs.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`RuntimeUrbitOps.UpdateUrbitSectionFn` uses `mutateFn any`, and `workflowRuntime.UpdateUrbitSectionFn` mirrors it with the same untyped contract.",
+        "`shipworkflow` forwards typed mutators through `any` casting (`any(mutate)`), so compile-time guarantees are lost at the boundary.",
+        "`SysConfig.UpdateSection` dispatches through descriptor mutations that type-assert and otherwise do nothing, so wrong callback shapes can fail silently."
+      ],
+      "suggestion": "Replace `any` mutation seams with typed contracts (generic section updater or explicit per-section methods), and return an explicit error when a mutation callback type is invalid instead of silently ignoring it.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "overlapping_runtime_facades",
+      "summary": "Orchestration runtime facades overlap heavily and are recomposed through pass-through helpers, adding layering without behavioral leverage.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`RuntimeStartupOps` duplicates fields already represented in `RuntimeConfigOps`, `RuntimeLoadOps`, and `RuntimeServiceOps`, then `defaultRuntimeStartupOps` re-copies those fields.",
+        "`RuntimeTransitionOpsFromContainerOps` and `RuntimeTransitionOpsFromUrbitOps` are thin merge helpers around embedded structs rather than policy-bearing abstractions.",
+        "Downstream runtimes (`workflowRuntime`, `RectifyRuntime`) consume subsets of these ops, indicating the top-level facades are broader than actual use sites."
+      ],
+      "suggestion": "Flatten orchestration runtime API into a smaller set of cohesive capability interfaces aligned to consumers (workflow, rectify, startup) and remove duplicate aggregate facades that only repackage the same callbacks.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "mutable_package_runtime_seams",
+      "summary": "Package-level mutable seam variables act as hidden dependency injection, creating implicit abstraction boundaries and harder-to-reason wiring.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "Startup uses package-level function vars (`startupUpdateSettingsSnapshot`, `startupStartramSettingsSnapshot`, `startupSwapSettingsSnapshot`) as dependency seams.",
+        "Main similarly uses mutable package vars (`runtimeContextSnapshotFn`, `connectivitySettingsSnapshot`, `netCheckFn`, `debugModeFn`) that influence runtime behavior outside constructor signatures.",
+        "Importer has package-level dependency function vars (`resolveStoragePathFor`, `importerSwapSettingsFor`, `importerStartramSettingsFor`) parallel to explicit runtime structs, resulting in mixed injection styles."
+      ],
+      "suggestion": "Standardize on constructor-injected dependencies and remove mutable package-level seam vars for runtime behavior; keep package-level vars only for constants and immutable defaults.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Broad runtime-seam pattern optimized for test override flexibility has grown into duplicated callback-bag architecture across modules.",
+      "Type erasure (`any`) is used at key mutation boundaries to unify APIs, but it degrades contract clarity and safety."
+    ],
+    "likely_symptoms": [
+      "overlapping_runtime_facades",
+      "mutable_package_runtime_seams"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 64.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Configuration schema is encoded in multiple manual registries/switches: `ConfPatch` field registry in `goseg/config/config_update_registry.go` (e.g., `connectivityPatchFields`, `runtimePatchFields`), section descriptor registry in `goseg/structs/configs.go` (`SysConfigSectionDescriptorList`), and another key switch in `(*UrbitDocker).UnmarshalJSON` (`goseg/structs/configs.go:407-678`).",
+        "Runtime wiring has repeated assembly logic in `goseg/docker/orchestration/runtime_ops.go`, including overlapping constructors (`urbitConfigOps` vs `defaultRuntimeUrbit`) and parallel load bundles (`defaultRuntimeLoad` vs `defaultStartupLoad`) with near-identical dependency assignments.",
+        "Large test files combine unrelated concerns and duplicate heavy fixture setup, e.g. `goseg/config/config_test.go` repeated full default/custom config construction across many test cases, and `goseg/system/wifi_test.go` mixing wifi command/runtime tests with captive transport and C2C orchestration tests."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "fragmented_config_schema_definition",
+      "summary": "Config schema behavior is split across independent manual maps/switches, creating structural drift risk.",
+      "related_files": [
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`goseg/config/config_update_registry.go` defines dozens of per-field specs in `connectivityPatchFields`, `startramPatchFields`, `runtimePatchFields`, `penpaiPatchFields`, and `authSessionPatchFields`.",
+        "`goseg/config/config_update_schema.go` separately defines `ConfPatch` and patch sub-structs (`ConnectivityPatch`, `RuntimePatch`, etc.), duplicating the same domain field inventory.",
+        "`goseg/structs/configs.go:407-678` uses a large string-key switch in `(*UrbitDocker).UnmarshalJSON`, manually re-listing and parsing each field instead of sharing a single schema source."
+      ],
+      "suggestion": "Introduce a single declarative schema table per config domain that drives parse/apply/merge behavior and (where needed) JSON decode mapping; generate or compose patch field registries from that schema to eliminate parallel manual inventories.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_schema_replication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "repeated_section_dispatch_patterns",
+      "summary": "Section dispatch logic is reimplemented in multiple modules with similar descriptor maps and mutation adapters.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/urbit.go",
+        "goseg/config/config_update_registry.go"
+      ],
+      "evidence": [
+        "`goseg/structs/configs.go:47-106` defines `SysConfigSectionDescriptorList` plus descriptor-map construction for section access/mutation.",
+        "`goseg/config/urbit.go:171-207` builds a separate `urbitSectionMutatorSpecs` list and map for section-based mutation with analogous section-to-mutator dispatch.",
+        "`goseg/config/config_update_registry.go:170-197` introduces `sysConfigSectionPatchSpecs` and a service map assembly layer over sections, adding a third section registry path."
+      ],
+      "suggestion": "Consolidate section metadata and mutation dispatch into shared section descriptors with typed adapters, so section addition/removal requires editing one authoritative registry instead of three parallel structures.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_schema_replication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_wiring_duplication",
+      "summary": "Runtime dependency composition duplicates the same wiring in separate constructor paths, increasing inconsistency risk.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_ops.go:246-254` (`urbitConfigOps`) and `:320-331` (`defaultRuntimeUrbit`) both wire `LoadUrbitConfigFn`, `UrbitConfFn`, `UrbitConfAllFn`, `UpdateUrbitFn`, and `UpdateUrbitSectionFn` from the same config package with overlapping intent.",
+        "`runtime_ops.go:354-360` (`defaultRuntimeLoad`) and `:382-390` (`defaultStartupLoad`) duplicate loader binding for wireguard/mc/minios/urbits with separate structs and call sites.",
+        "Ship workflow runtime entry points (`goseg/shipworkflow/startram_lifecycle_runtime.go`, `goseg/shipworkflow/urbit_operations_runtime.go`) depend on these composed runtime bundles, so divergence in one constructor path can create behavior skew."
+      ],
+      "suggestion": "Create a canonical runtime builder that composes base dependencies once and derives specialized views (startup/transition/urbit) by projection instead of independently re-wiring overlapping fields.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplicated_runtime_composition"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_file_mixed_responsibilities_and_fixture_duplication",
+      "summary": "Several large test files mix multiple domains and repeat bulky fixture assembly, reducing local coherence and maintainability.",
+      "related_files": [
+        "goseg/config/config_test.go",
+        "goseg/system/wifi_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "`goseg/config/config_test.go` repeatedly inlines large default/custom `SysConfig` initialization blocks across multiple tests (e.g., around lines 71-132, 186-244, 467-520).",
+        "`goseg/system/wifi_test.go` combines low-level wifi runtime command tests, C2C action parsing tests, captive transport adapter routing tests, and service flow tests in one file (e.g., around lines 30-243, 297-466, 609+).",
+        "`goseg/startuporchestrator/startup_orchestrator_test.go` contains broad startup validation, service callback matrix setup, and version-discovery behavior in a single file with a large string-based callback switch (`withStartBackgroundServiceCallback`, lines 55-98)."
+      ],
+      "suggestion": "Split tests by behavior slice (runtime command layer, transport adapter, orchestration flows) and replace repeated config setup with shared fixture builders/table-driven variants to isolate responsibilities and shrink per-test setup noise.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_design_sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Domain schemas and section dispatch are maintained through repeated hand-written registries instead of one authoritative model.",
+      "Runtime dependency composition evolved via additive constructors without a single canonical assembly point.",
+      "Test growth favored in-file incremental additions over behavior-oriented file boundaries and reusable fixtures."
+    ],
+    "likely_symptoms": [
+      "fragmented_config_schema_definition",
+      "repeated_section_dispatch_patterns",
+      "runtime_wiring_duplication",
+      "test_file_mixed_responsibilities_and_fixture_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -46,7 +46,7 @@ func TestResolveLatestChannelAndPublishVersionMetadata(t *testing.T) {
 
 	setVersionFetchPolicy(1, time.Millisecond)
 	setVersionFetchSleep(func(time.Duration) {})
-	globalConfig.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
 	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{resp: newHTTPResponse(200, `{"groundseg":{"beta":{"groundseg":{"repo":"repo-beta"}}}}`)},
@@ -54,8 +54,8 @@ func TestResolveLatestChannelAndPublishVersionMetadata(t *testing.T) {
 	})
 
 	conf := structs.SysConfig{}
-	conf.GsVersion = "1.0.0"
-	conf.UpdateBranch = "beta"
+	conf.Runtime.GsVersion = "1.0.0"
+	conf.Connectivity.UpdateBranch = "beta"
 	metadata, channel, err := ResolveLatestChannel(conf)
 	if err != nil {
 		t.Fatalf("ResolveLatestChannel failed: %v", err)
@@ -91,9 +91,9 @@ func TestCheckVersionReturnsStoredChannelOnFailure(t *testing.T) {
 	store.SetState(existing, true)
 	setVersionStore(store)
 
-	globalConfig.UpdateUrl = "https://updates.example/version"
-	globalConfig.GsVersion = "1.0.0"
-	globalConfig.UpdateBranch = "latest"
+	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Runtime.GsVersion = "1.0.0"
+	globalConfig.Connectivity.UpdateBranch = "latest"
 	setVersionFetchPolicy(1, time.Millisecond)
 	setVersionFetchSleep(func(time.Duration) {})
 	setVersionHTTPClient(&stubVersionHTTPClient{
@@ -117,9 +117,9 @@ func TestCheckVersionWithErrorReturnsCauseOnFailure(t *testing.T) {
 	store.SetState(existing, true)
 	setVersionStore(store)
 
-	globalConfig.UpdateUrl = "https://updates.example/version"
-	globalConfig.GsVersion = "1.0.0"
-	globalConfig.UpdateBranch = "latest"
+	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Runtime.GsVersion = "1.0.0"
+	globalConfig.Connectivity.UpdateBranch = "latest"
 	setVersionFetchPolicy(1, time.Millisecond)
 	setVersionFetchSleep(func(time.Duration) {})
 	setVersionHTTPClient(&stubVersionHTTPClient{
@@ -148,9 +148,9 @@ func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
 	setVersionStore(newInMemoryVersionStore())
 	setVersionFetchPolicy(1, time.Millisecond)
 	setVersionFetchSleep(func(time.Duration) {})
-	globalConfig.UpdateUrl = "https://updates.example/version"
-	globalConfig.GsVersion = "1.0.0"
-	globalConfig.UpdateBranch = "latest"
+	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Runtime.GsVersion = "1.0.0"
+	globalConfig.Connectivity.UpdateBranch = "latest"
 
 	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
@@ -165,7 +165,7 @@ func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
 		t.Fatalf("expected server ready after successful sync")
 	}
 
-	globalConfig.UpdateBranch = "missing"
+	globalConfig.Connectivity.UpdateBranch = "missing"
 	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},
@@ -193,9 +193,9 @@ func TestSyncVersionInfoWithErrorReturnsCauseOnFailure(t *testing.T) {
 	setVersionStore(newInMemoryVersionStore())
 	setVersionFetchPolicy(1, time.Millisecond)
 	setVersionFetchSleep(func(time.Duration) {})
-	globalConfig.UpdateUrl = "https://updates.example/version"
-	globalConfig.GsVersion = "1.0.0"
-	globalConfig.UpdateBranch = "latest"
+	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Runtime.GsVersion = "1.0.0"
+	globalConfig.Connectivity.UpdateBranch = "latest"
 
 	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
@@ -210,7 +210,7 @@ func TestSyncVersionInfoWithErrorReturnsCauseOnFailure(t *testing.T) {
 		t.Fatalf("expected initial channel, got %+v", channel)
 	}
 
-	globalConfig.UpdateBranch = "missing"
+	globalConfig.Connectivity.UpdateBranch = "missing"
 	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},

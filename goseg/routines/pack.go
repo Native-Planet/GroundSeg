@@ -17,11 +17,12 @@ func PackScheduleLoop() {
 	if err := queuePack(); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to make initial pack queue: %v", err))
 	}
+	runtime := broadcast.DefaultBroadcastStateRuntime()
 	ticker := time.NewTicker(1 * time.Minute)
 	//ticker := time.NewTicker(15 * time.Second)
 	for {
 		select {
-		case <-broadcast.SchedulePackEvents():
+		case <-runtime.SchedulePackEvents():
 			if err := queuePack(); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))
 			}
@@ -40,13 +41,14 @@ func PackScheduleLoopWithContext(ctx context.Context) error {
 	if err := queuePack(); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to make initial pack queue: %v", err))
 	}
+	runtime := broadcast.DefaultBroadcastStateRuntime()
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-broadcast.SchedulePackEvents():
+		case <-runtime.SchedulePackEvents():
 			if err := queuePack(); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))
 			}
@@ -62,7 +64,7 @@ func queuePack() error {
 	var err error
 	zap.L().Debug("Updating pack schedule")
 	conf := config.Conf()
-	for _, patp := range conf.Piers {
+	for _, patp := range conf.Connectivity.Piers {
 		shipConf := config.UrbitConf(patp)
 		// is scheduled
 		if !shipConf.MeldSchedule {
@@ -108,7 +110,7 @@ func queuePack() error {
 				continue
 			}
 		}
-		if err := broadcast.UpdateScheduledPack(patp, meldNext); err != nil {
+		if err := broadcast.DefaultBroadcastStateRuntime().UpdateScheduledPack(patp, meldNext); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to update pack schedule struct for %s: %v", patp, err))
 		}
 

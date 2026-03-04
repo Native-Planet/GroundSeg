@@ -44,7 +44,7 @@ func startramRenewalDelay() time.Duration {
 	conf := config.Conf()
 	zap.L().Debug(fmt.Sprintf("Checking StarTram renewal status.."))
 
-	if !conf.WgRegistered {
+	if !conf.Connectivity.WgRegistered {
 		zap.L().Debug(fmt.Sprintf("Next StarTram renewal check in 10 minutes"))
 		return 10 * time.Minute
 	}
@@ -75,10 +75,10 @@ func startramRenewalDelay() time.Duration {
 	daysUntil := int(expiryDate.Sub(time.Now()).Hours() / 24)
 	send := func() {
 		zap.L().Warn(fmt.Sprintf("Send renew notification to hark for test %v", daysUntil))
-		sendStartramHarkNotification(daysUntil, conf.Piers)
+		sendStartramHarkNotification(daysUntil, conf.Connectivity.Piers)
 	}
 
-	rem := conf.StartramSetReminder
+	rem := conf.Startram.StartramSetReminder
 	if !rem.One && daysUntil <= 1 {
 		zap.L().Warn("Send renew notification to hark for less than 1 day")
 		send()

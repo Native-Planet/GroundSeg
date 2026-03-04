@@ -83,7 +83,7 @@ func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
 			},
 		},
 	}
-	UpdateBroadcast(oldState)
+	DefaultBroadcastStateRuntime().UpdateBroadcast(oldState)
 
 	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
 		rt.getClientManagerFn = func() *structs.ClientManager {
@@ -114,7 +114,7 @@ func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
 	var updated structs.AuthBroadcast
 	runtime.updateBroadcastFn = func(next structs.AuthBroadcast) {
 		updated = next
-		UpdateBroadcast(next)
+		DefaultBroadcastStateRuntime().UpdateBroadcast(next)
 	}
 	broadcastCalls := 0
 	runtime.broadcastToClientsFn = func() error {
@@ -152,7 +152,7 @@ func TestRunBroadcastTickHandlesPierInfoError(t *testing.T) {
 	saved.Transition = structs.UrbitTransitionBroadcast{Pack: "packing"}
 	saved.Info.LusCode = "0v0"
 
-	UpdateBroadcast(structs.AuthBroadcast{
+	DefaultBroadcastStateRuntime().UpdateBroadcast(structs.AuthBroadcast{
 		Urbits: map[string]structs.Urbit{
 			"zod": saved,
 		},

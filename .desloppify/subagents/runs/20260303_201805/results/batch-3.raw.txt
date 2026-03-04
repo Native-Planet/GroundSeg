@@ -1,0 +1,90 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Best-effort mutations are handled inconsistently across runtime flows: `recreateContainerIfImageChanged` logs and suppresses `ContainerStop`/`ContainerRemove` failures (`goseg/docker/lifecycle/planner.go:67-73`), while related teardown logic in `urbitCleanDelete` accumulates and returns joined stop/delete errors (`goseg/shipworkflow/operations_runtime.go:382-424`).",
+        "Startram cleanup paths log deletion failures but still return success (`goseg/shipworkflow/startram_lifecycle_runtime.go:184-189`, `:227-230`), creating silent partial-failure outcomes.",
+        "WiFi service methods mix nil-receiver error returns and panic-prone dereferences: several methods return explicit errors for nil service (`goseg/system/wifi_runtime_api.go:39-49`, `:109-153`), but `StopWiFiInfoLoop` dereferences `service.state` without nil guards (`:128-133`).",
+        "Comparable status-not-found paths use incompatible error contracts: ad-hoc string error in docker subsystem (`goseg/docker/orchestration/subsystem/subsystem_health.go:146`) versus sentinel-wrapped typed error in workflow runtime (`goseg/shipworkflow/operations_runtime.go:427-429`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "orchestration_partial_failure_suppressed",
+      "summary": "Container and service teardown flows suppress operational failures in some paths, causing success returns after partial failure.",
+      "related_files": [
+        "goseg/docker/lifecycle/planner.go",
+        "goseg/shipworkflow/startram_lifecycle_runtime.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`recreateContainerIfImageChanged` logs but does not propagate `ContainerStop` and `ContainerRemove` errors (`planner.go:67-73`), then proceeds to recreate.",
+        "Startram endpoint/cancel flows log `SvcDeleteFn` failures and continue (`startram_lifecycle_runtime.go:184-189`, `:227-230`).",
+        "In contrast, `urbitCleanDelete` in workflow runtime explicitly accumulates and returns joined stop/delete failures (`operations_runtime.go:382-424`)."
+      ],
+      "suggestion": "Standardize teardown semantics with a shared policy: either aggregate non-fatal cleanup errors and return `errors.Join(...)`, or explicitly classify and emit best-effort-only failures via a typed warning channel. Apply the same contract across planner, startram lifecycle, and workflow delete paths.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_best_effort_error_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "wifi_nil_receiver_contract_split",
+      "summary": "WiFi runtime service exposes mixed nil-service failure modes (error returns in some methods, panic risk in others).",
+      "related_files": [
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`IsWifiEnabled`, `ConstructWifiInfo`, `ToggleDevice`, and `ApplyCaptiveRules` explicitly return errors on nil service (`wifi_runtime_api.go:39-49`, `:109-143`).",
+        "`StopWiFiInfoLoop` dereferences `service.state` immediately with no nil guard (`wifi_runtime_api.go:128-133`), creating panic risk unlike sibling methods.",
+        "Assigned tests focus on command/runtime behavior and do not cover nil receiver behavior, leaving the contract mismatch unguarded (`wifi_test.go`)."
+      ],
+      "suggestion": "Define one nil-receiver contract for `WiFiRuntimeService` (prefer explicit error returns), add nil/state guards to `StopWiFiInfoLoop` and `StartWiFiInfoLoop`, and add table-driven nil-behavior tests to lock the contract.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_best_effort_error_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "status_not_found_error_typing_drift",
+      "summary": "Status lookup failures use incompatible error types across neighboring orchestration code, weakening predictable handling.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "Docker subsystem returns plain formatted text for missing status: `fmt.Errorf(\"%s status doesn't exist\", patp)` (`subsystem_health.go:146`).",
+        "Workflow runtime models the same class as sentinel + wrapping (`errShipStatusNotFound` and `shipStatusNotFoundErr`) so callers can use `errors.Is` (`operations_runtime.go:49`, `:427-429`)."
+      ],
+      "suggestion": "Introduce a shared typed/sentinel error for ship-status lookup misses in orchestration layers and wrap consistently (`%w`) so retry/fallback logic can reliably branch via `errors.Is`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_error_typing"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No unified error policy for best-effort orchestration steps versus required state transitions.",
+      "Error taxonomy is fragmented across subsystems (typed/sentinel errors in some modules, ad-hoc strings in others)."
+    ],
+    "likely_symptoms": [
+      "orchestration_partial_failure_suppressed",
+      "status_not_found_error_typing_drift"
+    ],
+    "possible_false_positives": []
+  }
+}

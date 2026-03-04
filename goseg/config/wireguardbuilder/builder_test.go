@@ -9,7 +9,7 @@ import (
 
 func TestBuildConfigUsesDefaultsAndVersionOverrides(t *testing.T) {
 	conf := structs.SysConfig{}
-	conf.UpdateBranch = "canary"
+	conf.Connectivity.UpdateBranch = "canary"
 	version := structs.Channel{
 		Wireguard: structs.VersionDetails{
 			Repo:        "wireguard.repo/example",
@@ -20,7 +20,7 @@ func TestBuildConfigUsesDefaultsAndVersionOverrides(t *testing.T) {
 
 	config := BuildConfig(conf, version)
 	expected := defaults.WgConfig
-	expected.WireguardVersion = conf.UpdateBranch
+	expected.WireguardVersion = conf.Connectivity.UpdateBranch
 	expected.Repo = version.Wireguard.Repo
 	expected.Amd64Sha256 = version.Wireguard.Amd64Sha256
 	expected.Arm64Sha256 = version.Wireguard.Arm64Sha256
@@ -39,7 +39,7 @@ func TestBuildConfigUsesDefaultsAndVersionOverrides(t *testing.T) {
 
 func TestBuildConfigCopiesDefaultSlices(t *testing.T) {
 	conf := structs.SysConfig{}
-	conf.UpdateBranch = "stable"
+	conf.Connectivity.UpdateBranch = "stable"
 	version := structs.Channel{
 		Wireguard: structs.VersionDetails{
 			Repo:        "wireguard.repo/example",

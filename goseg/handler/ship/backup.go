@@ -3,7 +3,6 @@ package ship
 import (
 	"context"
 	"fmt"
-	"strings"
 	"groundseg/backupsvc"
 	"groundseg/config"
 	"groundseg/docker/events"
@@ -11,6 +10,7 @@ import (
 	"groundseg/shipworkflow"
 	"groundseg/startram"
 	"groundseg/structs"
+	"strings"
 	"time"
 )
 
@@ -100,7 +100,7 @@ func defaultBackupRuntime() backupRuntimeDependencies {
 	return backupRuntimeDependencies{
 		runTransitionFn: shipworkflow.RunTransitionedOperation,
 		persistShipBackupConfigFn: func(patp string, persistFn func(*structs.UrbitBackupConfig) error) error {
-			return config.UpdateUrbitSectionConfig(patp, config.UrbitConfigSectionBackup, persistFn)
+			return config.UpdateUrbitBackupConfig(patp, persistFn)
 		},
 		publishUrbitTransitionFn: func(ctx context.Context, transition structs.UrbitTransition) error {
 			return events.DefaultEventRuntime().PublishUrbitTransition(ctx, transition)

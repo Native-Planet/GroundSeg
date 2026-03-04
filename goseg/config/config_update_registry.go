@@ -1,599 +1,1040 @@
 package config
 
 import (
+	"fmt"
 	"groundseg/structs"
-	"reflect"
+	"strings"
 )
 
 type confPatchFieldSpec[T any] struct {
 	key        string
 	patchField string
 	parse      confPatchValueParser[T]
+	target     confPatchValueRef[T]
 	apply      confPatchApplyValueFn[T]
 	hasUpdates func(T) bool
-}
-
-func patchFieldRefByName[T any](field string) confPatchValueRef[T] {
-	return confPatchValueRef[T]{
-		getValue: func(patch *ConfPatch) (T, bool) {
-			return getConfigPatchValueByName[T](patch, field)
-		},
-		setValue: func(patch *ConfPatch, value T) {
-			setConfigPatchValueByName(patch, field, value)
-		},
-	}
+	merge      confPatchMergeFn
 }
 
 func configPatchFieldFromSpec[T any](spec confPatchFieldSpec[T]) confPatchField {
 	apply := spec.apply
 	if apply == nil {
-		panic("patch field spec requires explicit apply handler")
+		return confPatchField{
+			key:        spec.key,
+			patchField: spec.patchField,
+			initErr:    fmt.Errorf("patch field spec requires explicit apply handler for %q", spec.key),
+			hasUpdates: func(_ *ConfPatch) bool {
+				return false
+			},
+		}
+	}
+	if spec.target.setValue == nil && spec.target.getValue == nil {
+		return confPatchField{
+			key:        spec.key,
+			patchField: spec.patchField,
+			initErr:    fmt.Errorf("patch field spec requires explicit target accessor for %q", spec.key),
+			hasUpdates: func(_ *ConfPatch) bool {
+				return false
+			},
+		}
 	}
 	return newConfPatchField(
 		spec.key,
 		spec.patchField,
 		spec.parse,
-		patchFieldRefByName[T](spec.patchField),
+		spec.target,
 		apply,
 		spec.hasUpdates,
+		spec.merge,
 	)
 }
 
-type confPatchDomain string
+type confPatchConfigFieldRef[T any] func(*structs.SysConfig) *T
 
-const (
-	confPatchDomainConnectivity confPatchDomain = "connectivity"
-	confPatchDomainStartram     confPatchDomain = "startram"
-	confPatchDomainRuntime      confPatchDomain = "runtime"
-	confPatchDomainPenpai       confPatchDomain = "penpai"
-	confPatchDomainAuthSession  confPatchDomain = "authSession"
-	confPatchDomainUnsupported  confPatchDomain = "unsupported"
-)
-
-type confPatchDomainService struct {
-	name   confPatchDomain
-	fields []confPatchField
+type confPatchFieldBinding[T any] struct {
+	key         string
+	patchField  string
+	parse       confPatchValueParser[T]
+	target      confPatchValueRef[T]
+	configField confPatchConfigFieldRef[T]
+	apply       confPatchApplyValueFn[T]
+	hasUpdates  func(T) bool
+	merge       confPatchMergeFn
 }
 
-func (service confPatchDomainService) apply(target confPatchApplyTarget, patch *ConfPatch) {
-	for _, field := range service.fields {
-		field.apply(target, patch)
+func sectionField[Section any, T any](section func(*structs.SysConfig) *Section, field func(*Section) *T) confPatchConfigFieldRef[T] {
+	return func(cfg *structs.SysConfig) *T {
+		return field(section(cfg))
 	}
 }
 
-func (service confPatchDomainService) hasUpdates(patch *ConfPatch) bool {
-	for _, field := range service.fields {
-		if field.hasUpdates(patch) {
-			return true
+func applyPatchField[T any](field confPatchConfigFieldRef[T]) confPatchApplyValueFn[T] {
+	return func(target confPatchApplyTarget, value T) error {
+		if target == nil || field == nil {
+			return nil
 		}
-	}
-	return false
-}
-
-func confPatchServices() []confPatchDomainService {
-	return []confPatchDomainService{
-		{name: confPatchDomainConnectivity, fields: connectivityPatchFields()},
-		{name: confPatchDomainStartram, fields: startramPatchFields()},
-		{name: confPatchDomainRuntime, fields: runtimePatchFields()},
-		{name: confPatchDomainPenpai, fields: penpaiPatchFields()},
-		{name: confPatchDomainAuthSession, fields: authSessionPatchFields()},
-		{name: confPatchDomainUnsupported, fields: unsupportedPatchFields()},
+		destination := field(target)
+		if destination == nil {
+			return nil
+		}
+		*destination = value
+		return nil
 	}
 }
 
-func parseBoolField(name string) confPatchValueParser[bool] {
-	return func(value interface{}) (bool, error) {
-		return parseBoolValue(name, value)
-	}
-}
-
-func parseIntField(name string) confPatchValueParser[int] {
-	return func(value interface{}) (int, error) {
-		return parseIntValue(name, value)
-	}
-}
-
-func parseStringField(name string) confPatchValueParser[string] {
+func parseStringField(key string) confPatchValueParser[string] {
 	return func(value interface{}) (string, error) {
-		return parseStringValue(name, value)
+		return parseStringValue(key, value)
 	}
 }
 
-func parseStringSliceField(name string) confPatchValueParser[[]string] {
-	return func(value interface{}) ([]string, error) {
-		return parseStringSliceValue(name, value)
+func parseBoolField(key string) confPatchValueParser[bool] {
+	return func(value interface{}) (bool, error) {
+		return parseBoolValue(key, value)
 	}
 }
 
-func applyConnectivityPatchValue[T any](setter func(*structs.ConnectivityConfig, T)) confPatchApplyValueFn[T] {
-	return func(target confPatchApplyTarget, value T) {
-		if target == nil {
+func parseIntField(key string) confPatchValueParser[int] {
+	return func(value interface{}) (int, error) {
+		return parseIntValue(key, value)
+	}
+}
+
+func configPatchFieldFromBinding[T any](spec confPatchFieldBinding[T]) confPatchField {
+	apply := spec.apply
+	if apply == nil {
+		apply = applyPatchField(spec.configField)
+	}
+	return configPatchFieldFromSpec(confPatchFieldSpec[T]{
+		key:        spec.key,
+		patchField: spec.patchField,
+		parse:      spec.parse,
+		target:     spec.target,
+		apply:      apply,
+		hasUpdates: spec.hasUpdates,
+		merge:      spec.merge,
+	})
+}
+
+type confPatchFieldOptions[T any] struct {
+	apply      confPatchApplyValueFn[T]
+	hasUpdates func(T) bool
+	merge      confPatchMergeFn
+}
+
+type confPatchSectionBuilder[Section any] struct {
+	configSection func(*structs.SysConfig) *Section
+}
+
+func newConfPatchSection[Section any](section func(*structs.SysConfig) *Section) confPatchSectionBuilder[Section] {
+	return confPatchSectionBuilder[Section]{
+		configSection: section,
+	}
+}
+
+func patchConfigFieldFromSection[Section any, T any](
+	builder confPatchSectionBuilder[Section],
+	key string,
+	patchField string,
+	target confPatchValueRef[T],
+	parse confPatchValueParser[T],
+	cfgField func(*Section) *T,
+	options confPatchFieldOptions[T],
+) confPatchField {
+	configField := sectionField(builder.configSection, cfgField)
+	return configPatchFieldFromBinding(confPatchFieldBinding[T]{
+		key:         key,
+		patchField:  patchField,
+		target:      target,
+		parse:       parse,
+		configField: configField,
+		apply:       options.apply,
+		hasUpdates:  options.hasUpdates,
+		merge:       options.merge,
+	})
+}
+
+func (builder confPatchSectionBuilder[Section]) boolField(
+	key string,
+	patchField string,
+	target confPatchValueRef[bool],
+	cfgField func(*Section) *bool,
+	options confPatchFieldOptions[bool],
+) confPatchField {
+	return patchConfigFieldFromSection(builder, key, patchField, target, parseBoolField(key), cfgField, options)
+}
+
+func (builder confPatchSectionBuilder[Section]) intField(
+	key string,
+	patchField string,
+	target confPatchValueRef[int],
+	cfgField func(*Section) *int,
+	options confPatchFieldOptions[int],
+) confPatchField {
+	return patchConfigFieldFromSection(builder, key, patchField, target, parseIntField(key), cfgField, options)
+}
+
+func (builder confPatchSectionBuilder[Section]) stringField(
+	key string,
+	patchField string,
+	target confPatchValueRef[string],
+	cfgField func(*Section) *string,
+	options confPatchFieldOptions[string],
+) confPatchField {
+	return patchConfigFieldFromSection(builder, key, patchField, target, parseStringField(key), cfgField, options)
+}
+
+func (builder confPatchSectionBuilder[Section]) boolOrConfigField(cfgField func(*Section) *bool) confPatchMergeFn {
+	return mergeBoolOrConfigField(sectionField(builder.configSection, cfgField))
+}
+
+func (builder confPatchSectionBuilder[Section]) boolSetField(cfgField func(*Section) *bool) confPatchMergeFn {
+	return mergeBoolSetRef(sectionField(builder.configSection, cfgField))
+}
+
+func (builder confPatchSectionBuilder[Section]) stringSetIfNonEmptyField(cfgField func(*Section) *string) confPatchMergeFn {
+	return mergeStringSetIfNonEmptyRef(sectionField(builder.configSection, cfgField))
+}
+
+func (builder confPatchSectionBuilder[Section]) stringSetDirectField(cfgField func(*Section) *string) confPatchMergeFn {
+	return mergeStringSetDirectRef(sectionField(builder.configSection, cfgField))
+}
+
+func (builder confPatchSectionBuilder[Section]) intSetIfNonZeroField(cfgField func(*Section) *int) confPatchMergeFn {
+	return mergeIntSetIfNonZeroRef(sectionField(builder.configSection, cfgField))
+}
+
+func (builder confPatchSectionBuilder[Section]) stringSliceIfNonEmptyField(cfgField func(*Section) *[]string) confPatchMergeFn {
+	return mergeStringSliceSetIfNonEmptyRef(sectionField(builder.configSection, cfgField))
+}
+
+func mergeIfString(configField confPatchConfigFieldRef[string], shouldMerge func(string) bool) confPatchMergeFn {
+	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+		if shouldMerge == nil {
+			shouldMerge = func(_ string) bool { return true }
+		}
+		value := configField(&customConfig)
+		if value == nil || !shouldMerge(*value) {
 			return
 		}
-		target.UpdateConnectivityConfig(func(config *structs.ConnectivityConfig) {
-			setter(config, value)
-		})
+		destination := configField(mergedConfig)
+		if destination != nil {
+			*destination = *value
+		}
 	}
 }
 
-func applyStartramPatchValue[T any](setter func(*structs.StartramConfig, T)) confPatchApplyValueFn[T] {
-	return func(target confPatchApplyTarget, value T) {
-		if target == nil {
+func mergeIfInt(configField confPatchConfigFieldRef[int], shouldMerge func(int) bool) confPatchMergeFn {
+	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+		if shouldMerge == nil {
+			shouldMerge = func(_ int) bool { return true }
+		}
+		value := configField(&customConfig)
+		if value == nil || !shouldMerge(*value) {
 			return
 		}
-		target.UpdateStartramConfig(func(config *structs.StartramConfig) {
-			setter(config, value)
-		})
+		destination := configField(mergedConfig)
+		if destination != nil {
+			*destination = *value
+		}
 	}
 }
 
-func applyRuntimePatchValue[T any](setter func(*structs.RuntimeConfig, T)) confPatchApplyValueFn[T] {
-	return func(target confPatchApplyTarget, value T) {
-		if target == nil {
+func mergeIfBool(configField confPatchConfigFieldRef[bool], shouldMerge func(bool) bool) confPatchMergeFn {
+	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+		if shouldMerge == nil {
+			shouldMerge = func(_ bool) bool { return true }
+		}
+		value := configField(&customConfig)
+		if value == nil || !shouldMerge(*value) {
 			return
 		}
-		target.UpdateRuntimeConfig(func(config *structs.RuntimeConfig) {
-			setter(config, value)
-		})
+		destination := configField(mergedConfig)
+		if destination != nil {
+			*destination = *value
+		}
 	}
 }
 
-func applyPenpaiPatchValue[T any](setter func(*structs.PenpaiConfig, T)) confPatchApplyValueFn[T] {
-	return func(target confPatchApplyTarget, value T) {
-		if target == nil {
+func mergeBoolOrConfigField(configField confPatchConfigFieldRef[bool]) confPatchMergeFn {
+	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+		value := configField(&customConfig)
+		if value == nil || !*value {
 			return
 		}
-		target.UpdatePenpaiConfig(func(config *structs.PenpaiConfig) {
-			setter(config, value)
-		})
+		destination := configField(mergedConfig)
+		if destination != nil {
+			*destination = true
+		}
 	}
 }
 
-func applyAuthSessionPatchValue[T any](setter func(*structs.AuthSessionConfig, T)) confPatchApplyValueFn[T] {
-	return func(target confPatchApplyTarget, value T) {
-		if target == nil {
+func mergeSliceWhen[T any](configField confPatchConfigFieldRef[[]T], shouldMerge func([]T) bool) confPatchMergeFn {
+	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+		if shouldMerge == nil {
+			shouldMerge = func(_ []T) bool { return true }
+		}
+		value := configField(&customConfig)
+		if value == nil || !shouldMerge(*value) {
 			return
 		}
-		target.UpdateAuthSessionConfig(func(config *structs.AuthSessionConfig) {
-			setter(config, value)
-		})
-	}
-}
-
-func getConfigPatchValueByName[T any](patch *ConfPatch, field string) (T, bool) {
-	var zero T
-	if patch == nil {
-		return zero, false
-	}
-	patchValue := reflect.ValueOf(patch)
-	if !patchValue.IsValid() || patchValue.Kind() != reflect.Ptr || patchValue.IsNil() {
-		return zero, false
-	}
-
-	fieldValue := patchValue.Elem().FieldByName(field)
-	if !fieldValue.IsValid() {
-		return zero, false
-	}
-	if fieldValue.Kind() == reflect.Ptr {
-		if fieldValue.IsNil() {
-			return zero, false
-		}
-		fieldValue = fieldValue.Elem()
-	}
-	typed, ok := fieldValue.Interface().(T)
-	return typed, ok
-}
-
-func setConfigPatchValueByName[T any](patch *ConfPatch, field string, value T) {
-	if patch == nil {
-		return
-	}
-	patchValue := reflect.ValueOf(patch)
-	if !patchValue.IsValid() || patchValue.Kind() != reflect.Ptr || patchValue.IsNil() {
-		return
-	}
-
-	fieldValue := patchValue.Elem().FieldByName(field)
-	if !fieldValue.IsValid() || !fieldValue.CanSet() {
-		return
-	}
-
-	raw := reflect.ValueOf(value)
-	if !raw.IsValid() {
-		return
-	}
-
-	if fieldValue.Kind() == reflect.Ptr {
-		pointer := reflect.New(fieldValue.Type().Elem())
-		if !assignValueToField(pointer.Elem(), raw) {
-			if raw.Type().ConvertibleTo(pointer.Elem().Type()) {
-				assignValueToField(pointer.Elem(), raw.Convert(pointer.Elem().Type()))
-			} else {
-				return
-			}
-		}
-		fieldValue.Set(pointer)
-		return
-	}
-
-	if !assignValueToField(fieldValue, raw) {
-		if raw.Type().ConvertibleTo(fieldValue.Type()) {
-			fieldValue.Set(raw.Convert(fieldValue.Type()))
+		destination := configField(mergedConfig)
+		if destination != nil {
+			copied := append([]T(nil), (*value)...)
+			*destination = copied
 		}
 	}
 }
 
-func assignValueToField(target reflect.Value, value reflect.Value) bool {
-	if !target.IsValid() || !value.IsValid() {
-		return false
-	}
-	if !target.CanSet() {
-		return false
-	}
-
-	if value.Type().AssignableTo(target.Type()) {
-		target.Set(value)
-		return true
-	}
-	if value.Type().ConvertibleTo(target.Type()) {
-		target.Set(value.Convert(target.Type()))
-		return true
-	}
-	return false
+func mergeStringSetIfNonEmptyRef(configField confPatchConfigFieldRef[string]) confPatchMergeFn {
+	return mergeIfString(configField, func(value string) bool { return value != "" })
 }
 
-func connectivityPatchFields() []confPatchField {
-	return []confPatchField{
-		configPatchFieldFromSpec(confPatchFieldSpec[[]string]{
-			key:        "piers",
-			patchField: "Piers",
-			parse:      parseStringSliceField("piers"),
-			apply: applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value []string) {
-				config.Piers = append([]string(nil), value...)
+func mergeStringSetDirectRef(configField confPatchConfigFieldRef[string]) confPatchMergeFn {
+	return mergeIfString(configField, nil)
+}
+
+func mergeIntSetIfNonZeroRef(configField confPatchConfigFieldRef[int]) confPatchMergeFn {
+	return mergeIfInt(configField, func(value int) bool { return value != 0 })
+}
+
+func mergeBoolSetRef(configField confPatchConfigFieldRef[bool]) confPatchMergeFn {
+	return mergeIfBool(configField, nil)
+}
+
+func mergeStringSliceSetIfNonEmptyRef(configField confPatchConfigFieldRef[[]string]) confPatchMergeFn {
+	return mergeSliceWhen(configField, func(value []string) bool { return len(value) > 0 })
+}
+
+func mergeDiskWarning(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+	mergedConfig.Connectivity.DiskWarning = customConfig.Connectivity.DiskWarning
+}
+
+func mergeLinuxUpdates(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+	if customConfig.Runtime.LinuxUpdates.Value == 0 {
+		return
+	}
+	mergedConfig.Runtime.LinuxUpdates = customConfig.Runtime.LinuxUpdates
+}
+
+func mergeSetupFromConfig(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+	if customConfig.AuthSession.PwHash == "" {
+		mergedConfig.Runtime.Setup = "start"
+		mergedConfig.AuthSession.Salt = RandString(32)
+		return
+	}
+
+	if customConfig.Runtime.Setup == "" {
+		mergedConfig.Runtime.Setup = "complete"
+	} else {
+		mergedConfig.Runtime.Setup = customConfig.Runtime.Setup
+	}
+}
+
+func mergeAuthSessionSalt(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+	if customConfig.AuthSession.Salt != "" {
+		mergedConfig.AuthSession.Salt = customConfig.AuthSession.Salt
+	}
+}
+
+func mergeAuthSessionAuthorizedSessions(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+	if customConfig.AuthSession.Sessions.Authorized != nil {
+		mergedConfig.AuthSession.Sessions.Authorized = customConfig.AuthSession.Sessions.Authorized
+	}
+}
+
+func mergeAuthSessionUnauthorizedSessions(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+	if customConfig.AuthSession.Sessions.Unauthorized != nil {
+		mergedConfig.AuthSession.Sessions.Unauthorized = customConfig.AuthSession.Sessions.Unauthorized
+	}
+}
+
+func mergeDefaultModels(defaultConfig structs.SysConfig, _ structs.SysConfig, mergedConfig *structs.SysConfig) {
+	mergedConfig.Penpai.PenpaiModels = append([]structs.Penpai(nil), defaultConfig.Penpai.PenpaiModels...)
+}
+
+func mergePenpaiActive(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+	if customConfig.Penpai.PenpaiActive == "" {
+		return
+	}
+
+	for _, model := range mergedConfig.Penpai.PenpaiModels {
+		if strings.EqualFold(model.ModelName, customConfig.Penpai.PenpaiActive) {
+			mergedConfig.Penpai.PenpaiActive = customConfig.Penpai.PenpaiActive
+			return
+		}
+	}
+}
+
+func allConfPatchFields() []confPatchField {
+	connectivity := newConfPatchSection(func(cfg *structs.SysConfig) *structs.ConnectivityConfig {
+		return &cfg.Connectivity
+	})
+	startram := newConfPatchSection(func(cfg *structs.SysConfig) *structs.StartramConfig {
+		return &cfg.Startram
+	})
+	runtime := newConfPatchSection(func(cfg *structs.SysConfig) *structs.RuntimeConfig {
+		return &cfg.Runtime
+	})
+	penpai := newConfPatchSection(func(cfg *structs.SysConfig) *structs.PenpaiConfig {
+		return &cfg.Penpai
+	})
+	authSession := newConfPatchSection(func(cfg *structs.SysConfig) *structs.AuthSessionConfig {
+		return &cfg.AuthSession
+	})
+
+	fields := []confPatchField{
+		patchConfigFieldFromSection(
+			connectivity,
+			"piers",
+			"Piers",
+			confPatchPointerRef(func(patch *ConfPatch) **[]string {
+				return &patch.Piers
 			}),
-			hasUpdates: func(value []string) bool {
-				return len(value) > 0
+			func(value interface{}) ([]string, error) {
+				return parseStringSliceValue("piers", value)
 			},
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "wgOn",
-			patchField: "WgOn",
-			parse:      parseBoolField("wgOn"),
-			apply:      applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value bool) { config.WgOn = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "endpointUrl",
-			patchField: "EndpointURL",
-			parse:      parseStringField("endpointUrl"),
-			apply:      applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value string) { config.EndpointUrl = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "wgRegistered",
-			patchField: "WgRegistered",
-			parse:      parseBoolField("wgRegistered"),
-			apply:      applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value bool) { config.WgRegistered = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "remoteBackupPassword",
-			patchField: "RemoteBackupPassword",
-			parse:      parseStringField("remoteBackupPassword"),
-			apply: applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value string) {
-				config.RemoteBackupPassword = value
+			func(cfg *structs.ConnectivityConfig) *[]string {
+				return &cfg.Piers
+			},
+			confPatchFieldOptions[[]string]{
+				hasUpdates: func(value []string) bool {
+					return len(value) > 0
+				},
+				merge: connectivity.stringSliceIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *[]string {
+					return &cfg.Piers
+				}),
+			},
+		),
+		connectivity.boolField(
+			"wgOn",
+			"WgOn",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.WgOn
 			}),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "netCheck",
-			patchField: "NetCheck",
-			parse:      parseStringField("netCheck"),
-			apply:      applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value string) { config.NetCheck = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "updateMode",
-			patchField: "UpdateMode",
-			parse:      parseStringField("updateMode"),
-			apply:      applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value string) { config.UpdateMode = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "updateUrl",
-			patchField: "UpdateUrl",
-			parse:      parseStringField("updateUrl"),
-			apply:      applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value string) { config.UpdateUrl = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "updateBranch",
-			patchField: "UpdateBranch",
-			parse:      parseStringField("updateBranch"),
-			apply:      applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value string) { config.UpdateBranch = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "apiVersion",
-			patchField: "ApiVersion",
-			parse:      parseStringField("apiVersion"),
-			apply:      applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value string) { config.ApiVersion = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[int]{
-			key:        "c2cInterval",
-			patchField: "C2cInterval",
-			parse:      parseIntField("c2cInterval"),
-			apply:      applyConnectivityPatchValue(func(config *structs.ConnectivityConfig, value int) { config.C2cInterval = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[map[string]structs.DiskWarning]{
+			func(cfg *structs.ConnectivityConfig) *bool {
+				return &cfg.WgOn
+			},
+			confPatchFieldOptions[bool]{
+				merge: connectivity.boolOrConfigField(func(cfg *structs.ConnectivityConfig) *bool {
+					return &cfg.WgOn
+				}),
+			},
+		),
+		connectivity.stringField(
+			"endpointUrl",
+			"EndpointURL",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.EndpointURL
+			}),
+			func(cfg *structs.ConnectivityConfig) *string {
+				return &cfg.EndpointUrl
+			},
+			confPatchFieldOptions[string]{
+				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
+					return &cfg.EndpointUrl
+				}),
+			},
+		),
+		connectivity.boolField(
+			"wgRegistered",
+			"WgRegistered",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.WgRegistered
+			}),
+			func(cfg *structs.ConnectivityConfig) *bool {
+				return &cfg.WgRegistered
+			},
+			confPatchFieldOptions[bool]{
+				merge: connectivity.boolOrConfigField(func(cfg *structs.ConnectivityConfig) *bool {
+					return &cfg.WgRegistered
+				}),
+			},
+		),
+		connectivity.stringField(
+			"remoteBackupPassword",
+			"RemoteBackupPassword",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.RemoteBackupPassword
+			}),
+			func(cfg *structs.ConnectivityConfig) *string {
+				return &cfg.RemoteBackupPassword
+			},
+			confPatchFieldOptions[string]{
+				merge: connectivity.stringSetDirectField(func(cfg *structs.ConnectivityConfig) *string {
+					return &cfg.RemoteBackupPassword
+				}),
+			},
+		),
+		connectivity.stringField(
+			"netCheck",
+			"NetCheck",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.NetCheck
+			}),
+			func(cfg *structs.ConnectivityConfig) *string {
+				return &cfg.NetCheck
+			},
+			confPatchFieldOptions[string]{
+				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
+					return &cfg.NetCheck
+				}),
+			},
+		),
+		connectivity.stringField(
+			"updateMode",
+			"UpdateMode",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.UpdateMode
+			}),
+			func(cfg *structs.ConnectivityConfig) *string {
+				return &cfg.UpdateMode
+			},
+			confPatchFieldOptions[string]{
+				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
+					return &cfg.UpdateMode
+				}),
+			},
+		),
+		connectivity.stringField(
+			"updateUrl",
+			"UpdateUrl",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.UpdateUrl
+			}),
+			func(cfg *structs.ConnectivityConfig) *string {
+				return &cfg.UpdateUrl
+			},
+			confPatchFieldOptions[string]{
+				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
+					return &cfg.UpdateUrl
+				}),
+			},
+		),
+		connectivity.stringField(
+			"updateBranch",
+			"UpdateBranch",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.UpdateBranch
+			}),
+			func(cfg *structs.ConnectivityConfig) *string {
+				return &cfg.UpdateBranch
+			},
+			confPatchFieldOptions[string]{
+				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
+					return &cfg.UpdateBranch
+				}),
+			},
+		),
+		connectivity.stringField(
+			"apiVersion",
+			"ApiVersion",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.ApiVersion
+			}),
+			func(cfg *structs.ConnectivityConfig) *string {
+				return &cfg.ApiVersion
+			},
+			confPatchFieldOptions[string]{
+				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
+					return &cfg.ApiVersion
+				}),
+			},
+		),
+		connectivity.intField(
+			"c2cInterval",
+			"C2cInterval",
+			confPatchPointerRef(func(patch *ConfPatch) **int {
+				return &patch.C2cInterval
+			}),
+			func(cfg *structs.ConnectivityConfig) *int {
+				return &cfg.C2cInterval
+			},
+			confPatchFieldOptions[int]{
+				merge: connectivity.intSetIfNonZeroField(func(cfg *structs.ConnectivityConfig) *int {
+					return &cfg.C2cInterval
+				}),
+			},
+		),
+		configPatchFieldFromBinding(confPatchFieldBinding[map[string]structs.DiskWarning]{
 			key:        "diskWarning",
 			patchField: "DiskWarning",
-			parse:      parseDiskWarningMapField("diskWarning"),
+			target:     confPatchPointerRef(func(patch *ConfPatch) **map[string]structs.DiskWarning { return &patch.DiskWarning }),
+			parse: func(value interface{}) (map[string]structs.DiskWarning, error) {
+				return parseDiskWarningMap("diskWarning", value)
+			},
 			hasUpdates: func(warnings map[string]structs.DiskWarning) bool {
 				return len(warnings) > 0
 			},
-			apply: func(target confPatchApplyTarget, warnings map[string]structs.DiskWarning) {
-				target.UpdateConnectivityConfig(func(config *structs.ConnectivityConfig) {
-					config.DiskWarning = copyDiskWarnings(warnings)
-				})
+			apply: func(target confPatchApplyTarget, value map[string]structs.DiskWarning) error {
+				if target == nil {
+					return nil
+				}
+				target.Connectivity.DiskWarning = copyDiskWarnings(value)
+				return nil
 			},
+			merge: mergeDiskWarning,
 		}),
-	}
-}
 
-func startramPatchFields() []confPatchField {
-	return []confPatchField{
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "startramSetReminderOne",
-			patchField: "StartramReminderOne",
-			parse:      parseBoolField("startramSetReminderOne"),
-			apply: applyStartramPatchValue(func(config *structs.StartramConfig, value bool) {
-				config.StartramSetReminder.One = value
+		startram.boolField(
+			"startramSetReminderOne",
+			"StartramReminderOne",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.StartramReminderOne
 			}),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "startramSetReminderThree",
-			patchField: "StartramReminderThree",
-			parse:      parseBoolField("startramSetReminderThree"),
-			apply: applyStartramPatchValue(func(config *structs.StartramConfig, value bool) {
-				config.StartramSetReminder.Three = value
+			func(cfg *structs.StartramConfig) *bool {
+				return &cfg.StartramSetReminder.One
+			},
+			confPatchFieldOptions[bool]{
+				merge: startram.boolOrConfigField(func(cfg *structs.StartramConfig) *bool {
+					return &cfg.StartramSetReminder.One
+				}),
+			},
+		),
+		startram.boolField(
+			"startramSetReminderThree",
+			"StartramReminderThree",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.StartramReminderThree
 			}),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "startramSetReminderSeven",
-			patchField: "StartramReminderSeven",
-			parse:      parseBoolField("startramSetReminderSeven"),
-			apply: applyStartramPatchValue(func(config *structs.StartramConfig, value bool) {
-				config.StartramSetReminder.Seven = value
+			func(cfg *structs.StartramConfig) *bool {
+				return &cfg.StartramSetReminder.Three
+			},
+			confPatchFieldOptions[bool]{
+				merge: startram.boolOrConfigField(func(cfg *structs.StartramConfig) *bool {
+					return &cfg.StartramSetReminder.Three
+				}),
+			},
+		),
+		startram.boolField(
+			"startramSetReminderSeven",
+			"StartramReminderSeven",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.StartramReminderSeven
 			}),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "pubkey",
-			patchField: "Pubkey",
-			parse:      parseStringField("pubkey"),
-			apply:      applyStartramPatchValue(func(config *structs.StartramConfig, value string) { config.Pubkey = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "privkey",
-			patchField: "Privkey",
-			parse:      parseStringField("privkey"),
-			apply:      applyStartramPatchValue(func(config *structs.StartramConfig, value string) { config.Privkey = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "disableSlsa",
-			patchField: "DisableSlsa",
-			parse:      parseBoolField("disableSlsa"),
-			apply:      applyStartramPatchValue(func(config *structs.StartramConfig, value bool) { config.DisableSlsa = value }),
-		}),
-	}
-}
+			func(cfg *structs.StartramConfig) *bool {
+				return &cfg.StartramSetReminder.Seven
+			},
+			confPatchFieldOptions[bool]{
+				merge: startram.boolOrConfigField(func(cfg *structs.StartramConfig) *bool {
+					return &cfg.StartramSetReminder.Seven
+				}),
+			},
+		),
+		startram.stringField(
+			"pubkey",
+			"Pubkey",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.Pubkey
+			}),
+			func(cfg *structs.StartramConfig) *string {
+				return &cfg.Pubkey
+			},
+			confPatchFieldOptions[string]{
+				merge: startram.stringSetIfNonEmptyField(func(cfg *structs.StartramConfig) *string {
+					return &cfg.Pubkey
+				}),
+			},
+		),
+		startram.stringField(
+			"privkey",
+			"Privkey",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.Privkey
+			}),
+			func(cfg *structs.StartramConfig) *string {
+				return &cfg.Privkey
+			},
+			confPatchFieldOptions[string]{
+				merge: startram.stringSetIfNonEmptyField(func(cfg *structs.StartramConfig) *string {
+					return &cfg.Privkey
+				}),
+			},
+		),
+		startram.boolField(
+			"disableSlsa",
+			"DisableSlsa",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.DisableSlsa
+			}),
+			func(cfg *structs.StartramConfig) *bool {
+				return &cfg.DisableSlsa
+			},
+			confPatchFieldOptions[bool]{
+				merge: startram.boolSetField(func(cfg *structs.StartramConfig) *bool {
+					return &cfg.DisableSlsa
+				}),
+			},
+		),
 
-func runtimePatchFields() []confPatchField {
-	return []confPatchField{
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "gracefulExit",
-			patchField: "GracefulExit",
-			parse:      parseBoolField("gracefulExit"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value bool) { config.GracefulExit = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[int]{
-			key:        "swapVal",
-			patchField: "SwapVal",
-			parse:      parseIntField("swapVal"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value int) { config.SwapVal = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "swapFile",
-			patchField: "SwapFile",
-			parse:      parseStringField("swapFile"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.SwapFile = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[linuxUpdatesPatch]{
+		runtime.boolField(
+			"gracefulExit",
+			"GracefulExit",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.GracefulExit
+			}),
+			func(cfg *structs.RuntimeConfig) *bool {
+				return &cfg.GracefulExit
+			},
+			confPatchFieldOptions[bool]{
+				merge: runtime.boolOrConfigField(func(cfg *structs.RuntimeConfig) *bool {
+					return &cfg.GracefulExit
+				}),
+			},
+		),
+		runtime.intField(
+			"swapVal",
+			"SwapVal",
+			confPatchPointerRef(func(patch *ConfPatch) **int {
+				return &patch.SwapVal
+			}),
+			func(cfg *structs.RuntimeConfig) *int {
+				return &cfg.SwapVal
+			},
+			confPatchFieldOptions[int]{
+				merge: runtime.intSetIfNonZeroField(func(cfg *structs.RuntimeConfig) *int {
+					return &cfg.SwapVal
+				}),
+			},
+		),
+		runtime.stringField(
+			"swapFile",
+			"SwapFile",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.SwapFile
+			}),
+			func(cfg *structs.RuntimeConfig) *string {
+				return &cfg.SwapFile
+			},
+			confPatchFieldOptions[string]{
+				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
+					return &cfg.SwapFile
+				}),
+			},
+		),
+		configPatchFieldFromBinding(confPatchFieldBinding[linuxUpdatesPatch]{
 			key:        "linuxUpdates",
 			patchField: "LinuxUpdates",
+			target: confPatchPointerRef(func(patch *ConfPatch) **linuxUpdatesPatch {
+				return &patch.LinuxUpdates
+			}),
 			parse: func(value interface{}) (linuxUpdatesPatch, error) {
 				return parseLinuxUpdatesValue("linuxUpdates", value)
 			},
-			apply: applyRuntimePatchValue(func(config *structs.RuntimeConfig, value linuxUpdatesPatch) {
-				config.LinuxUpdates = struct {
+			apply: func(target confPatchApplyTarget, value linuxUpdatesPatch) error {
+				if target == nil {
+					return nil
+				}
+				target.Runtime.LinuxUpdates = struct {
 					Value    int    `json:"value"`
 					Interval string `json:"interval"`
 				}{
 					Value:    value.Value,
 					Interval: value.Interval,
 				}
+				return nil
+			},
+			merge: mergeLinuxUpdates,
+		}),
+		runtime.stringField(
+			"dockerData",
+			"DockerData",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.DockerData
 			}),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "dockerData",
-			patchField: "DockerData",
-			parse:      parseStringField("dockerData"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.DockerData = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "setup",
-			patchField: "Setup",
-			parse:      parseStringField("setup"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.Setup = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "cfgDir",
-			patchField: "CfgDir",
-			parse:      parseStringField("cfgDir"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.CfgDir = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[int]{
-			key:        "updateInterval",
-			patchField: "UpdateInterval",
-			parse:      parseIntField("updateInterval"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value int) { config.UpdateInterval = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "disable502",
-			patchField: "Disable502",
-			parse:      parseBoolField("disable502"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value bool) { config.Disable502 = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[int]{
-			key:        "snapTime",
-			patchField: "SnapTime",
-			parse:      parseIntField("snapTime"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value int) { config.SnapTime = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "lastKnownMDNS",
-			patchField: "LastKnownMDNS",
-			parse:      parseStringField("lastKnownMDNS"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.LastKnownMDNS = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "gsVersion",
-			patchField: "GSVersion",
-			parse:      parseStringField("gsVersion"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.GsVersion = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "binHash",
-			patchField: "BinHash",
-			parse:      parseStringField("binHash"),
-			apply:      applyRuntimePatchValue(func(config *structs.RuntimeConfig, value string) { config.BinHash = value }),
-		}),
-	}
-}
+			func(cfg *structs.RuntimeConfig) *string {
+				return &cfg.DockerData
+			},
+			confPatchFieldOptions[string]{
+				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
+					return &cfg.DockerData
+				}),
+			},
+		),
+		runtime.stringField(
+			"setup",
+			"Setup",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.Setup
+			}),
+			func(cfg *structs.RuntimeConfig) *string {
+				return &cfg.Setup
+			},
+			confPatchFieldOptions[string]{
+				merge: mergeSetupFromConfig,
+			},
+		),
+		runtime.stringField(
+			"cfgDir",
+			"CfgDir",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.CfgDir
+			}),
+			func(cfg *structs.RuntimeConfig) *string {
+				return &cfg.CfgDir
+			},
+			confPatchFieldOptions[string]{
+				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
+					return &cfg.CfgDir
+				}),
+			},
+		),
+		runtime.intField(
+			"updateInterval",
+			"UpdateInterval",
+			confPatchPointerRef(func(patch *ConfPatch) **int {
+				return &patch.UpdateInterval
+			}),
+			func(cfg *structs.RuntimeConfig) *int {
+				return &cfg.UpdateInterval
+			},
+			confPatchFieldOptions[int]{
+				merge: runtime.intSetIfNonZeroField(func(cfg *structs.RuntimeConfig) *int {
+					return &cfg.UpdateInterval
+				}),
+			},
+		),
+		runtime.boolField(
+			"disable502",
+			"Disable502",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.Disable502
+			}),
+			func(cfg *structs.RuntimeConfig) *bool {
+				return &cfg.Disable502
+			},
+			confPatchFieldOptions[bool]{
+				merge: runtime.boolOrConfigField(func(cfg *structs.RuntimeConfig) *bool {
+					return &cfg.Disable502
+				}),
+			},
+		),
+		runtime.intField(
+			"snapTime",
+			"SnapTime",
+			confPatchPointerRef(func(patch *ConfPatch) **int {
+				return &patch.SnapTime
+			}),
+			func(cfg *structs.RuntimeConfig) *int {
+				return &cfg.SnapTime
+			},
+			confPatchFieldOptions[int]{
+				merge: runtime.intSetIfNonZeroField(func(cfg *structs.RuntimeConfig) *int {
+					return &cfg.SnapTime
+				}),
+			},
+		),
+		runtime.stringField(
+			"lastKnownMDNS",
+			"LastKnownMDNS",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.LastKnownMDNS
+			}),
+			func(cfg *structs.RuntimeConfig) *string {
+				return &cfg.LastKnownMDNS
+			},
+			confPatchFieldOptions[string]{
+				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
+					return &cfg.LastKnownMDNS
+				}),
+			},
+		),
+		runtime.stringField(
+			"gsVersion",
+			"GSVersion",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.GSVersion
+			}),
+			func(cfg *structs.RuntimeConfig) *string {
+				return &cfg.GsVersion
+			},
+			confPatchFieldOptions[string]{
+				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
+					return &cfg.GsVersion
+				}),
+			},
+		),
+		runtime.stringField(
+			"binHash",
+			"BinHash",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.BinHash
+			}),
+			func(cfg *structs.RuntimeConfig) *string {
+				return &cfg.BinHash
+			},
+			confPatchFieldOptions[string]{
+				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
+					return &cfg.BinHash
+				}),
+			},
+		),
 
-func penpaiPatchFields() []confPatchField {
-	return []confPatchField{
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "penpaiAllow",
-			patchField: "PenpaiAllow",
-			parse:      parseBoolField("penpaiAllow"),
-			apply:      applyPenpaiPatchValue(func(config *structs.PenpaiConfig, value bool) { config.PenpaiAllow = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[bool]{
-			key:        "penpaiRunning",
-			patchField: "PenpaiRunning",
-			parse:      parseBoolField("penpaiRunning"),
-			apply:      applyPenpaiPatchValue(func(config *structs.PenpaiConfig, value bool) { config.PenpaiRunning = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[int]{
-			key:        "penpaiCores",
-			patchField: "PenpaiCores",
-			parse:      parseIntField("penpaiCores"),
-			apply:      applyPenpaiPatchValue(func(config *structs.PenpaiConfig, value int) { config.PenpaiCores = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "penpaiActive",
-			patchField: "PenpaiActive",
-			parse:      parseStringField("penpaiActive"),
-			apply:      applyPenpaiPatchValue(func(config *structs.PenpaiConfig, value string) { config.PenpaiActive = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[[]structs.Penpai]{
+		penpai.boolField(
+			"penpaiAllow",
+			"PenpaiAllow",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.PenpaiAllow
+			}),
+			func(cfg *structs.PenpaiConfig) *bool {
+				return &cfg.PenpaiAllow
+			},
+			confPatchFieldOptions[bool]{
+				merge: penpai.boolOrConfigField(func(cfg *structs.PenpaiConfig) *bool {
+					return &cfg.PenpaiAllow
+				}),
+			},
+		),
+		penpai.boolField(
+			"penpaiRunning",
+			"PenpaiRunning",
+			confPatchPointerRef(func(patch *ConfPatch) **bool {
+				return &patch.PenpaiRunning
+			}),
+			func(cfg *structs.PenpaiConfig) *bool {
+				return &cfg.PenpaiRunning
+			},
+			confPatchFieldOptions[bool]{
+				merge: penpai.boolSetField(func(cfg *structs.PenpaiConfig) *bool {
+					return &cfg.PenpaiRunning
+				}),
+			},
+		),
+		penpai.intField(
+			"penpaiCores",
+			"PenpaiCores",
+			confPatchPointerRef(func(patch *ConfPatch) **int {
+				return &patch.PenpaiCores
+			}),
+			func(cfg *structs.PenpaiConfig) *int {
+				return &cfg.PenpaiCores
+			},
+			confPatchFieldOptions[int]{
+				merge: penpai.intSetIfNonZeroField(func(cfg *structs.PenpaiConfig) *int {
+					return &cfg.PenpaiCores
+				}),
+			},
+		),
+		penpai.stringField(
+			"penpaiActive",
+			"PenpaiActive",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.PenpaiActive
+			}),
+			func(cfg *structs.PenpaiConfig) *string {
+				return &cfg.PenpaiActive
+			},
+			confPatchFieldOptions[string]{
+				merge: mergePenpaiActive,
+			},
+		),
+		configPatchFieldFromBinding(confPatchFieldBinding[[]structs.Penpai]{
 			key:        "penpaiModels",
 			patchField: "PenpaiModels",
+			target:     confPatchValueAccessor(func(patch *ConfPatch) *[]structs.Penpai { return &patch.PenpaiModels }),
 			parse: func(value interface{}) ([]structs.Penpai, error) {
 				return parsePenpaiModels("penpaiModels", value)
 			},
-			apply: func(target confPatchApplyTarget, value []structs.Penpai) {
-				target.UpdatePenpaiConfig(func(config *structs.PenpaiConfig) {
-					config.PenpaiModels = append([]structs.Penpai(nil), value...)
-				})
+			apply: func(target confPatchApplyTarget, value []structs.Penpai) error {
+				if target == nil {
+					return nil
+				}
+				target.Penpai.PenpaiModels = append([]structs.Penpai(nil), value...)
+				return nil
 			},
-			hasUpdates: func(value []structs.Penpai) bool {
-				return len(value) > 0
+			hasUpdates: func(models []structs.Penpai) bool {
+				return len(models) > 0
 			},
+			merge: mergeDefaultModels,
 		}),
-	}
-}
 
-func authSessionPatchFields() []confPatchField {
-	return []confPatchField{
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "salt",
-			patchField: "Salt",
-			parse:      parseStringField("salt"),
-			apply:      applyAuthSessionPatchValue(func(config *structs.AuthSessionConfig, value string) { config.Salt = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "keyFile",
-			patchField: "KeyFile",
-			parse:      parseStringField("keyFile"),
-			apply:      applyAuthSessionPatchValue(func(config *structs.AuthSessionConfig, value string) { config.KeyFile = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[string]{
-			key:        "pwHash",
-			patchField: "PwHash",
-			parse:      parseStringField("pwHash"),
-			apply:      applyAuthSessionPatchValue(func(config *structs.AuthSessionConfig, value string) { config.PwHash = value }),
-		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[map[string]structs.SessionInfo]{
+		authSession.stringField(
+			"salt",
+			"Salt",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.Salt
+			}),
+			func(cfg *structs.AuthSessionConfig) *string {
+				return &cfg.Salt
+			},
+			confPatchFieldOptions[string]{
+				merge: mergeAuthSessionSalt,
+			},
+		),
+		authSession.stringField(
+			"keyFile",
+			"KeyFile",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.KeyFile
+			}),
+			func(cfg *structs.AuthSessionConfig) *string {
+				return &cfg.KeyFile
+			},
+			confPatchFieldOptions[string]{
+				merge: authSession.stringSetIfNonEmptyField(func(cfg *structs.AuthSessionConfig) *string {
+					return &cfg.KeyFile
+				}),
+			},
+		),
+		authSession.stringField(
+			"pwHash",
+			"PwHash",
+			confPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.PwHash
+			}),
+			func(cfg *structs.AuthSessionConfig) *string {
+				return &cfg.PwHash
+			},
+			confPatchFieldOptions[string]{
+				merge: authSession.stringSetIfNonEmptyField(func(cfg *structs.AuthSessionConfig) *string {
+					return &cfg.PwHash
+				}),
+			},
+		),
+		configPatchFieldFromBinding(confPatchFieldBinding[map[string]structs.SessionInfo]{
 			key:        "authorizedSessions",
 			patchField: "AuthorizedSessions",
-			parse:      parseSessionMapField("authorizedSessions"),
-			apply: func(target confPatchApplyTarget, sessions map[string]structs.SessionInfo) {
-				target.UpdateAuthSessionConfig(func(config *structs.AuthSessionConfig) {
-					config.Sessions.Authorized = mergeSessions(config.Sessions.Authorized, sessions)
-				})
+			target:     confPatchValueAccessor(func(patch *ConfPatch) *map[string]structs.SessionInfo { return &patch.AuthorizedSessions }),
+			parse: func(value interface{}) (map[string]structs.SessionInfo, error) {
+				return parseSessionMap("authorizedSessions", value)
 			},
-			hasUpdates: func(value map[string]structs.SessionInfo) bool {
-				return len(value) > 0
+			apply: func(target confPatchApplyTarget, value map[string]structs.SessionInfo) error {
+				if target == nil {
+					return nil
+				}
+				target.AuthSession.Sessions.Authorized = mergeSessions(target.AuthSession.Sessions.Authorized, value)
+				return nil
 			},
+			hasUpdates: func(sessions map[string]structs.SessionInfo) bool {
+				return len(sessions) > 0
+			},
+			merge: mergeAuthSessionAuthorizedSessions,
 		}),
-		configPatchFieldFromSpec(confPatchFieldSpec[map[string]structs.SessionInfo]{
+		configPatchFieldFromBinding(confPatchFieldBinding[map[string]structs.SessionInfo]{
 			key:        "unauthorizedSessions",
 			patchField: "UnauthorizedSessions",
-			parse:      parseSessionMapField("unauthorizedSessions"),
-			apply: func(target confPatchApplyTarget, sessions map[string]structs.SessionInfo) {
-				target.UpdateAuthSessionConfig(func(config *structs.AuthSessionConfig) {
-					config.Sessions.Unauthorized = mergeSessions(config.Sessions.Unauthorized, sessions)
-				})
+			target:     confPatchValueAccessor(func(patch *ConfPatch) *map[string]structs.SessionInfo { return &patch.UnauthorizedSessions }),
+			parse: func(value interface{}) (map[string]structs.SessionInfo, error) {
+				return parseSessionMap("unauthorizedSessions", value)
 			},
-			hasUpdates: func(value map[string]structs.SessionInfo) bool {
-				return len(value) > 0
+			apply: func(target confPatchApplyTarget, value map[string]structs.SessionInfo) error {
+				if target == nil {
+					return nil
+				}
+				target.AuthSession.Sessions.Unauthorized = mergeSessions(target.AuthSession.Sessions.Unauthorized, value)
+				return nil
 			},
+			hasUpdates: func(sessions map[string]structs.SessionInfo) bool {
+				return len(sessions) > 0
+			},
+			merge: mergeAuthSessionUnauthorizedSessions,
 		}),
 	}
-}
 
-func unsupportedPatchFields() []confPatchField {
-	return []confPatchField{unsupportedConfPatchField("isEMMCMachine")}
-}
-
-func parseDiskWarningMapField(name string) confPatchValueParser[map[string]structs.DiskWarning] {
-	return func(value interface{}) (map[string]structs.DiskWarning, error) {
-		return parseDiskWarningMap(name, value)
-	}
-}
-
-func parseSessionMapField(name string) confPatchValueParser[map[string]structs.SessionInfo] {
-	return func(value interface{}) (map[string]structs.SessionInfo, error) {
-		return parseSessionMap(name, value)
-	}
-}
-
-func mergeConfPatchDomainFields(services ...confPatchDomainService) []confPatchField {
-	total := 0
-	for _, service := range services {
-		total += len(service.fields)
-	}
-	fields := make([]confPatchField, 0, total+1)
-	for _, service := range services {
-		fields = append(fields, service.fields...)
-	}
+	fields = append(fields, unsupportedPatchField(confPatchFieldBinding[string]{})...)
 	return fields
 }
 
-func allConfPatchFields() []confPatchField {
-	return mergeConfPatchDomainFields(confPatchServices()...)
+func unsupportedPatchField(_ confPatchFieldBinding[string]) []confPatchField {
+	return []confPatchField{unsupportedConfPatchField("isEMMCMachine")}
 }

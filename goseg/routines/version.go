@@ -64,20 +64,19 @@ func CheckVersionLoopWithContext(ctx context.Context) error {
 	rt := newVersionRuntime()
 	conf := rt.configOps.getConfFn()
 	var updateInterval int
-	if conf.UpdateInterval < 60 {
+	if conf.Runtime.UpdateInterval < 60 {
 		updateInterval = 60
 	} else {
-		updateInterval = conf.UpdateInterval
+		updateInterval = conf.Runtime.UpdateInterval
 	}
 	checkInterval := time.Duration(updateInterval) * time.Second
 	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
-	releaseChannel := conf.UpdateBranch
-	if conf.UpdateMode == "auto" {
+	releaseChannel := conf.Connectivity.UpdateBranch
+	if conf.Connectivity.UpdateMode == "auto" {
 		consecutiveFailures := 0
 		if err := callUpdater(ctx, rt, releaseChannel); err != nil {
 			consecutiveFailures++
-			zap.L().Warn(fmt.Sprintf("version update cycle failed: %v", err))
 			if consecutiveFailures >= maxVersionUpdateConsecutiveFailures {
 				return fmt.Errorf("version update failed after %d consecutive attempts: %w", maxVersionUpdateConsecutiveFailures, err)
 			}
@@ -91,7 +90,6 @@ func CheckVersionLoopWithContext(ctx context.Context) error {
 			case <-ticker.C:
 				if err := callUpdater(ctx, rt, releaseChannel); err != nil {
 					consecutiveFailures++
-					zap.L().Warn(fmt.Sprintf("version update cycle failed: %v", err))
 					if consecutiveFailures >= maxVersionUpdateConsecutiveFailures {
 						return fmt.Errorf("version update failed after %d consecutive attempts: %w", maxVersionUpdateConsecutiveFailures, err)
 					}
@@ -182,7 +180,7 @@ func updateBinary(
 	}
 	msg := fmt.Sprintf(
 		"A GroundSeg binary update detected! Current Version: %v%v , Latest Version v%v.%v.%v%v",
-		conf.GsVersion, displayedBranch,
+		conf.Runtime.GsVersion, displayedBranch,
 		versionInfo.Groundseg.Major, versionInfo.Groundseg.Minor,
 		versionInfo.Groundseg.Patch, displayedBranch,
 	)
@@ -251,7 +249,7 @@ func updateBinary(
 		zap.L().Error(fmt.Sprintf("New binary hash does not match downloaded file: remote %v / downloaded %v", newVersionHash, newBinHash))
 		return fmt.Errorf("binary hash mismatch: remote %v / downloaded %v", newVersionHash, newBinHash)
 	}
-	if !conf.DisableSlsa {
+	if !conf.Startram.DisableSlsa {
 		zap.L().Info("Verifying SLSA provenance")
 		if err := verifySlsaProvenance(
 			ctx,
@@ -285,7 +283,7 @@ func updateBinary(
 		return fmt.Errorf("rename groundseg_new to groundseg: %w", err)
 	}
 	// re-disable bypass after one update
-	if conf.DisableSlsa {
+	if conf.Startram.DisableSlsa {
 		if err := config.UpdateConfTyped(config.WithDisableSlsa(false)); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't reset SLSA bypass config: %v", err))
 			return fmt.Errorf("reset disable slsa config: %w", err)
@@ -400,7 +398,7 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 		})
 	}
 	conf := configOps.getConfFn()
-	statuses, err := configOps.getShipStatusFn(conf.Piers)
+	statuses, err := configOps.getShipStatusFn(conf.Connectivity.Piers)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't get ship statuses: %v", err))
 		return fmt.Errorf("get ship statuses: %w", err)

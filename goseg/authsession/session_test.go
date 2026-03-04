@@ -36,20 +36,16 @@ func (cb *countingBoundary) snapshot() (int, int) {
 	return cb.addCalled, cb.removeCalled
 }
 
-func TestSetSessionBoundaryIsSafeForConcurrentMutationAndCalls(t *testing.T) {
+func TestAuthSessionBoundaryInjectionSafeUnderConcurrentLoad(t *testing.T) {
 	boundaryA := &countingBoundary{}
 	boundaryB := &countingBoundary{}
-	origBoundary := &countingBoundary{}
-
-	SetSessionBoundary(origBoundary)
-	defer SetSessionBoundary(nil)
 
 	conn := &websocket.Conn{}
 	token := map[string]string{"id": "token-id", "token": "token-value"}
 
 	const totalCalls = 160
-	const totalAdds = totalCalls / 2
-	const totalRemoves = totalCalls - totalAdds
+	const totalAdds = totalCalls
+	const totalRemoves = totalCalls
 
 	var wg sync.WaitGroup
 	for i := 0; i < totalCalls; i++ {
@@ -58,20 +54,22 @@ func TestSetSessionBoundaryIsSafeForConcurrentMutationAndCalls(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			if i%2 == 0 {
-				SetSessionBoundary(boundaryA)
+				if err := AddToAuthMapWithBoundary(boundaryA, conn, token, true); err != nil {
+					t.Fatalf("unexpected add error: %v", err)
+				}
 			} else {
-				SetSessionBoundary(boundaryB)
+				if err := AddToAuthMapWithBoundary(boundaryB, conn, token, true); err != nil {
+					t.Fatalf("unexpected add error: %v", err)
+				}
 			}
 		}()
 		go func(i int) {
 			defer wg.Done()
 			if i%2 == 0 {
-				if err := AddToAuthMap(conn, token, true); err != nil {
-					t.Fatalf("unexpected add error: %v", err)
-				}
-				return
+				RemoveFromAuthMapWithBoundary(boundaryA, token["id"], true)
+			} else {
+				RemoveFromAuthMapWithBoundary(boundaryB, token["id"], true)
 			}
-			RemoveFromAuthMap(token["id"], true)
 		}(i)
 	}
 	wg.Wait()
@@ -79,9 +77,8 @@ func TestSetSessionBoundaryIsSafeForConcurrentMutationAndCalls(t *testing.T) {
 	boundaryAAdd, boundaryARemove := boundaryA.snapshot()
 	boundaryBAdd, boundaryBRemove := boundaryB.snapshot()
 
-	origBoundaryAdd, _ := origBoundary.snapshot()
-	if boundaryAAdd+boundaryBAdd+origBoundaryAdd != totalAdds {
-		t.Fatalf("expected %d add calls, got %d", totalAdds, boundaryAAdd+boundaryBAdd+origBoundaryAdd)
+	if boundaryAAdd+boundaryBAdd != totalAdds {
+		t.Fatalf("expected %d add calls, got %d", totalAdds, boundaryAAdd+boundaryBAdd)
 	}
 	if boundaryARemove+boundaryBRemove != totalRemoves {
 		t.Fatalf("expected %d remove calls, got %d", totalRemoves, boundaryARemove+boundaryBRemove)

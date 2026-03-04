@@ -1,0 +1,73 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md defines `protocol/actions` as the single source of truth for websocket command tokens (lines 92-104), but `protocol/contracts/protocol_contracts.go` independently declares action tokens (`open-endpoint`, `reset`, `connect`) and IDs.",
+        "The same action surface is represented in two modules with separate constants and descriptors (`README.md` governance text vs `protocol/contracts/protocol_contracts.go` catalog), creating boundary ambiguity over which package owns contract evolution.",
+        "README compatibility guidance requires parser/executor test updates for action changes (lines 106-110), but the contract catalog files (`protocol/contracts/protocol_contracts.go`, `protocol/contracts/startram_contracts.go`) add runtime contract metadata and messages without corresponding documented governance or quality-gate requirements in README."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_contract_authority_between_actions_and_contracts",
+      "summary": "Action contract authority is split across docs and runtime catalogs, increasing drift risk.",
+      "related_files": [
+        "README.md",
+        "protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "README.md states `protocol/actions` is the single source of truth for client-originating action tokens.",
+        "`protocol/contracts/protocol_contracts.go` redefines those same action tokens and binds them into a separate contract catalog (`ActionUploadOpenEndpoint`, `ActionUploadReset`, `ActionC2CConnect`).",
+        "Because the token set is duplicated across modules, adding or renaming an action requires coordinated manual edits in multiple ownership locations."
+      ],
+      "suggestion": "Establish one authoritative action-contract boundary: either (a) generate `protocol/contracts` action entries directly from `protocol/actions`, or (b) move token ownership to `protocol/contracts` and have `protocol/actions` consume it. Then update README to document that single owner explicitly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "governance_rules_do_not_cover_contract_catalog_changes",
+      "summary": "Compatibility policy documents action parser tests but omits catalog-level contract change gates.",
+      "related_files": [
+        "README.md",
+        "protocol/contracts/protocol_contracts.go",
+        "protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README compatibility guidance specifies updates to `protocol/actions` and domain parser/executor tests for action surface changes.",
+        "`protocol/contracts/protocol_contracts.go` and `protocol/contracts/startram_contracts.go` define public contract IDs, metadata, descriptions, and messages that form cross-module runtime contracts.",
+        "No documented policy in README requires contract-catalog regression tests or compatibility checks when IDs/messages/metadata change, leaving a governance gap at this boundary."
+      ],
+      "suggestion": "Extend README governance with an explicit contract-catalog policy: require contract ID stability rules, changelog/compatibility semantics, and mandatory tests in `protocol/contracts` for any contract descriptor/message/metadata changes.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract ownership is split between token registry documentation and a separate runtime catalog layer without a single enforced source-of-truth model.",
+      "Quality gates are defined for parser behavior but not for contract-catalog evolution, so boundary contracts can drift without explicit review hooks."
+    ],
+    "likely_symptoms": [
+      "split_contract_authority_between_actions_and_contracts",
+      "governance_rules_do_not_cover_contract_catalog_changes"
+    ],
+    "possible_false_positives": [
+      "Prior automated flag `security: Hardcoded secret in variable 'ActionToken'` appears mis-scoped because values are protocol tokens, not secrets."
+    ]
+  }
+}

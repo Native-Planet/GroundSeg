@@ -47,7 +47,7 @@ func TestUpdateMcConfWritesVersionChannelData(t *testing.T) {
 
 	confForMc = func() structs.SysConfig {
 		conf := structs.SysConfig{}
-		conf.UpdateBranch = "edge"
+		conf.Connectivity.UpdateBranch = "edge"
 		return conf
 	}
 	getVersionChannelForMc = func() structs.Channel {

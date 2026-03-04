@@ -111,7 +111,7 @@ func InitializeWiFiWithState(state ...*wifiRuntimeState) error {
 	resolvedState := resolveWiFiRuntimeState(state...)
 	var initErr error
 	resolvedState.wifiInit.Do(func() {
-		initErr = DefaultWiFiRuntimeService().StartWiFiInfoLoop(context.Background())
+		initErr = NewWiFiRuntimeService().StartWiFiInfoLoop(context.Background())
 	})
 	return initErr
 }

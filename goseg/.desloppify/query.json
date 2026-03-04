@@ -1,53 +1,80 @@
 {
-  "command": "issues",
-  "action": "show",
-  "number": 1,
-  "finding": {
-    "id": "review::.::holistic::abstraction_fitness::inconsistent_wrapper_contracts::ced3747e",
-    "summary": "Wrapper abstractions expose inconsistent contracts (silent no-op vs hard error), making interfaces dishonest and harder to reason about.",
-    "detail": {
-      "holistic": true,
-      "dimension": "abstraction_fitness",
-      "related_files": [
-        "importer/importer.go",
-        "startuporchestrator/startup_orchestrator.go",
-        "main.go"
-      ],
-      "evidence": [
-        "importer/importer.go has wrappers that sometimes fail hard on nil dependencies (startContainer/deleteVolume) but other wrappers silently do nothing (updateContainer, waitForBootCode/waitForRemoteReady when lifecycleOps is nil).",
-        "startuporchestrator/startup_orchestrator.go has storage callbacks that silently no-op when unset (configureSwap/setupTmpDir return nil), while other callbacks are treated as required via validate().",
-        "main.go bootstrapRuntime.startServer and runC2cCheck return nil if callback is missing, but startup options in orchestrator treat server startup as required behavior."
-      ],
-      "suggestion": "Define one contract style per runtime seam: either required dependencies validated at construction (no nil branches in hot paths) or explicit optional dependencies modeled as Optional* fields with documented no-op behavior. Apply consistently across wrappers.",
-      "reasoning": ""
+  "command": "next",
+  "items": [
+    {
+      "id": "review::.::holistic::abstraction_fitness::runtime_callback_bag_sprawl::f73721dd",
+      "kind": "finding",
+      "tier": 3,
+      "effective_tier": 1,
+      "confidence": "high",
+      "detector": "review",
+      "file": ".",
+      "summary": "Large callback-bag runtimes create high indirection with limited domain leverage.",
+      "detail": {
+        "holistic": true,
+        "dimension": "abstraction_fitness",
+        "related_files": [
+          "importer/importer.go",
+          "shipworkflow/operations_runtime.go",
+          "startuporchestrator/startup_orchestrator.go",
+          "docker/orchestration/runtime_ops.go",
+          "rectify/rectify.go"
+        ],
+        "evidence": [
+          "`docker/orchestration/runtime_ops.go` defines broad cross-domain runtime structs that are reused by importer/workflow/rectify, so each consumer inherits many callbacks beyond its core responsibility.",
+          "`importer/importer.go` and `shipworkflow/operations_runtime.go` both validate long callback lists manually, showing abstraction cost has shifted to defensive wiring rather than simpler domain contracts.",
+          "`rectify/rectify.go` and `startuporchestrator/startup_orchestrator.go` layer additional runtime composition/merge logic on top of these bundles, increasing maintenance surface for every seam rename or new callback."
+        ],
+        "suggestion": "Refactor runtime seams into smaller capability interfaces per use-case (for example, `UrbitConfigMutator`, `ContainerLifecycle`, `TransitionPublisher`) and inject only those into each subsystem. Replace manual nil-check lists with grouped interface assertions so adding/removing callbacks does not require synchronized edits across multiple runtime builders and validators.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "primary_command": "desloppify issues"
     }
+  ],
+  "queue": {
+    "tier_counts": {
+      "1": 15,
+      "2": 1,
+      "3": 371,
+      "4": 160
+    },
+    "requested_tier": null,
+    "selected_tier": null,
+    "fallback_reason": null,
+    "available_tiers": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "total": 547
   },
-  "next_command": "desloppify resolve fixed \"review::.::holistic::abstraction_fitness::inconsistent_wrapper_contracts::ced3747e\" --note \"<what you fixed>\"",
   "narrative": {
-    "phase": "middle_grind",
-    "headline": "All T1 and T2 items cleared! (23 review findings \u2014 run `desloppify issues`)",
+    "phase": "stagnation",
+    "headline": "\u26a0 1 security finding \u2014 review before other cleanup. Score plateaued at 71.0 for 5 scans. Design coherence (49.3%) is where the breakthrough is. (15 review findings \u2014 run `desloppify issues`)",
     "dimensions": {
       "lowest_dimensions": [
         {
-          "name": "Abstraction fit",
-          "strict": 47.0,
-          "issues": 5,
+          "name": "Design coherence",
+          "strict": 49.3,
+          "issues": 4,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
         },
         {
-          "name": "Design coherence",
-          "strict": 48.3,
-          "issues": 7,
+          "name": "Abstraction fit",
+          "strict": 54.8,
+          "issues": 3,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
         },
         {
           "name": "Error consistency",
-          "strict": 49.2,
-          "issues": 5,
+          "strict": 59.0,
+          "issues": 3,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
@@ -56,13 +83,33 @@
       "biggest_gap_dimensions": [],
       "stagnant_dimensions": [
         {
+          "name": "File health",
+          "strict": 96.7,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Code quality",
+          "strict": 92.3,
+          "stuck_scans": 5
+        },
+        {
           "name": "Duplication",
           "strict": 100.0,
           "stuck_scans": 5
         },
         {
           "name": "Security",
-          "strict": 100.0,
+          "strict": 99.6,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Error consistency",
+          "strict": 59.0,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Test strategy",
+          "strict": 71.5,
           "stuck_scans": 5
         }
       ]
@@ -71,24 +118,13 @@
       {
         "type": "issue_queue",
         "detector": "review",
-        "count": 23,
-        "description": "23 review findings need investigation \u2014 run `desloppify issues` to see the work queue",
+        "count": 15,
+        "description": "15 review findings need investigation \u2014 run `desloppify issues` to see the work queue",
         "command": "desloppify issues",
         "impact": 0.0,
         "dimension": "Unknown",
         "priority": 1,
         "lane": "refactor_0"
-      },
-      {
-        "type": "auto_fix",
-        "detector": "unused",
-        "count": 275,
-        "description": "275 unused findings \u2014 run `desloppify fix unused-imports --dry-run` to preview, then apply",
-        "command": "desloppify fix unused-imports --dry-run",
-        "impact": 0.0,
-        "dimension": "Code quality",
-        "priority": 2,
-        "lane": "cleanup"
       },
       {
         "type": "reorganize",
@@ -98,7 +134,7 @@
         "command": "desloppify show flat_dirs --status open",
         "impact": 0.0,
         "dimension": "Code quality",
-        "priority": 3,
+        "priority": 2,
         "lane": "restructure"
       },
       {
@@ -109,7 +145,7 @@
         "command": "desloppify show structural --status open",
         "impact": 0.0,
         "dimension": "File health",
-        "priority": 4,
+        "priority": 3,
         "lane": "refactor_1"
       },
       {
@@ -120,29 +156,29 @@
         "command": "desloppify show dupes --status open",
         "impact": 0.0,
         "dimension": "Duplication",
-        "priority": 5,
+        "priority": 4,
         "lane": "refactor_1"
       },
       {
         "type": "refactor",
         "detector": "test_coverage",
-        "count": 11,
-        "description": "11 test_coverage findings \u2014 add tests for untested production modules \u2014 prioritize by import count",
+        "count": 17,
+        "description": "17 test_coverage findings \u2014 add tests for untested production modules \u2014 prioritize by import count",
         "command": "desloppify show test_coverage --status open",
         "impact": 0.0,
         "dimension": "Test health",
-        "priority": 6,
+        "priority": 5,
         "lane": "test_coverage"
       },
       {
         "type": "refactor",
         "detector": "signature",
-        "count": 20,
-        "description": "20 signature findings \u2014 consolidate inconsistent function signatures",
+        "count": 21,
+        "description": "21 signature findings \u2014 consolidate inconsistent function signatures",
         "command": "desloppify show signature --status open",
         "impact": 0.0,
         "dimension": "Unknown",
-        "priority": 7,
+        "priority": 6,
         "lane": "refactor_1"
       },
       {
@@ -153,42 +189,55 @@
         "command": "desloppify show responsibility_cohesion --status open",
         "impact": 0.0,
         "dimension": "Code quality",
+        "priority": 7,
+        "lane": "refactor_1"
+      },
+      {
+        "type": "manual_fix",
+        "detector": "unused",
+        "count": 268,
+        "description": "268 unused findings \u2014 inspect with `desloppify next` and fix manually",
+        "command": "desloppify show unused --status open",
+        "impact": 0.0,
+        "dimension": "Code quality",
         "priority": 8,
         "lane": "refactor_1"
       },
       {
         "type": "manual_fix",
+        "detector": "security",
+        "count": 1,
+        "description": "1 security findings \u2014 review and fix security findings \u2014 prioritize by severity",
+        "command": "desloppify show security --status open",
+        "impact": 0.0,
+        "dimension": "Security",
+        "priority": 9,
+        "lane": "refactor_2"
+      },
+      {
+        "type": "manual_fix",
         "detector": "subjective_review",
-        "count": 21,
-        "description": "21 files need design review \u2014 run design review with dimension templates",
+        "count": 155,
+        "description": "155 files need design review \u2014 run design review with dimension templates",
         "command": "desloppify fix review",
         "impact": 0.0,
         "dimension": "Test health",
-        "priority": 9,
+        "priority": 10,
         "lane": "refactor_1"
       }
     ],
     "strategy": {
       "fixer_leverage": {
-        "auto_fixable_count": 275,
-        "total_count": 461,
-        "coverage": 0.597,
+        "auto_fixable_count": 0,
+        "total_count": 572,
+        "coverage": 0.0,
         "impact_ratio": 0.0,
-        "recommendation": "strong"
+        "recommendation": "none"
       },
       "lanes": {
-        "cleanup": {
-          "actions": [
-            2
-          ],
-          "file_count": 193,
-          "total_impact": 0.0,
-          "automation": "full",
-          "run_first": true
-        },
         "restructure": {
           "actions": [
-            3
+            2
           ],
           "file_count": 5,
           "total_impact": 0.0,
@@ -206,51 +255,42 @@
         },
         "refactor_1": {
           "actions": [
+            3,
             4,
-            5,
+            6,
             7,
             8,
+            10
+          ],
+          "file_count": 297,
+          "total_impact": 0.0,
+          "automation": "manual",
+          "run_first": false
+        },
+        "refactor_2": {
+          "actions": [
             9
           ],
-          "file_count": 77,
+          "file_count": 1,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
         },
         "test_coverage": {
           "actions": [
-            6
+            5
           ],
-          "file_count": 11,
+          "file_count": 17,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
         }
       },
       "can_parallelize": true,
-      "hint": "Run fixers first \u2014 they cover 60% of findings. Then 4 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 23 finding(s) \u2014 `desloppify issues`."
+      "hint": "5 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 15 finding(s) \u2014 `desloppify issues`."
     },
     "tools": {
-      "fixers": [
-        {
-          "name": "unused-imports",
-          "detector": "unused",
-          "open_count": 275,
-          "command": "desloppify fix unused-imports --dry-run"
-        },
-        {
-          "name": "unused-vars",
-          "detector": "unused",
-          "open_count": 275,
-          "command": "desloppify fix unused-vars --dry-run"
-        },
-        {
-          "name": "unused-params",
-          "detector": "unused",
-          "open_count": 275,
-          "command": "desloppify fix unused-params --dry-run"
-        }
-      ],
+      "fixers": [],
       "move": {
         "available": true,
         "relevant": true,
@@ -275,12 +315,12 @@
       "worst_gap": 0.0,
       "trend": "stable"
     },
-    "milestone": "All T1 and T2 items cleared!",
+    "milestone": null,
     "primary_action": {
       "command": "desloppify issues",
-      "description": "23 review findings need investigation \u2014 run `desloppify issues` to see the work queue"
+      "description": "15 review findings need investigation \u2014 run `desloppify issues` to see the work queue"
     },
-    "why_now": "Run fixers first \u2014 they cover 60% of findings. Then 4 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 23 finding(s) \u2014 `desloppify issues`.",
+    "why_now": "5 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 15 finding(s) \u2014 `desloppify issues`.",
     "verification_step": {
       "command": "desloppify scan",
       "reason": "revalidate after changes"
@@ -288,29 +328,202 @@
     "risk_flags": [],
     "strict_target": {
       "target": 95.0,
-      "current": 68.4,
-      "gap": 26.6,
+      "current": 71.0,
+      "gap": 24.0,
       "state": "below",
       "warning": null
     },
-    "reminders": [
-      {
-        "type": "auto_fixers_available",
-        "message": "275 findings are auto-fixable. Run `desloppify fix unused-imports --dry-run`.",
-        "command": "desloppify fix unused-imports --dry-run",
-        "priority": 2,
-        "severity": "medium"
-      }
-    ],
+    "reminders": [],
     "reminder_history": {
       "zone_classification": 3,
-      "report_scores": 7,
+      "report_scores": 12,
       "review_findings_pending": 3,
       "stagnant_nudge": 3,
-      "feedback_nudge": 3,
-      "auto_fixers_available": 1
+      "feedback_nudge": 3
     }
   },
+  "overall_score": 71.0,
+  "objective_score": 96.7,
+  "strict_score": 71.0,
+  "scorecard_dimensions": [
+    {
+      "name": "File health",
+      "score": 96.7,
+      "strict": 96.7,
+      "checks": 272,
+      "issues": 13,
+      "tier": 3,
+      "subjective": false
+    },
+    {
+      "name": "Abstraction fit",
+      "score": 54.8,
+      "strict": 54.8,
+      "checks": 10,
+      "issues": 3,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "abstraction_fitness"
+      ]
+    },
+    {
+      "name": "Code quality",
+      "score": 92.3,
+      "strict": 92.3,
+      "checks": 128,
+      "issues": 14,
+      "tier": 3,
+      "subjective": false
+    },
+    {
+      "name": "Cross-module arch",
+      "score": 59.1,
+      "strict": 59.1,
+      "checks": 10,
+      "issues": 3,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "cross_module_architecture"
+      ]
+    },
+    {
+      "name": "Design coherence",
+      "score": 49.3,
+      "strict": 49.3,
+      "checks": 10,
+      "issues": 4,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "design_coherence"
+      ]
+    },
+    {
+      "name": "Duplication",
+      "score": 100.0,
+      "strict": 100.0,
+      "checks": 3220,
+      "issues": 0,
+      "tier": 3,
+      "subjective": false
+    },
+    {
+      "name": "Error consistency",
+      "score": 59.0,
+      "strict": 59.0,
+      "checks": 10,
+      "issues": 3,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "error_consistency"
+      ]
+    },
+    {
+      "name": "Security",
+      "score": 99.6,
+      "strict": 99.6,
+      "checks": 272,
+      "issues": 1,
+      "tier": 4,
+      "subjective": false
+    },
+    {
+      "name": "Test health",
+      "score": 93.2,
+      "strict": 93.2,
+      "checks": 3015,
+      "issues": 172,
+      "tier": 4,
+      "subjective": false
+    },
+    {
+      "name": "Test strategy",
+      "score": 71.5,
+      "strict": 71.5,
+      "checks": 10,
+      "issues": 2,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "test_strategy"
+      ]
+    }
+  ],
+  "subjective_measures": [
+    {
+      "name": "Abstraction fit",
+      "score": 54.8,
+      "strict": 54.8,
+      "checks": 10,
+      "issues": 3,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "abstraction_fitness"
+      ]
+    },
+    {
+      "name": "Cross-module arch",
+      "score": 59.1,
+      "strict": 59.1,
+      "checks": 10,
+      "issues": 3,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "cross_module_architecture"
+      ]
+    },
+    {
+      "name": "Design coherence",
+      "score": 49.3,
+      "strict": 49.3,
+      "checks": 10,
+      "issues": 4,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "design_coherence"
+      ]
+    },
+    {
+      "name": "Error consistency",
+      "score": 59.0,
+      "strict": 59.0,
+      "checks": 10,
+      "issues": 3,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "error_consistency"
+      ]
+    },
+    {
+      "name": "Test strategy",
+      "score": 71.5,
+      "strict": 71.5,
+      "checks": 10,
+      "issues": 2,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "test_strategy"
+      ]
+    }
+  ],
   "config": {
     "target_strict_score": 95,
     "review_max_age_days": 30,

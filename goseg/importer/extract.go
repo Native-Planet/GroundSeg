@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"groundseg/logger"
 	"groundseg/structs"
 	"io"
 	"os"
@@ -136,7 +137,9 @@ func extractWithStrategy(src, dest string, strategy archiveExtractionStrategy) e
 
 		entry, err := iterator.Next()
 		if err == io.EOF {
-			publishImportTransition(structs.UploadTransition{Type: "extracted", Value: 100})
+			if err := publishImportTransition(structs.UploadTransition{Type: "extracted", Value: 100}); err != nil {
+				logger.Warnf("failed to publish extracted completion transition: %v", err)
+			}
 			return nil
 		}
 		if err != nil {
@@ -429,10 +432,12 @@ func (p *extractionProgressTracker) tryPublish(processedEntries, processedBytes 
 	if percentExtracted > 99 {
 		percentExtracted = 99
 	}
-	publishImportTransition(structs.UploadTransition{
+	if err := publishImportTransition(structs.UploadTransition{
 		Type:  "extracted",
 		Value: percentExtracted,
-	})
+	}); err != nil {
+		logger.Warnf("failed to publish extraction progress transition: %v", err)
+	}
 	p.last = time.Now()
 }
 

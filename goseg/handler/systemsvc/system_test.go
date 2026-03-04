@@ -31,7 +31,7 @@ func TestHandleSystemTogglePenpaiFeature(t *testing.T) {
 
 	deps := SystemDependencies{
 		Conf: func() structs.SysConfig {
-			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: true}}
+			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiAllow: true}}
 		},
 		StopContainerByName: func(name string) error {
 			stopped = append(stopped, name)
@@ -61,7 +61,7 @@ func TestHandleSystemTogglePenpaiFeature(t *testing.T) {
 
 	deps = SystemDependencies{
 		Conf: func() structs.SysConfig {
-			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiAllow: false}}
+			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiAllow: false}}
 		},
 		UpdateConfTyped: func(opts ...config.ConfUpdateOption) error {
 			p := &config.ConfPatch{}
@@ -145,7 +145,7 @@ func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
 	upgradeCount := 0
 	deps := SystemDependencies{
 		Conf: func() structs.SysConfig {
-			return structs.SysConfig{RuntimeConfig: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
+			return structs.SysConfig{Runtime: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
 		},
 		ConfigureSwap: func(_ string, value int) error { configureCalls = append(configureCalls, value); return nil },
 		UpdateConfTyped: func(opts ...config.ConfUpdateOption) error {
@@ -257,7 +257,7 @@ func TestHandlePenpaiToggle(t *testing.T) {
 	deps := PenpaiDependencies{
 		Unmarshal: json.Unmarshal,
 		Conf: func() structs.SysConfig {
-			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 		},
 		StopContainerByName: func(name string) error {
 			stopCalls++
@@ -295,7 +295,7 @@ func TestHandlePenpaiToggle(t *testing.T) {
 	}
 
 	deps.Conf = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: false}}
+		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: false}}
 	}
 	if err := HandlePenpai([]byte(`{"payload":{"action":"toggle"}}`), deps); err != nil {
 		t.Fatalf("expected second toggle to start container: %v", err)
@@ -314,7 +314,7 @@ func TestHandlePenpaiSetModel(t *testing.T) {
 	deps := PenpaiDependencies{
 		Unmarshal: json.Unmarshal,
 		Conf: func() structs.SysConfig {
-			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 		},
 		StopContainerByName: func(string) error { return nil },
 		StartContainerByName: func(_ string, _ string) (structs.ContainerState, error) {
@@ -347,7 +347,7 @@ func TestHandlePenpaiSetModel(t *testing.T) {
 	}
 
 	deps.Conf = func() structs.SysConfig {
-		return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: false}}
+		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: false}}
 	}
 	restarts = 0
 	if err := HandlePenpai([]byte(`{"payload":{"action":"set-model","model":"mistral"}}`), deps); err != nil {
@@ -362,7 +362,7 @@ func TestHandlePenpaiSetCoresValidation(t *testing.T) {
 	deps := PenpaiDependencies{
 		Unmarshal: json.Unmarshal,
 		Conf: func() structs.SysConfig {
-			return structs.SysConfig{PenpaiConfig: structs.PenpaiConfig{PenpaiRunning: true}}
+			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 		},
 		StopContainerByName:  func(string) error { return nil },
 		StartContainerByName: func(_ string, _ string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },

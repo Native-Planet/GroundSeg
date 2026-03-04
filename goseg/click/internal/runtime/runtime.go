@@ -13,7 +13,7 @@ import (
 
 var (
 	execDockerCommandFn = func(container string, cmd []string) (string, error) {
-		response, exitCode, err := lifecycle.DefaultRuntime.ExecDockerCommand(container, cmd)
+		response, exitCode, err := lifecycle.DefaultRuntime().ExecDockerCommand(container, cmd)
 		if err != nil {
 			return "", err
 		}

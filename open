@@ -1,0 +1,832 @@
+{
+  "position": 2,
+  "status": "succeeded",
+  "prompt_path": "/Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260303_212203/prompts/batch-2.md",
+  "result_path": "/Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260303_212203/results/batch-2.raw.txt",
+  "log_path": "/Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260303_212203/logs/batch-2.log",
+  "started_at": "2026-03-03T21:22:04+00:00",
+  "elapsed_seconds": 107,
+  "exit_code": 0,
+  "completed_at": "2026-03-03T21:23:52+00:00",
+  "subjective_assessments": {
+    "abstraction_fitness": {
+      "score": 48.3,
+      "source": "holistic",
+      "assessed_at": "2026-03-03T21:23:52+00:00",
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 68.0,
+        "Indirection Cost": 76.0,
+        "Interface Honesty": 72.0
+      }
+    },
+    "design_coherence": {
+      "score": 61.6,
+      "source": "holistic",
+      "assessed_at": "2026-03-03T21:23:52+00:00"
+    },
+    "error_consistency": {
+      "score": 49.1,
+      "source": "holistic",
+      "assessed_at": "2026-03-03T21:23:52+00:00"
+    }
+  },
+  "potentials": {
+    "go": {
+      "review": 10
+    }
+  },
+  "version": 1,
+  "created": "2026-03-03T21:23:52+00:00",
+  "last_scan": "2026-03-03T21:23:52+00:00",
+  "scan_count": 1,
+  "overall_score": 50.0,
+  "objective_score": 100.0,
+  "strict_score": 50.0,
+  "verified_strict_score": 100.0,
+  "stats": {
+    "total": 9,
+    "open": 9,
+    "fixed": 0,
+    "auto_resolved": 0,
+    "wontfix": 0,
+    "false_positive": 0,
+    "by_tier": {
+      "3": {
+        "open": 9,
+        "fixed": 0,
+        "auto_resolved": 0,
+        "wontfix": 0,
+        "false_positive": 0
+      }
+    }
+  },
+  "findings": {
+    "review::.::holistic::abstraction_fitness::callback_bag_sprawl::ad680d89": {
+      "id": "review::.::holistic::abstraction_fitness::callback_bag_sprawl::ad680d89",
+      "detector": "review",
+      "file": ".",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Large runtime callback-bag abstractions create high indirection without clear bounded contracts.",
+      "detail": {
+        "holistic": true,
+        "dimension": "abstraction_fitness",
+        "related_files": [
+          "goseg/docker/orchestration/runtime_ops.go",
+          "goseg/importer/importer.go",
+          "goseg/startuporchestrator/startup_orchestrator.go",
+          "goseg/shipworkflow/operations_runtime.go",
+          "goseg/rectify/rectify.go"
+        ],
+        "evidence": [
+          "`runtime_ops.go` defines many broad seam structs with dozens of function fields; downstream modules embed these bags rather than small role-specific interfaces.",
+          "`importerRuntime`, `workflowRuntime`, and `RectifyRuntime` each include long manual callback presence checks, duplicating infrastructure logic and coupling behavior to field-name lists.",
+          "Runtime composition repeatedly uses default runtime + merge + validate patterns, increasing call-depth and cognitive overhead before domain logic executes."
+        ],
+        "suggestion": "Split seam bags into narrower domain ports (for example: transition publisher, config updater, ship state reader, urbit config store), make each module depend on only the minimal port set, and centralize callback validation in reusable constructors so modules stop maintaining bespoke callback inventories.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-03T21:23:52+00:00",
+      "last_seen": "2026-03-03T21:23:52+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::abstraction_fitness::thin_wrapper_delegate_layer::a78c2219": {
+      "id": "review::.::holistic::abstraction_fitness::thin_wrapper_delegate_layer::a78c2219",
+      "detector": "review",
+      "file": ".",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Event and WiFi service wrappers add a delegating layer with minimal policy, increasing indirection cost.",
+      "detail": {
+        "holistic": true,
+        "dimension": "abstraction_fitness",
+        "related_files": [
+          "goseg/docker/events/events.go",
+          "goseg/system/wifi_runtime_api.go",
+          "goseg/system/wifi_runtime_methods.go"
+        ],
+        "evidence": [
+          "`EventRuntime` repeats delegate-or-local forwarding across publish/read methods; behavior is mostly pass-through except selecting backing channel.",
+          "`WiFiRuntimeService` methods (`IsWifiEnabled`, `ListWifiSSIDs`, `ConnectToWifi`, `DisconnectWifi`, `ApplyCaptiveRules`) primarily relay to `wifiRuntime` with repeated nil/default checks.",
+          "The wrapper layer duplicates guard logic per method instead of expressing one clear boundary type with explicit lifecycle guarantees."
+        ],
+        "suggestion": "Either collapse these wrappers into direct runtime usage where no policy is added, or enforce a stronger service contract (single initialization path plus non-nil invariant) so wrappers provide substantive behavior (retry/policy/telemetry/error shaping) rather than repetitive forwarding.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-03T21:23:52+00:00",
+      "last_seen": "2026-03-03T21:23:52+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::abstraction_fitness::global_singleton_runtime_coupling::7ae20bc2": {
+      "id": "review::.::holistic::abstraction_fitness::global_singleton_runtime_coupling::7ae20bc2",
+      "detector": "review",
+      "file": ".",
+      "tier": 3,
+      "confidence": "medium",
+      "summary": "Default singleton runtimes and fallback resolvers leak hidden dependencies through ostensibly injectable APIs.",
+      "detail": {
+        "holistic": true,
+        "dimension": "abstraction_fitness",
+        "related_files": [
+          "goseg/broadcast/state.go",
+          "goseg/broadcast/transitions.go",
+          "goseg/main.go",
+          "goseg/startuporchestrator/startup_orchestrator.go"
+        ],
+        "evidence": [
+          "`broadcast/state.go` uses package-level singleton `defaultBroadcastStateRuntime` and many helpers silently fall back to it via resolver functions.",
+          "`broadcast/transitions.go` accepts optional runtime overrides but defaults to global `DefaultBroadcastStateRuntime()`, preserving hidden shared state dependency.",
+          "`main.go` and startup bootstrapping rely on package-level function variables/snapshots (`runtimeContextSnapshotFn`, `connectivitySettingsSnapshot`, startup snapshot vars), which behave as ambient dependencies instead of explicit constructor inputs."
+        ],
+        "suggestion": "Move to explicit dependency injection at module boundaries (constructors for broadcast/startup/main orchestration), remove optional varargs fallback-to-global APIs, and keep a single composition root responsible for choosing production singletons vs test doubles.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-03T21:23:52+00:00",
+      "last_seen": "2026-03-03T21:23:52+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::abstraction_fitness::config_patch_registry_overgeneralized::5922d7ba": {
+      "id": "review::.::holistic::abstraction_fitness::config_patch_registry_overgeneralized::5922d7ba",
+      "detector": "review",
+      "file": ".",
+      "tier": 3,
+      "confidence": "medium",
+      "summary": "Generic patch-field abstraction in config registry still requires repetitive per-field boilerplate, indicating weak leverage.",
+      "detail": {
+        "holistic": true,
+        "dimension": "abstraction_fitness",
+        "related_files": [
+          "goseg/config/config_update_registry.go",
+          "goseg/structs/configs.go",
+          "goseg/config/config_test.go"
+        ],
+        "evidence": [
+          "`config_update_registry.go` contains a long sequence of near-identical `configPatchFieldFromSpec(...)` entries and merge helpers (`mergeStringSetIfNonEmpty`, `mergeIntSetIfNonZero`, etc.).",
+          "Despite generic helpers, each new setting still needs repeated parse/apply/merge wiring, so abstraction complexity remains while change cost stays high.",
+          "Tests in `config_test.go` exercise many merge-path combinations, reflecting how much behavior is encoded in this registry scaffolding."
+        ],
+        "suggestion": "Introduce schema-driven registration (table-generated parse/apply/merge policies per section) or code generation for patch descriptors so behavior is declared once and emitted consistently, reducing manual indirection and drift risk.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-03T21:23:52+00:00",
+      "last_seen": "2026-03-03T21:23:52+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::design_coherence::rectify_duplicate_service_registration_publish::4968e829": {
+      "id": "review::.::holistic::design_coherence::rectify_duplicate_service_registration_publish::4968e829",
+      "detector": "review",
+      "file": ".",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Startram reconcile publishes the same service-registration transition update twice per ship, indicating duplicated side-effect logic in a multi-responsibility reconciliation loop.",
+      "detail": {
+        "holistic": true,
+        "dimension": "design_coherence",
+        "related_files": [
+          "goseg/rectify/rectify_services.go",
+          "goseg/rectify/rectify_test.go"
+        ],
+        "evidence": [
+          "`StartramRetrieveReconciler.Reconcile` calls `publishUrbitServiceRegistrationTransitionWithCurrentState(current, patp, serviceCreated)` twice consecutively at lines 153-154.",
+          "Current rectify tests validate field convergence but do not assert single publication/assignment behavior, so this duplicate side effect is not guarded."
+        ],
+        "suggestion": "Remove the duplicate call and split reconciliation into smaller phases (discovery, mutation, persistence, publish) with focused tests asserting one publication/update per ship per pass.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-03T21:23:52+00:00",
+      "last_seen": "2026-03-03T21:23:52+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::design_coherence::startup_policy_model_divergence::5fc87fda": {
+      "id": "review::.::holistic::design_coherence::startup_policy_model_divergence::5fc87fda",
+      "detector": "review",
+      "file": ".",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Startup flow duplicates policy semantics in two orchestration layers that now behave differently for optional failures.",
+      "detail": {
+        "holistic": true,
+        "dimension": "design_coherence",
+        "related_files": [
+          "goseg/startuporchestrator/startup_orchestrator.go",
+          "goseg/startuporchestrator/startup_orchestrator_test.go"
+        ],
+        "evidence": [
+          "`runStartupSubsystem` logs optional init failures via `logOptionalStartupFailure(\"init\", ...)` and suppresses them.",
+          "`startupOrchestrator.init` suppresses non-required init failures without logging, while `start`/`health` do log optional failures, creating intra-orchestrator inconsistency."
+        ],
+        "suggestion": "Consolidate on one startup policy abstraction (either step-policy or task-required model), and enforce one optional-failure contract (log+continue or aggregate+report) across init/start/health.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-03T21:23:52+00:00",
+      "last_seen": "2026-03-03T21:23:52+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::error_consistency::mixed_panic_vs_error_validation::a671abc0": {
+      "id": "review::.::holistic::error_consistency::mixed_panic_vs_error_validation::a671abc0",
+      "detector": "review",
+      "file": ".",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Configuration/runtime validation uses both panic and returned errors for comparable invalid-dependency conditions.",
+      "detail": {
+        "holistic": true,
+        "dimension": "error_consistency",
+        "related_files": [
+          "goseg/config/config_update_registry.go",
+          "goseg/importer/importer.go",
+          "goseg/main.go"
+        ],
+        "evidence": [
+          "`configPatchFieldFromSpec` panics when apply/target callbacks are missing (lines 21-25).",
+          "Comparable callback validation in `bootstrapRuntime.validate` and `validateImporterProvisionRuntime` returns typed/contextual errors instead of terminating via panic."
+        ],
+        "suggestion": "Replace panic-based spec validation with explicit error-returning constructors (or init-time validation returning errors) so misconfiguration failure mode stays uniform and recoverable across subsystems.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-03T21:23:52+00:00",
+      "last_seen": "2026-03-03T21:23:52+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::error_consistency::workflow_runtime_validation_error_dropped::1b2975b9": {
+      "id": "review::.::holistic::error_consistency::workflow_runtime_validation_error_dropped::1b2975b9",
+      "detector": "review",
+      "file": ".",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Workflow transition emission silently ignores runtime validation failures that sibling workflow paths propagate.",
+      "detail": {
+        "holistic": true,
+        "dimension": "error_consistency",
+        "related_files": [
+          "goseg/shipworkflow/operations_runtime.go",
+          "goseg/docker/events/events.go"
+        ],
+        "evidence": [
+          "`emitWorkflowTransition` uses `resolvedRuntime, _ := resolveWorkflowRuntime(runtime)` and proceeds even when validation fails.",
+          "`dispatchUploadImport` in the same file returns validation errors from `resolveWorkflowRuntime`, proving two inconsistent strategies for the same precondition class."
+        ],
+        "suggestion": "Propagate `resolveWorkflowRuntime` errors in `emitWorkflowTransition` (or explicitly route through `HandleTransitionPublishError`) and remove silent fallback paths that hide invalid runtime state.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-03T21:23:52+00:00",
+      "last_seen": "2026-03-03T21:23:52+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "review::.::holistic::error_consistency::background_service_contract_hides_failures::acf77d20": {
+      "id": "review::.::holistic::error_consistency::background_service_contract_hides_failures::acf77d20",
+      "detector": "review",
+      "file": ".",
+      "tier": 3,
+      "confidence": "medium",
+      "summary": "Some background services are wired into supervised startup as error-returning tasks but never surface operational failures through that contract.",
+      "detail": {
+        "holistic": true,
+        "dimension": "error_consistency",
+        "related_files": [
+          "goseg/startuporchestrator/startup_orchestrator.go",
+          "goseg/routines/system/system.go",
+          "goseg/routines/logstream/logs.go"
+        ],
+        "evidence": [
+          "`defaultStartBackgroundServicesRuntime` registers `StartBackupRoutinesWithContext` as a supervised background service callback.",
+          "`StartBackupRoutinesWithContext` spawns loops and returns nil on context cancellation without any error channel/propagation path, unlike `OldLogsCleanerWithContext`/`DockerLogStreamerWithRuntime` which return errors after repeated failures."
+        ],
+        "suggestion": "Standardize background service contract on supervised run loops that can report failures (error return or health probe), and refactor backup/chop routines to expose errors instead of fire-and-forget behavior.",
+        "reasoning": ""
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-03T21:23:52+00:00",
+      "last_seen": "2026-03-03T21:23:52+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    }
+  },
+  "scan_coverage": {},
+  "score_confidence": {
+    "status": "full",
+    "confidence": 1.0,
+    "detectors": [],
+    "dimensions": []
+  },
+  "subjective_integrity": {
+    "status": "disabled",
+    "target_score": null,
+    "matched_count": 0,
+    "matched_dimensions": [],
+    "reset_dimensions": []
+  },
+  "scan_history": [
+    {
+      "timestamp": "2026-03-03T21:23:52+00:00",
+      "lang": "go",
+      "strict_score": 9.3,
+      "verified_strict_score": 100.0,
+      "objective_score": 100.0,
+      "overall_score": 9.3,
+      "open": 9,
+      "diff_new": 9,
+      "diff_resolved": 0,
+      "ignored": 0,
+      "raw_findings": 9,
+      "suppressed_pct": 0.0,
+      "ignore_patterns": 0,
+      "subjective_integrity": {
+        "status": "disabled",
+        "matched_count": 0,
+        "reset_count": 0,
+        "target_score": null
+      },
+      "score_confidence": {
+        "status": "full",
+        "confidence": 1.0,
+        "detector_count": 0,
+        "dimension_count": 0
+      },
+      "dimension_scores": {
+        "Naming quality": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Logic clarity": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Type safety": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Contracts": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Error consistency": {
+          "score": 49.1,
+          "strict": 49.1
+        },
+        "Abstraction fit": {
+          "score": 48.3,
+          "strict": 48.3
+        },
+        "AI generated debt": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "High elegance": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Mid elegance": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Low elegance": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Cross-module arch": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Init coupling": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Convention drift": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Dep health": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Test strategy": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "API coherence": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Auth consistency": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Stale migration": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Structure nav": {
+          "score": 0.0,
+          "strict": 0.0
+        },
+        "Design coherence": {
+          "score": 61.6,
+          "strict": 61.6
+        }
+      }
+    }
+  ],
+  "tool_hash": "e073c6da67fa",
+  "scan_path": null,
+  "scan_completeness": {
+    "go": "full"
+  },
+  "dimension_scores": {
+    "Error consistency": {
+      "score": 49.1,
+      "strict_score": 49.1,
+      "verified_strict_score": 49.1,
+      "checks": 10,
+      "issues": 3,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.491,
+          "issues": 3,
+          "weighted_failures": 5.09,
+          "assessment_score": 49.1,
+          "placeholder": false,
+          "dimension_key": "error_consistency",
+          "configured_weight": 3.0,
+          "components": []
+        }
+      },
+      "strict": 49.1
+    },
+    "Abstraction fit": {
+      "score": 48.3,
+      "strict_score": 48.3,
+      "verified_strict_score": 48.3,
+      "checks": 10,
+      "issues": 4,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.483,
+          "issues": 4,
+          "weighted_failures": 5.17,
+          "assessment_score": 48.3,
+          "placeholder": false,
+          "dimension_key": "abstraction_fitness",
+          "configured_weight": 8.0,
+          "components": [
+            "Abstraction Leverage",
+            "Indirection Cost",
+            "Interface Honesty"
+          ],
+          "component_scores": {
+            "Abstraction Leverage": 68.0,
+            "Indirection Cost": 76.0,
+            "Interface Honesty": 72.0
+          }
+        }
+      },
+      "strict": 48.3
+    },
+    "Cross-module arch": {
+      "score": 0.0,
+      "strict_score": 0.0,
+      "verified_strict_score": 0.0,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.0,
+          "issues": 0,
+          "weighted_failures": 10.0,
+          "assessment_score": 0.0,
+          "placeholder": true,
+          "dimension_key": "cross_module_architecture",
+          "configured_weight": 1.0,
+          "components": []
+        }
+      },
+      "strict": 0.0
+    },
+    "Test strategy": {
+      "score": 0.0,
+      "strict_score": 0.0,
+      "verified_strict_score": 0.0,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.0,
+          "issues": 0,
+          "weighted_failures": 10.0,
+          "assessment_score": 0.0,
+          "placeholder": true,
+          "dimension_key": "test_strategy",
+          "configured_weight": 1.0,
+          "components": []
+        }
+      },
+      "strict": 0.0
+    },
+    "Design coherence": {
+      "score": 61.6,
+      "strict_score": 61.6,
+      "verified_strict_score": 61.6,
+      "checks": 10,
+      "issues": 2,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.616,
+          "issues": 2,
+          "weighted_failures": 3.84,
+          "assessment_score": 61.6,
+          "placeholder": false,
+          "dimension_key": "design_coherence",
+          "configured_weight": 10.0,
+          "components": []
+        }
+      },
+      "strict": 61.6
+    }
+  },
+  "review_cache": {
+    "files": {
+      "goseg/broadcast/state.go": {
+        "content_hash": "ad440f6b8e6d5b00",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/broadcast/state_test.go": {
+        "content_hash": "9f018f5d9dafebd1",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/broadcast/loop_test.go": {
+        "content_hash": "6af28134bd79b81d",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/rectify/rectify_services.go": {
+        "content_hash": "3ca815bf7fdd1b13",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/defaults/defaults.go": {
+        "content_hash": "0d3474849ccfada2",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/leak/broadcast_test.go": {
+        "content_hash": "15eb1470496a8248",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/rectify/rectify_test.go": {
+        "content_hash": "da9d3fce3ccf3f15",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/docker/orchestration/subsystem/docker_test.go": {
+        "content_hash": "88ef3bc1c45df572",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/leak/broadcast.go": {
+        "content_hash": "2419a9808c2e8d7a",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/docker/orchestration/wireguard.go": {
+        "content_hash": "57bf432964ec0bd6",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/docker/orchestration/wireguard_test.go": {
+        "content_hash": "3a56498aa4f7ebd7",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/system/wifi_runtime_methods.go": {
+        "content_hash": "93c02bd24344d322",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/leak/leak_test.go": {
+        "content_hash": "8afef8e8fbfe57fe",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/broadcast/transitions.go": {
+        "content_hash": "16465806c3689541",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/structs/configs.go": {
+        "content_hash": "11f65869b22d235e",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/config/config_test.go": {
+        "content_hash": "34165474792e84de",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/config/config_update_registry.go": {
+        "content_hash": "f530e11ca99949ea",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/importer/importer.go": {
+        "content_hash": "89afd65551698c4e",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/defaults/version.go": {
+        "content_hash": "3ac5e7b912eeee99",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/accesspoint/accesspoint_test.go": {
+        "content_hash": "af5125da8cd2dba3",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/startuporchestrator/startup_orchestrator.go": {
+        "content_hash": "22b518ba9ecb4133",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/main.go": {
+        "content_hash": "da1ce75da0575c00",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/main_test.go": {
+        "content_hash": "8cb255bbd284d227",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/routines/version.go": {
+        "content_hash": "3bef1e64ea7bee54",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/routines/logstream/logs.go": {
+        "content_hash": "b7ef74c19b4a31df",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/startuporchestrator/startup_orchestrator_test.go": {
+        "content_hash": "40a7af2aad7985aa",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/docker/orchestration/runtime_ops.go": {
+        "content_hash": "e14e04ca14beb559",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/handler/systemsvc/system_test.go": {
+        "content_hash": "f30f7ab71da14006",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/docker/events/events.go": {
+        "content_hash": "f6fa7c32de28bd1e",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/docker/orchestration/subsystem/subsystem_events.go": {
+        "content_hash": "041e0c4f34c03ccb",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/rectify/rectify.go": {
+        "content_hash": "0e0e3495ff440dac",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/shipworkflow/operations_runtime.go": {
+        "content_hash": "af98b32b2bc5629e",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/docker/lifecycle/planner.go": {
+        "content_hash": "923170a1b1f3d4e1",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/routines/system/system.go": {
+        "content_hash": "ff6ce5158ea105b3",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/docker/network/network.go": {
+        "content_hash": "6309a1aaf0736e4b",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/docker/orchestration/subsystem/subsystem_health.go": {
+        "content_hash": "794430c2cef76473",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      },
+      "goseg/system/wifi_runtime_api.go": {
+        "content_hash": "e58355418927ddb7",
+        "reviewed_at": "2026-03-03T21:23:52+00:00",
+        "finding_count": 0
+      }
+    },
+    "holistic": {
+      "reviewed_at": "2026-03-03T21:23:52+00:00",
+      "file_count_at_review": 574,
+      "finding_count": 9,
+      "reviewed_files_count": 37,
+      "full_sweep_included": false
+    }
+  },
+  "assessment_import_audit": [
+    {
+      "timestamp": "2026-03-03T21:23:52+00:00",
+      "mode": "trusted_internal",
+      "trusted": true,
+      "reason": "trusted internal run-batches import",
+      "override_used": false,
+      "attested_external": false,
+      "provisional": false,
+      "provisional_count": 0,
+      "attest": "",
+      "import_file": "/Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260303_212203/holistic_findings_merged.json"
+    }
+  ]
+}
