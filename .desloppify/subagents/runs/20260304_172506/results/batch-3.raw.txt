@@ -1,0 +1,91 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 76.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows very large flat directories for the reviewed areas: goseg/shipworkflow/ has 45 files, goseg/system/ has 42 files, and goseg/config/ has 41 files (all above the >10 mixed-concern overload threshold in the rubric).",
+        "Within goseg/config/, bootstrap.go handles startup/bootstrap flow while config.go defines broad runtime context/state snapshots and multiple settings model types, indicating coarse placement of distinct concerns in one package root.",
+        "Within goseg/system/, apt.go is a pure forwarding facade into a deeper package (groundseg/system/maintenance/apt), but remains at system root beside unrelated system concerns, which blurs boundary ownership.",
+        "Test-placement drift appears in reviewed files: goseg/system/broadcast_info_test.go and goseg/config/bootstrap_test.go are placeholder-only tests, while separate coverage smoke files (goseg/system/coverage_smoke_test.go, goseg/shipworkflow/coverage_smoke_test.go) add root-level test noise rather than concern-aligned placement."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "flat_package_overload_across_core_dirs",
+      "summary": "Core directories are over-flat, mixing multiple concerns in single package roots.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/bootstrap.go",
+        "goseg/shipworkflow/lifecycle.go"
+      ],
+      "evidence": [
+        "directory_profiles reports goseg/config/ (41 files), goseg/shipworkflow/ (45 files), and goseg/system/ (42 files), which exceeds the >10-file mixed-concern threshold for split consideration.",
+        "goseg/config/bootstrap.go contains initialization/bootstrap orchestration while goseg/config/config.go contains runtime-context/state models and global config storage, suggesting distinct change boundaries co-located at root.",
+        "goseg/shipworkflow/lifecycle.go is lifecycle-specific but sits in a very broad package root with many workflow domains."
+      ],
+      "suggestion": "Staged reorg plan: (1) create concern folders `goseg/config/runtime/`, `goseg/config/bootstrap/`, and `goseg/shipworkflow/lifecycle/`; (2) move lowest-dependency files first (`config.go` runtime/context types, then `bootstrap.go` init flow, then `lifecycle.go`), keeping temporary shims in original packages; (3) update imports via `gofmt -w` on moved files and `goimports -w goseg/config goseg/shipworkflow`; (4) validate with `go test ./goseg/config ./goseg/shipworkflow` and `go test ./...` before removing shims.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "coarse_root_packages"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "system_root_facade_straggler_for_apt",
+      "summary": "APT API lives as a root-level shim instead of with maintenance ownership.",
+      "related_files": [
+        "goseg/system/apt.go",
+        "goseg/system/coverage_smoke_test.go"
+      ],
+      "evidence": [
+        "goseg/system/apt.go only delegates three functions to `groundseg/system/maintenance/apt` and contains no system-root-specific policy.",
+        "The existence of a dedicated maintenance apt package plus a root shim indicates incomplete placement migration and unclear ownership boundary at package root."
+      ],
+      "suggestion": "Staged reorg plan: (1) establish `goseg/system/maintenance` as the canonical owner and keep `goseg/system/apt.go` as temporary compatibility shim with deprecation comment; (2) migrate direct callers to `groundseg/system/maintenance/apt` (or a `maintenance` facade package) in small batches; (3) run import updates with `goimports -w goseg/system goseg/handler goseg/broadcast`; (4) validate with `go test ./goseg/system ./goseg/system/maintenance/...` and then remove the root shim once callers are migrated.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "coarse_root_packages"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "test_file_placement_noise_in_root_packages",
+      "summary": "Placeholder and smoke tests are scattered in package roots, reducing navigability.",
+      "related_files": [
+        "goseg/system/broadcast_info_test.go",
+        "goseg/config/bootstrap_test.go",
+        "goseg/shipworkflow/coverage_smoke_test.go",
+        "goseg/system/coverage_smoke_test.go"
+      ],
+      "evidence": [
+        "goseg/system/broadcast_info_test.go and goseg/config/bootstrap_test.go are placeholder-only test files and do not validate concrete behavior.",
+        "Smoke import tests are duplicated as root-level one-off files in multiple packages, adding file-count noise in already large directories."
+      ],
+      "suggestion": "Staged reorg plan: (1) create a consistent compile/smoke test location such as `goseg/<pkg>/internaltest/` or one unified `smoke_import_test.go` per package; (2) move/remove placeholder tests first, then consolidate smoke tests into the chosen location and naming convention; (3) update package declarations/imports and run `gofmt -w` plus `goimports -w goseg/system goseg/config goseg/shipworkflow`; (4) validate with targeted runs `go test ./goseg/system ./goseg/config ./goseg/shipworkflow` and full `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "coarse_root_packages"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Core packages accumulated responsibilities faster than directory boundaries were split.",
+      "Partial extraction patterns (new subpackages plus legacy root shims) were not completed to clear ownership."
+    ],
+    "likely_symptoms": [
+      "system_root_facade_straggler_for_apt",
+      "test_file_placement_noise_in_root_packages"
+    ],
+    "possible_false_positives": []
+  }
+}

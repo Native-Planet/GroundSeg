@@ -34,6 +34,8 @@ upload_service_changed=0
 startram_errors_changed=0
 protocol_actions_changed=0
 protocol_contracts_changed=0
+contract_metadata_changed=0
+contracts_file_changed=0
 startram_contracts_changed=0
 if changed "goseg/handler/ws/upload.go"; then
   upload_handler_changed=1
@@ -53,7 +55,13 @@ fi
 if changed "goseg/protocol/contracts/startram_contracts.go"; then
   startram_contracts_changed=1
 fi
-if [[ ${upload_handler_changed} -eq 0 && ${upload_service_changed} -eq 0 && ${startram_errors_changed} -eq 0 && ${protocol_actions_changed} -eq 0 && ${protocol_contracts_changed} -eq 0 && ${startram_contracts_changed} -eq 0 ]]; then
+if changed "goseg/protocol/contracts/contract_metadata.go"; then
+  contract_metadata_changed=1
+fi
+if changed "goseg/protocol/contracts/contracts.go"; then
+  contracts_file_changed=1
+fi
+if [[ ${upload_handler_changed} -eq 0 && ${upload_service_changed} -eq 0 && ${startram_errors_changed} -eq 0 && ${protocol_actions_changed} -eq 0 && ${protocol_contracts_changed} -eq 0 && ${contract_metadata_changed} -eq 0 && ${contracts_file_changed} -eq 0 && ${startram_contracts_changed} -eq 0 ]]; then
   echo "Runtime contract surfaces unchanged; contract gate passed."
   exit 0
 fi
@@ -86,7 +94,7 @@ if [[ ${protocol_actions_changed} -eq 1 ]] && ! changed "goseg/protocol/actions/
   exit 1
 fi
 
-if [[ (${protocol_contracts_changed} -eq 1 || ${startram_contracts_changed} -eq 1) ]] && ! changed "goseg/protocol/contracts/contracts_test.go"; then
+if [[ ${protocol_contracts_changed} -eq 1 || ${startram_contracts_changed} -eq 1 || ${contract_metadata_changed} -eq 1 || ${contracts_file_changed} -eq 1 ]] && ! changed "goseg/protocol/contracts/contracts_test.go"; then
   echo "Protocol contract catalog contract violation:"
   echo "  protocol contract descriptors changed without goseg/protocol/contracts/contracts_test.go update."
   echo "Required coverage: registry health and descriptor invariants."
@@ -99,7 +107,7 @@ cd goseg
 go test ./handler/ws -run 'TestUploadHandlerBranchMatrix|TestUploadHandlerDispatchesActions|TestUploadHandlerPropagatesServiceErrors|TestUploadHandlerRejectsUnknownAction|TestNewUploadMessageHandlerNilServiceAndUploadRejectsMalformedJSON' -count=1
 go test ./uploadsvc -run 'TestExecutorDispatchTableParityAcrossSupportedActions|TestExecutorSupportedActionsMatchesContract|TestExecutorReturnsUnsupportedActionError' -count=1
 go test ./startram -run 'TestWrapAPIConnectionErrorRedactsUpstreamDetailsAndPreservesCause|TestWrapAPIConnectionErrorRetainsStableMessageWithoutPubkey' -count=1
-go test ./protocol/actions -run 'TestParseUploadActionRejectsUnknown|TestSupportedUploadActionsMatchesContract|TestSupportedC2CActionsMatchesContract' -count=1
-  if [[ ${protocol_contracts_changed} -eq 1 || ${startram_contracts_changed} -eq 1 ]]; then
-  go test ./protocol/contracts -run 'TestContractCatalogHasLifecycleMetadata|TestContractLifecyclePolicyDeclaredPerContract|TestActionContractBindingsHaveActiveDescriptors|TestActionContractBindingsAreDeterministicallyOrdered' -count=1
+go test ./protocol/actions -run 'TestParseUploadActionRejectsUnknown|TestSupportedUploadActionsMatchesContract|TestSupportedC2CActionsMatchesContract|TestC2CActionContractForActionResolvesKnownAction|TestC2CActionMetadataContainsLifecycle|TestC2CActionCompatibilityChecksUseMetadata' -count=1
+if [[ ${protocol_contracts_changed} -eq 1 || ${startram_contracts_changed} -eq 1 || ${contract_metadata_changed} -eq 1 || ${contracts_file_changed} -eq 1 ]]; then
+  go test ./protocol/contracts -run 'TestProtocolContractCatalogSpecsAreSelfConsistent|TestProtocolContractCatalogEntriesAreSnapshots|TestProtocolContractCatalogSnapshotAreSnapshots|TestProtocolContractDefinitionsAreDeterministic|TestProtocolContractCatalogSpecsDeclareStableLifecycles|TestStartramContractCatalogSpecsAreSelfConsistent|TestStartramContractCatalogEntriesAreSnapshots|TestStartramContractCatalogSnapshotEntriesAreSnapshots|TestStartramContractDefinitionsAreDeterministic|TestStartramContractCatalogSpecsDeclareLifecycleMetadata|TestContractCatalogHasLifecycleMetadata|TestContractLifecyclePolicyDeclaredPerContract|TestActionContractBindingsHaveActiveDescriptors|TestActionContractBindingsAreDeterministicallyOrdered' -count=1
 fi

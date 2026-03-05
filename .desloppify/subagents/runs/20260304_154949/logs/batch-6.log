@@ -1,0 +1,1240 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_154949/results/batch-6.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 6
+Batch name: Cross-cutting Sweep
+Batch dimensions: api_surface_coherence, authorization_consistency, error_consistency, naming_quality, convention_outlier, initialization_coupling
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+- goseg/broadcast/state.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/loop_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/importer/importer.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/routines/version.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/config/config.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/system/wifi_runtime_api.go
+- goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go
+- goseg/shipworkflow/coverage_smoke_test.go
+- goseg/shipworkflow/doc.go
+- goseg/shipworkflow/lifecycle.go
+- goseg/system/apt.go
+- goseg/system/apt_test.go
+- goseg/system/broadcast_info_test.go
+- goseg/config/bootstrap.go
+- goseg/config/bootstrap_test.go
+- README.md
+- goseg/exporter/exporter_test.go
+- goseg/config/config_update_schema.go
+- goseg/docker/lifecycle/lifecycle_full_test.go
+- goseg/handler/ship/urbit_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger_test.go
+- goseg/protocol/actions/actions_test.go
+- goseg/protocol/contracts/contracts_test.go
+- goseg/session/logstream_session_store.go
+- goseg/shipworkflow/urbit_operations_runtime.go
+- goseg/startram/backup_runtime_test.go
+- goseg/startram/state_sync_test.go
+- goseg/system/metrics/metrics_test.go
+- goseg/system/storage/storage_test.go
+- goseg/system/wifi_test.go
+- goseg/uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 6,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "api_surface_coherence": 78.0,
+    "authorization_consistency": 89.0,
+    "error_consistency": 74.0,
+    "naming_quality": 82.0,
+    "convention_outlier": 80.0,
+    "initialization_coupling": 72.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "The code exposes multiple parallel entrypoints for the same behavior with different defaulting semantics, e.g. `SysLogStreamer`, `SysLogStreamerWithContext`, and `SysLogStreamerWithRuntime` in `goseg/routines/logstream/logs.go`, plus similar triads for docker log streaming.",
+        "Workflow APIs duplicate surface area via `RunTransitionedOperation` and `runTransitionedOperationWithRuntime` in `goseg/shipworkflow/operations_runtime.go`, forcing callers to choose between implicit runtime construction and explicit runtime injection.",
+        "Upload session APIs split closely related responsibilities across `SetUploadSession`, `OpenUploadEndpoint`, `VerifySession`, and `validateUploadRequest` in `goseg/importer/importer.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "authorization_consistency": {
+      "evidence": [
+        "Upload authorization is consistently enforced in the critical request path via `validateUploadRequest` checking both token headers and token authorization callback in `goseg/importer/importer.go`.",
+        "Session token verification includes rotation handling (`authz.IsRotated`) and updates stored token state, reducing drift between issued and accepted credentials in `goseg/importer/importer.go`."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Authorization checks are concentrated in importer upload flow; adjacent APIs like `VerifySession` expose weaker semantics (existence-only) that can be misused by future callers."
+    },
+    "error_consistency": {
+      "evidence": [
+        "Error handling policy is split between critical and best-effort variants (`publishImportStatus` vs `publishImportStatusBestEffort`, `publishImportTransition` vs `publishImportTransitionBestEffort`) in `goseg/importer/importer.go`, with call-site choice determining propagation behavior.",
+        "Some parsing boundaries drop root cause detail (`parseUploadChunkMetadata` returns plain `invalid chunk index` / `invalid total chunk count`) while most neighboring functions wrap causes with `%w` in `goseg/importer/importer.go`.",
+        "Transition publishing uses policy-mediated error shaping in `goseg/shipworkflow/operations_runtime.go`, while other paths return direct wrapped errors, producing mixed failure contracts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "naming_quality": {
+      "evidence": [
+        "Acronym casing is inconsistent across related APIs: public `StartC2CCheck` vs internal `startC2cCheck` in `goseg/startuporchestrator/startup_orchestrator.go`.",
+        "Method name `init()` on `startupOrchestrator` (`goseg/startuporchestrator/startup_orchestrator.go`) is easy to confuse with Go package `init` semantics and does not communicate phase intent as clearly as `initializePhases`/`runInitPhase`.",
+        "Mixed acronym styles appear in configuration and runtime naming (`C2cInterval` in `goseg/config/config_update_schema.go` vs `C2C` naming in runtime/startup code)."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "convention_outlier": {
+      "evidence": [
+        "Sibling modules follow different acronym conventions for the same domain concept (`C2C` in startup/main paths vs `C2cInterval` in config patch schema).",
+        "Exported/internal API naming conventions are not uniformly applied for acronym-containing identifiers (`StartC2CCheck` vs `startC2cCheck`) within the same startup orchestrator subsystem."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "Package-level `init()` in `goseg/main.go` performs embedded FS setup and mutates globals (`webContent`, `fileServer`, `initWebErr`), then startup validation later depends on `initWebErr` in `runBootstrapSubsystems`.",
+        "Package-level `init()` in `goseg/config/config.go` initializes runtime context, while `config.Initialize()` in `goseg/config/bootstrap.go` mutates additional global process state (`Ready`, global config, debug mode) behind `sync.Once`.",
+        "Runtime behavior depends on ambient process inputs (`os.Args` and `GS_BASE_PATH`) read during initialization paths in `goseg/config/bootstrap.go`, creating order-sensitive global state."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "init_side_effect_bootstrap_chain",
+      "summary": "Import-time and boot-time global initialization are coupled through mutable package state, making startup order and tests fragile.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`main.init()` mutates `webContent/fileServer/initWebErr` and bootstrap later reads `initWebErr` via `ValidateConfig` callback.",
+        "`config.init()` seeds runtime context, while `config.Initialize()` separately mutates global config/readiness/debug mode under `sync.Once`.",
+        "Initialization reads process-global inputs (`os.Args`, `GS_BASE_PATH`) and writes package-global state, creating hidden dependencies across startup subsystems."
+      ],
+      "suggestion": "Replace package-level `init` side effects with explicit bootstrap constructors that return immutable runtime structs; pass those through `StartupOptions` so initialization order is encoded in call graph instead of global state.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_process_state"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_error_policy_scatter",
+      "summary": "Transition publishing and upload flow mix strict and best-effort error contracts at call sites, producing inconsistent failure behavior.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "Importer exposes paired APIs with different semantics (`publishImportStatus` vs `publishImportStatusBestEffort`, `publishImportTransition` vs `publishImportTransitionBestEffort`).",
+        "Workflow transition emission uses policy-based error shaping (`transition.HandleTransitionPublishError`) while surrounding operations often return direct wrapped errors.",
+        "Call-site selection, not layer policy, decides whether transition failures are fatal."
+      ],
+      "suggestion": "Define one canonical transition error policy per workflow boundary (e.g., strict for user-visible state mutation, best-effort for telemetry only) and expose a single API per boundary that encodes that policy.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "policy_not_centralized"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "parallel_api_variants_without_clear_contract",
+      "summary": "Multiple near-duplicate API variants expose the same capability with inconsistent defaulting and runtime resolution behavior.",
+      "related_files": [
+        "goseg/routines/logstream/logs.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "Logstream exposes 3-level variants (`X`, `XWithContext`, `XWithRuntime`) with implicit `context.Background()` fallback in some paths.",
+        "Shipworkflow keeps both `RunTransitionedOperation` and `runTransitionedOperationWithRuntime`, splitting runtime ownership across call styles.",
+        "Importer exposes both command-style (`OpenUploadEndpoint`) and wrapper (`SetUploadSession`) plus separate `VerifySession` with weaker semantics."
+      ],
+      "suggestion": "Collapse each subsystem to a primary explicit API (runtime+context required) plus a thin compatibility shim layer marked deprecated; document one defaulting policy and remove duplicate behavioral entrypoints.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "api_surface_growth_without_governance"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "acronym_and_phase_name_drift",
+      "summary": "Acronym casing and lifecycle method names drift across adjacent startup/config code, reducing intent clarity.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Public `StartC2CCheck` and internal `startC2cCheck` use different acronym casing for the same concept.",
+        "`startupOrchestrator.init()` is semantically a startup phase executor, but name collides conceptually with Go's package `init` lifecycle.",
+        "Config field `C2cInterval` diverges from `C2C` naming used in runtime/startup APIs."
+      ],
+      "suggestion": "Adopt a repository-level acronym naming rule (e.g., preserve all-caps for known acronyms in identifiers) and rename startup phase functions to explicit verbs (`initialize`, `runInitPhase`) with compatibility refactors in one pass.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_convention_drift"
+    },
+    {
+      "dimension": "convention_outlier",
+      "identifier": "startup_config_acronym_style_island",
+      "summary": "Startup and config modules form a style island where acronym conventions differ inside the same domain boundary.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/config/bootstrap.go"
+      ],
+      "evidence": [
+        "Startup APIs consistently use `C2C` in exported names, while config schema/patch naming uses `C2c`.",
+        "The mismatch appears within directly collaborating modules (startup consumes config values), not isolated legacy code."
+      ],
+      "suggestion": "Normalize acronym casing end-to-end for C2C-related identifiers and JSON field mapping helpers, including migration helpers/tests where external JSON compatibility is required.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_convention_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit process-global state is still used as a cross-module coordination mechanism.",
+      "API growth occurred via additive wrappers/variants without a strict surface-governance rule.",
+      "Naming conventions for acronyms were not centrally enforced during refactors."
+    ],
+    "likely_symptoms": [
+      "parallel_api_variants_without_clear_contract",
+      "startup_config_acronym_style_island",
+      "acronym_and_phase_name_drift"
+    ],
+    "possible_false_positives": [
+      "Some `WithContext`/`WithRuntime` variants may be intentional compatibility seams, but current spread still creates coherence cost."
+    ]
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cb98c-2de5-77a0-912a-3dccca56cb81
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 6
+Batch name: Cross-cutting Sweep
+Batch dimensions: api_surface_coherence, authorization_consistency, error_consistency, naming_quality, convention_outlier, initialization_coupling
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+- goseg/broadcast/state.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/loop_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/importer/importer.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/routines/version.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/config/config.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/system/wifi_runtime_api.go
+- goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go
+- goseg/shipworkflow/coverage_smoke_test.go
+- goseg/shipworkflow/doc.go
+- goseg/shipworkflow/lifecycle.go
+- goseg/system/apt.go
+- goseg/system/apt_test.go
+- goseg/system/broadcast_info_test.go
+- goseg/config/bootstrap.go
+- goseg/config/bootstrap_test.go
+- README.md
+- goseg/exporter/exporter_test.go
+- goseg/config/config_update_schema.go
+- goseg/docker/lifecycle/lifecycle_full_test.go
+- goseg/handler/ship/urbit_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger_test.go
+- goseg/protocol/actions/actions_test.go
+- goseg/protocol/contracts/contracts_test.go
+- goseg/session/logstream_session_store.go
+- goseg/shipworkflow/urbit_operations_runtime.go
+- goseg/startram/backup_runtime_test.go
+- goseg/startram/state_sync_test.go
+- goseg/system/metrics/metrics_test.go
+- goseg/system/storage/storage_test.go
+- goseg/system/wifi_test.go
+- goseg/uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 6,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+Reviewing batch 6 now. I’ll first read the blind packet `system_prompt` constraints, then inspect only the listed files for the six specified dimensions and produce a strict JSON assessment with supported findings.
+exec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg --files goseg/protocol/contracts goseg/broadcast goseg/rectify goseg/defaults goseg/leak goseg/docker/orchestration goseg/system goseg/structs goseg/config goseg/importer goseg/accesspoint goseg/startuporchestrator goseg/routines goseg/docker/events goseg/docker/lifecycle goseg/docker/network goseg/shipworkflow goseg/handler goseg/session goseg/startram goseg/uploadsvc | wc -l' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 5826
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "abstraction_fitness",
+    "api_surface_coherence",
+    "authorization_consistency",
+    "dependency_health",
+    "error_consistency",
+    "naming_quality",
+    "package_organization",
+    "design_coherence",
+    "cross_module_architecture",
+    "convention_outlier",
+    "initialization_coupling",
+    "test_strategy"
+  ],
+ succeeded in 51ms:
+     453
+codex
+I’ve loaded the packet and batch mapping. Next I’m scanning the assigned files for concrete cross-cutting signals (auth checks, error handling style, initialization side effects, and naming/convention drift) before drafting findings.
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"Admin|Auth|authorized|token|session|permission|middleware|ws\\.Unauthorized|unauthorized|validate|acl|rbac\" goseg/main.go goseg/routines/system/system.go goseg/routines/logstream/logs.go goseg/system/wifi_runtime_api.go goseg/system/wifi_runtime_methods.go goseg/shipworkflow/operations_runtime.go goseg/shipworkflow/urbit_operations_runtime.go goseg/importer/importer.go goseg/leak/broadcast.go goseg/docker/events/events.go goseg/docker/orchestration/subsystem/subsystem_events.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "rg -n \"type .* struct|func \\(["'^)]+'"\\) [A-Z]|func [A-Z]|func [a-zA-Z0-9_]+\\(\" goseg/protocol/contracts/protocol_contracts.go goseg/protocol/contracts/startram_contracts.go goseg/config/config.go goseg/config/bootstrap.go goseg/system/wifi_runtime_api.go goseg/system/wifi_runtime_methods.go goseg/importer/importer.go goseg/startuporchestrator/startup_orchestrator.go goseg/routines/system/system.go goseg/routines/logstream/logs.go goseg/docker/network/network.go goseg/shipworkflow/lifecycle.go goseg/shipworkflow/operations_runtime.go goseg/shipworkflow/urbit_operations_runtime.go goseg/defaults/defaults.go | head -n 300" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "rg -n \"os\\.Getenv|Must|panic\\(|log\\.Fatal|init\\(|var \\(|:= .*error|fmt\\.Errorf|errors\\.New|return nil|TODO|FIXME\" goseg/protocol/contracts/protocol_contracts.go goseg/protocol/contracts/startram_contracts.go goseg/broadcast/state.go goseg/rectify/rectify_services.go goseg/defaults/defaults.go goseg/broadcast/loop.go goseg/leak/broadcast.go goseg/docker/orchestration/wireguard.go goseg/system/wifi_runtime_methods.go goseg/broadcast/transitions.go goseg/structs/configs.go goseg/config/config_update_registry.go goseg/importer/importer.go goseg/startuporchestrator/startup_orchestrator.go goseg/main.go goseg/routines/version.go goseg/docker/orchestration/subsystem/subsystem_events.go goseg/routines/logstream/logs.go goseg/docker/orchestration/runtime_ops.go goseg/docker/events/events.go goseg/config/config.go goseg/docker/lifecycle/planner.go goseg/routines/system/system.go goseg/docker/network/network.go goseg/shipworkflow/operations_runtime.go goseg/docker/orchestration/subsystem/subsystem_health.go goseg/system/wifi_runtime_api.go goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go goseg/shipworkflow/lifecycle.go goseg/system/apt.go goseg/config/bootstrap.go goseg/config/config_update_schema.go goseg/session/logstream_session_store.go goseg/shipworkflow/urbit_operations_runtime.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/shipworkflow/operations_runtime.go:117:	if err := runtime.validate(); err != nil {
+goseg/shipworkflow/operations_runtime.go:123:func (runtime workflowRuntime) validate() error {
+goseg/leak/broadcast.go:50:					reportLeakInternalError(patp, info.Auth, fmt.Sprintf("failed to read leak packet: %v", err))
+goseg/leak/broadcast.go:73:				reportLeakInternalError(patp, info.Auth, fmt.Sprintf("failed to send broadcast: %v", err))
+goseg/leak/broadcast.go:88:					reportLeakInternalError(patp, info.Auth, reason)
+goseg/leak/broadcast.go:91:				reportLeakInternalError(patp, info.Auth, fmt.Sprintf("failed to handle leak action: %v", err))
+goseg/leak/broadcast.go:97:func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.AuthBroadcast, error) {
+goseg/leak/broadcast.go:117:		if status.Auth {
+goseg/leak/broadcast.go:121:				sendErrors = append(sendErrors, fmt.Errorf("dropping authorized broadcast for %q", patp))
+goseg/leak/broadcast.go:134:		wrappedUrbit := structs.AuthBroadcast{
+goseg/leak/broadcast.go:136:			AuthLevel: patp,
+goseg/routines/logstream/logs.go:13:	"groundseg/session"
+goseg/routines/logstream/logs.go:40:	sessionRuntime             session.LogstreamRuntime
+goseg/routines/logstream/logs.go:46:func NewLogstreamRuntime(logRuntime session.LogstreamRuntime, systemLogMessages <-chan []byte) *LogstreamRuntime {
+goseg/routines/logstream/logs.go:48:		logRuntime = session.LogstreamRuntimeState()
+goseg/routines/logstream/logs.go:54:		sessionRuntime:         logRuntime,
+goseg/routines/logstream/logs.go:62:		return NewLogstreamRuntime(session.LogstreamRuntimeState(), nil)
+goseg/routines/logstream/logs.go:69:func Configure(logRuntime session.LogstreamRuntime, systemLogMessages <-chan []byte) *LogstreamRuntime {
+goseg/routines/logstream/logs.go:154:		if runtime.sessionRuntime != nil {
+goseg/routines/logstream/logs.go:155:			runtime.sessionRuntime.RemoveSysLogSessions()
+ succeeded in 53ms:
+goseg/shipworkflow/lifecycle.go:20:func WaitForUrbitStopWith(patp string, getStatus shipStatusLookup, poller pollerFunc, timeout time.Duration) error {
+goseg/shipworkflow/lifecycle.go:65:func WaitForUrbitStop(patp string, getStatus shipStatusLookup, poller pollerFunc) error {
+goseg/shipworkflow/lifecycle.go:69:func PersistUrbitConfig(patp string, mutate func(*structs.UrbitDocker) error, persistFn shipConfigPersist) error {
+goseg/shipworkflow/lifecycle.go:76:func PollWithTimeout(ctx context.Context, interval time.Duration, condition func() (bool, error)) error {
+goseg/protocol/contracts/protocol_contracts.go:26:func protocolActionContract(
+goseg/protocol/contracts/protocol_contracts.go:40:func protocolContractCatalogSpecs() []contractCatalogEntry {
+goseg/protocol/contracts/protocol_contracts.go:75:func validateProtocolContractSpecs(entries []contractCatalogEntry) error {
+goseg/protocol/contracts/startram_contracts.go:23:func startramContract(id ContractID, descriptor ContractDescriptor) contractCatalogEntry {
+goseg/protocol/contracts/startram_contracts.go:30:func startramContractCatalogSpecs() []contractCatalogEntry {
+goseg/protocol/contracts/startram_contracts.go:44:func validateStartramContractSpecs(entries []contractCatalogEntry) error {
+goseg/config/config.go:14:type StartramConfigSnapshot struct {
+goseg/config/config.go:20:type StartramSettings struct {
+goseg/config/config.go:29:type AuthSettings struct {
+goseg/config/config.go:36:type PenpaiSettings struct {
+goseg/config/config.go:44:type Check502Settings struct {
+goseg/config/config.go:50:type HealthCheckSettings struct {
+goseg/config/config.go:55:type ShipSettings struct {
+goseg/config/config.go:59:type ConnectivitySettings struct {
+goseg/config/config.go:63:type UpdateSettings struct {
+goseg/config/config.go:68:type SwapSettings struct {
+ succeeded in 53ms:
+Total output lines: 756
+
+goseg/leak/broadcast.go:104:		return oldBroadcast, fmt.Errorf("failed to marshal full broadcast for lick: %w", err)
+goseg/leak/broadcast.go:113:			sendErrors = append(sendErrors, fmt.Errorf("no leak channel for %q", patp))
+goseg/leak/broadcast.go:121:				sendErrors = append(sendErrors, fmt.Errorf("dropping authorized broadcast for %q", patp))
+goseg/leak/broadcast.go:144:			sendErrors = append(sendErrors, fmt.Errorf("marshal scoped broadcast for %q: %w", patp, err))
+goseg/leak/broadcast.go:150:			sendErrors = append(sendErrors, fmt.Errorf("dropping scoped broadcast for %q", patp))
+goseg/leak/broadcast.go:170:			return nil, fmt.Errorf("send broadcast: %w", err)
+goseg/system/wifi_runtime_methods.go:111:	parseErrors := make([]error, 0)
+goseg/system/wifi_runtime_methods.go:127:		return nil, parseErrors[0]
+goseg/system/wifi_runtime_methods.go:135:	parseErrors := make([]error, 0)
+goseg/system/wifi_runtime_methods.go:152:		return nil, parseErrors[0]
+goseg/system/wifi_runtime_methods.go:192:		return nil, err
+goseg/system/wifi_runtime_methods.go:197:		return nil, ErrWiFiInterfaceNotFound
+goseg/system/wifi_runtime_methods.go:205:		return nil, err
+goseg/system/wifi_runtime_methods.go:218:		return false, fmt.Errorf("couldn't check interface: %w", err)
+goseg/system/wifi_runtime_methods.go:226:		return nil, fmt.Errorf("couldn't read wifi devices: %w", err)
+goseg/system/wifi_runtime_methods.go:234:		return "", fmt.Errorf("failed to retrieve wifi devices: %w", err)
+goseg/system/wifi_runtime_methods.go:245:		return nil, fmt.Errorf("couldn't gather wifi networks: %w", err)
+goseg/system/wifi_runtime_methods.go:254:		return "", fmt.Errorf("couldn't get devices: %w", err)
+codex
+I’ve identified likely hotspots. I’m now opening the key runtime files to extract exact, defensible evidence lines and verify whether each issue is structural versus local before scoring.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/config.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/main.go | sed -n '1,360p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/importer/importer.go | sed -n '300,760p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package main
+     2	
+     3	// NativePlanet GroundSeg: Go Edition (goseg)
+     4	// 🄯 2023 ~nallux-dozryl & ~sitful-hatred
+     5	// This is a Golang rewrite of GroundSeg that serves the v2 json
+     6	// object via websocket.
+     7	// The v2 rewrite decouples the frontend and backend, which makes it
+     8	// straightforward to implement alternative backends.
+     9	//
+    10	// Under development: reimplementing all pyseg functionality.
+    11	// Advantages:
+    12	// - Really, really fast
+    13	// - Event-driven
+    14	// - First-class support for concurrent operations
+    15	// - Very good golang Docker libraries
+    16	
+    17	import (
+    18		"context"
+    19		"embed"
+    20		"errors"
+ succeeded in 53ms:
+   300	
+   301	func resolveImporterRuntimeForWorkflow(overrides ...importerRuntime) (importerRuntime, error) {
+   302		return resolveImporterRuntimeForRequirements(importerWorkflowRequirements, overrides...)
+   303	}
+   304	
+   305	func resolveImporterRuntimeForUpload(overrides ...importerRuntime) (importerRuntime, error) {
+   306		return resolveImporterRuntimeForRequirements(importerUploadRequirements, overrides...)
+   307	}
+   308	
+   309	func resolveImporterRuntimeForPublish(overrides ...importerRuntime) (importerRuntime, error) {
+   310		resolvedRuntime := resolveImporterRuntime(overrides...)
+   311		if err := validateImporterProvisionRuntime(resolvedRuntime); err != nil {
+   312			return resolvedRuntime, err
+   313		}
+   314		return resolvedRuntime, nil
+   315	}
+   316	
+   317	func resolveImporterRuntimeForInit(overrides ...importerRuntime) (importerRuntime, error) {
+   318		return resolveImporterRuntimeForRequirements(importerInitRequirements, overrides...)
+   319	}
+ succeeded in 53ms:
+     1	package config
+     2	
+     3	// code for managing groundseg and container configurations
+     4	
+     5	import (
+     6		"groundseg/defaults"
+     7		"sync"
+     8		"sync/atomic"
+     9		"time"
+    10	
+    11		"groundseg/structs"
+    12	)
+    13	
+    14	type StartramConfigSnapshot struct {
+    15		Value     structs.StartramRetrieve
+    16		UpdatedAt time.Time
+    17		Fresh     bool
+    18	}
+    19	
+    20	type StartramSettings struct {
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/bootstrap.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/leak/broadcast.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/routines/logstream/logs.go | sed -n '120,260p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package config
+     2	
+     3	// code for managing groundseg and container configurations
+     4	
+     5	import (
+     6		"fmt"
+     7		"groundseg/defaults"
+     8		"groundseg/structs"
+     9		"os"
+    10		"path/filepath"
+    11		"runtime"
+    12		"sync"
+    13		"time"
+    14	
+    15		"go.uber.org/zap"
+    16	)
+    17	
+    18	var (
+    19		// global settings config (accessed via funcs)
+    20		globalConfig structs.SysConfig
+ succeeded in 53ms:
+     1	package leak
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/internal/resource"
+     8		"groundseg/structs"
+     9		"io"
+    10		"net"
+    11		"reflect"
+    12	
+    13		"github.com/stevelacy/go-urbit/noun"
+    14		"go.uber.org/zap"
+    15	)
+    16	
+    17	func listener(patp string, conn net.Conn, info LickStatus) {
+    18		lickMu.Lock()
+    19		BytesChan[patp] = make(chan string)
+    20		readChan := make(chan []byte)
+ succeeded in 53ms:
+   120				continue
+   121			}
+   122			if err := os.Remove(fullName); err != nil {
+   123				splitErrs = append(splitErrs, fmt.Errorf("remove legacy logfile %s: %w", fn, err))
+   124			}
+   125		}
+   126		if err := keepMostRecentFiles(logger.LogPath()); err != nil {
+   127			splitErrs = append(splitErrs, fmt.Errorf("clear old logs: %w", err))
+   128		}
+   129		return errors.Join(splitErrs...)
+   130	}
+   131	
+   132	// zap
+   133	func SysLogStreamer() error {
+   134		return SysLogStreamerWithRuntime(context.Background(), nil)
+   135	}
+   136	
+   137	func SysLogStreamerWithRuntime(ctx context.Context, runtime *LogstreamRuntime) error {
+   138		runtime = resolveLogstreamRuntime(runtime)
+   139		if ctx == nil {
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startuporchestrator/startup_orchestrator.go | sed -n '680,860p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+   680				if err != nil {
+   681					return err
+   682				}
+   683				remaining--
+   684			case <-timeoutCtx.Done():
+   685				return nil
+   686			}
+   687		}
+   688		return nil
+   689	}
+   690	
+   691	type StartupOptions struct {
+   692		HTTPPort         int
+   693		WebsocketPort    int
+   694		ValidateConfig   func() error
+   695		StartServer      func(context.Context, int, int) error
+   696		StartC2CCheck    func(context.Context) error
+   697		StartupRuntime   StartupRuntime
+   698		LogstreamRuntime *logstream.LogstreamRuntime
+   699	}
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/defaults/defaults.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package defaults
+     2	
+     3	// default config json structs
+     4	// these get written to disk in absence of version server
+     5	
+     6	import (
+     7		"groundseg/structs"
+     8		"os"
+     9		"path/filepath"
+    10		"strings"
+    11	)
+    12	
+    13	var (
+    14		defaultUrbitConfig = structs.UrbitDocker{
+    15			UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+    16				PierName:         "",
+    17				HTTPPort:         0,
+    18				AmesPort:         0,
+    19				LoomSize:         31,
+    20				UrbitVersion:     "v2.11",
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"initWebErr|fileServer|webContent|config\\.Initialize\\(|RuntimeContextSnapshot\\(|VerifySession\\(|OpenUploadEndpoint\\(|setDebugMode\\(|GS_BASE_PATH\" goseg/main.go goseg/config/bootstrap.go goseg/importer/importer.go goseg/config/config.go goseg/startuporchestrator/startup_orchestrator.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/config/config.go:104:func RuntimeContextSnapshot() RuntimeContext {
+goseg/config/config.go:144:	ctx := RuntimeContextSnapshot()
+goseg/config/config.go:150:	ctx := RuntimeContextSnapshot()
+goseg/config/config.go:156:	ctx := RuntimeContextSnapshot()
+goseg/config/config.go:162:	ctx := RuntimeContextSnapshot()
+goseg/importer/importer.go:321:func OpenUploadEndpoint(cmd OpenUploadEndpointCmd, runtime ...importerRuntime) error {
+goseg/importer/importer.go:402:	return OpenUploadEndpoint(OpenUploadEndpointCmd{
+goseg/importer/importer.go:417:func VerifySession(session string) bool {
+goseg/main.go:49:	webContent    fs.FS
+goseg/main.go:50:	fileServer    http.Handler
+goseg/main.go:54:	initWebErr    error
+goseg/main.go:163:	context := config.RuntimeContextSnapshot()
+goseg/main.go:290:	webContent, err = fs.Sub(content, "web")
+goseg/main.go:292:		initWebErr = err
+goseg/main.go:295:	fileServer = http.FileServer(http.FS(webContent))
+goseg/main.go:567:			return initWebErr
+goseg/startuporchestrator/startup_orchestrator.go:177:			InitializeConfigFn: func() error { return config.Initialize() },
+goseg/config/bootstrap.go:53:	setDebugMode()
+goseg/config/bootstrap.go:55:	ctx := RuntimeContextSnapshot()
+goseg/config/bootstrap.go:128:	switch os.Getenv("GS_BASE_PATH") {
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/main.go | sed -n '540,620p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+   540	
+   541	func startDevMode(opts appStartupOptions) {
+   542		if !opts.devMode {
+   543			return
+   544		}
+   545		logger.Info("Starting pprof (:6060)")
+   546		go func() {
+   547			if err := http.ListenAndServe("0.0.0.0:6060", nil); err != nil && err != http.ErrServerClosed {
+   548				logger.Errorf("pprof server failed: %v", err)
+   549			}
+   550		}()
+   551	}
+   552	
+   553	func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime bootstrapRuntime) error {
+   554		runtime = bootstrapRuntimeWith(
+   555			runtime.BootstrapFn,
+   556			runtime.StartServerFn,
+   557			runtime.RunC2CCheckFn,
+   558			runtime.StartupRuntime,
+   559		)
+codex
+I’m narrowing to a small set of defensible findings. I’ll now verify acronym/style and API-shape inconsistencies across `main`, `startuporchestrator`, `importer`, and `config` so scores and findings stay tightly aligned.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/shipworkflow/operations_runtime.go | sed -n '160,280p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/system/wifi_runtime_api.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startuporchestrator/startup_orchestrator.go | sed -n '548,710p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+   160			return err
+   161		}
+   162		runtime = resolvedRuntime
+   163		return runtime.UploadImportCoordinator(ctx, cmd)
+   164	}
+   165	
+   166	func emitWorkflowTransition(runtime workflowRuntime, patp, transitionType, event string) error {
+   167		resolvedRuntime, err := resolveWorkflowRuntime(runtime)
+   168		if err != nil {
+   169			return fmt.Errorf("prepare workflow runtime: %w", err)
+   170		}
+   171		return emitWorkflowTransitionResolved(resolvedRuntime, patp, transitionType, event)
+   172	}
+   173	
+   174	func emitWorkflowTransitionResolved(runtime workflowRuntime, patp, transitionType, event string) error {
+   175		if err := runtime.TransitionEmitter(patp, transitionType, event); err != nil {
+   176			return transition.HandleTransitionPublishError(
+   177				fmt.Sprintf("publish urbit transition for %s", patp),
+   178				err,
+   179				runtime.TransitionErrorPolicy,
+ succeeded in 53ms:
+     1	package system
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7		"os/exec"
+     8		"strings"
+     9	)
+    10	
+    11	var ErrWiFiInterfaceNotFound = errors.New("wifi interface not found")
+    12	
+    13	type WiFiRuntimeService struct {
+    14		runtime          wifiRuntime
+    15		state            *wifiRuntimeState
+    16		runtimeValidated bool
+    17	}
+    18	
+    19	func resolveWiFiRuntime(overrides ...wifiRuntime) wifiRuntime {
+    20		if len(overrides) > 0 {
+ succeeded in 53ms:
+   548			StartDockerLogConnRemoverFn: func(ctx context.Context) error {
+   549				return logstream.DockerLogConnRemoverWithRuntime(ctx, logstreamRuntime)
+   550			},
+   551		}
+   552	}
+   553	
+   554	type startupPhase struct {
+   555		id           startupTaskID
+   556		name         string
+   557		dependencies []startupTaskID
+   558		initFn       func() error
+   559		startFn      func(context.Context) error
+   560		healthFn     func(context.Context) error
+   561		required     bool
+   562	}
+   563	
+   564	type startupOptions struct {
+   565		httpPort       int
+   566		websocketPort  int
+   567		validateConfig func() error
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/protocol/contracts/startram_contracts.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/protocol/contracts/protocol_contracts.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/session/logstream_session_store.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package contracts
+     2	
+     3	import (
+     4		"fmt"
+     5		"strings"
+     6	)
+     7	
+     8	const (
+     9		// StarTram contract namespace segments.
+    10		startramContractFamily = "startram"
+    11		startramContractScope  = "errors"
+    12		startramAPIConnSlug    = "api-connection"
+    13	
+    14		// APIConnectionErrorMessage is the canonical StarTram API connectivity contract message.
+    15		APIConnectionErrorMessage             = "Unable to connect to API server"
+    16		startramAPIConnectionErrorName        = "APIConnectionError"
+    17		startramAPIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+    18	)
+    19	
+    20	// APIConnectionError is the canonical StarTram API connectivity contract id.
+ succeeded in 53ms:
+     1	package contracts
+     2	
+     3	import "fmt"
+     4	
+     5	const (
+     6		// Protocol namespaces for websocket action contracts.
+     7		ActionNamespaceUpload ActionNamespace = "upload"
+     8		ActionNamespaceC2C    ActionNamespace = "c2c"
+     9	
+    10		// Protocol action tokens.
+    11		ActionUploadOpenEndpoint ActionVerb = "open-endpoint"
+    12		ActionUploadReset        ActionVerb = "reset"
+    13		ActionC2CConnect         ActionVerb = "connect"
+    14	)
+    15	
+    16	const (
+    17		protocolActionContractRoot = "protocol.actions"
+    18	
+    19		// #nosec G101 -- These values are protocol action names required for contract binding, not secrets.
+    20		// Protocol action contract identities are immutable to preserve contract governance boundaries.
+ succeeded in 53ms:
+     1	package session
+     2	
+     3	import (
+     4		"sync"
+     5	
+     6		"github.com/gorilla/websocket"
+     7	)
+     8	
+     9	type LogstreamRuntime interface {
+    10		SysLogSessions() []*websocket.Conn
+    11		SetSysLogSessions([]*websocket.Conn)
+    12		SysSessionsToRemove() []*websocket.Conn
+    13		SetSysSessionsToRemove([]*websocket.Conn)
+    14		AddSysLogSession(*websocket.Conn)
+    15		RemoveSysLogSessions()
+    16		AddSysSessionToRemove(*websocket.Conn)
+    17		DockerLogSessions() map[string]map[*websocket.Conn]bool
+    18		SetDockerLogSessions(map[string]map[*websocket.Conn]bool)
+    19		SetDockerLogSession(string, *websocket.Conn, bool)
+    20		SetDockerLogSessionLive(string, *websocket.Conn, bool)
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"VerifySession\\(|SetUploadSession\\(|validateUploadRequest\\(|upload session expired|missing upload authorization headers\" goseg/importer/importer.go goseg/importer/importer_test.go goseg/importer/extract_test.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+goseg/importer/importer_test.go:374:	_, err := validateUploadRequest(req, "abcdabcdabcdabcdabcdabcdabcdabcd", "~zod")
+goseg/importer/importer_test.go:378:	if !strings.Contains(err.Error(), "missing upload authorization headers") {
+goseg/importer/importer_test.go:410:	_, err := validateUploadRequest(req, "abcdabcdabcdabcdabcdabcdabcdabcd", "~zod")
+goseg/importer/importer_test.go:613:	if err := SetUploadSession(payload, runtime); err != nil {
+goseg/importer/importer.go:401:func SetUploadSession(uploadPayload structs.WsUploadPayload, runtime ...importerRuntime) error {
+goseg/importer/importer.go:417:func VerifySession(session string) bool {
+goseg/importer/importer.go:656:func validateUploadRequest(r *http.Request, uploadSession, patp string, runtime ...importerRuntime) (validatedUploadRequest, error) {
+goseg/importer/importer.go:672:		return validated, fmt.Errorf("upload session expired")
+goseg/importer/importer.go:678:		return validated, fmt.Errorf("missing upload authorization headers")
+goseg/importer/importer.go:850:	validated, err := validateUploadRequest(r, uploadSession, patp, runtime...)
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/importer/importer_test.go | sed -n '560,700p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+   560				}
+   561			}
+   562			if got := request.Header.Get("X-Upload-Token-Id"); got != providedToken.ID {
+   563				return tokens.UploadTokenAuthorizationResult{
+   564					Status:           tokens.UploadValidationStatusTokenContract,
+   565					AuthorizationErr: fmt.Errorf("unexpected token id header %q", got),
+   566				}
+   567			}
+   568			if got := request.Header.Get("X-Upload-Token"); got != providedToken.Token {
+   569				return tokens.UploadTokenAuthorizationResult{
+   570					Status:           tokens.UploadValidationStatusTokenContract,
+   571					AuthorizationErr: fmt.Errorf("unexpected token hash header %q", got),
+   572				}
+   573			}
+   574			return tokens.UploadTokenAuthorizationResult{
+   575				Status:          tokens.UploadValidationStatusAuthorized,
+   576				AuthorizedToken: providedToken.Token,
+   577			}
+   578		}
+   579	
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/config_update_schema.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/config_update_registry.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/routines/system/system.go | sed -n '1,200p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package system
+     2	
+     3	import (
+     4		"context"
+     5		"time"
+     6	
+     7		"groundseg/routines/backup"
+     8		"groundseg/routines/chop"
+     9	)
+    10	
+    11	var (
+    12		remoteBackupSleep = time.Sleep
+    13		localBackupSleep  = time.Sleep
+    14		sleepForChop      = time.Sleep
+    15	)
+    16	
+    17	func StartBackupRoutines() error {
+    18		return backup.StartBackupRoutines()
+    19	}
+    20	
+ succeeded in 52ms:
+     1	package config
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6	
+     7		"groundseg/structs"
+     8	)
+     9	
+    10	type ConfUpdateOption func(*ConfPatch)
+    11	
+    12	type ConnectivityPatch struct {
+    13		Piers                *[]string
+    14		WgOn                 *bool
+    15		NetCheck             *string
+    16		UpdateMode           *string
+    17		UpdateUrl            *string
+    18		UpdateBranch         *string
+    19		RemoteBackupPassword *string
+    20		C2cInterval          *int
+ succeeded in 52ms:
+     1	package config
+     2	
+     3	import (
+     4		"fmt"
+     5		"groundseg/structs"
+     6		"strings"
+     7	)
+     8	
+     9	type confPatchFieldSpec[T any] struct {
+    10		key        string
+    11		patchField string
+    12		parse      confPatchValueParser[T]
+    13		target     confPatchValueRef[T]
+    14		apply      confPatchApplyValueFn[T]
+    15		hasUpdates func(T) bool
+    16		merge      confPatchMergeFn
+    17	}
+    18	
+    19	func configPatchFieldFromSpec[T any](spec confPatchFieldSpec[T]) confPatchField {
+    20		apply := spec.apply
+codex
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "api_surface_coherence": 78.0,
+    "authorization_consistency": 89.0,
+    "error_consistency": 74.0,
+    "naming_quality": 82.0,
+    "convention_outlier": 80.0,
+    "initialization_coupling": 72.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "The code exposes multiple parallel entrypoints for the same behavior with different defaulting semantics, e.g. `SysLogStreamer`, `SysLogStreamerWithContext`, and `SysLogStreamerWithRuntime` in `goseg/routines/logstream/logs.go`, plus similar triads for docker log streaming.",
+        "Workflow APIs duplicate surface area via `RunTransitionedOperation` and `runTransitionedOperationWithRuntime` in `goseg/shipworkflow/operations_runtime.go`, forcing callers to choose between implicit runtime construction and explicit runtime injection.",
+        "Upload session APIs split closely related responsibilities across `SetUploadSession`, `OpenUploadEndpoint`, `VerifySession`, and `validateUploadRequest` in `goseg/importer/importer.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "authorization_consistency": {
+      "evidence": [
+        "Upload authorization is consistently enforced in the critical request path via `validateUploadRequest` checking both token headers and token authorization callback in `goseg/importer/importer.go`.",
+        "Session token verification includes rotation handling (`authz.IsRotated`) and updates stored token state, reducing drift between issued and accepted credentials in `goseg/importer/importer.go`."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Authorization checks are concentrated in importer upload flow; adjacent APIs like `VerifySession` expose weaker semantics (existence-only) that can be misused by future callers."
+    },
+    "error_consistency": {
+      "evidence": [
+        "Error handling policy is split between critical and best-effort variants (`publishImportStatus` vs `publishImportStatusBestEffort`, `publishImportTransition` vs `publishImportTransitionBestEffort`) in `goseg/importer/importer.go`, with call-site choice determining propagation behavior.",
+        "Some parsing boundaries drop root cause detail (`parseUploadChunkMetadata` returns plain `invalid chunk index` / `invalid total chunk count`) while most neighboring functions wrap causes with `%w` in `goseg/importer/importer.go`.",
+        "Transition publishing uses policy-mediated error shaping in `goseg/shipworkflow/operations_runtime.go`, while other paths return direct wrapped errors, producing mixed failure contracts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "naming_quality": {
+      "evidence": [
+        "Acronym casing is inconsistent across related APIs: public `StartC2CCheck` vs internal `startC2cCheck` in `goseg/startuporchestrator/startup_orchestrator.go`.",
+        "Method name `init()` on `startupOrchestrator` (`goseg/startuporchestrator/startup_orchestrator.go`) is easy to confuse with Go package `init` semantics and does not communicate phase intent as clearly as `initializePhases`/`runInitPhase`.",
+        "Mixed acronym styles appear in configuration and runtime naming (`C2cInterval` in `goseg/config/config_update_schema.go` vs `C2C` naming in runtime/startup code)."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "convention_outlier": {
+      "evidence": [
+        "Sibling modules follow different acronym conventions for the same domain concept (`C2C` in startup/main paths vs `C2cInterval` in config patch schema).",
+        "Exported/internal API naming conventions are not uniformly applied for acronym-containing identifiers (`StartC2CCheck` vs `startC2cCheck`) within the same startup orchestrator subsystem."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "Package-level `init()` in `goseg/main.go` performs embedded FS setup and mutates globals (`webContent`, `fileServer`, `initWebErr`), then startup validation later depends on `initWebErr` in `runBootstrapSubsystems`.",
+        "Package-level `init()` in `goseg/config/config.go` initializes runtime context, while `config.Initialize()` in `goseg/config/bootstrap.go` mutates additional global process state (`Ready`, global config, debug mode) behind `sync.Once`.",
+        "Runtime behavior depends on ambient process inputs (`os.Args` and `GS_BASE_PATH`) read during initialization paths in `goseg/config/bootstrap.go`, creating order-sensitive global state."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "init_side_effect_bootstrap_chain",
+      "summary": "Import-time and boot-time global initialization are coupled through mutable package state, making startup order and tests fragile.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`main.init()` mutates `webContent/fileServer/initWebErr` and bootstrap later reads `initWebErr` via `ValidateConfig` callback.",
+        "`config.init()` seeds runtime context, while `config.Initialize()` separately mutates global config/readiness/debug mode under `sync.Once`.",
+        "Initialization reads process-global inputs (`os.Args`, `GS_BASE_PATH`) and writes package-global state, creating hidden dependencies across startup subsystems."
+      ],
+      "suggestion": "Replace package-level `init` side effects with explicit bootstrap constructors that return immutable runtime structs; pass those through `StartupOptions` so initialization order is encoded in call graph instead of global state.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_process_state"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_error_policy_scatter",
+      "summary": "Transition publishing and upload flow mix strict and best-effort error contracts at call sites, producing inconsistent failure behavior.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "Importer exposes paired APIs with different semantics (`publishImportStatus` vs `publishImportStatusBestEffort`, `publishImportTransition` vs `publishImportTransitionBestEffort`).",
+        "Workflow transition emission uses policy-based error shaping (`transition.HandleTransitionPublishError`) while surrounding operations often return direct wrapped errors.",
+        "Call-site selection, not layer policy, decides whether transition failures are fatal."
+      ],
+      "suggestion": "Define one canonical transition error policy per workflow boundary (e.g., strict for user-visible state mutation, best-effort for telemetry only) and expose a single API per boundary that encodes that policy.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "policy_not_centralized"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "parallel_api_variants_without_clear_contract",
+      "summary": "Multiple near-duplicate API variants expose the same capability with inconsistent defaulting and runtime resolution behavior.",
+      "related_files": [
+        "goseg/routines/logstream/logs.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "Logstream exposes 3-level variants (`X`, `XWithContext`, `XWithRuntime`) with implicit `context.Background()` fallback in some paths.",
+        "Shipworkflow keeps both `RunTransitionedOperation` and `runTransitionedOperationWithRuntime`, splitting runtime ownership across call styles.",
+        "Importer exposes both command-style (`OpenUploadEndpoint`) and wrapper (`SetUploadSession`) plus separate `VerifySession` with weaker semantics."
+      ],
+      "suggestion": "Collapse each subsystem to a primary explicit API (runtime+context required) plus a thin compatibility shim layer marked deprecated; document one defaulting policy and remove duplicate behavioral entrypoints.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "api_surface_growth_without_governance"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "acronym_and_phase_name_drift",
+      "summary": "Acronym casing and lifecycle method names drift across adjacent startup/config code, reducing intent clarity.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Public `StartC2CCheck` and internal `startC2cCheck` use different acronym casing for the same concept.",
+        "`startupOrchestrator.init()` is semantically a startup phase executor, but name collides conceptually with Go's package `init` lifecycle.",
+        "Config field `C2cInterval` diverges from `C2C` naming used in runtime/startup APIs."
+      ],
+      "suggestion": "Adopt a repository-level acronym naming rule (e.g., preserve all-caps for known acronyms in identifiers) and rename startup phase functions to explicit verbs (`initialize`, `runInitPhase`) with compatibility refactors in one pass.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_convention_drift"
+    },
+    {
+      "dimension": "convention_outlier",
+      "identifier": "startup_config_acronym_style_island",
+      "summary": "Startup and config modules form a style island where acronym conventions differ inside the same domain boundary.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/config/bootstrap.go"
+      ],
+      "evidence": [
+        "Startup APIs consistently use `C2C` in exported names, while config schema/patch naming uses `C2c`.",
+        "The mismatch appears within directly collaborating modules (startup consumes config values), not isolated legacy code."
+      ],
+      "suggestion": "Normalize acronym casing end-to-end for C2C-related identifiers and JSON field mapping helpers, including migration helpers/tests where external JSON compatibility is required.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_convention_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit process-global state is still used as a cross-module coordination mechanism.",
+      "API growth occurred via additive wrappers/variants without a strict surface-governance rule.",
+      "Naming conventions for acronyms were not centrally enforced during refactors."
+    ],
+    "likely_symptoms": [
+      "parallel_api_variants_without_clear_contract",
+      "startup_config_acronym_style_island",
+      "acronym_and_phase_name_drift"
+    ],
+    "possible_false_positives": [
+      "Some `WithContext`/`WithRuntime` variants may be intentional compatibility seams, but current spread still creates coherence cost."
+    ]
+  }
+}
+tokens used
+93,129
+

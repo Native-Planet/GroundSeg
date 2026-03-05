@@ -1,0 +1,94 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 2,
+  "assessments": {
+    "package_organization": 72.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows very large mixed directories for this scope: goseg/config/ has 41 files and goseg/system/ has 39 files, each combining multiple concerns under one package boundary.",
+        "goseg/system/disk_fstab.go and goseg/system/disk_health.go are parent-package pass-through files that delegate entirely into subpackages (groundseg/system/disk and groundseg/system/storage), indicating boundary overlap rather than clear ownership.",
+        "goseg/config/bootstrap.go contains process bootstrap and environment/runtime wiring (initOnce, GS_BASE_PATH, os.Args debug parsing, path initialization), while goseg/config/config.go also defines runtime context defaults and setters; startup/runtime concerns are split across config internals instead of a dedicated startup boundary.",
+        "goseg/shipworkflow/ is another overloaded directory in this batch context (49 files in directory_profiles), and goseg/shipworkflow/lifecycle.go mixes reusable polling/stop-wait helpers with ship config persistence seam logic in a top-level workflow package."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "system_parent_bridge_overlap",
+      "summary": "System-level disk files are bridge wrappers over subpackages, creating overlapping ownership boundaries.",
+      "related_files": [
+        "goseg/system/disk_fstab.go",
+        "goseg/system/disk_health.go",
+        "goseg/system/disk_fstab_test.go"
+      ],
+      "evidence": [
+        "disk_fstab.go defines parse/reconcile/read/write helpers that directly call systemdisk.ParseFstabLine/ReconcileFstabLines/ReadFstabLines/WriteFstabLines without local policy.",
+        "disk_health.go exports SmartResultsSnapshot/SetSmartResults/ListHardDisks/IsDevMounted/SmartCheckAllDrives and forwards directly to storage package functions.",
+        "The test file disk_fstab_test.go is a smoke placeholder, which reinforces that this file is currently acting as a placement/compatibility shim rather than an owned domain unit."
+      ],
+      "suggestion": "Staged reorg plan: (1) Create explicit compatibility boundary package `goseg/system/legacydisk` and move bridge files there (`git mv goseg/system/disk_fstab.go goseg/system/legacydisk/fstab_bridge.go` and `git mv goseg/system/disk_health.go goseg/system/legacydisk/health_bridge.go`). (2) Update callers to import `goseg/system/disk` or `goseg/system/storage` directly where possible; keep temporary bridge exports only for external API stability. (3) Remove placeholder smoke tests and add package-specific tests in destination packages. (4) Validate imports/build with `go test ./goseg/system/... ./goseg/routines/...` and `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_shim_accumulation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_startup_boundary_blur",
+      "summary": "Bootstrap/runtime process concerns are embedded in config package files instead of a dedicated startup boundary.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "bootstrap.go manages process initialization state (`initOnce`, global readiness, path setup, debug mode argument parsing from os.Args, environment-based base path) together with config loading.",
+        "config.go also owns runtime context defaults and mutation (`basePathDefault`, `architectureDefault`, `SetBasePath`, `SetDebugMode`, `SetDockerDir`), further mixing process boot/runtime concerns inside config package.",
+        "directory_profiles marks goseg/config/ as a high-count mixed directory (41 files), consistent with flattened concerns and weaker navigability."
+      ],
+      "suggestion": "Staged reorg plan: (1) Introduce `goseg/startup/runtimectx` for runtime context defaults/setters and `goseg/startup/bootstrap` for initialization orchestration. (2) Move functions in order: first context primitives from `config.go`, then bootstrap orchestration from `bootstrap.go`, then update config package to consume those APIs. (3) Keep temporary forwarding wrappers in `config` only during migration. (4) Run import-update and validation commands: `go test ./goseg/config/... ./goseg/startup...` then full `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flattened_runtime_ownership"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "shipworkflow_generic_lifecycle_placement",
+      "summary": "Generic lifecycle polling helpers are placed in a large workflow package, increasing package breadth and weakening layering.",
+      "related_files": [
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/lifecycle_test.go"
+      ],
+      "evidence": [
+        "lifecycle.go defines generic-style helpers (`PollWithTimeout`, `WaitForUrbitStopWith`, `PersistUrbitConfig`) that are reusable lifecycle primitives but live in a broad top-level workflow package.",
+        "doc.go describes shipworkflow as coordinating new-ship, StarTram, and Urbit operations, indicating already broad package scope.",
+        "directory_profiles shows goseg/shipworkflow/ at 49 files, a flat and mixed directory where additional generic helpers reduce navigability and ownership clarity."
+      ],
+      "suggestion": "Staged reorg plan: (1) Create focused package `goseg/shipworkflow/lifecycle` (or `goseg/internal/transitionlifecycle` if internal-only) for polling/stop lifecycle primitives. (2) Move `lifecycle.go` first, then update all shipworkflow callers/imports to use new package APIs, then keep short deprecated forwarding funcs only if needed. (3) Replace placeholder lifecycle smoke test with behavior tests in the destination package. (4) Validate with `go test ./goseg/shipworkflow/... ./goseg/internal/transitionlifecycle/...` and then `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flattened_runtime_ownership"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Flat top-level domain packages accumulated compatibility shims and startup/runtime logic instead of pushing ownership to focused subpackages.",
+      "Migration-era bridge APIs were retained in parent packages, creating dual boundaries and unclear import targets."
+    ],
+    "likely_symptoms": [
+      "system_parent_bridge_overlap",
+      "config_startup_boundary_blur",
+      "shipworkflow_generic_lifecycle_placement"
+    ],
+    "possible_false_positives": []
+  }
+}

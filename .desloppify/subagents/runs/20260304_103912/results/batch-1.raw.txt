@@ -1,0 +1,35 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 91.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files are narrow contract-catalog contributors and do not introduce outbound imports, so their coupling is contained within `goseg/protocol/contracts`.",
+        "`protocol_contracts.go` and `startram_contracts.go` both expose canonical contract IDs and descriptors through package-local catalog spec functions (`protocolContractCatalogSpecs` and `startramContractCatalogSpecs`), and the family-level registry resolves via shared lookups in `contractCatalogFamilySpecs` in `goseg/protocol/contracts/contracts.go`.",
+        "The protocol family uses a dedicated ID constructor/helper (`protocolActionContractID` + `protocolActionContract`) while startram uses a direct `contractID`/literal-style spec entry, creating a mild consistency gap in how cross-module contract boundaries are constructed."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "No critical coupling defects are present, but a small consistency gap across family spec construction (helper-driven action family vs direct contractID-based startram spec) creates potential drift risk as contract families scale and weakens the architectural contract story if left unstandardized.",
+      "sub_axes": {
+        "abstraction_leverage": 100,
+        "indirection_cost": 100,
+        "interface_honesty": 100
+      }
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "No material boundary violations found in the assigned scope; only a low-severity style-level consistency gap across catalog-spec construction patterns."
+    ],
+    "likely_symptoms": [],
+    "possible_false_positives": [
+      "Potentially over-interpreting the contract-spec construction inconsistency as a hard architectural defect in a low-volume, generated-like surface."
+    ]
+  }
+}

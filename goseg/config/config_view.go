@@ -5,9 +5,9 @@ import (
 )
 
 func StartramSettingsSnapshot() StartramSettings {
-	conf := Conf()
+	conf := Config()
 	return StartramSettings{
-		EndpointURL:          conf.Connectivity.EndpointUrl,
+		EndpointURL:          conf.Connectivity.EndpointURL,
 		Pubkey:               conf.Startram.Pubkey,
 		RemoteBackupPassword: conf.Connectivity.RemoteBackupPassword,
 		WgRegistered:         conf.Connectivity.WgRegistered,
@@ -17,21 +17,21 @@ func StartramSettingsSnapshot() StartramSettings {
 }
 
 func AuthSettingsSnapshot() AuthSettings {
-	conf := Conf()
+	conf := Config()
 	authorizedSessions := make(map[string]structs.SessionInfo, len(conf.AuthSession.Sessions.Authorized))
 	for tokenID, session := range conf.AuthSession.Sessions.Authorized {
 		authorizedSessions[tokenID] = session
 	}
 	return AuthSettings{
-			KeyFile:            conf.AuthSession.KeyFile,
-			Salt:               conf.AuthSession.Salt,
-			PasswordHash:       conf.AuthSession.PwHash,
-			AuthorizedSessions: authorizedSessions,
-		}
+		KeyFile:            conf.AuthSession.KeyFile,
+		Salt:               conf.AuthSession.Salt,
+		PasswordHash:       conf.AuthSession.PwHash,
+		AuthorizedSessions: authorizedSessions,
+	}
 }
 
 func PenpaiSettingsSnapshot() PenpaiSettings {
-	conf := Conf()
+	conf := Config()
 	return PenpaiSettings{
 		Models:      append([]structs.Penpai(nil), conf.Penpai.PenpaiModels...),
 		Allowed:     conf.Penpai.PenpaiAllow,
@@ -42,7 +42,7 @@ func PenpaiSettingsSnapshot() PenpaiSettings {
 }
 
 func Check502SettingsSnapshot() Check502Settings {
-	conf := Conf()
+	conf := Config()
 	return Check502Settings{
 		Piers:      copyStringSlice(conf.Connectivity.Piers),
 		WgOn:       conf.Connectivity.WgOn,
@@ -51,7 +51,7 @@ func Check502SettingsSnapshot() Check502Settings {
 }
 
 func HealthCheckSettingsSnapshot() HealthCheckSettings {
-	conf := Conf()
+	conf := Config()
 	return HealthCheckSettings{
 		Piers:        copyStringSlice(conf.Connectivity.Piers),
 		DiskWarnings: copyDiskWarnings(conf.Connectivity.DiskWarning),
@@ -59,17 +59,17 @@ func HealthCheckSettingsSnapshot() HealthCheckSettings {
 }
 
 func ShipSettingsSnapshot() ShipSettings {
-	conf := Conf()
+	conf := Config()
 	return ShipSettings{Piers: copyStringSlice(conf.Connectivity.Piers)}
 }
 
 func ConnectivitySettingsSnapshot() ConnectivitySettings {
-	conf := Conf()
-	return ConnectivitySettings{C2cInterval: conf.Connectivity.C2cInterval}
+	conf := Config()
+	return ConnectivitySettings{C2CInterval: conf.Connectivity.C2CInterval}
 }
 
 func UpdateSettingsSnapshot() UpdateSettings {
-	conf := Conf()
+	conf := Config()
 	return UpdateSettings{
 		UpdateMode:   conf.Connectivity.UpdateMode,
 		UpdateBranch: conf.Connectivity.UpdateBranch,
@@ -77,7 +77,7 @@ func UpdateSettingsSnapshot() UpdateSettings {
 }
 
 func SwapSettingsSnapshot() SwapSettings {
-	conf := Conf()
+	conf := Config()
 	return SwapSettings{
 		SwapFile: conf.Runtime.SwapFile,
 		SwapVal:  conf.Runtime.SwapVal,
@@ -85,7 +85,7 @@ func SwapSettingsSnapshot() SwapSettings {
 }
 
 func ShipRuntimeSettingsSnapshot() ShipRuntimeSettings {
-	conf := Conf()
+	conf := Config()
 	return ShipRuntimeSettings{SnapTime: conf.Runtime.SnapTime}
 }
 

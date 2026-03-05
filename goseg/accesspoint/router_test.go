@@ -25,6 +25,48 @@ func TestFormatShellCommandForRouter(t *testing.T) {
 	}
 }
 
+func TestIPv4NetworkPrefix(t *testing.T) {
+	ipv4Prefix, err := ipv4NetworkPrefix("192.168.45.1")
+	if err != nil {
+		t.Fatalf("expected ipv4 prefix, got: %v", err)
+	}
+	if ipv4Prefix != "192.168.45" {
+		t.Fatalf("expected prefix 192.168.45, got %q", ipv4Prefix)
+	}
+
+	if _, err := ipv4NetworkPrefix("2001:db8::1"); err == nil {
+		t.Fatal("expected non-IPv4 address to fail network prefix extraction")
+	}
+}
+
+func TestStartRouterWithRuntimeRejectsIPv6Address(t *testing.T) {
+	restore := restoreRouterCommandGlobals()
+	t.Cleanup(restore)
+
+	routerSleepFn = func(_ time.Duration) {}
+	var commands []string
+	executeRouterShellFn = func(cmd string) (string, error) {
+		commands = append(commands, cmd)
+		return "", nil
+	}
+
+	err := startRouterWithRuntime(AccessPointRuntime{
+		Wlan:              "wlan0",
+		IP:                "2001:db8::1",
+		Netmask:           "255.255.255.0",
+		HostapdConfigPath: "/tmp/hostapd.config",
+	})
+	if err == nil {
+		t.Fatal("expected startRouterWithRuntime to reject IPv6 IP")
+	}
+	if !strings.Contains(err.Error(), "start router") {
+		t.Fatalf("expected wrapped start router error, got: %v", err)
+	}
+	if len(commands) != 0 {
+		t.Fatalf("expected no router commands when IP validation fails, got %v", commands)
+	}
+}
+
 func TestExecuteRouterShellCommand(t *testing.T) {
 	restore := restoreRouterCommandGlobals()
 	t.Cleanup(restore)

@@ -8,14 +8,14 @@ import (
 	"github.com/docker/docker/api/types/container"
 )
 
-func (runtime *Runtime) GetShipStatus(patps []string) (map[string]string, error) {
-	statuses := make(map[string]string)
+func (runtime *Runtime) GetShipStatus(patps []string) (statuses map[string]string, err error) {
+	statuses = make(map[string]string)
 	cli, err := runtime.dockerClientNew()
 	if err != nil {
 		errmsg := fmt.Errorf("unable to create docker client: %w", err)
 		return statuses, errmsg
 	}
-	defer cli.Close()
+	defer closeRuntimeDockerClient(cli, "ship status", &err)
 	containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
 		errmsg := fmt.Errorf("failed to list containers: %w", err)
@@ -33,7 +33,7 @@ func (runtime *Runtime) GetContainerImageTag(containerName string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("unable to create docker client: %w", err)
 	}
-	defer cli.Close()
+	defer closeRuntimeDockerClient(cli, "container image tag lookup", &err)
 
 	containers, err := cli.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
@@ -66,13 +66,12 @@ func imageTagFromReference(image string) string {
 }
 
 // GetContainerRunningStatus returns status for a container by exact name.
-func (runtime *Runtime) GetContainerRunningStatus(containerName string) (string, error) {
-	var status string
+func (runtime *Runtime) GetContainerRunningStatus(containerName string) (status string, err error) {
 	cli, err := runtime.dockerClientNew()
 	if err != nil {
 		return status, fmt.Errorf("unable to create docker client: %w", err)
 	}
-	defer cli.Close()
+	defer closeRuntimeDockerClient(cli, "container running status", &err)
 	containers, err := cli.ContainerList(context.Background(), container.ListOptions{})
 	if err != nil {
 		return status, fmt.Errorf("failed to list containers: %w", err)

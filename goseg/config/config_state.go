@@ -1,19 +1,20 @@
 package config
 
 import (
+	cryptorand "crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"os"
 	"time"
 
-	"go.uber.org/zap"
 	"groundseg/structs"
+
+	"go.uber.org/zap"
 )
 
 // we keep map[string]structs.ContainerState in memory to keep track of the containers
@@ -70,13 +71,25 @@ func NetCheck(netCheck string) bool {
 
 // generates a random secret string of the input length
 func RandString(length int) string {
-	randBytes := make([]byte, length)
-	_, err := rand.Read(randBytes)
+	randomValue, err := RandStringWithError(length)
 	if err != nil {
-		zap.L().Warn("Random error :s")
+		zap.L().Warn("Random error :s", zap.Error(err))
 		return ""
 	}
-	return base64.URLEncoding.EncodeToString(randBytes)
+	return randomValue
+}
+
+// RandStringWithError generates a random secret string of the input length.
+func RandStringWithError(length int) (string, error) {
+	if length <= 0 {
+		return "", nil
+	}
+	randBytes := make([]byte, length)
+	_, err := cryptorand.Read(randBytes)
+	if err != nil {
+		return "", fmt.Errorf("generate random bytes: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(randBytes), nil
 }
 
 func GetSHA256(filePath string) (string, error) {

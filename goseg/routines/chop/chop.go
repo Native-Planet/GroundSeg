@@ -14,7 +14,7 @@ import (
 const BytesPerGiB = 1 << 30
 
 var (
-	ConfForChop           = config.Conf
+	ConfForChop           = config.Config
 	UrbitConfForChop      = config.UrbitConf
 	ContainerStatsForChop = orchestration.GetContainerStats
 	ChopPierForChop       = chopsvc.ChopPier
@@ -60,8 +60,9 @@ func StartLoop(sleep func(time.Duration)) {
 	}
 }
 
-func StartChopRoutines() {
+func StartChopRoutines() error {
 	go ChopAtLimit()
+	return nil
 }
 
 func ChopAtLimit() {

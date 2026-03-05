@@ -1,0 +1,95 @@
+{
+  "batch": "AI Debt & Migrations",
+  "batch_index": 3,
+  "assessments": {
+    "ai_generated_debt": 88.0,
+    "incomplete_migration": 92.0,
+    "low_level_elegance": 87.0
+  },
+  "dimension_notes": {
+    "ai_generated_debt": {
+      "evidence": [
+        "All four files contain near-identical two-line package comments with a similar templated pattern ('Package <name> ... and ...').",
+        "Comments summarize broadly but do not capture package-specific constraints, invariants, or boundary intent, which is a common low-signal boilerplate pattern."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Package docs read as formulaic summaries and miss differentiating technical intent, increasing risk of stale or low-value documentation."
+    },
+    "incomplete_migration": {
+      "evidence": [
+        "No deprecated markers, TODO migration notes, temporary compatibility wording, or old/new API coexistence indicators are present in these four files.",
+        "The files are package docs only, so migration state cannot be fully validated from this batch’s scope."
+      ],
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Evidence is limited to doc stubs; absence of migration markers here does not prove migration completion in implementation files."
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "Each file compresses multiple responsibilities into one broad sentence, reducing precision of package-level intent (e.g., lifecycle operations + workflows + runtime actions in one line).",
+        "The same terse style appears across all assigned files, indicating low-information local craft rather than tailored documentation."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Local documentation craft is concise but too coarse-grained to clearly communicate package boundaries and expected behavior."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "ai_generated_debt",
+      "identifier": "templated_package_doc_boilerplate",
+      "summary": "Package docs use repeated template phrasing with low domain-specific signal.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/startram/doc.go",
+        "goseg/system/doc.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "All comments follow the same formula ('Package X <verb phrase>, including ... and ...').",
+        "None of the docs describe why boundaries exist, key constraints, or non-obvious behavior."
+      ],
+      "suggestion": "Rewrite each package comment with concrete scope statements: what the package owns, what it explicitly does not own, and one key invariant or integration boundary per package.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "package_doc_genericity"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "coarse_grained_doc_contracts",
+      "summary": "Single-sentence docs bundle multiple concerns, weakening package contract clarity.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/startram/doc.go",
+        "goseg/system/doc.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "Comments enumerate several capabilities without clarifying primary responsibility or boundary edges.",
+        "Readers cannot infer which responsibilities are core vs incidental from the current wording."
+      ],
+      "suggestion": "Split each package doc into 2-4 short sentences: primary responsibility first, then explicit boundary notes and key collaborator packages.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "package_doc_genericity"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Documentation appears standardized for brevity, but this introduced a repeated low-detail pattern across packages."
+    ],
+    "likely_symptoms": [
+      "templated_package_doc_boilerplate",
+      "coarse_grained_doc_contracts"
+    ],
+    "possible_false_positives": [
+      "If repository standards intentionally require ultra-brief package comments only, severity may be overstated."
+    ]
+  }
+}

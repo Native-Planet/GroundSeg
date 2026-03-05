@@ -1,0 +1,100 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 92.0,
+    "error_consistency": 84.0,
+    "abstraction_fitness": 90.0,
+    "test_strategy": 93.0,
+    "design_coherence": 90.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Runtime state is shared through package-level mutable globals in config (`runtimeContextValue`) and default runtime accessors are widely used as the de-facto cross-cutting control point (e.g., `goseg/config/config.go`, `goseg/accesspoint/accesspoint.go`).",
+        "Several packages expose default singleton seams (`DefaultBroadcastStateRuntime`, `DefaultEventRuntime`, `DefaultRuntime`) which are convenient for wiring but make startup ordering and ownership boundaries less explicit across modules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Reduce ad-hoc global singleton access by threading explicit startup/runtime context through module boundaries where feasible, while keeping seam points for tests."
+    },
+    "error_consistency": {
+      "evidence": [
+        "requestIdentityFromRequest() extracts the first X-Forwarded-For hop without trimming whitespace (`strings.Split(forwarded, \",\")[0]`), while the same value is compared later against a persisted token context in `AuthorizeUploadToken`.",
+        "The auth policy path that validates request context (`Policy.RequireRequestContext`) depends on exact string equality, so unnormalized header formatting can cause deterministic false negatives in request binding."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime boundary structs are used consistently across high-volume subsystems (`LlamaRuntime`, `MinioRuntime`, `broadcastLoopRuntime`) and provide testability value, but several call sites mostly pass-through to defaults without behavior-shaping logic.",
+        "The abstraction layering is coherent, yet some files still carry wide callback maps/large option structs, increasing local onboarding cost without an obvious reduction in behavior variance."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Consolidate the most common runtime-shim paths where behavior is unchanged, and reserve wider seam structs for places that truly need pluggability (e.g., transport/container boundaries only).",
+      "sub_axes": {
+        "abstraction_leverage": 88.4,
+        "indirection_cost": 76.9,
+        "interface_honesty": 87.2
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "Tests exist in many touched areas (accesspoint, broadcast, config, docker, click), but security-sensitive auth-context matching and several orchestration edge branches rely heavily on integration-level behavior that is harder to validate through unit tests alone.",
+        "The batch includes high-risk paths around token context checks and Docker lifecycle handoffs; those behaviors would benefit from targeted cross-module test cases even when unit tests are present."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Add focused contract tests for token-context validation and a narrow integration test for auth-token lifecycle + container-state update coupling paths."
+    },
+    "design_coherence": {
+      "evidence": [
+        "Most functions are purposeful and single-responsibility focused in the reviewed files, but several modules still have mixed orchestration/formatting/validation duties at boundaries that can obscure ownership at a glance.",
+        "Naming is generally consistent, with a few places where operational intent is spread across defaults + coordinators in adjacent files instead of one explicit orchestration boundary."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Tighten boundary ownership in a small set of orchestration modules (auth/container/broadcast) by separating command execution orchestration from policy validation and data transformation."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "auth_context_ip_whitespace",
+      "summary": "Normalize forwarded IP before context checks to prevent false token mismatches",
+      "related_files": [
+        "goseg/auth/tokens/tokens.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "requestIdentityFromRequest() uses strings.Split(r.Header.Get(\"X-Forwarded-For\"), \",\")[0] without strings.TrimSpace on the extracted IP.",
+        "When `auth.UploadAuthPolicy().RequireRequestContext` is enabled, `AuthorizeUploadToken` compares this raw IP directly against token metadata, so proxy-formatted header variants can fail auth context checks unexpectedly."
+      ],
+      "suggestion": "In requestIdentityFromRequest, trim whitespace on the selected hop (`strings.TrimSpace(strings.Split(...)[0])`) and optionally validate it with net.SplitHostPort/ParseIP normalization before comparison; add a regression test in `goseg/auth/tokens/tokens_test.go` for spaced X-Forwarded-For variants.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "request_context_normalization"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Request-context handling is tolerant in parsing but strict in equality comparison, creating avoidable auth false negatives under real-world proxy header formats.",
+      "Cross-cutting singleton/runtime seams are heavily optimized for flexibility, which increases coordination cost even when many call sites use defaults."
+    ],
+    "likely_symptoms": [
+      "auth_context_ip_whitespace",
+      "intermittent websocket/session auth rejection behind proxies with spaced X-Forwarded-For"
+    ],
+    "possible_false_positives": [
+      "No duplicate signature drift findings for `SetStartramConfig` were reissued because current snapshot already reflects a single signature in this revision."
+    ]
+  }
+}

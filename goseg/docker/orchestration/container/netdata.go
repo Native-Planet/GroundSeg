@@ -3,6 +3,7 @@ package container
 import (
 	"fmt"
 	"groundseg/docker/orchestration/internal/artifactwriter"
+	"groundseg/docker/registry"
 	"groundseg/internal/seams"
 	"groundseg/structs"
 	"os"
@@ -20,7 +21,7 @@ type NetdataRuntime struct {
 	UpdateContainerState      func(string, structs.ContainerState)
 	CreateDefaultFn           func() error
 	WriteNDConfFn             func() error
-	GetLatestContainerInfoFn  func(string) (map[string]string, error)
+	GetLatestContainerInfoFn  func(string) (registry.ImageDescriptor, error)
 	GetLatestContainerImageFn func(string) (string, error)
 	CopyFileToVolumeFn        func(string, string, string, string, func() (string, error)) error
 	VolumeExistsFn            func(string) (bool, error)
@@ -161,7 +162,7 @@ func NetdataContainerConfWithRuntime(rt NetdataRuntime) (container.Config, conta
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("lookup latest netdata metadata: %w", err)
 	}
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
+	desiredImage := containerInfo.Reference()
 	containerConfig = container.Config{
 		Image:        desiredImage,
 		ExposedPorts: nat.PortSet{"19999/tcp": struct{}{}},

@@ -16,7 +16,7 @@ import (
 // MessageProcessor handles inbound captive-control messages.
 type MessageProcessor func([]byte) error
 
-// WirelessSSIDs lists nearby SSIDs for a given device.
+// WirelessSSIDs lists nearby SSIDs for a given interface name.
 type WirelessSSIDs func(string) ([]string, error)
 
 // CaptiveTransportAdapter manages websocket clients and captive portal message flow.
@@ -79,12 +79,12 @@ func (a *CaptiveTransportAdapter) HandleAPI(w http.ResponseWriter, r *http.Reque
 }
 
 // BroadcastNetworks loops and pushes discovered SSIDs to all active clients.
-func (a *CaptiveTransportAdapter) BroadcastNetworks(dev string) {
+func (a *CaptiveTransportAdapter) BroadcastNetworks(interfaceName string) {
 	tick := time.Tick(2 * time.Second)
 	for {
 		select {
 		case <-tick:
-			networks, err := a.listWirelessSSIDs(dev)
+			networks, err := a.listWirelessSSIDs(interfaceName)
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("couldn't list wifi networks: %v", err))
 				networks = []string{}

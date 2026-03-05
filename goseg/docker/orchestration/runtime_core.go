@@ -14,18 +14,18 @@ type Runtime struct {
 	RuntimeStartramOps
 }
 
-func (runtime Runtime) UpdateConfig(opts ...config.ConfUpdateOption) error {
-	if runtime.UpdateConfTypedFn == nil {
+func (runtime Runtime) UpdateConfig(opts ...config.ConfigUpdateOption) error {
+	if runtime.UpdateConfigTypedFn == nil {
 		return errConfUpdateMissing
 	}
-	return runtime.UpdateConfTypedFn(opts...)
+	return runtime.UpdateConfigTypedFn(opts...)
 }
 
-func (runtime Runtime) WithWgOn(enabled bool) config.ConfUpdateOption {
-	if runtime.WithWgOnFn == nil {
+func (runtime Runtime) WithWgOn(enabled bool) config.ConfigUpdateOption {
+	if runtime.WithWireguardEnabledFn == nil {
 		return config.WithWgOn(enabled)
 	}
-	return runtime.WithWgOnFn(enabled)
+	return runtime.WithWireguardEnabledFn(enabled)
 }
 
 type StartupRuntime struct {
@@ -35,10 +35,11 @@ type StartupRuntime struct {
 }
 
 func (runtime StartupRuntime) Initialize() error {
-	if runtime.StartupBootstrapOps.Initialize == nil {
+	initialize := runtime.StartupBootstrapOps.initializeCallback()
+	if initialize == nil {
 		return nil
 	}
-	return runtime.StartupBootstrapOps.Initialize()
+	return initialize()
 }
 
 type RuntimeOption func(*Runtime)
@@ -90,12 +91,12 @@ func WithRuntimeDependencies(dependencies Runtime) RuntimeOption {
 
 func NewRuntimeWithDependencies(overrides Runtime) Runtime {
 	return Runtime{
-		RuntimeContainerOps:  seams.Merge(defaultRuntimeContainerOps(), overrides.RuntimeContainerOps),
-		RuntimeUrbitOps:      seams.Merge(defaultRuntimeUrbit(), overrides.RuntimeUrbitOps),
-		RuntimeSnapshotOps:   seams.Merge(defaultRuntimeSnapshot(), overrides.RuntimeSnapshotOps),
-		RuntimeHealthOps:     seams.Merge(defaultRuntimeHealthOps(), overrides.RuntimeHealthOps),
-		RuntimeStartupOps:    seams.Merge(defaultRuntimeStartupOps(), overrides.RuntimeStartupOps),
-		RuntimeStartramOps:   seams.Merge(defaultRuntimeStartramOps(), overrides.RuntimeStartramOps),
+		RuntimeContainerOps: seams.Merge(defaultRuntimeContainerOps(), overrides.RuntimeContainerOps),
+		RuntimeUrbitOps:     seams.Merge(defaultRuntimeUrbit(), overrides.RuntimeUrbitOps),
+		RuntimeSnapshotOps:  seams.Merge(defaultRuntimeSnapshot(), overrides.RuntimeSnapshotOps),
+		RuntimeHealthOps:    seams.Merge(defaultRuntimeHealthOps(), overrides.RuntimeHealthOps),
+		RuntimeStartupOps:   seams.Merge(defaultRuntimeStartupOps(), overrides.RuntimeStartupOps),
+		RuntimeStartramOps:  seams.Merge(defaultRuntimeStartramOps(), overrides.RuntimeStartramOps),
 	}
 }
 
@@ -138,11 +139,11 @@ func WithStartupRuntimeDependencies(dependencies StartupRuntime) StartupRuntimeO
 }
 
 func NewStartupRuntimeWithDependencies(overrides StartupRuntime) StartupRuntime {
-	return StartupRuntime{
+	return normalizeStartupRuntimeCallbacks(StartupRuntime{
 		StartupBootstrapOps: seams.Merge(defaultStartupBootstrap(), overrides.StartupBootstrapOps),
 		StartupImageOps:     seams.Merge(defaultStartupImage(), overrides.StartupImageOps),
 		StartupLoadOps:      seams.Merge(defaultStartupLoad(), overrides.StartupLoadOps),
-	}
+	})
 }
 
 func NewStartupRuntime(opts ...StartupRuntimeOption) StartupRuntime {
@@ -153,4 +154,104 @@ func NewStartupRuntime(opts ...StartupRuntimeOption) StartupRuntime {
 		}
 	}
 	return NewStartupRuntimeWithDependencies(overrides)
+}
+
+func normalizeStartupRuntimeCallbacks(runtime StartupRuntime) StartupRuntime {
+	runtime.StartupBootstrapOps = normalizeStartupBootstrapOps(runtime.StartupBootstrapOps)
+	runtime.StartupImageOps = normalizeStartupImageOps(runtime.StartupImageOps)
+	runtime.StartupLoadOps = normalizeStartupLoadOps(runtime.StartupLoadOps)
+	return runtime
+}
+
+func normalizeStartupBootstrapOps(ops StartupBootstrapOps) StartupBootstrapOps {
+	if ops.Initialize != nil {
+		ops.InitializeFn = ops.Initialize
+	}
+	if ops.InitializeFn == nil {
+		ops.InitializeFn = ops.Initialize
+	}
+	if ops.Initialize == nil {
+		ops.Initialize = ops.InitializeFn
+	}
+	return ops
+}
+
+func normalizeStartupImageOps(ops StartupImageOps) StartupImageOps {
+	if ops.GetLatestContainerInfo != nil {
+		ops.GetLatestContainerInfoFn = ops.GetLatestContainerInfo
+	}
+	if ops.GetLatestContainerInfoFn == nil {
+		ops.GetLatestContainerInfoFn = ops.GetLatestContainerInfo
+	}
+	if ops.GetLatestContainerInfo == nil {
+		ops.GetLatestContainerInfo = ops.GetLatestContainerInfoFn
+	}
+	if ops.PullImageIfNotExist != nil {
+		ops.PullImageIfNotExistFn = ops.PullImageIfNotExist
+	}
+	if ops.PullImageIfNotExistFn == nil {
+		ops.PullImageIfNotExistFn = ops.PullImageIfNotExist
+	}
+	if ops.PullImageIfNotExist == nil {
+		ops.PullImageIfNotExist = ops.PullImageIfNotExistFn
+	}
+	return ops
+}
+
+func normalizeStartupLoadOps(ops StartupLoadOps) StartupLoadOps {
+	if ops.LoadWireguard != nil {
+		ops.LoadWireguardFn = ops.LoadWireguard
+	}
+	if ops.LoadWireguardFn == nil {
+		ops.LoadWireguardFn = ops.LoadWireguard
+	}
+	if ops.LoadWireguard == nil {
+		ops.LoadWireguard = ops.LoadWireguardFn
+	}
+	if ops.LoadMC != nil {
+		ops.LoadMCFn = ops.LoadMC
+	}
+	if ops.LoadMCFn == nil {
+		ops.LoadMCFn = ops.LoadMC
+	}
+	if ops.LoadMC == nil {
+		ops.LoadMC = ops.LoadMCFn
+	}
+	if ops.LoadMinIOs != nil {
+		ops.LoadMinIOsFn = ops.LoadMinIOs
+	}
+	if ops.LoadMinIOsFn == nil {
+		ops.LoadMinIOsFn = ops.LoadMinIOs
+	}
+	if ops.LoadMinIOs == nil {
+		ops.LoadMinIOs = ops.LoadMinIOsFn
+	}
+	if ops.LoadNetdata != nil {
+		ops.LoadNetdataFn = ops.LoadNetdata
+	}
+	if ops.LoadNetdataFn == nil {
+		ops.LoadNetdataFn = ops.LoadNetdata
+	}
+	if ops.LoadNetdata == nil {
+		ops.LoadNetdata = ops.LoadNetdataFn
+	}
+	if ops.LoadUrbits != nil {
+		ops.LoadUrbitsFn = ops.LoadUrbits
+	}
+	if ops.LoadUrbitsFn == nil {
+		ops.LoadUrbitsFn = ops.LoadUrbits
+	}
+	if ops.LoadUrbits == nil {
+		ops.LoadUrbits = ops.LoadUrbitsFn
+	}
+	if ops.LoadLlama != nil {
+		ops.LoadLlamaFn = ops.LoadLlama
+	}
+	if ops.LoadLlamaFn == nil {
+		ops.LoadLlamaFn = ops.LoadLlama
+	}
+	if ops.LoadLlama == nil {
+		ops.LoadLlama = ops.LoadLlamaFn
+	}
+	return ops
 }

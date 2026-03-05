@@ -1,0 +1,1041 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_143812/results/batch-1.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Abstractions & Dependencies
+Batch dimensions: abstraction_fitness
+Batch rationale: abstraction hotspots (wrappers/interfaces/param bags), dep cycles
+
+Files assigned:
+- goseg/broadcast/state.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/loop_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/importer/importer.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/routines/version.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/config/config.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/system/wifi_runtime_api.go
+- goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 61.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules rely on process-wide default runtimes/singletons (for example `defaultBroadcastStateRuntime`, `defaultDockerSubsystemRuntime`, and `defaultEventRuntime`) while also exposing optional override paths, creating two competing dependency models.",
+        "Runtime dependency carriers are very wide and embed other runtime bundles (`workflowRuntime`, `importerRuntime`, `StartupRuntime`, `startBackgroundServicesRuntime`), so features consume broad capability bags instead of narrow domain ports.",
+        "Several wrappers only forward calls without adding policy or translation (for example `startDockerHealthLoopWithRuntime`, `stopDockerHealthLoopWithRuntime`, `defaultWorkflowRuntime`, `NewWiFiRuntime`, `BroadcastLoopWithRuntime`), increasing call depth without leverage."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 52.0,
+        "interface_honesty": 66.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "ambient_singleton_runtime_model",
+      "summary": "Ambient singleton runtimes and optional override injection coexist, creating hidden dependency direction and inconsistent abstraction boundaries.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/state.go` exposes shared mutable state via `defaultBroadcastStateRuntime` and `DefaultBroadcastStateRuntime()`.",
+        "`goseg/docker/orchestration/subsystem/subsystem_events.go` runs subsystem entrypoints against `defaultDockerSubsystemRuntime` by default (`StartDockerHealthLoops`, `StartDockerSubsystem`, `StopDockerHealthLoops`).",
+        "`goseg/docker/events/events.go` uses `sync.OnceValue(newEventRuntime)` for a process-wide broker while callers can also pass delegate brokers.",
+        "`goseg/shipworkflow/operations_runtime.go` rebuilds defaults through `defaultWorkflowRuntime()` and then merges optional overrides in `resolveWorkflowRuntime`, mixing ambient and explicit dependency ownership."
+      ],
+      "suggestion": "Choose one dependency model per subsystem: prefer constructor-created runtime instances passed through orchestration boundaries, and remove package-level default runtime state from feature paths (retain only compatibility shims at entrypoints).",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "ambient_global_state"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_dependency_bag_overreach",
+      "summary": "Large embedded runtime structs act as capability bags, obscuring true domain interfaces and increasing coupling.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`importerRuntime` embeds `importerStorageRuntime`, `importerUploadRuntime`, `importerProvisionRuntime`, and transitively embeds `RuntimeContainerOps`/`RuntimeVolumeOps`.",
+        "`workflowRuntime` embeds `RuntimeContainerOps`, `RuntimeUrbitOps`, and `RuntimeSnapshotOps` plus unrelated callbacks (transition emit, CNAME, bar exit, upload coordinator).",
+        "`goseg/docker/orchestration/runtime_ops.go` defines many broad ops groups that aggregate unrelated responsibilities (context, file, snapshot, image, wireguard, minio, timer, command, startup).",
+        "`startBackgroundServicesRuntime` contains a long list of service start callbacks, making a single runtime abstraction cover many independent subsystems."
+      ],
+      "suggestion": "Refactor to narrower per-use-case ports (for example transition publishing, ship persistence, container lifecycle, config snapshots) and pass only required ports into each workflow/service function.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "capability_bag_abstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_wrapper_indirection",
+      "summary": "Multiple pass-through wrappers add indirection layers without policy, validation, or translation.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`startDockerHealthLoopWithRuntime` and `stopDockerHealthLoopWithRuntime` simply delegate to internal functions with no added behavior.",
+        "`NewWiFiRuntime()` only returns `newWiFiRuntime()` unchanged.",
+        "`defaultWorkflowRuntime()` only returns `newWorkflowRuntime()` unchanged.",
+        "`BroadcastLoopWithRuntime()` just forwards to `StartBroadcastLoopWithRuntime()`."
+      ],
+      "suggestion": "Collapse no-op forwarding layers and keep only API boundaries that enforce contract checks or policy; where compatibility APIs are needed, centralize and document them as legacy shims.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "indirection_without_policy"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_snapshot_reach_through",
+      "summary": "Orchestration abstractions repeatedly reach through to global config snapshots/functions, leaking infrastructure concerns across layers.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go"
+      ],
+      "evidence": [
+        "`defaultRuntimeSnapshot()` and `runtimeContextOps()` bind orchestration runtime directly to global config functions (`config.*Snapshot`, `config.BasePath`, `config.DockerDir`, etc.).",
+        "`main.go` constructs C2C logic from `config.RuntimeContextSnapshot`, `config.ConnectivitySettingsSnapshot`, and other package-level config calls instead of a dedicated connectivity port.",
+        "`startup_orchestrator.go` default runtimes wire directly to many global config entrypoints (initialize, settings snapshots, conf event loop) inside orchestration code.",
+        "`subsystem_health.go` consumes snapshot functions from runtime state, but these are still sourced from global config seams by default, preserving ambient coupling."
+      ],
+      "suggestion": "Introduce explicit domain services (runtime context provider, connectivity policy provider, ship/health settings provider) and keep config package usage at composition roots only.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "ambient_global_state"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Incremental testability seams were added on top of existing package-level globals instead of replacing them, resulting in dual abstraction models.",
+      "Runtime structs evolved as additive callback registries, producing low-cohesion capability bags."
+    ],
+    "likely_symptoms": [
+      "pass_through_wrapper_indirection",
+      "config_snapshot_reach_through"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cb948-fc3d-7923-abf9-366d45e56c68
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Abstractions & Dependencies
+Batch dimensions: abstraction_fitness
+Batch rationale: abstraction hotspots (wrappers/interfaces/param bags), dep cycles
+
+Files assigned:
+- goseg/broadcast/state.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/loop_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/importer/importer.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/routines/version.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/config/config.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/system/wifi_runtime_api.go
+- goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’m reviewing batch 1 for `abstraction_fitness` only, using the blind packet constraints first and then inspecting the listed files for concrete, supportable abstraction/dependency defects. I’ll gather evidence from the packet and source files now, then return strict JSON only.
+exec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg --files goseg/broadcast goseg/rectify goseg/defaults goseg/leak goseg/docker goseg/system goseg/structs goseg/config goseg/importer goseg/accesspoint goseg/startuporchestrator goseg/routines goseg/shipworkflow goseg/handler/systemsvc goseg/main.go goseg/main_test.go' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+Total output lines: 5555
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "error_consistency",
+    "abstraction_fitness",
+    "design_coherence"
+  ],
+  "dimension_prompts": {
+    "error_consistency": {
+      "description": "Consistent error strategies, preserved context, predictable failure modes",
+      "look_for": [
+        "Mixed error strategies: some functions throw, others return null, others use Result types",
+        "Error context lost at boundaries: catch-and-rethrow without wrapping original",
+        "Inconsistent error types: custom error classes in some modules, bare strings in others",
+        "Silent error swallowing: catches that log but don't propagate or recover",
+        "Missing error handling on I/O boundaries (file, network, parse operations)"
+ succeeded in 51ms:
+goseg/leak/broadcast.go
+goseg/rectify/rectify.go
+goseg/importer/extract.go
+goseg/routines/system_test.go
+goseg/routines/pack_test.go
+goseg/defaults/scripts.go
+goseg/defaults/version_defaults.json
+goseg/defaults/version_test.go
+goseg/defaults/defaults.go
+goseg/defaults/scripts_test.go
+goseg/defaults/defaults_test.go
+goseg/defaults/version.go
+goseg/leak/broadcast_test.go
+goseg/leak/handler_dispatch_test.go
+goseg/leak/handler_protocol_test.go
+goseg/leak/leak.go
+goseg/main.go
+goseg/leak/handler_test.go
+goseg/leak/structs.go
+goseg/leak/handler_session.go
+codex
+I’ve loaded the packet and confirmed the scoring/format constraints. Next I’m scanning only the assigned files for abstraction symptoms: pass-through wrappers, wide config bags, and indirection chains with minimal policy.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/config.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/main.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/startuporchestrator/startup_orchestrator.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg -n "''^type |''^func |interface'"\\{|struct\\{|Config|Runtime|Ops|With|Default|Registry|Apply|Broadcast|Orchestrator\" goseg/broadcast/state.go goseg/rectify/rectify_services.go goseg/defaults/defaults.go goseg/broadcast/loop.go goseg/leak/broadcast.go goseg/docker/orchestration/wireguard.go goseg/system/wifi_runtime_methods.go goseg/broadcast/transitions.go goseg/structs/configs.go goseg/config/config_update_registry.go goseg/importer/importer.go goseg/startuporchestrator/startup_orchestrator.go goseg/main.go goseg/docker/orchestration/subsystem/subsystem_events.go goseg/routines/version.go goseg/routines/logstream/logs.go goseg/docker/orchestration/runtime_ops.go goseg/docker/events/events.go goseg/config/config.go goseg/docker/lifecycle/planner.go goseg/routines/system/system.go goseg/docker/network/network.go goseg/shipworkflow/operations_runtime.go goseg/docker/orchestration/subsystem/subsystem_health.go goseg/system/wifi_runtime_api.go goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"groundseg/defaults"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"groundseg/structs"
+)
+
+type StartramConfigSnapshot struct {
+	Value     structs.StartramRetrieve
+	UpdatedAt time.Time
+	Fresh     bool
+}
+
+type StartramSettings struct {
+ succeeded in 50ms:
+package main
+
+// NativePlanet GroundSeg: Go Edition (goseg)
+// 🄯 2023 ~nallux-dozryl & ~sitful-hatred
+// This is a Golang rewrite of GroundSeg that serves the v2 json
+// object via websocket.
+// The v2 rewrite decouples the frontend and backend, which makes it
+// straightforward to implement alternative backends.
+//
+// Under development: reimplementing all pyseg functionality.
+// Advantages:
+// - Really, really fast
+// - Event-driven
+// - First-class support for concurrent operations
+// - Very good golang Docker libraries
+
+import (
+	"context"
+	"embed"
+	"errors"
+ succeeded in 51ms:
+package startuporchestrator
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/config"
+	"groundseg/docker/orchestration/subsystem"
+	"groundseg/exporter"
+	"groundseg/handler/router"
+	groundSystem "groundseg/handler/system"
+	"groundseg/importer"
+	"groundseg/internal/seams"
+	"groundseg/leak"
+	"groundseg/logger"
+	"groundseg/rectify"
+	"groundseg/routines"
+	"groundseg/routines/logstream"
+	"groundseg/session"
+ succeeded in 51ms:
+Total output lines: 1619
+
+goseg/broadcast/transitions.go:9:type BroadcastStateRuntime = broadcastStateRuntime
+goseg/broadcast/transitions.go:11:// BroadcastTransition describes a single, typed transition applied to broadcast state.
+goseg/broadcast/transitions.go:13:type BroadcastTransition interface {
+goseg/broadcast/transitions.go:14:	Apply(*structs.AuthBroadcast) error
+goseg/broadcast/transitions.go:17:// ApplyBroadcastTransition applies a typed transition to the current broadcast state.
+goseg/broadcast/transitions.go:19:func ApplyBroadcastTransition(notify bool, transition BroadcastTransition, runtime ...*BroadcastStateRuntime) error {
+goseg/broadcast/transitions.go:26:	resolvedRuntime := resolveBroadcastStateTransitionRuntime(runtime...)
+goseg/broadcast/transitions.go:27:	if resolvedRuntime == nil {
+goseg/broadcast/transitions.go:30:	current := resolvedRuntime.GetState()
+goseg/broadcast/transitions.go:31:	if err := transition.Apply(&current); err != nil {
+goseg/broadcast/transitions.go:34:	resolvedRuntime.UpdateBroadcast(current)
+goseg/broadcast/transitions.go:38:	return resolvedRuntime.BroadcastToClients()
+goseg/broadcast/transitions.go:41:// ApplyBroadcastMutation applies an inline mutation to the current broadcast state.
+goseg/broadcast/transitions.go:42:func ApplyBroadcastMutation(notify bool, mutate func(state *structs.AuthBroadcast), runtime ...*BroadcastStateRuntime) error {
+goseg/broadcast/transitions.go:49:	resolvedRuntime := resolveBroadcastStateTransitionRuntime(runtime...)
+goseg/broadcast/transitions.go:50:	if resolvedRuntime == nil {
+goseg/broadcast/transitions.go:53:	current := resolvedRuntime.GetState()
+goseg/broadcast/transitions.go:55:	resolvedRuntime.UpdateBroadcast(current)
+codex
+I’ve identified strong hotspots around runtime structs and global-default resolution. I’m now reading the orchestration/workflow/runtime files in full to validate whether these are real abstraction defects versus intentional seams.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/orchestration/subsystem/subsystem_events.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,240p' goseg/system/wifi_runtime_api.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/shipworkflow/operations_runtime.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/orchestration/runtime_ops.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package subsystem
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"groundseg/dockerclient"
+	"groundseg/logger"
+	"groundseg/structs"
+	"groundseg/transition"
+
+	eventtypes "github.com/docker/docker/api/types/events"
+)
+
+type dockerSubsystemRuntime struct {
+	eventBus           chan structs.Event
+	dockerHealthLoopMu sync.Mutex
+	healthLoopRunning  bool
+ succeeded in 52ms:
+package system
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os/exec"
+	"strings"
+)
+
+var ErrWifiInterfaceNotFound = errors.New("wifi interface not found")
+
+type WiFiRuntimeService struct {
+	runtime wifiRuntime
+	state   *wifiRuntimeState
+}
+
+func resolveWiFiRuntime(overrides ...wifiRuntime) wifiRuntime {
+	if len(overrides) > 0 {
+		return NewWiFiRuntimeWith(overrides[0])
+ succeeded in 52ms:
+package shipworkflow
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker/events"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/internal/seams"
+	"groundseg/internal/shipstatus"
+	"groundseg/internal/transitionlifecycle"
+	"groundseg/lifecycle"
+	"groundseg/structs"
+	"groundseg/transition"
+	"net"
+	"strings"
+	"time"
+
+ succeeded in 52ms:
+package orchestration
+
+import (
+	"errors"
+	"fmt"
+
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker/network"
+	"groundseg/docker/orchestration/container"
+	"groundseg/docker/registry"
+	"groundseg/startram"
+	"groundseg/structs"
+	"os"
+	"time"
+)
+
+type RuntimeContainerOps struct {
+	StartContainerFn            func(name string, ctype string) (structs.ContainerState, error) `runtime:"importer-provision,workflow,rectify" runtime_name:"start container callback"`
+	StopContainerByNameFn       func(name string) error                                         `runtime:"workflow" runtime_name:"stop container callback"`
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/importer/importer.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/rectify/rectify_services.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/events/events.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/routines/system/system.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package importer
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/auth/tokens"
+	"groundseg/click/acme"
+	"groundseg/config"
+	"groundseg/docker/events"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/driveresolver"
+	"groundseg/internal/resource"
+	"groundseg/internal/seams"
+	"groundseg/lifecycle"
+	"groundseg/logger"
+	workflowOrchestration "groundseg/orchestration"
+	"groundseg/shipcleanup"
+	"groundseg/shipcreator"
+ succeeded in 50ms:
+package system
+
+import (
+	"context"
+	"time"
+
+	"groundseg/routines/backup"
+	"groundseg/routines/chop"
+)
+
+var (
+	remoteBackupSleep = time.Sleep
+	localBackupSleep  = time.Sleep
+	sleepForChop      = time.Sleep
+)
+
+func StartBackupRoutines() {
+	go TlonBackupRemote()
+	go TlonBackupLocal()
+}
+ succeeded in 50ms:
+package events
+
+import (
+	"context"
+	"errors"
+	"sync"
+
+	"groundseg/structs"
+)
+
+var (
+	ErrTransitionPublishTimeout = errors.New("transition publish cancelled before enqueue")
+	ErrTransitionBusFull        = errors.New("transition event bus is full")
+	errTransitionBusNotDefined  = errors.New("transition broker is not defined")
+)
+
+var defaultEventRuntime = sync.OnceValue(newEventRuntime)
+
+type EventRuntime struct {
+	delegate                EventBroker
+ succeeded in 50ms:
+package rectify
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+
+	"groundseg/config"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/transition"
+
+	"go.uber.org/zap"
+)
+
+type UrbitTransitionApplier struct{}
+
+func (applier UrbitTransitionApplier) Apply(current *structs.AuthBroadcast, event structs.UrbitTransition) error {
+	urbitStruct, exists := current.Urbits[event.Patp]
+	if !exists {
+codex
+I’m now validating likely findings in `broadcast`, `wifi`, and docker subsystem files so each issue has direct evidence across at least two files and reflects structural root causes rather than one-off symptoms.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/broadcast/transitions.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/broadcast/loop.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/broadcast/state.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/system/wifi_runtime_methods.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package system
+
+import (
+	"fmt"
+	"os/exec"
+	"strings"
+	"time"
+
+	"groundseg/internal/resource"
+	"groundseg/internal/seams"
+
+	"github.com/mdlayher/wifi"
+	"go.uber.org/zap"
+)
+
+type wifiRuntime struct {
+	ExecCommand        func(string, ...string) *exec.Cmd
+	RunCommand         func(string, ...string) (string, error)
+	RunNmcliFn         func(args ...string) (string, error)
+	NewWifiClient      func() (*wifi.Client, error)
+ succeeded in 52ms:
+package broadcast
+
+import (
+	"fmt"
+
+	"groundseg/structs"
+)
+
+type BroadcastStateRuntime = broadcastStateRuntime
+
+// BroadcastTransition describes a single, typed transition applied to broadcast state.
+// Mutations must be scoped to the transition contract implemented by the transition type.
+type BroadcastTransition interface {
+	Apply(*structs.AuthBroadcast) error
+}
+
+// ApplyBroadcastTransition applies a typed transition to the current broadcast state.
+// If `notify` is true, it refreshes connected websocket clients afterward.
+func ApplyBroadcastTransition(notify bool, transition BroadcastTransition, runtime ...*BroadcastStateRuntime) error {
+	if transition == nil {
+ succeeded in 52ms:
+package broadcast
+
+import (
+	"fmt"
+	"groundseg/auth"
+	"groundseg/leak"
+	"groundseg/structs"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var broadcastInterval = 1 * time.Second
+
+type broadcastLoopRuntime struct {
+	stateRuntime           *broadcastStateRuntime
+	getClientManagerFn     func() *structs.ClientManager
+	getLickStatusesFn      func() map[string]leak.LickStatus
+	constructSystemInfoFn  func() structs.System
+ succeeded in 52ms:
+package broadcast
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"groundseg/broadcast/collectors"
+	"groundseg/structs"
+	"groundseg/transition"
+	"maps"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	defaultBroadcastStateRuntime = NewBroadcastStateRuntime()
+)
+
+codex
+I have enough signal on the runtime-seam pattern; I’m doing a final pass through `wireguard`, `artifactwriter`, `network`, and planner files to confirm impact scope and avoid over-reporting intentional adapters.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/orchestration/wireguard.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/lifecycle/planner.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/network/network.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package orchestration
+
+import (
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"groundseg/docker/orchestration/container"
+	"groundseg/docker/orchestration/internal/artifactwriter"
+	"groundseg/internal/seams"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	dockerc "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"go.uber.org/zap"
+)
+
+func (rt WireguardRuntime) LoadWireguard() error {
+ succeeded in 52ms:
+package lifecycle
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
+	"groundseg/structs"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
+	"go.uber.org/zap"
+)
+
+type containerPlan struct {
+	Name         string
+	Type         string
+	Config       container.Config
+	HostConfig   container.HostConfig
+ succeeded in 52ms:
+package network
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	dockernetwork "github.com/docker/docker/api/types/network"
+	volumetypes "github.com/docker/docker/api/types/volume"
+	"go.uber.org/zap"
+
+	"groundseg/dockerclient"
+	"groundseg/internal/seams"
+
+	"github.com/docker/docker/client"
+ succeeded in 50ms:
+package artifactwriter
+
+import (
+	"archive/tar"
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+type VolumeOps struct {
+	VolumeExistsFn func(string) (bool, error)
+	CreateVolumeFn func(string) error
+}
+
+type VolumeInitializationPlan struct {
+	ops         VolumeOps
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"Snapshot|config\\.|RuntimeContextSnapshot|default.*Runtime|NewRuntime|WithRuntime|resolve.*Runtime\" goseg/startuporchestrator/startup_orchestrator.go goseg/main.go goseg/docker/orchestration/subsystem/subsystem_health.go goseg/routines/version.go goseg/docker/orchestration/runtime_ops.go goseg/config/config_update_registry.go goseg/system/wifi_runtime_api.go goseg/docker/events/events.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/docker/events/events.go:17:var defaultEventRuntime = sync.OnceValue(newEventRuntime)
+goseg/docker/events/events.go:35:	return defaultEventRuntime()
+goseg/docker/orchestration/runtime_ops.go:32:type RuntimeSnapshotOps struct {
+goseg/docker/orchestration/runtime_ops.go:33:	StartramSettingsSnapshotFn    func() config.StartramSettings
+goseg/docker/orchestration/runtime_ops.go:34:	PenpaiSettingsSnapshotFn      func() config.PenpaiSettings
+goseg/docker/orchestration/runtime_ops.go:35:	ShipSettingsSnapshotFn        func() config.ShipSettings        `runtime:"workflow,rectify" runtime_name:"ship settings snapshot callback"`
+goseg/docker/orchestration/runtime_ops.go:36:	ShipRuntimeSettingsSnapshotFn func() config.ShipRuntimeSettings `runtime:"workflow,rectify" runtime_name:"ship runtime settings snapshot callback"`
+goseg/docker/orchestration/runtime_ops.go:38:	Check502SettingsSnapshotFn    func() config.Check502Settings    `runtime:"workflow,rectify" runtime_name:"check 502 snapshot callback"`
+goseg/docker/orchestration/runtime_ops.go:42:	HealthCheck502SettingsSnapshotFn func() config.Check502Settings
+goseg/docker/orchestration/runtime_ops.go:43:	HealthShipSettingsSnapshotFn     func() config.ShipSettings
+goseg/docker/orchestration/runtime_ops.go:55:	UpdateConfTypedFn func(...config.ConfUpdateOption) error `runtime:"rectify" runtime_name:"update config callback"`
+goseg/docker/orchestration/runtime_ops.go:56:	WithWgOnFn        func(bool) config.ConfUpdateOption
+goseg/docker/orchestration/runtime_ops.go:77:type UrbitConfigSection = config.UrbitConfigSection
+goseg/docker/orchestration/runtime_ops.go:80:	UrbitConfigSectionRuntime  = config.UrbitConfigSectionRuntime
+goseg/docker/orchestration/runtime_ops.go:81:	UrbitConfigSectionNetwork  = config.UrbitConfigSectionNetwork
+goseg/docker/orchestration/runtime_ops.go:82:	UrbitConfigSectionSchedule = config.UrbitConfigSectionSchedule
+goseg/docker/orchestration/runtime_ops.go:83:	UrbitConfigSectionFeature  = config.UrbitConfigSectionFeature
+goseg/docker/orchestration/runtime_ops.go:84:	UrbitConfigSectionWeb      = config.UrbitConfigSectionWeb
+goseg/docker/orchestration/runtime_ops.go:85:	UrbitConfigSectionBackup   = config.UrbitConfigSectionBackup
+goseg/docker/orchestration/runtime_ops.go:163:	snapshotOps  RuntimeSnapshotOps
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '460,620p' goseg/startuporchestrator/startup_orchestrator.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+		requiredGroups = append(requiredGroups, "startup-background-service-startram")
+	}
+	if err := seams.NewCallbackRequirementsWithGroups(requiredGroups...).ValidateCallbacks(runtime, "start background services runtime"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (runtime startBackgroundServicesRuntime) startupServiceSpecs(startramWgRegistered bool) []backgroundServiceSpec {
+	if runtime.overrideServiceSpecsFn != nil {
+		return runtime.overrideServiceSpecsFn(startramWgRegistered)
+	}
+	specs := make([]backgroundServiceSpec, 0, len(startBackgroundServiceSpecs))
+	for _, serviceSpec := range startupServiceSpecsForMode(startramWgRegistered) {
+		startFn := serviceSpec.startFn(runtime)
+		specs = append(specs, backgroundServiceSpec{
+			name:     string(serviceSpec.name),
+			startFn:  startFn,
+			failFast: serviceSpec.failFast,
+		})
+codex
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 61.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules rely on process-wide default runtimes/singletons (for example `defaultBroadcastStateRuntime`, `defaultDockerSubsystemRuntime`, and `defaultEventRuntime`) while also exposing optional override paths, creating two competing dependency models.",
+        "Runtime dependency carriers are very wide and embed other runtime bundles (`workflowRuntime`, `importerRuntime`, `StartupRuntime`, `startBackgroundServicesRuntime`), so features consume broad capability bags instead of narrow domain ports.",
+        "Several wrappers only forward calls without adding policy or translation (for example `startDockerHealthLoopWithRuntime`, `stopDockerHealthLoopWithRuntime`, `defaultWorkflowRuntime`, `NewWiFiRuntime`, `BroadcastLoopWithRuntime`), increasing call depth without leverage."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 52.0,
+        "interface_honesty": 66.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "ambient_singleton_runtime_model",
+      "summary": "Ambient singleton runtimes and optional override injection coexist, creating hidden dependency direction and inconsistent abstraction boundaries.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/state.go` exposes shared mutable state via `defaultBroadcastStateRuntime` and `DefaultBroadcastStateRuntime()`.",
+        "`goseg/docker/orchestration/subsystem/subsystem_events.go` runs subsystem entrypoints against `defaultDockerSubsystemRuntime` by default (`StartDockerHealthLoops`, `StartDockerSubsystem`, `StopDockerHealthLoops`).",
+        "`goseg/docker/events/events.go` uses `sync.OnceValue(newEventRuntime)` for a process-wide broker while callers can also pass delegate brokers.",
+        "`goseg/shipworkflow/operations_runtime.go` rebuilds defaults through `defaultWorkflowRuntime()` and then merges optional overrides in `resolveWorkflowRuntime`, mixing ambient and explicit dependency ownership."
+      ],
+      "suggestion": "Choose one dependency model per subsystem: prefer constructor-created runtime instances passed through orchestration boundaries, and remove package-level default runtime state from feature paths (retain only compatibility shims at entrypoints).",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "ambient_global_state"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_dependency_bag_overreach",
+      "summary": "Large embedded runtime structs act as capability bags, obscuring true domain interfaces and increasing coupling.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`importerRuntime` embeds `importerStorageRuntime`, `importerUploadRuntime`, `importerProvisionRuntime`, and transitively embeds `RuntimeContainerOps`/`RuntimeVolumeOps`.",
+        "`workflowRuntime` embeds `RuntimeContainerOps`, `RuntimeUrbitOps`, and `RuntimeSnapshotOps` plus unrelated callbacks (transition emit, CNAME, bar exit, upload coordinator).",
+        "`goseg/docker/orchestration/runtime_ops.go` defines many broad ops groups that aggregate unrelated responsibilities (context, file, snapshot, image, wireguard, minio, timer, command, startup).",
+        "`startBackgroundServicesRuntime` contains a long list of service start callbacks, making a single runtime abstraction cover many independent subsystems."
+      ],
+      "suggestion": "Refactor to narrower per-use-case ports (for example transition publishing, ship persistence, container lifecycle, config snapshots) and pass only required ports into each workflow/service function.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "capability_bag_abstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_wrapper_indirection",
+      "summary": "Multiple pass-through wrappers add indirection layers without policy, validation, or translation.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`startDockerHealthLoopWithRuntime` and `stopDockerHealthLoopWithRuntime` simply delegate to internal functions with no added behavior.",
+        "`NewWiFiRuntime()` only returns `newWiFiRuntime()` unchanged.",
+        "`defaultWorkflowRuntime()` only returns `newWorkflowRuntime()` unchanged.",
+        "`BroadcastLoopWithRuntime()` just forwards to `StartBroadcastLoopWithRuntime()`."
+      ],
+      "suggestion": "Collapse no-op forwarding layers and keep only API boundaries that enforce contract checks or policy; where compatibility APIs are needed, centralize and document them as legacy shims.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "indirection_without_policy"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_snapshot_reach_through",
+      "summary": "Orchestration abstractions repeatedly reach through to global config snapshots/functions, leaking infrastructure concerns across layers.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go"
+      ],
+      "evidence": [
+        "`defaultRuntimeSnapshot()` and `runtimeContextOps()` bind orchestration runtime directly to global config functions (`config.*Snapshot`, `config.BasePath`, `config.DockerDir`, etc.).",
+        "`main.go` constructs C2C logic from `config.RuntimeContextSnapshot`, `config.ConnectivitySettingsSnapshot`, and other package-level config calls instead of a dedicated connectivity port.",
+        "`startup_orchestrator.go` default runtimes wire directly to many global config entrypoints (initialize, settings snapshots, conf event loop) inside orchestration code.",
+        "`subsystem_health.go` consumes snapshot functions from runtime state, but these are still sourced from global config seams by default, preserving ambient coupling."
+      ],
+      "suggestion": "Introduce explicit domain services (runtime context provider, connectivity policy provider, ship/health settings provider) and keep config package usage at composition roots only.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "ambient_global_state"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Incremental testability seams were added on top of existing package-level globals instead of replacing them, resulting in dual abstraction models.",
+      "Runtime structs evolved as additive callback registries, producing low-cohesion capability bags."
+    ],
+    "likely_symptoms": [
+      "pass_through_wrapper_indirection",
+      "config_snapshot_reach_through"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+76,160
+

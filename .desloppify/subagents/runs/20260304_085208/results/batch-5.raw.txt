@@ -1,0 +1,71 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 83.7
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/main.go ends the startup path with `os.Exit(1)` after logging `runBootstrapSubsystems` failure, which bypasses normal deferred cleanup/signaling flow despite returning a first-class error from `runBootstrapSubsystems`.",
+        "goseg/main.go uses a different end-state strategy for I/O/resource failures in backgrounded workflows compared to other files that capture close/teardown errors (e.g., `goseg/importer/importer.go`, `goseg/system/wifi_runtime_methods.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Error handling is inconsistent: one path exits the process immediately while similar teardown/error points elsewhere preserve and propagate cleanup errors. Normalizing fatal startup/error paths with explicit shutdown/cleanup hooks would make behavior more predictable."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "startup_exit_bypasses_cleanup",
+      "summary": "Top-level startup uses immediate process exit instead of propagating failure through shutdown/error pathways.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "goseg/main.go logs the bootstrap error and then calls `os.Exit(1)` in `main` (around line 576).",
+        "goseg/main.go already has `main()`-scope context lifecycle setup (`signal.NotifyContext`, `defer cancel()`), but `os.Exit` skips deferred cleanup and can strand in-flight background resources."
+      ],
+      "suggestion": "Replace hard exit with a consistent shutdown path: return/route startup failure into a single terminator that first cancels context, stops background loops, closes resources, and then exits with status, so failures are handled uniformly across startup failure scenarios.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "deferred_close_error_ignored",
+      "summary": "Resource close errors in listener cleanup are silently dropped instead of being preserved or surfaced.",
+      "related_files": [
+        "goseg/leak/broadcast.go",
+        "goseg/importer/importer.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "goseg/leak/broadcast.go cleanup block calls `conn.Close()` directly without handling the returned error.",
+        "goseg/importer/importer.go and goseg/system/wifi_runtime_methods.go use close/error-join helpers to retain and surface close failures when closing I/O resources."
+      ],
+      "suggestion": "Wrap `conn.Close()` with the same close-error pattern used elsewhere (e.g., `resource.JoinCloseError`) or log/propagate closure failure explicitly, so leak listener shutdown failures are not silently hidden.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_file",
+      "root_cause_cluster": "io-close-hygiene"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Inconsistent fatal/error and cleanup contracts between startup and long-lived runtime components",
+      "Uneven discipline around I/O close-error handling in cleanup paths"
+    ],
+    "likely_symptoms": [
+      "startup path exits without predictable resource shutdown",
+      "hard-to-detect teardown regressions in connection handling"
+    ],
+    "possible_false_positives": [
+      "The main-process exit strategy may be intentionally minimal at binary top-level; confirm whether deferred cleanup is intentionally non-critical before refactor.",
+      "Some background services may intentionally treat connection-close errors as non-actionable telemetry"
+    ]
+  }
+}

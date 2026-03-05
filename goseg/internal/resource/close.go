@@ -20,4 +20,3 @@ func JoinCloseError(err error, closer io.Closer, context string) error {
 	}
 	return errors.Join(err, wrapped)
 }
-

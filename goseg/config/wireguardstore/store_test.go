@@ -17,7 +17,7 @@ func TestFileStoreRoundTripsWireguardConfig(t *testing.T) {
 	if err := store.EnsureDir(filepath.Dir(path)); err != nil {
 		t.Fatalf("EnsureDir failed: %v", err)
 	}
-	if err := store.Save(path, defaults.WgConfig); err != nil {
+	if err := store.Save(path, defaults.DefaultWgConfig()); err != nil {
 		t.Fatalf("Save failed: %v", err)
 	}
 
@@ -25,8 +25,8 @@ func TestFileStoreRoundTripsWireguardConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
-	if !reflect.DeepEqual(got, defaults.WgConfig) {
-		t.Fatalf("unexpected config: got %+v want %+v", got, defaults.WgConfig)
+	if !reflect.DeepEqual(got, defaults.DefaultWgConfig()) {
+		t.Fatalf("unexpected config: got %+v want %+v", got, defaults.DefaultWgConfig())
 	}
 }
 

@@ -1,0 +1,81 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 88.0,
+    "test_strategy": 86.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`protocol_contracts.go` derives `ActionToken` by splitting `ContractID` strings (`actionTokenFromContractID`), coupling action identity to a specific dotted-format convention instead of explicit contract metadata.",
+        "The derived coupling spans contract declaration, namespace binding, and action contract usage, so a contract identifier format change creates cross-module breakage risk without explicit type-level intent."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Introduce explicit, non-derived action-token constants and explicit catalog builders so the contract encoding format is not reused as an implicit parsing contract across modules."
+    },
+    "test_strategy": {
+      "evidence": [
+        "The batch docs list strict contract-gate expectations in `README.md`, but the contract surfaces here (`protocol_contracts.go`/`startram_contracts.go`) expose non-trivial mapping logic (`actionTokenFromContractID`) without in-scope regression assertions in this area.",
+        "Governance text references path-aware checks and test scripts, but mapping invariants for token extraction/metadata linkage are not represented as executable local assertions on these files themselves."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Add focused contract tests for catalog integrity (ID, namespace, action token, and metadata binding) adjacent to the contract definitions so governance is enforced by compile-time and unit-test signals, not only CI scripts."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "implicit_contract_id_parsing",
+      "summary": "Action token is computed by parsing contract IDs, coupling runtime semantics to string format",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`actionTokenFromContractID` splits `ContractID` by \".\" and uses the last segment as the action token.",
+        "This makes token identity depend on string encoding convention rather than explicit contract API declarations."
+      ],
+      "suggestion": "Replace implicit parsing with explicit per-contract `ActionToken` constants and wire `contractCatalogSpec` entries to those constants directly. Keep string parsing only in migration/compatibility adapter code with hard failure when format assumptions change.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_format_coupling"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract_mapping_not_unit_guarded",
+      "summary": "Protocol/StarTram contract mappings lack local regression tests for catalog consistency",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines catalog specs and derived token extraction logic, but no inline assertions or test-adjacent coverage are visible in the reviewed contract surfaces.",
+        "`README.md` documents strict contract-gate expectations but that expectation is not mirrored as explicit tests tied to these mapping functions."
+      ],
+      "suggestion": "Add `protocol_contracts_test.go` and `startram_contracts_test.go` with table-driven tests for ID, namespace, action token, and descriptor/metadata wiring, plus a regression test that rejects malformed or unexpected contract ID shapes.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_mapping_test_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Encoded contract identifiers are being used as both semantic IDs and parsing inputs without explicit schema-level ownership.",
+      "Contract governance depends on external CI scripts more than local executable invariants at definition sites."
+    ],
+    "likely_symptoms": [
+      "implicit_contract_id_parsing",
+      "contract_mapping_not_unit_guarded"
+    ],
+    "possible_false_positives": [
+      "The absence of in-file tests in the reviewed files could be interpreted as scope separation if tests are intentionally in dedicated `contracts_test.go`; this batch only reviewed a constrained file subset."
+    ]
+  }
+}

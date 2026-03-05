@@ -56,8 +56,8 @@ func WithBroadcastLoadStartramRegions(runtimeFn func() error) BroadcastRuntimeOp
 
 func defaultBroadcastRuntime() broadcastRuntime {
 	return broadcastRuntime{
-		bootstrapFn:           func() error { return bootstrapBroadcastState() },
-		loadStartramRegionsFn: func() error { return LoadStartramRegionsWithRuntime() },
+		bootstrapFn:           func() error { return bootstrapBroadcastStateWithRuntime(DefaultBroadcastStateRuntime()) },
+		loadStartramRegionsFn: func() error { return LoadStartramRegionsWithRuntimeState(DefaultBroadcastStateRuntime()) },
 	}
 }
 

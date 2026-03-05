@@ -2,10 +2,11 @@ package collectors
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/transition"
+
+	"go.uber.org/zap"
 )
 
 func LoadStartramRegions() (map[string]structs.StartramRegion, error) {

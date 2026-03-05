@@ -262,13 +262,13 @@ type WsSupportAction struct {
 	Penpai      bool     `json:"penpai"`
 }
 
-type WsC2cPayload struct {
+type WsC2CPayload struct {
 	ID      string      `json:"id"`
 	Type    string      `json:"type"` // "c2c"
-	Payload WsC2cAction `json:"payload"`
+	Payload WsC2CAction `json:"payload"`
 }
 
-type WsC2cAction struct {
+type WsC2CAction struct {
 	Type     string `json:"type"`
 	Action   string `json:"action"`
 	SSID     string `json:"ssid"`

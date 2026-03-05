@@ -1,0 +1,94 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 2,
+  "assessments": {
+    "package_organization": 72.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles reports `goseg/config/` at 41 files and `goseg/docker/orchestration/` at 34 files, both above the >10 mixed-concern overload signal in the review rubric.",
+        "`goseg/config/bootstrap.go` handles process bootstrap/runtime path/debug initialization while `goseg/config/config.go` exposes broad domain snapshots and runtime setters; this mixes startup/process-context ownership with config domain APIs in one top-level package.",
+        "`goseg/shipworkflow/newship_service.go` combines websocket ingress action routing, drive resolution, async workflow kickoff, and patp lexical validation tables, while related responsibilities already exist in dedicated subpackages (`shipworkflow/provisioning`, `shipworkflow/adapters`, `shipworkflow/lifecyclewait`).",
+        "`goseg/docker/orchestration/container_bridge.go` and `container_config.go` implement container runtime composition/dispatch in the crowded orchestration root even though a dedicated `goseg/docker/orchestration/container/` package exists for container-specific runtime/config concerns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "config_root_mixes_bootstrap_and_domain_api",
+      "summary": "The top-level config package conflates process bootstrap context with domain config surfaces.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/runtimecontext/context.go"
+      ],
+      "evidence": [
+        "`bootstrap.go` owns process startup concerns (`Initialize`, debug/path setup, base-path IO setup), while `config.go` exposes broad domain snapshots and setters for many features.",
+        "The packet flags `goseg/config/` as a flat 41-file directory; these files show two distinct ownership boundaries (startup/runtime context vs domain config APIs) co-located.",
+        "`config.go` already forwards runtime concerns to subpackages (`runtimecontext`, `startramstate`), indicating the top-level package is acting as an overloaded facade."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/config/bootstrap/` (or `goseg/startupdeps/configbootstrap/`) for `Initialize`/startup wiring and move `bootstrap.go` there; (2) keep `goseg/config/` focused on domain config read/write/snapshots and reduce re-export forwarding in `config.go`; (3) keep pure runtime context APIs in `goseg/config/runtimecontext/` and import them directly from bootstrap code. Move order: `bootstrap.go` first, then update callers, then trim bridge functions in `config.go`. Import-update/validation commands: `goimports -w goseg/config/bootstrap/*.go goseg/config/*.go`; `go test ./goseg/config/... ./goseg/startupdeps/...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overloaded_top_level_packages"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "newship_ingress_and_validation_not_isolated",
+      "summary": "New-ship ingress, validation, and orchestration kickoff are packed into a single root shipworkflow file.",
+      "related_files": [
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/provisioning/newship.go"
+      ],
+      "evidence": [
+        "`newship_service.go` handles action parsing (`HandleNewShip`), lifecycle UI event emission, drive resolution calls, async provisioning kickoff, and full patp lexical validation constants.",
+        "The same domain already has dedicated subpackages (`shipworkflow/provisioning`, `shipworkflow/adapters`, `shipworkflow/lifecyclewait`), but ingress/validation remains in the crowded root package (`goseg/shipworkflow/` has 51 files).",
+        "`newship.go` wires provisioning runtime dependencies while `newship_service.go` performs request-level parsing/validation; these are adjacent but separate concerns that should sit behind clearer folder boundaries."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/shipworkflow/newship/ingress.go` for message/action handling and `goseg/shipworkflow/newship/validation.go` for patp/key validation; (2) keep provisioning execution in `goseg/shipworkflow/provisioning/`; (3) expose a small coordinator API from `shipworkflow/newship` that root `shipworkflow` calls. Move order: extract validation first, then ingress handlers, then update `newship.go` wiring imports. Import-update/validation commands: `goimports -w goseg/shipworkflow/newship/*.go goseg/shipworkflow/*.go`; `go test ./goseg/shipworkflow/...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overloaded_top_level_packages"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "orchestration_root_contains_container_specific_bridge_logic",
+      "summary": "Container-specific runtime bridge/dispatch code is misplaced in orchestration root instead of container-focused package space.",
+      "related_files": [
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go",
+        "goseg/docker/orchestration/container/container_runtime.go"
+      ],
+      "evidence": [
+        "`container_bridge.go` builds `container.LlamaRuntime`, `container.NetdataRuntime`, and `container.MinioRuntime` and merges seams, but lives in `docker/orchestration/` root.",
+        "`container_config.go` maintains container-type dispatch and builder map in the same crowded root package (`goseg/docker/orchestration/` has 34 files), while `goseg/docker/orchestration/container/` already exists for container-specific logic.",
+        "The current placement increases cross-file navigation cost for a single concern (container runtime/config assembly) and blurs boundaries between orchestration facade APIs and container implementation assembly."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/docker/orchestration/internal/containerbridge/` (or extend `goseg/docker/orchestration/container/` with builder files) and move `container_bridge.go`; (2) move `container_config.go` dispatch map beside builder implementations; (3) keep root orchestration package exposing only high-level entrypoints delegating to the moved package. Move order: bridge first, then dispatch map, then root wrapper functions. Import-update/validation commands: `goimports -w goseg/docker/orchestration/**/*.go`; `go test ./goseg/docker/orchestration/...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overloaded_top_level_packages"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "High-file-count top-level packages are carrying both facade APIs and implementation assembly details instead of pushing internals into purpose-scoped subfolders.",
+      "Incremental additions favored colocating new workflow/container/config logic in existing root packages, creating boundary drift despite presence of related subpackages."
+    ],
+    "likely_symptoms": [
+      "config_root_mixes_bootstrap_and_domain_api",
+      "newship_ingress_and_validation_not_isolated",
+      "orchestration_root_contains_container_specific_bridge_logic"
+    ],
+    "possible_false_positives": []
+  }
+}

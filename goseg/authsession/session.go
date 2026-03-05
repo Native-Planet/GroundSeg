@@ -38,7 +38,6 @@ func defaultSessionBoundary() SessionBoundary {
 	}
 }
 
-
 func AddToAuthMapWithBoundary(boundary SessionBoundary, conn *websocket.Conn, token map[string]string, authed bool) error {
 	if boundary == nil {
 		boundary = defaultSessionBoundary()
@@ -127,7 +126,7 @@ func persistAuthorizedSession(tokenID, hash, created string) error {
 		Hash:    hash,
 		Created: created,
 	}
-	if err := config.UpdateConfTyped(config.WithAuthorizedSession(tokenID, sessionRecord)); err != nil {
+	if err := config.UpdateConfigTyped(config.WithAuthorizedSession(tokenID, sessionRecord)); err != nil {
 		return fmt.Errorf("adding authorized session %s: %w", tokenID, err)
 	}
 	return nil
@@ -138,7 +137,7 @@ func persistUnauthorizedSession(tokenID, hash, created string) error {
 		Hash:    hash,
 		Created: created,
 	}
-	if err := config.UpdateConfTyped(config.WithUnauthorizedSession(tokenID, sessionRecord)); err != nil {
+	if err := config.UpdateConfigTyped(config.WithUnauthorizedSession(tokenID, sessionRecord)); err != nil {
 		return fmt.Errorf("adding unauthorized session %s: %w", tokenID, err)
 	}
 	return nil

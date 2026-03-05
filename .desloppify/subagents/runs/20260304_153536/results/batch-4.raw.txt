@@ -1,0 +1,116 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 4,
+  "assessments": {
+    "error_consistency": 79.0,
+    "naming_quality": 76.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/shipworkflow/urbit_operations_runtime.go:119 calls broadcast.BroadcastToClients() and drops its returned error, while nearby transition paths wrap/propagate errors (for example schedulePack at lines 514-520).",
+        "goseg/docker/orchestration/runtime_ops.go mixes reusable sentinel errors (errConfUpdateMissing at line 139) with ad-hoc fmt.Errorf(\"...not configured\") closures (lines 251-256), reducing predictable error classification compared with sentinel-style errors in other runtime modules (for example errEventBusFull in goseg/docker/orchestration/subsystem/subsystem_events.go:34 and errSchedulePackBusFull in goseg/broadcast/state.go:114)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "naming_quality": {
+      "evidence": [
+        "Acronym casing diverges for the same domain terms across config surfaces: EndpointURL (goseg/config/config_update_schema.go:21) vs EndpointUrl (goseg/structs/configs.go:203), GSVersion (config_update_schema.go:35) vs GsVersion (structs/configs.go:218), and mixed C2c/C2C tokens across fields and contracts.",
+        "Tests still reference legacy names in failure text after symbol renames, e.g. makeConfig/getWifiDevice/ListWiFiSSIDs/ToggleDevice strings in goseg/accesspoint/accesspoint_test.go:40,84 and goseg/system/wifi_test.go:48,104,205,249,281,298 while implementation names are buildHostapdConfig/wifiDevices/listSSIDs/toggleDevice."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_broadcast_error_in_transition_path",
+      "summary": "toggleAutoReboot silently drops broadcast publish failures",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "toggleAutoReboot ends with broadcast.BroadcastToClients() and always returns nil (goseg/shipworkflow/urbit_operations_runtime.go:119-120).",
+        "BroadcastToClients is explicitly fallible and returns errors (goseg/broadcast/state.go:107-112), including nil-runtime and downstream publish errors."
+      ],
+      "suggestion": "Handle the returned error in toggleAutoReboot and apply the same transition policy used in schedulePack (e.g., wrap with context or use transition.HandleTransitionPublishError with an explicit criticality decision).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_boundary_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "missing_dependency_errors_not_normalized",
+      "summary": "Runtime seam defaults use mixed non-configured error patterns",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "runtime_ops defines errConfUpdateMissing sentinel (line 139) but defaultRuntimeStartramOps returns fresh fmt.Errorf strings for equivalent \"not configured\" conditions (lines 251-256).",
+        "Other modules expose stable sentinel-style errors (errEventBusFull, errSchedulePackBusFull) that support consistent classification and errors.Is checks."
+      ],
+      "suggestion": "Standardize seam/dependency-missing failures to package-level sentinel errors (or typed errors) and wrap those sentinels with context, so callers can reliably branch on failure class across runtime components.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_boundary_policy_drift"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "acronym_casing_drift_across_config_surfaces",
+      "summary": "Same concepts use conflicting acronym casing and token forms",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "Patch model uses EndpointURL and GSVersion (goseg/config/config_update_schema.go:21,35) while persisted config model uses EndpointUrl and GsVersion (goseg/structs/configs.go:203,218).",
+        "Tests reinforce mixed naming forms and make surface vocabulary less predictable (goseg/config/config_test.go references EndpointUrl extensively)."
+      ],
+      "suggestion": "Define and enforce one acronym convention for Go identifiers (for example URL/ID/API/C2C uppercase) and align config structs, patch structs, and tests to that vocabulary in one migration pass.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_naming_drift"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "legacy_test_labels_after_function_renames",
+      "summary": "Test failure messages use outdated function names",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "accesspoint tests call buildHostapdConfig but assert with \"makeConfig returned error\" and \"expected makeConfig validation error\" (lines 40 and 84).",
+        "wifi tests call wifiDevices/listSSIDs/toggleDevice but message strings still reference getWifiDevice/ListWiFiSSIDs/ToggleDevice (lines 48,104,205,249,281,298)."
+      ],
+      "suggestion": "Update assertion messages and test names to current symbol names so failing output maps directly to real APIs and avoids reintroducing deprecated terminology.",
+      "confidence": "high",
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "acronym_naming_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error-boundary policy is applied unevenly across runtime seams (some paths classify/propagate, others drop or ad-hoc format errors).",
+      "No single enforced naming lexicon for acronyms and renamed APIs across config models and tests."
+    ],
+    "likely_symptoms": [
+      "ignored_broadcast_error_in_transition_path",
+      "missing_dependency_errors_not_normalized",
+      "legacy_test_labels_after_function_renames"
+    ],
+    "possible_false_positives": []
+  }
+}

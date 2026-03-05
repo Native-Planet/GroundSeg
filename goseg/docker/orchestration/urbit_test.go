@@ -9,6 +9,7 @@ import (
 
 	"groundseg/config"
 	"groundseg/defaults"
+	"groundseg/docker/registry"
 	"groundseg/structs"
 
 	"github.com/docker/docker/api/types/mount"
@@ -17,24 +18,24 @@ import (
 func testUrbitRuntime() UrbitRuntime {
 	return UrbitRuntime{
 		RuntimeSnapshotOps: RuntimeSnapshotOps{
-			ShipSettingsSnapshotFn:     func() config.ShipSettings { return config.ShipSettings{} },
+			ShipSettingsSnapshotFn:        func() config.ShipSettings { return config.ShipSettings{} },
 			ShipRuntimeSettingsSnapshotFn: func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{} },
 		},
 		RuntimeUrbitOps: RuntimeUrbitOps{
 			LoadUrbitConfigFn: func(string) error { return nil },
-			UrbitConfFn: func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
+			UrbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
 			UpdateUrbitFn: func(string, func(*structs.UrbitDocker) error) error {
 				return nil
 			},
 		},
 		RuntimeContainerOps: RuntimeContainerOps{
-			StartContainerFn:      func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
-			CreateContainerFn:     func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+			StartContainerFn:       func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+			CreateContainerFn:      func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
 			UpdateContainerStateFn: func(string, structs.ContainerState) {},
 		},
 		RuntimeImageOps: RuntimeImageOps{
-			GetLatestContainerInfoFn: func(string) (map[string]string, error) {
-				return map[string]string{"repo": "repo", "tag": "tag", "hash": "hash"}, nil
+			GetLatestContainerInfoFn: func(string) (registry.ImageDescriptor, error) {
+				return registry.ImageDescriptor{Repo: "repo", Tag: "tag", Hash: "hash"}, nil
 			},
 		},
 		RuntimeContextOps: RuntimeContextOps{
@@ -143,14 +144,14 @@ func TestUrbitContainerConfDefaultNetworkAndPackReset(t *testing.T) {
 		return nil
 	}
 	rt.UrbitConfFn = func(name string) structs.UrbitDocker { return shipState[name] }
-	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
+	rt.GetLatestContainerInfoFn = func(kind string) (registry.ImageDescriptor, error) {
 		switch kind {
 		case "vere":
-			return map[string]string{"repo": "repo/vere", "tag": "v4.0", "hash": "new-urbit"}, nil
+			return registry.ImageDescriptor{Repo: "repo/vere", Tag: "v4.0", Hash: "new-urbit"}, nil
 		case "minio":
-			return map[string]string{"repo": "repo/minio", "tag": "latest", "hash": "new-minio"}, nil
+			return registry.ImageDescriptor{Repo: "repo/minio", Tag: "latest", Hash: "new-minio"}, nil
 		default:
-			return nil, errors.New("unknown kind")
+			return registry.ImageDescriptor{}, errors.New("unknown kind")
 		}
 	}
 	var scriptPath, scriptContent string
@@ -213,11 +214,11 @@ func TestUrbitContainerConfReloadsConfigAfterMutation(t *testing.T) {
 	rt.UrbitConfFn = func(name string) structs.UrbitDocker {
 		return shipState[name]
 	}
-	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
+	rt.GetLatestContainerInfoFn = func(kind string) (registry.ImageDescriptor, error) {
 		if kind == "minio" {
-			return map[string]string{"repo": "repo/minio", "tag": "tag", "hash": "new-minio"}, nil
+			return registry.ImageDescriptor{Repo: "repo/minio", Tag: "tag", Hash: "new-minio"}, nil
 		}
-		return map[string]string{"repo": "repo/vere", "tag": "tag", "hash": "new-urbit"}, nil
+		return registry.ImageDescriptor{Repo: "repo/vere", Tag: "tag", Hash: "new-urbit"}, nil
 	}
 
 	var scriptContent string
@@ -269,8 +270,8 @@ func TestUrbitContainerConfWireguardAndCustomPier(t *testing.T) {
 		return nil
 	}
 	rt.UrbitConfFn = func(name string) structs.UrbitDocker { return shipState[name] }
-	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
-		return map[string]string{"repo": "repo/" + kind, "tag": "tag", "hash": "hash"}, nil
+	rt.GetLatestContainerInfoFn = func(kind string) (registry.ImageDescriptor, error) {
+		return registry.ImageDescriptor{Repo: "repo/" + kind, Tag: "tag", Hash: "hash"}, nil
 	}
 	rt.ArchitectureFn = func() string { return "arm64" }
 	rt.DockerDirFn = func() string { return "/custom/pier" }
@@ -312,19 +313,19 @@ func TestUrbitContainerConfErrors(t *testing.T) {
 	}
 	rt.UpdateUrbitFn = func(string, func(*structs.UrbitDocker) error) error { return nil }
 	rt.ShipRuntimeSettingsSnapshotFn = func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{} }
-	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
+	rt.GetLatestContainerInfoFn = func(kind string) (registry.ImageDescriptor, error) {
 		if kind == "minio" {
-			return nil, errors.New("minio lookup failed")
+			return registry.ImageDescriptor{}, errors.New("minio lookup failed")
 		}
-		return map[string]string{"repo": "repo/vere", "tag": "tag", "hash": "hash"}, nil
+		return registry.ImageDescriptor{Repo: "repo/vere", Tag: "tag", Hash: "hash"}, nil
 	}
 
 	if _, _, err := urbitContainerConfWithRuntime(rt, "~zod"); err == nil || !strings.Contains(err.Error(), "minio lookup failed") {
 		t.Fatalf("expected minio lookup error, got %v", err)
 	}
 
-	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
-		return map[string]string{"repo": "repo/x", "tag": "tag", "hash": "hash"}, nil
+	rt.GetLatestContainerInfoFn = func(kind string) (registry.ImageDescriptor, error) {
+		return registry.ImageDescriptor{Repo: "repo/x", Tag: "tag", Hash: "hash"}, nil
 	}
 	if _, _, err := urbitContainerConfWithRuntime(rt, "~zod"); err == nil || !strings.Contains(err.Error(), "Unknown action") {
 		t.Fatalf("expected unknown action error, got %v", err)

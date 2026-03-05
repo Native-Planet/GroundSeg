@@ -7,6 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"groundseg/config"
+	"groundseg/internal/resource"
+	"groundseg/internal/workflow"
+	"groundseg/routines/slsa"
 	"groundseg/structs"
 	"io"
 	"net/http"
@@ -18,37 +21,29 @@ import (
 	"strings"
 	"time"
 
-	"github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier/verify"
 	"go.uber.org/zap"
 )
 
 const maxVersionUpdateConsecutiveFailures = 3
 
-func StartVersionSubsystem() {
-	if err := StartVersionSubsystemWithContext(context.Background()); err != nil {
-		zap.L().Warn(fmt.Sprintf("version subsystem stopped with error: %v", err))
-	}
+var artifactVerifier slsa.ArtifactVerifier = slsa.CLIArtifactVerifier{}
+
+func StartVersionSubsystem() error {
+	return RunVersionSubsystemWithContext(context.Background())
+}
+
+// RunVersionSubsystem blocks until context cancellation or worker failure.
+func RunVersionSubsystem() error {
+	return RunVersionSubsystemWithContext(context.Background())
 }
 
 func StartVersionSubsystemWithContext(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	errs := make(chan error, 2)
-	go func() {
-		errs <- CheckVersionLoopWithContext(ctx)
-	}()
-	go func() {
-		errs <- AptUpdateLoopWithContext(ctx)
-	}()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case err := <-errs:
-			return err
-		}
-	}
+	return RunVersionSubsystemWithContext(ctx)
+}
+
+// RunVersionSubsystemWithContext blocks until context cancellation or worker failure.
+func RunVersionSubsystemWithContext(ctx context.Context) error {
+	return workflow.RunUntilDoneOrWorkerResult(ctx, CheckVersionLoopWithContext, AptUpdateLoopWithContext)
 }
 
 func CheckVersionLoop() {
@@ -63,43 +58,52 @@ func CheckVersionLoopWithContext(ctx context.Context) error {
 	}
 	rt := newVersionRuntime()
 	conf := rt.configOps.getConfFn()
-	var updateInterval int
-	if conf.Runtime.UpdateInterval < 60 {
-		updateInterval = 60
-	} else {
-		updateInterval = conf.Runtime.UpdateInterval
-	}
-	checkInterval := time.Duration(updateInterval) * time.Second
+	checkInterval := time.Duration(resolveVersionUpdateIntervalSeconds(conf.Runtime.UpdateInterval)) * time.Second
 	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
 	releaseChannel := conf.Connectivity.UpdateBranch
-	if conf.Connectivity.UpdateMode == "auto" {
-		consecutiveFailures := 0
+	if conf.Connectivity.UpdateMode != "auto" {
+		return nil
+	}
+	return runAutoVersionUpdateLoop(ctx, ticker, rt, releaseChannel)
+}
+
+func resolveVersionUpdateIntervalSeconds(configuredInterval int) int {
+	if configuredInterval < 60 {
+		return 60
+	}
+	return configuredInterval
+}
+
+func runAutoVersionUpdateLoop(ctx context.Context, ticker *time.Ticker, rt versionRuntime, releaseChannel string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	consecutiveFailures := 0
+	runUpdateAttempt := func() error {
 		if err := callUpdater(ctx, rt, releaseChannel); err != nil {
 			consecutiveFailures++
 			if consecutiveFailures >= maxVersionUpdateConsecutiveFailures {
 				return fmt.Errorf("version update failed after %d consecutive attempts: %w", maxVersionUpdateConsecutiveFailures, err)
 			}
-		} else {
-			consecutiveFailures = 0
+			return nil
 		}
-		for {
-			select {
-			case <-ctx.Done():
-				return nil
-			case <-ticker.C:
-				if err := callUpdater(ctx, rt, releaseChannel); err != nil {
-					consecutiveFailures++
-					if consecutiveFailures >= maxVersionUpdateConsecutiveFailures {
-						return fmt.Errorf("version update failed after %d consecutive attempts: %w", maxVersionUpdateConsecutiveFailures, err)
-					}
-				} else {
-					consecutiveFailures = 0
-				}
+		consecutiveFailures = 0
+		return nil
+	}
+	if err := runUpdateAttempt(); err != nil {
+		return err
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			if err := runUpdateAttempt(); err != nil {
+				return err
 			}
 		}
 	}
-	return nil
 }
 
 func callUpdater(ctx context.Context, rt versionRuntime, releaseChannel string) error {
@@ -171,7 +175,7 @@ func updateBinary(
 	configOps versionConfigOps,
 	branch string,
 	versionInfo structs.Channel,
-) error {
+) (err error) {
 	// get config
 	conf := configOps.getConfFn()
 	var displayedBranch string
@@ -209,10 +213,12 @@ func updateBinary(
 		zap.L().Error(fmt.Sprintf("Failed to download new GroundSeg binary: %v", err))
 		return fmt.Errorf("download new GroundSeg binary: %w", err)
 	}
+	defer func() {
+		err = resource.JoinCloseError(err, resp.Body, "close downloaded binary response")
+	}()
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("couldn't download binary: status %d", resp.StatusCode)
 	}
-	defer resp.Body.Close()
 
 	// Create a new file to save the downloaded content
 	zap.L().Info("Creating groundseg_new")
@@ -221,7 +227,9 @@ func updateBinary(
 		zap.L().Error(fmt.Sprintf("Failed to save GroundSeg binary: %v", err))
 		return fmt.Errorf("create groundseg_new download file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		err = resource.JoinCloseError(err, file, "close downloaded binary file")
+	}()
 	zap.L().Info("Writing groundseg_new contents")
 	// Write the contents from the HTTP response to the new file
 	_, err = io.Copy(file, resp.Body)
@@ -284,7 +292,7 @@ func updateBinary(
 	}
 	// re-disable bypass after one update
 	if conf.Startram.DisableSlsa {
-		if err := config.UpdateConfTyped(config.WithDisableSlsa(false)); err != nil {
+		if err := config.UpdateConfigTyped(config.WithDisableSlsa(false)); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't reset SLSA bypass config: %v", err))
 			return fmt.Errorf("reset disable slsa config: %w", err)
 		}
@@ -297,7 +305,7 @@ func updateBinary(
 		zap.L().Error(fmt.Sprintf("Couldn't hash new binary: %v", err))
 		return fmt.Errorf("hash new groundseg binary: %w", err)
 	}
-	if err := config.UpdateConfTyped(
+	if err := config.UpdateConfigTyped(
 		config.WithGSVersion(versionStr),
 		config.WithBinHash(binHash),
 	); err != nil {
@@ -326,7 +334,7 @@ func verifySlsaProvenance(
 	provenanceURL string,
 	binaryPath string,
 	sourceURI string,
-) error {
+) (err error) {
 	if downloadFn == nil {
 		return fmt.Errorf("version update provenance download runtime is not configured")
 	}
@@ -338,12 +346,16 @@ func verifySlsaProvenance(
 		return fmt.Errorf("failed to create temp file for provenance: %w", err)
 	}
 	defer os.Remove(provenanceFile.Name())
-	defer provenanceFile.Close()
+	defer func() {
+		err = resource.JoinCloseError(err, provenanceFile, "close temporary provenance file")
+	}()
 	resp, err := downloadFn(ctx, provenanceURL)
 	if err != nil {
 		return fmt.Errorf("failed to download provenance: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err = resource.JoinCloseError(err, resp.Body, "close provenance response")
+	}()
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("failed to download provenance, status: %v", resp.StatusCode)
@@ -352,16 +364,7 @@ func verifySlsaProvenance(
 	if err != nil {
 		return fmt.Errorf("failed to write provenance file: %w", err)
 	}
-	verifyCmd := &verify.VerifyArtifactCommand{
-		ProvenancePath:  provenanceFile.Name(),
-		SourceURI:       sourceURI,
-		PrintProvenance: false,
-	}
-	verifyCtx := ctx
-	if verifyCtx == nil {
-		verifyCtx = context.Background()
-	}
-	trustedBuilder, err := verifyCmd.Exec(verifyCtx, []string{binaryPath})
+	trustedBuilder, err := artifactVerifier.VerifyArtifact(ctx, provenanceFile.Name(), sourceURI, []string{binaryPath})
 	if err != nil {
 		return fmt.Errorf("SLSA verification failed: %w", err)
 	}
@@ -518,16 +521,17 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 	return errors.Join(updateErrs...)
 }
 
-func getSha256(filePath string) (string, error) {
+func getSha256(filePath string) (hash string, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		err = resource.JoinCloseError(err, file, "close hash input file")
+	}()
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
 		return "", err
 	}
-	hashValue := hex.EncodeToString(hasher.Sum(nil))
-	return hashValue, nil
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }

@@ -6,8 +6,8 @@ import (
 
 	"groundseg/config"
 	"groundseg/startram"
-	"groundseg/transition"
 	"groundseg/structs"
+	"groundseg/transition"
 
 	"go.uber.org/zap"
 )
@@ -62,7 +62,7 @@ func runStartramRegisterWithRuntime(runtime startramRuntime, regCode, region str
 
 func runStartramSetBackupPasswordWithRuntime(runtime startramRuntime, password string) error {
 	runtime = resolveStartramRuntime(runtime)
-	err := runtime.UpdateConfTypedFn(config.WithRemoteBackupPassword(password))
+	err := runtime.UpdateConfigTypedFn(config.WithRemoteBackupPassword(password))
 	if err != nil {
 		return fmt.Errorf("set backup password: %w", err)
 	}

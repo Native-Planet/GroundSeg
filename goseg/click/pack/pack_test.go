@@ -7,22 +7,32 @@ import (
 )
 
 func resetPackSeams() {
-	executeClickCommandForPack = executePackCommand
+	SetRuntime(nil)
+}
+
+func withPackRuntime(mutator func(*packRuntime)) {
+	runtime := defaultPackRuntime()
+	if mutator != nil {
+		mutator(&runtime)
+	}
+	SetRuntime(runtime)
 }
 
 func TestSendPackBuildsExpectedCommand(t *testing.T) {
 	t.Cleanup(resetPackSeams)
 
 	var gotPatp, gotFile, gotHoon, gotSource, gotToken, gotOp string
-	executeClickCommandForPack = func(patp, file, hoon, sourcePath, successToken, operation string) (string, error) {
-		gotPatp = patp
-		gotFile = file
-		gotHoon = hoon
-		gotSource = sourcePath
-		gotToken = successToken
-		gotOp = operation
-		return "ok", nil
-	}
+	withPackRuntime(func(runtime *packRuntime) {
+		runtime.executeClickCommandForPack = func(patp, file, hoon, sourcePath, successToken, operation string) (string, error) {
+			gotPatp = patp
+			gotFile = file
+			gotHoon = hoon
+			gotSource = sourcePath
+			gotToken = successToken
+			gotOp = operation
+			return "ok", nil
+		}
+	})
 
 	if err := SendPack("~zod"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -37,15 +47,13 @@ func TestSendPackBuildsExpectedCommand(t *testing.T) {
 
 func TestSendPackBubblesError(t *testing.T) {
 	t.Cleanup(resetPackSeams)
-	executeClickCommandForPack = func(string, string, string, string, string, string) (string, error) {
-		return "", errors.New("failed")
-	}
+	withPackRuntime(func(runtime *packRuntime) {
+		runtime.executeClickCommandForPack = func(string, string, string, string, string, string) (string, error) {
+			return "", errors.New("failed")
+		}
+	})
 
 	if err := SendPack("~bus"); err == nil {
 		t.Fatalf("expected error")
 	}
-}
-
-func executePackCommand(_, _, _, _, _, _ string) (string, error) {
-	return "ok", nil
 }

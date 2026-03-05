@@ -1,0 +1,52 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 2,
+  "assessments": {
+    "error_consistency": 87.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "`config_update_schema.go` implements `parseStringSliceValue` by accepting `[]interface{}` and converting every element with `fmt.Sprint`, so non-string payload values are silently coerced instead of rejected as invalid.",
+        "`config_update_registry.go` routes `piers` through that parser, so a malformed config patch can report success while storing implicitly stringified values in `Connectivity.Piers`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Enforcing strict element typing for string-slice config patches (and adding targeted regression tests) would improve predictability of patch validation across config update boundaries."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "coerce_non_string_piers_in_config_patch",
+      "summary": "Configuration patch parser silently stringifies non-string piers instead of returning a typed validation error.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`parseStringSliceValue` returns `append(parsed, fmt.Sprint(item))` for each `[]interface{}` entry, so values like `1` or `true` become `\"1\"`/`\"true\"` rather than failing.",
+        "`piers` in `allConfPatchFields()` is parsed using this helper, then applied into `ConnectivityConfig.Piers []string`."
+      ],
+      "suggestion": "Tighten `parseStringSliceValue` to validate each element is a string (or explicitly document and narrow supported types), return a typed parse error on invalid element types, and add a patch test for `{\"piers\":[123]}`/`{\"piers\":[true]}` in `config_update_schema` tests.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "config_type_validation_inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Overly permissive parser behavior in string-slice config patch handling erodes error consistency versus strict typed config parsing."
+    ],
+    "likely_symptoms": [
+      "Unexpectedly normalized/converted patch inputs entering `Connectivity.Piers`.",
+      "Hard-to-debug downstream failures because invalid patch payloads are accepted at ingestion."
+    ],
+    "possible_false_positives": [
+      "If intentional coercion behavior is relied on by clients, this should be explicitly documented and covered by tests before changing semantics."
+    ]
+  }
+}

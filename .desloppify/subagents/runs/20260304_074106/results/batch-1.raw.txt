@@ -1,0 +1,50 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 86.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Protocol contract action token values are derived indirectly from the `ContractID` string in `deriveActionToken`, so contract identity and action binding semantics are coupled through a naming convention rather than an explicit contract boundary field.",
+        "`protocol_contracts.go` and `startram_contracts.go` both register contracts through `contractCatalogFamilySpecs` in the package, but protocol contracts encode action semantics through implicit parsing while startram entries stay message/metadata-focused, creating uneven contract-family declaration style within the same boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Refactor contract definitions to make action token declarations explicit for protocol contracts, aligned with a consistent catalog schema across families, so changes to contract ID formatting do not alter action-level runtime semantics."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "implicit-action-token-coupling",
+      "summary": "Protocol action tokens are derived from ContractID strings, tightly coupling identity format to action binding semantics.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` derives `ActionToken` via `deriveActionToken(id ContractID)` using `strings.Split(string(id), \".\")` and taking the last segment.",
+        "The same file also builds `contractCatalogFamilySpecs` entries with `Action` derived from that parsing rather than explicit action token constants, while `startram_contracts.go` follows a separate declaration style, increasing family-level coupling risk in the contract registry boundary."
+      ],
+      "suggestion": "Define explicit `ActionToken` constants per protocol action contract (e.g., `ActionUploadOpenEndpointToken = \"open-endpoint\"`, `ActionUploadResetToken = \"reset\"`, etc.) and map each `Action` field directly to those constants. Keep `ContractID` as identity and add validation tests ensuring ID suffix can be validated but not used as the source of truth.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract-boundary-format-coupling"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "String-format coupling between protocol contract IDs and action token extraction in shared governance catalog."
+    ],
+    "likely_symptoms": [
+      "protocol-id-format edits can unintentionally alter action token behavior without touching explicit action declarations"
+    ],
+    "possible_false_positives": [
+      "If cross-module consumers intentionally treat `ContractID` as the sole authority and expect suffix-derived action tokens, this may be an accepted convention rather than a defect"
+    ]
+  }
+}

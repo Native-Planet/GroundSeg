@@ -3,6 +3,8 @@ package accesspoint
 import (
 	"fmt"
 	"log"
+	"net"
+	"regexp"
 	"strings"
 	"time"
 
@@ -14,8 +16,27 @@ var (
 	routerSleepFn        = time.Sleep
 )
 
+var unsafeShellArgPattern = regexp.MustCompile(`[^\w\.\-,:/+=@%]+`)
+
 func startRouter() error {
 	return startRouterWithRuntime(accessPointRuntime())
+}
+
+func ipv4NetworkPrefix(ip string) (string, error) {
+	parsedIP := net.ParseIP(strings.TrimSpace(ip))
+	if parsedIP == nil {
+		return "", fmt.Errorf("invalid IP %q", ip)
+	}
+	ipv4 := parsedIP.To4()
+	if ipv4 == nil {
+		return "", fmt.Errorf("non-IPv4 IP %q", ip)
+	}
+	ipParts := ipv4.String()
+	lastDot := strings.LastIndex(ipParts, ".")
+	if lastDot <= 0 {
+		return "", fmt.Errorf("invalid IPv4 format %q", ip)
+	}
+	return ipParts[:lastDot], nil
 }
 
 func stopRouter() error {
@@ -23,6 +44,11 @@ func stopRouter() error {
 }
 
 func startRouterWithRuntime(rt AccessPointRuntime) error {
+	ipPrefix, err := ipv4NetworkPrefix(rt.IP)
+	if err != nil {
+		return fmt.Errorf("start router: %w", err)
+	}
+
 	if err := preStart(); err != nil {
 		return fmt.Errorf("pre-start configuration: %w", err)
 	}
@@ -37,16 +63,14 @@ func startRouterWithRuntime(rt AccessPointRuntime) error {
 	zap.L().Debug(fmt.Sprintf("wait.."))
 	routerSleepFn(2 * time.Second)
 
-	ipParts := rt.IP[:strings.LastIndex(rt.IP, ".")]
-
 	zap.L().Debug(fmt.Sprintf("enabling forward in sysctl."))
-	if err := executeRouterCommand("sysctl -w net.ipv4.ip_forward=1"); err != nil {
+	if err := executeRouterCommand("sysctl", "-w", "net.ipv4.ip_forward=1"); err != nil {
 		return fmt.Errorf("enable ipv4 forwarding: %w", err)
 	}
 
 	if rt.Inet != "" {
 		zap.L().Debug(fmt.Sprintf("creating NAT using iptables: %s <-> %s", rt.Wlan, rt.Inet))
-		if err := executeRouterCommand("iptables -P FORWARD ACCEPT"); err != nil {
+		if err := executeRouterCommand("iptables", "-P", "FORWARD", "ACCEPT"); err != nil {
 			return fmt.Errorf("set forward policy: %w", err)
 		}
 		if err := executeRouterCommand("iptables", "--table", "nat", "--delete-chain"); err != nil {
@@ -77,7 +101,7 @@ func startRouterWithRuntime(rt AccessPointRuntime) error {
 	}
 
 	zap.L().Debug(fmt.Sprintf("running dnsmasq"))
-	if err := executeRouterCommand("dnsmasq", "--dhcp-authoritative", fmt.Sprintf("--interface=%s", rt.Wlan), fmt.Sprintf("--dhcp-range=%s.20,%s.100,%s,4h", ipParts, ipParts, rt.Netmask)); err != nil {
+	if err := executeRouterCommand("dnsmasq", "--dhcp-authoritative", fmt.Sprintf("--interface=%s", rt.Wlan), fmt.Sprintf("--dhcp-range=%s.20,%s.100,%s,4h", ipPrefix, ipPrefix, rt.Netmask)); err != nil {
 		return fmt.Errorf("start dnsmasq: %w", err)
 	}
 
@@ -188,17 +212,51 @@ func preStart() error {
 }
 
 func executeRouterShellCommand(name string, args ...string) (string, error) {
-	cmd := formatShellCommand(name, args...)
+	cmd, err := buildRouterShellCommand(name, args...)
+	if err != nil {
+		return "", err
+	}
 	return executeRouterShellFn(cmd)
 }
 
 func executeRouterCommand(name string, args ...string) error {
-	cmd := formatShellCommand(name, args...)
+	cmd, err := buildRouterShellCommand(name, args...)
+	if err != nil {
+		return err
+	}
 	res, err := executeRouterShellFn(cmd)
 	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
 	if err != nil {
 		zap.L().Warn(fmt.Sprintf("accesspoint command failed: %s: %v", cmd, err))
 		return err
+	}
+	return nil
+}
+
+func buildRouterShellCommand(name string, args ...string) (string, error) {
+	if err := validateShellCommandInput(name, args...); err != nil {
+		return "", err
+	}
+	return formatShellCommand(name, args...), nil
+}
+
+func validateShellCommandInput(name string, args ...string) error {
+	if strings.TrimSpace(name) == "" {
+		return fmt.Errorf("empty command name")
+	}
+	for _, arg := range append([]string{name}, args...) {
+		if strings.ContainsAny(arg, "\x00\n\r\t") {
+			return fmt.Errorf("command token contains control character: %q", arg)
+		}
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if strings.Contains(arg, "$") || strings.ContainsAny(arg, "'\"`") {
+			return fmt.Errorf("command token contains shell metacharacter: %q", arg)
+		}
+		if unsafeShellArgPattern.MatchString(arg) {
+			return fmt.Errorf("invalid command token characters in %q", arg)
+		}
 	}
 	return nil
 }

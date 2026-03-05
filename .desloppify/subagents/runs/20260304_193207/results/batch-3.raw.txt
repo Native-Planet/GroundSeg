@@ -1,0 +1,120 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 82.0,
+    "test_strategy": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Protocol contract identity is spread across `goseg/protocol/actionids/actionids.go` (raw namespace/action strings) and `goseg/protocol/contracts/protocol_contracts.go` (typed aliases plus formula-built IDs), so compatibility-critical identifiers are maintained through multiple public layers.",
+        "`README.md` defines governance/compatibility expectations and points to governance docs, while runtime governance fields in `goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/contracts/startram_contracts.go` are encoded as free-form literals (`OwnerModule`, `Stability`, `SinceVersion`) without an explicit shared policy object in this reviewed slice."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/protocol/contracts/family_specs_test.go` mainly validates builder mechanics and selected validation branches, but does not assert policy-level governance invariants for real catalog families (for example: owner vocabulary rules, version format consistency, or compatibility transition rules).",
+        "`goseg/protocol/conformance/fixtures_test.go` verifies fixture presence/validation and a single canonical C2C case, but does not provide cross-family regression tests that would fail on governance drift between protocol and startram contract specs.",
+        "`README.md` declares backend quality gates for contracts/conformance, yet this batch’s tests are concentrated on local contract-shape checks rather than end-to-end governance-policy guarantees."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_protocol_identity_layers",
+      "summary": "Canonical action identity is maintained through duplicated layers across protocol modules.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines canonical namespace/action strings, while `protocol_contracts.go` re-exposes them as separate typed constants and composes contract IDs from those aliases.",
+        "Conformance tests consume `groundseg/protocol/actions` values, not the same constants package used by contracts, so identity has multiple maintenance entry points instead of one boundary."
+      ],
+      "suggestion": "Define one authoritative protocol identity source (for namespace/action bindings and contract IDs) and make both contracts and conformance tests import that source; keep adapters as thin compatibility shims only.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "governance_contract_policy_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "governance_policy_encoded_as_literals",
+      "summary": "Governance compatibility metadata is distributed as unconstrained literals across families.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "Both contract family specs hardcode governance fields (`OwnerModule`, `Stability`, `SinceVersion`) as plain string/value literals in each entry.",
+        "README establishes governance/quality-gate expectations, but no explicit architecture-level policy object is visible in this batch to constrain these per-family literals."
+      ],
+      "suggestion": "Introduce a shared governance policy layer (typed owner/module registry, version-format validator, and compatibility-state rules) consumed by all contract family specs, then generate/validate entries through that policy API.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "governance_contract_policy_fragmentation"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "missing_policy_level_governance_tests",
+      "summary": "Tests focus on shape/mechanics but leave governance-policy regressions weakly protected.",
+      "related_files": [
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`family_specs_test.go` checks entry construction and selected negative cases, but does not validate full policy expectations across real protocol/startram spec sets.",
+        "Protocol/startram specs embed policy-relevant metadata (`OwnerModule`, `Stability`, `SinceVersion`) that is not directly asserted by dedicated, family-level policy tests in this slice."
+      ],
+      "suggestion": "Add table-driven policy tests that load real family specs and assert governance invariants (allowed owner modules, valid version format, stability/deprecation transition rules, and required metadata completeness) for each family.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_contract_policy_fragmentation"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "quality_gate_not_backed_by_contract_suite_mapping",
+      "summary": "Documented backend quality gate is not directly verified by an enforceable test mapping artifact.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "README declares specific backend quality-gate commands and governance links, but the reviewed tests do not include a manifest-style assertion tying required governance checks to that gate.",
+        "Current tests in this batch validate local fixture/spec behavior; they do not assert that all documented governance-critical contract paths are included in a single compatibility gate."
+      ],
+      "suggestion": "Create a governance test manifest (or meta-test) that enumerates required contract/conformance policy checks and fails when documented gate scope and executable suite coverage diverge.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_contract_policy_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract identity and governance policy are represented in multiple places instead of one enforceable boundary.",
+      "Test coverage emphasizes local mechanics over cross-family policy contracts tied to release quality gates."
+    ],
+    "likely_symptoms": [
+      "split_protocol_identity_layers",
+      "governance_policy_encoded_as_literals",
+      "missing_policy_level_governance_tests",
+      "quality_gate_not_backed_by_contract_suite_mapping"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -12,13 +12,13 @@ import (
 func TestConfPatchRegistryMatchesPatchStructFields(t *testing.T) {
 	fields := reflect.TypeOf(ConfPatch{})
 	registered := make(map[string]struct{}, fields.NumField())
-	for _, field := range allConfPatchFields() {
+	for _, field := range allConfigPatchFields() {
 		if field.patchField == "" {
 			continue
 		}
 		registered[field.patchField] = struct{}{}
 		if _, ok := fields.FieldByName(field.patchField); !ok {
-			t.Fatalf("confPatchRegistry references unknown field %q", field.patchField)
+			t.Fatalf("configPatchRegistry references unknown field %q", field.patchField)
 		}
 	}
 
@@ -31,7 +31,7 @@ func TestConfPatchRegistryMatchesPatchStructFields(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		sort.Strings(missing)
-		t.Fatalf("confPatchRegistry missing %d fields: %s", len(missing), strings.Join(missing, ", "))
+		t.Fatalf("configPatchRegistry missing %d fields: %s", len(missing), strings.Join(missing, ", "))
 	}
 }
 
@@ -51,7 +51,7 @@ func collectConfPatchFieldNames(typ reflect.Type) map[string]struct{} {
 }
 
 func TestBuildConfPatchByKeyRejectsDuplicateKeys(t *testing.T) {
-	_, err := buildConfPatchByKey([]confPatchField{
+	_, err := buildConfigPatchByKey([]configPatchField{
 		{key: "duplicate", patchField: "Piers"},
 		{key: "duplicate", patchField: "WgOn"},
 	})
@@ -68,6 +68,24 @@ func TestBuildConfigPatchSupportsKnownAndUnsupportedKeys(t *testing.T) {
 		"startramSetReminderOne": true,
 	}); err == nil || !strings.Contains(err.Error(), "unsupported config key: isEMMCMachine") {
 		t.Fatalf("expected unsupported key error for isEMMCMachine, got %v", err)
+	}
+}
+
+func TestBuildConfigPatchRejectsNonStringPiersValueTypes(t *testing.T) {
+	_, err := buildConfigPatch(map[string]interface{}{
+		"piers": []interface{}{123},
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid piers item 0 value: int") {
+		t.Fatalf("expected int piers type error, got %v", err)
+	}
+}
+
+func TestBuildConfigPatchRejectsBooleanPiersValueType(t *testing.T) {
+	_, err := buildConfigPatch(map[string]interface{}{
+		"piers": []interface{}{true},
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid piers item 0 value: bool") {
+		t.Fatalf("expected bool piers type error, got %v", err)
 	}
 }
 

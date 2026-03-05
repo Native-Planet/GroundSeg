@@ -1,0 +1,209 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 72.0,
+    "error_consistency": 68.0,
+    "abstraction_fitness": 64.0,
+    "test_strategy": 88.0,
+    "design_coherence": 66.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Core flows depend on process-wide singletons instead of explicit boundaries: `broadcast` reads `auth.GetClientManager()` and writes `leak.LeakChan` in `broadcastToClientsWithRuntime`.",
+        "`config` wires cross-subsystem behavior directly by importing `system` and consuming `system.ConfChannel()` in `ConfChannel`, coupling config lifecycle to system package globals.",
+        "Multiple packages expose default runtime singletons (`DefaultBroadcastStateRuntime`, `defaultRuntime` in docker lifecycle, config globals), increasing hidden dependency direction and startup-order sensitivity."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "Initialization APIs mix 'return error' and 'log-and-continue' semantics: `auth.InitializeWithContext` logs in caller (`InitializeWithContext`) while `Start` returns errors.",
+        "`BroadcastLoop()` explicitly discards startup errors (`_ = StartBroadcastLoopWithRuntime(...)`), while `StartBroadcastLoop()` returns errors.",
+        "Delivery paths are inconsistent on backpressure: `broadcastToClientsWithRuntime` drops leak events after retries and only logs warning, while auth broadcast returns errors synchronously."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Large pass-through facades add call depth without policy: `docker/docker.go` forwards directly to orchestration/events functions.",
+        "`auth/auth.go` mainly re-exports lifecycle/token behavior with minimal transformation.",
+        "`click/click.go` duplicates interface + struct + wrappers around function fields, with most methods forwarding 1:1 to injected funcs."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 61.0,
+        "indirection_cost": 44.0,
+        "interface_honesty": 67.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "Assigned production files generally have dedicated tests in their directories (accesspoint, auth, broadcast, click, config, docker, defaults).",
+        "Code is seam-heavy (runtime function injection, configurable runtimes), which supports deterministic unit testing across modules.",
+        "Critical stateful paths (broadcast loop/state, config patching, docker lifecycle planners) are structured to be test-driven through runtime injection."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Most tests appear unit/seam-oriented; cross-module integration behavior (startup ordering, singleton interactions, backpressure behavior across broadcast/auth/config/docker) is still weakly guaranteed by this design."
+    },
+    "design_coherence": {
+      "evidence": [
+        "`AccessPointRuntime` carries many data fields + behavior hooks + mode flags (`UseDefaultStartFn`, `UseDefaultStopFn`), and lifecycle coordinator branches on both, blending configuration and execution strategy.",
+        "Config patch system is split across schema/registry/executor with layered generic builders (`confPatchField`, `confPatchFieldBinding`, section builders), which raises cognitive load for straightforward field updates.",
+        "Several top-level packages keep both legacy and runtime-injected entrypoints, creating parallel paths with slightly different semantics."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "singleton_runtime_coupling",
+      "summary": "Process-wide singleton runtimes create hidden cross-package coupling and lifecycle order risk.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/delivery.go",
+        "goseg/config/config.go",
+        "goseg/config/config_events.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "`DefaultBroadcastStateRuntime()` and default loop controller are global mutable process state.",
+        "`broadcastToClientsWithRuntime` directly reaches `auth.GetClientManager()` and `leak.LeakChan` instead of explicit boundary interfaces.",
+        "`config` and docker lifecycle maintain package-level runtime singletons/globals (`globalConfig`, `defaultRuntime`)."
+      ],
+      "suggestion": "Introduce explicit runtime composition at subsystem bootstrap (inject event sink, auth broadcaster, config source, docker lifecycle runtime) and keep package globals only as thin backward-compatibility adapters.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_singletons"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "init_error_contract_drift",
+      "summary": "Initialization entrypoints use inconsistent failure contracts (return vs log-and-swallow).",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/auth/lifecycle/lifecycle.go",
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`auth.InitializeWithContext` logs failures but does not return them to caller, while `Start` returns `error`.",
+        "`BroadcastLoop()` discards `StartBroadcastLoopWithRuntime` error, while `StartBroadcastLoop()` returns error explicitly.",
+        "Callers can unintentionally choose a non-failing entrypoint and miss startup failures."
+      ],
+      "suggestion": "Define one canonical init contract (`Start(...) error`) per subsystem and make convenience wrappers either return errors or clearly document and emit structured metrics when intentionally best-effort.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "silent_backpressure_drop",
+      "summary": "Backpressure handling drops events silently in one channel while other paths fail fast.",
+      "related_files": [
+        "goseg/broadcast/delivery.go",
+        "goseg/docker/events/events.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`broadcastToClientsWithRuntime` retries sending to `leak.LeakChan` then logs and continues without returning error when still congested.",
+        "In contrast, event broker publishing returns explicit `ErrTransitionBusFull`/`ErrTransitionPublishTimeout`.",
+        "This creates inconsistent observability and behavior for dropped state updates."
+      ],
+      "suggestion": "Unify queue/backpressure policy: either propagate a typed drop error (and optionally downgrade by caller policy) or publish drop metrics/events consistently across all broadcast/event buses.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_facade_layers",
+      "summary": "Multiple facade packages mostly forward calls without adding policy or translation.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/auth/auth.go",
+        "goseg/click/click.go"
+      ],
+      "evidence": [
+        "`docker/docker.go` methods are near-direct forwards to orchestration/events package functions.",
+        "`auth/auth.go` mostly aliases tokens/lifecycle APIs with minimal behavioral differentiation.",
+        "`click/click.go` defines broad interface+runtime wrapper where many methods are one-line forwards."
+      ],
+      "suggestion": "Collapse no-op facades or move them to explicit boundary adapters with clear responsibilities (policy enforcement, input normalization, metrics, or API stability guarantees).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "indirection_without_policy"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_patch_meta_indirection",
+      "summary": "Config patching uses deep generic/meta builders that increase indirection more than leverage.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_executor.go"
+      ],
+      "evidence": [
+        "Patch behavior is split among parser/field/binding/section builders and merge/apply callbacks across multiple files.",
+        "Simple field updates require traversing several abstraction layers (`confPatchFieldSpec` -> binding -> generated field -> executor loop).",
+        "Indirection cost is high for maintenance/debugging relative to the domain complexity of key/value patch application."
+      ],
+      "suggestion": "Refactor toward a flatter declarative registry (single table of field descriptors with parse/apply/merge functions) and generate repetitive wiring where needed to reduce runtime abstraction depth.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "indirection_without_policy"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "accesspoint_context_overload",
+      "summary": "Access point runtime struct mixes configuration, dependency injection, and behavior flags in one overloaded context object.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/accesspoint/lifecycle_coordinator.go",
+        "goseg/accesspoint/router.go"
+      ],
+      "evidence": [
+        "`AccessPointRuntime` contains operational config plus many function seams and mode booleans.",
+        "`normalizeAccessPointRuntime` mutates defaults and toggles strategy flags based on whether handlers are nil.",
+        "Coordinator/start-stop flow branches on both function presence and `UseDefault*` flags, spreading behavior selection logic across files."
+      ],
+      "suggestion": "Split runtime into immutable config + explicit strategy interfaces (router ops, dependency checks, process probes), and remove dual flag/function fallback logic by constructing one resolved strategy object at bootstrap.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overloaded_runtime_context"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Heavy reliance on package-level default runtimes/global state instead of explicit composition boundaries.",
+      "Wrapper-first evolution introduced multiple pass-through layers with limited behavioral ownership.",
+      "Error-path policies were added per module without a shared contract for startup/backpressure semantics."
+    ],
+    "likely_symptoms": [
+      "init_error_contract_drift",
+      "silent_backpressure_drop",
+      "accesspoint_context_overload"
+    ],
+    "possible_false_positives": [
+      "Some facade layers may be intentional compatibility shims; if they are contract-preserving boundaries with external consumers, severity should be reduced."
+    ]
+  }
+}

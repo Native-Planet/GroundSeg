@@ -21,14 +21,14 @@ func TestGetLatestContainerInfoUsesStaticLlamaConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got, want := info["repo"], "nativeplanet/llama-gpt"; got != want {
+	if got, want := info.Repo, "nativeplanet/llama-gpt"; got != want {
 		t.Fatalf("repo: got %q want %q", got, want)
 	}
-	if got, want := info["tag"], "dev"; got != want {
+	if got, want := info.Tag, "dev"; got != want {
 		t.Fatalf("tag: got %q want %q", got, want)
 	}
 	hash := "ac2dcfac72bc3d8ee51ee255edecc10072ef9c0f958120971c00be5f4944a6fa"
-	if got := info["hash"]; got != hash {
+	if got := info.Hash; got != hash {
 		t.Fatalf("hash: got %q want %q", got, hash)
 	}
 }
@@ -51,10 +51,10 @@ func TestGetLatestContainerInfoReadsFromVersionChannel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got, want := info["repo"], "example/wg"; got != want {
+	if got, want := info.Repo, "example/wg"; got != want {
 		t.Fatalf("repo: got %q want %q", got, want)
 	}
-	if got, want := info["hash"], "deadbeef"; got != want {
+	if got, want := info.Hash, "deadbeef"; got != want {
 		t.Fatalf("hash: got %q want %q", got, want)
 	}
 }

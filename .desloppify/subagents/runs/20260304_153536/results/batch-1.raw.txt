@@ -1,0 +1,66 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 82.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/protocol_contracts.go validates bindings by namespace/action map and formula (`protocolActionContractID(...)`) while goseg/protocol/contracts/startram_contracts.go validates only prefix plus a positional `entries[0]` equality check.",
+        "Both files implement separate contract-spec builders and validators (`protocolContractCatalogSpecs`/`validateProtocolContractSpecs` vs `startramContractCatalogSpecs`/`validateStartramContractSpecs`) with different invariants, indicating fragmented boundary-governance rules inside the same contracts subsystem."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_validation_invariant_drift",
+      "summary": "Contract boundary validation is inconsistent across protocol and StarTram catalogs, allowing uneven enforcement of architecture contracts.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Protocol validation enforces a complete expected binding map keyed by namespace/action and verifies formula-derived IDs for each entry.",
+        "StarTram validation enforces only ID prefix and then compares `entries[0].ID` to `APIConnectionError`, which relies on slice order and does not use keyed binding semantics."
+      ],
+      "suggestion": "Unify catalog validation behind one shared contract-governance helper that validates by stable keys (not positional index), enforces deterministic ID derivation rules, and applies the same completeness checks for every contract family.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "catalog_governance_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "missing_shared_catalog_boundary_abstraction",
+      "summary": "Per-family ad hoc catalog builders duplicate boundary logic instead of using a shared architectural abstraction.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Both files define near-parallel patterns (`<family>Contract(...)`, `<family>ContractCatalogSpecs(...)`, `validate<Family>ContractSpecs(...)`) but with diverging rule strictness and naming strategy.",
+        "The duplicated pattern suggests architecture-level policy is encoded in each family file rather than in one module-level contract registry abstraction."
+      ],
+      "suggestion": "Introduce a single contracts-registry abstraction (e.g., family descriptor + declarative entries) that centralizes ID construction, metadata defaults, and validation policy; keep family files declarative data-only to reduce coupling drift.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "catalog_governance_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance is implemented as family-local logic rather than a shared boundary contract.",
+      "Validation policy is duplicated, which causes invariant drift between sibling modules."
+    ],
+    "likely_symptoms": [
+      "contract_validation_invariant_drift"
+    ],
+    "possible_false_positives": []
+  }
+}

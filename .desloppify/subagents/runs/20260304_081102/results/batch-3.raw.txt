@@ -1,0 +1,36 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 91.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Error flow is generally propagated with wrapping where appropriate, for example state transition and broadcast paths use wrapped errors and `errors.Join` at caller boundaries.",
+        "Error boundaries are explicit in modules like importer/config and runtime orchestration: caller code inspects returned errors and converts/annotates failures rather than silently discarding them.",
+        "Optional/side-effect callbacks in startup/runtime wiring are typed as non-returning functions (no error output), so callsites treat them as fire-and-forget lifecycle hooks while still logging outcomes when available."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "A small residual inconsistency remains in optional lifecycle/error-path handling (some callback-style hooks intentionally do not return errors), which can make strict consistency scoring imperfect even though behavior is intentional.",
+      "sub_axes": {
+        "abstraction_leverage": 90.0,
+        "indirection_cost": 88.0,
+        "interface_honesty": 92.0
+      }
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "No material error-consistency defects identified in the assigned file set for this batch.",
+      "The batch includes intentional fire-and-forget lifecycle callback patterns that reduce observable consistency across non-critical paths."
+    ],
+    "likely_symptoms": [],
+    "possible_false_positives": [
+      "No prior error_consistency findings from earlier packets were directly mapped to these files in the blind packet, so no re-reporting was possible."
+    ]
+  }
+}

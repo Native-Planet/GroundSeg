@@ -14,9 +14,8 @@ var (
 	sleepForChop      = time.Sleep
 )
 
-func StartBackupRoutines() {
-	go TlonBackupRemote()
-	go TlonBackupLocal()
+func StartBackupRoutines() error {
+	return backup.StartBackupRoutines()
 }
 
 func StartBackupRoutinesWithContext(ctx context.Context) error {
@@ -51,18 +50,20 @@ func runRoutineWithContext(ctx context.Context, interval time.Duration, fn func(
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for {
 		fn()
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(interval):
+		case <-ticker.C:
 		}
 	}
 }
 
-func StartChopRoutines() {
-	go ChopAtLimit()
+func StartChopRoutines() error {
+	return chop.StartChopRoutines()
 }
 
 func StartChopRoutinesWithContext(ctx context.Context) error {

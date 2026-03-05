@@ -1,0 +1,75 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.5
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "In `goseg/defaults/defaults.go`, `SysConfig(basePath string)` ignores its input and always sets `DockerData: DockerData(\"basePath\")`, so callers cannot influence the configured docker data path through the API surface.",
+        "`goseg/rectify/rectify_services.go` and `goseg/shipworkflow/operations_runtime.go` independently define an `adaptUrbitSectionMutation` adapter with the same type-erasing wrapper pattern for section mutation calls, indicating repeated ad-hoc abstraction instead of a single shared seam.",
+        "Across `goseg/defaults/defaults.go`, `goseg/rectify/rectify_services.go`, `goseg/shipworkflow/operations_runtime.go`, and `goseg/startuporchestrator/startup_orchestrator.go`, dependency wiring remains mostly package-local and wrapper-heavy rather than a consistent reusable abstraction boundary, increasing indirection and drift risk."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 74.0,
+        "indirection_cost": 70.0,
+        "interface_honesty": 76.5
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "defaults-basepath-param-ignored",
+      "summary": "Config factory exposes `basePath` but silently hard-codes docker data to the literal \"basePath\", breaking the abstraction contract.",
+      "related_files": [
+        "goseg/defaults/defaults.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`goseg/defaults/defaults.go` `SysConfig(basePath string)` assigns `DockerData: DockerData(\"basePath\")`, while the `basePath` argument is never used.",
+        "Callers in higher-level setup (e.g. startup wiring in `goseg/main.go`) pass a caller-derived path expecting it to influence generated defaults."
+      ],
+      "suggestion": "Use the `basePath` argument directly when constructing defaults (or rename/remove parameter if unused): `DockerData: DockerData(basePath)`; add a unit test that asserts caller-supplied path is preserved.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "abstraction-contract-breaches"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate-urbit-mutation-adapter",
+      "summary": "Identical urbit section mutation adapter logic is duplicated in multiple packages, creating fragile copy-paste abstractions.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "Both files implement `adaptUrbitSectionMutation[T any](mutateFn func(*T) error) func(any) error` using equivalent type assertion and delegated mutation behavior.",
+        "The duplicated helper encodes the same abstraction seam in separate packages rather than centralizing in one shared utility."
+      ],
+      "suggestion": "Extract a single shared generic adapter utility in a small internal package used by both runtime construction paths, and update both callers; add a focused test table for the shared function to prevent divergence.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "abstraction-contract-breaches"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Configuration factories and helper adapters have drifted into inconsistent, local implementations; shared seam logic is re-authored instead of extracted.",
+      "Abstractions are too tightly coupled to call sites, allowing interface/constructor mismatches to hide as API-looks-correct code."
+    ],
+    "likely_symptoms": [
+      "defaults-basepath-param-ignored",
+      "duplicate-urbit-mutation-adapter"
+    ],
+    "possible_false_positives": [
+      "Potential future use of a differently scoped `basePath` naming convention could make the hard-coded string intentional in a narrow legacy mode, but this is unlikely and should be confirmed before accepting."
+    ]
+  }
+}

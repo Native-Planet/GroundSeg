@@ -1,0 +1,297 @@
+{
+  "assessments": {
+    "error_consistency": 53.0,
+    "package_organization": 54.5
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows `goseg/system/` has 36 files while disk behavior is already split into focused subpackages (`goseg/system/disk/` and `goseg/system/storage/`), yet assigned disk shim tests remain in root-level `system` package (`disk_health_test.go`, `disk_shims_test.go`, `disk_storage_test.go`).",
+        "Assigned `goseg/system/disk_shims_test.go` validates wrappers that delegate to `goseg/system/storage` and `goseg/system/disk` adapters, indicating cross-folder seam behavior is owned by root package tests instead of colocated package tests.",
+        "holistic_context.structure.directory_profiles shows `goseg/shipworkflow/` has 49 files; assigned `lifecycle.go` holds generic stop/poll/persist helpers while `doc.go` describes a broad multi-domain workflow package, signaling continued flattening inside an already overloaded directory."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "goseg/shipworkflow/lifecycle.go compares timeout errors with `err == context.DeadlineExceeded` even though the injected poller interface allows wrapped timeout errors.",
+        "goseg/config/bootstrap.go uses package-level `initOnce` + `initErr`, so any transient initialization I/O failure is memoized and returned forever with no retry pathway.",
+        "Protocol validator tests in goseg/protocol/conformance/fixtures_test.go and goseg/protocol/contracts/family_specs_test.go assert generic non-nil or substring-based errors, while system/shipworkflow tests assert stable wrapping semantics with `errors.Is`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "system_disk_tests_not_colocated_with_disk_packages",
+      "summary": "Disk seam tests are anchored in root `system` package instead of the disk/storage package boundaries they verify.",
+      "related_files": [
+        "goseg/system/disk_health_test.go",
+        "goseg/system/disk_shims_test.go",
+        "goseg/system/disk_storage_test.go",
+        "goseg/system/disk/adapter.go",
+        "goseg/system/storage/storage.go"
+      ],
+      "evidence": [
+        "`disk_shims_test.go` asserts behavior of root-level shim functions that immediately delegate to `system/storage` and `system/disk` concerns.",
+        "The directory profile for `goseg/system/` is large (36 files), while dedicated subdirectories already exist for disk adapters and storage implementations, so keeping seam tests in root increases boundary blur and navigation cost."
+      ],
+      "suggestion": "Staged reorg plan: 1) create `goseg/system/diskshim/` (or `goseg/system/diskbridge/`) for root-wrapper ownership and move `disk_shims_test.go` plus wrapper functions there; 2) move storage-focused tests (`disk_storage_test.go`) under `goseg/system/storage/` and adapter-focused tests (`disk_health_test.go` cases that are adapter-specific) under `goseg/system/disk/`; 3) keep only orchestration-level integration tests in `goseg/system/`; 4) run import updates with `go test ./goseg/system/... ./goseg/system/disk/... ./goseg/system/storage/...` and `go test ./...` to validate no package-cycle or API breakage.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "disk_boundary_flattening"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "shipworkflow_lifecycle_helpers_embedded_in_overloaded_package",
+      "summary": "Generic lifecycle helpers remain in a 49-file workflow package instead of a narrower lifecycle boundary.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go",
+        "goseg/shipworkflow/workflow.go",
+        "goseg/shipworkflow/newship.go"
+      ],
+      "evidence": [
+        "`lifecycle.go` contains reusable timeout/poll/persist primitives (`PollWithTimeout`, `PersistUrbitConfig`, `WaitForUrbitStop*`) that are not specific to one workflow branch.",
+        "The directory profile reports `goseg/shipworkflow/` at 49 files (23 production/26 test), which exceeds the mixed-concern threshold and increases discoverability friction when generic lifecycle code is kept in the same flat directory."
+      ],
+      "suggestion": "Staged reorg plan: 1) add `goseg/shipworkflow/lifecycle/` (or `goseg/shiplifecycle/`) and move `lifecycle.go` + `lifecycle_test.go` there; 2) expose a small API from that package and update callers in `shipworkflow` runtime files to import it explicitly; 3) leave `doc.go` in root `shipworkflow` focused on orchestration ownership only; 4) run `go test ./goseg/shipworkflow/...` then `go test ./...` to validate imports and ensure move does not create cycles.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "workflow_directory_overflattening"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "protocol_identity_split_across_packages",
+      "summary": "Protocol action identity is split across multiple packages with overlapping ownership boundaries.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` owns raw namespace/action constants (`upload`, `c2c`, `open-endpoint`, `connect`).",
+        "`protocol_contracts.go` rebuilds the same identity space as `ActionNamespace*`/`Action*` and formula-based `ContractID`s.",
+        "`fixtures_test.go` validates canonical bindings via `groundseg/protocol/actions` symbols instead of a single contract-identity source, indicating consumers depend on different identity packages."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1 create `goseg/protocol/contracts/identity/` (or `goseg/protocol/identity/`) as the sole exported owner of namespace/action/contract-id bindings and move token declarations from `actionids` plus typed bindings from `protocol_contracts.go` into it. Stage 2 keep `goseg/protocol/contracts/` focused on catalog assembly/validation and switch conformance fixtures to import the new identity package only. Stage 3 add temporary aliases in old locations (`actionids` and any `actions` bridge) marked deprecated, then remove after downstream migration. Stage 4 run import updates and validation with `go test ./protocol/contracts ./protocol/conformance ./uploadsvc/...` and then `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "protocol_contract_boundary_split"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "governance_policy_scattered_between_docs_and_runtime",
+      "summary": "Governance contract policy is scattered between README policy docs and inline runtime specs.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`README.md` declares backend quality-gate and governance documentation ownership.",
+        "Both `protocol_contracts.go` and `startram_contracts.go` inline governance policy fields (`OwnerModule`, `Stability`, `SinceVersion`) directly in family specs.",
+        "`family_specs_test.go` constructs governance-bearing specs in tests, reinforcing that governance semantics are spread across runtime and test setup rather than a clearly isolated policy layer."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1 introduce `goseg/protocol/contracts/governance/` with a dedicated schema and per-family policy declarations (protocol/startram) as the single policy source. Stage 2 move inline governance literals from `protocol_contracts.go` and `startram_contracts.go` to that package and make catalog builders consume those declarations. Stage 3 narrow `family_specs_test.go` to validate builder behavior and add governance package tests for policy integrity/versioning rules. Stage 4 update docs links in `README.md` to the new package path and validate with `go test ./protocol/contracts ./protocol/conformance` plus `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "protocol_contract_boundary_split"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "wrapped_deadline_not_classified",
+      "summary": "Timeout classification in ship lifecycle uses direct equality, so wrapped deadline errors can follow the wrong failure path.",
+      "related_files": [
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go",
+        "goseg/system/disk_health_test.go"
+      ],
+      "evidence": [
+        "goseg/shipworkflow/lifecycle.go:62 checks `if err == context.DeadlineExceeded` on an error returned by injected `pollerFunc`.",
+        "The same function already wraps operational errors with `%w` (line 37), showing wrapped errors are expected in this flow.",
+        "Nearby tests in other modules use `errors.Is` for contract checks (goseg/system/disk_health_test.go:22,40; goseg/shipworkflow/lifecycle_test.go:19,29,63), creating inconsistent timeout/error matching behavior."
+      ],
+      "suggestion": "Change deadline handling to `errors.Is(err, context.DeadlineExceeded)` (or a dedicated timeout sentinel), and add a test where poller returns a wrapped deadline error to lock behavior.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_contract_assertion_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "init_failure_memoized_forever",
+      "summary": "Config bootstrap memoizes first initialization error indefinitely, making transient failures permanent and failure modes inconsistent with recoverable I/O operations.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/bootstrap_test.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "goseg/config/bootstrap.go:41-46 stores first `initializeConfig()` result in package-level `initErr` guarded by `sync.Once`.",
+        "initializeConfig performs multiple external I/O steps (`openOrCreateConfigFile`, `persistConfig`, `ensureSessionKeyExists`, `UpdateConfigTyped`) where transient errors are possible (lines 59-95).",
+        "No bootstrap test covers retry-after-failure semantics; current tests in goseg/config/bootstrap_test.go only cover environment and runtime-mode helpers."
+      ],
+      "suggestion": "Split permanent validation errors from transient I/O errors and allow retry on transient failures (for example via guarded state machine or resettable initializer used by startup orchestration), then add tests for first-call failure followed by successful retry.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "error_lifecycle_state_coupling"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "protocol_error_contracts_not_type_checked",
+      "summary": "Protocol conformance tests validate failure presence/messages but not stable error identity, leaving validator error contracts inconsistent and fragile.",
+      "related_files": [
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/system/disk_health_test.go"
+      ],
+      "evidence": [
+        "goseg/protocol/conformance/fixtures_test.go:35-37 only checks `err != nil` for unknown action fixture errors.",
+        "goseg/protocol/contracts/family_specs_test.go:71 and 95 rely on `strings.Contains(err.Error(), ...)` message matching.",
+        "By contrast, goseg/system/disk_health_test.go asserts wrapping semantics with `errors.Is`, indicating a stronger and more stable error contract style elsewhere."
+      ],
+      "suggestion": "Introduce exported sentinel/type errors for protocol validation failures (e.g., unknown action, unexpected ID, unknown deprecation target) and migrate tests to `errors.Is`/`errors.As` assertions instead of substring checks.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_assertion_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "disk_storage_error_paths_untested",
+      "summary": "Disk storage test coverage includes a placeholder smoke test, so error propagation contracts are not consistently enforced across disk entry points.",
+      "related_files": [
+        "goseg/system/disk_storage_test.go",
+        "goseg/system/disk_shims_test.go",
+        "goseg/system/disk_health_test.go"
+      ],
+      "evidence": [
+        "goseg/system/disk_storage_test.go:5-8 contains only an unreachable placeholder (`if false`) and no behavioral assertions.",
+        "Other disk shim tests (goseg/system/disk_health_test.go) explicitly verify wrapped command/stat error propagation, demonstrating stronger expectations in sibling tests.",
+        "The mismatch means some disk wrappers may regress in error shape/context without failing tests."
+      ],
+      "suggestion": "Replace the placeholder with table-driven tests for key disk-storage wrappers and assert error wrapping/identity consistently (including command failures, parse failures, and filesystem failures).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_assertion_drift"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 3,
+    "dimension_coverage": 0.5,
+    "evidence_density": 1.25,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 20.1,
+    "dimensions_with_findings": 2
+  },
+  "review_scope": {
+    "reviewed_files_count": 15,
+    "successful_batch_count": 3,
+    "full_sweep_included": false,
+    "total_files": 612,
+    "imported_dimensions": [
+      "error_consistency",
+      "package_organization"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/shipworkflow/doc.go",
+    "goseg/shipworkflow/lifecycle.go",
+    "goseg/shipworkflow/lifecycle_test.go",
+    "goseg/config/bootstrap.go",
+    "goseg/config/bootstrap_test.go",
+    "goseg/config/config.go",
+    "goseg/system/disk_health_test.go",
+    "goseg/system/disk_shims_test.go",
+    "goseg/system/disk_storage_test.go",
+    "README.md",
+    "goseg/protocol/actionids/actionids.go",
+    "goseg/protocol/conformance/fixtures_test.go",
+    "goseg/protocol/contracts/family_specs_test.go",
+    "goseg/protocol/contracts/protocol_contracts.go",
+    "goseg/protocol/contracts/startram_contracts.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_193551",
+    "created_at": "2026-03-04T19:37:09+00:00",
+    "batch_count": 3,
+    "batch_indexes": [
+      1,
+      2,
+      3
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "68ee61cb18c9aaf4e288fd63dd71aea847a75e0e8c5b60b33daf386e39b767e5"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "error_consistency",
+      "package_organization"
+    ],
+    "imported_dimensions": [
+      "error_consistency",
+      "package_organization"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "design_coherence"
+    ]
+  }
+}

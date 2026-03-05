@@ -43,14 +43,19 @@ func resolveWiFiRuntimeState(overrides ...*wifiRuntimeState) *wifiRuntimeState {
 	return DefaultWiFiRuntimeState()
 }
 
-func ConfChannel(state ...*wifiRuntimeState) chan string {
+func ConfigEventChannel(state ...*wifiRuntimeState) chan string {
 	resolvedState := resolveWiFiRuntimeState(state...)
-	resolvedState.wifiStateMu.RLock()
-	defer resolvedState.wifiStateMu.RUnlock()
+	resolvedState.wifiStateMu.Lock()
+	defer resolvedState.wifiStateMu.Unlock()
 	if resolvedState.confChannel == nil {
 		resolvedState.confChannel = make(chan string, 100)
 	}
 	return resolvedState.confChannel
+}
+
+// ConfChannel is a backwards-compatible alias for ConfigEventChannel.
+func ConfChannel(state ...*wifiRuntimeState) chan string {
+	return ConfigEventChannel(state...)
 }
 
 func LocalUrl(state ...*wifiRuntimeState) string {

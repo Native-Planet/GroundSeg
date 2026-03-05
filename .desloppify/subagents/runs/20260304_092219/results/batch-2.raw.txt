@@ -1,0 +1,145 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 48.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "The batch repeatedly introduces tiny interface/struct seam pairs (for example in startup orchestration and importer runtime composition) that are resolved through default/override plumbing before every concrete call path.",
+        "Several packages expose function-field-heavy runtime bundles and then immediately pass only one concrete implementation through them, which weakens abstraction leverage while retaining significant indirection cost.",
+        "Global context access in config is provided through exported package-level snapshot/paths, increasing coupling between unrelated layers instead of explicit constructor-injected dependencies."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 35.5,
+        "indirection_cost": 48.0,
+        "interface_honesty": 29.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_bundle_overabstraction",
+      "summary": "Cross-cutting runtime-seam pattern is overused and duplicated, adding abstraction overhead without increasing substitutability.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/rectify/rectify_services.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "Startup orchestration wires behavior through a runtime contract and a dedicated runtime struct, while concrete logic is still in local package methods.",
+        "Importer uses multiple runtime structs plus default constructors and merge helpers for storage/upload/provision behavior.",
+        "Rectify and logstream packages mirror this same layering with default-runtime helpers and resolve/with-defaults flow, creating repeated indirection patterns across unrelated domains.",
+        "In each case, interfaces are introduced to model single-package implementation seams that are only loosely exercised by package-local tests."
+      ],
+      "suggestion": "Replace the repeated tiny seam architecture with explicit dependency structs per subsystem entrypoint, injecting only the concrete collaborators needed by production code; keep interface boundaries only where there are actual alternate implementations.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overengineering"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "single_impl_contracts",
+      "summary": "Interfaces are used as default-impl wrappers with no visible alternative implementation, weakening interface honesty.",
+      "related_files": [
+        "goseg/broadcast/transitions.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`transitions` defines a store contract that exists to wrap behavior already implemented in the same package’s concrete runtime/state path.",
+        "`startBackgroundServicesRuntimeContract` is defined for `startBackgroundServicesRuntime`-style delegation rather than domain-level polymorphism.",
+        "`wireguard` runtime helpers and orchestration call sites pass through narrow interface layers that mirror concrete helper methods and add extra call depth."
+      ],
+      "suggestion": "Collapse these wrapper interfaces into concrete types when there is no documented alternate implementation, or move interface definitions outward to package boundaries where alternate implementations are expected.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overengineering"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_global_context_leak",
+      "summary": "Config context is stored in exported package-level globals, creating hidden coupling and difficult-to-reason dependency flow.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/main.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "Config module exposes global snapshot/context accessors (for example runtime context and base/docker path fields) and populates them through mutable package state.",
+        "Multiple subsystems consume these globals indirectly instead of receiving explicit context inputs.",
+        "This increases accidental shared-state coupling and makes abstraction boundaries depend on process-wide mutable state rather than explicit inputs."
+      ],
+      "suggestion": "Thread an immutable configuration/runtime context object through constructor parameters and function signatures; avoid exported mutable globals and mutable setters for cross-package coordination.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_context_hidden_dependencies"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wrapper_duplication_in_event_publishers",
+      "summary": "Event publishing abstractions duplicate wrapper methods instead of composing a generic path, increasing maintenance drag.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "Event APIs provide multiple narrowly named publish functions with near-identical control flow, each hardcoding event-specific shape/dispatch rather than a reusable strategy.",
+        "Callers still pass through extra levels to these wrappers from loop and wireguard paths, increasing cognitive overhead while gaining little abstraction benefit.",
+        "The abstraction boundary appears to optimize for call-site readability but not for variation points or extension points."
+      ],
+      "suggestion": "Introduce a small event-dispatch helper with a constrained payload/type descriptor and keep only truly variant event types in one generic path.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "constants_blob_config_hardening",
+      "summary": "Embedded default payload blobs and version defaults couple defaults/parsing to build-time static state and weaken configuration abstraction.",
+      "related_files": [
+        "goseg/defaults/defaults.go",
+        "goseg/defaults/version.go",
+        "goseg/config/config_update_registry.go"
+      ],
+      "evidence": [
+        "Defaults and version metadata are kept in package-level raw constants/JSON and parsed at init rather than modeled as typed, injectable provider objects.",
+        "Runtime code reads these monolithic constants through shared package imports, reducing the value of abstraction boundaries and making targeted overrides harder.",
+        "Update flows then rely on runtime patch logic for small overrides instead of clean replacement points."
+      ],
+      "suggestion": "Convert defaults/version seeds into typed providers loaded through dependency injection, with small composable fragments per subsystem and explicit override hooks for tests/CLI.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overengineering"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Systemic over-abstraction around test seams and defaults has produced repeated interface/struct runtime layers with low substitutability.",
+      "Context flows are still global and implicit, masking dependencies and reducing boundary clarity.",
+      "Many wrappers exist for minor adaptation, favoring call-stack indirection over compositional design."
+    ],
+    "likely_symptoms": [
+      "runtime_bundle_overabstraction",
+      "single_impl_contracts",
+      "config_global_context_leak",
+      "wrapper_duplication_in_event_publishers",
+      "constants_blob_config_hardening"
+    ],
+    "possible_false_positives": [
+      "Some interfaces may be intentionally retained for upcoming alternate implementations; if such implementations are introduced later, severity of single_impl_contracts should be re-evaluated."
+    ]
+  }
+}

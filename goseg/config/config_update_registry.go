@@ -6,70 +6,27 @@ import (
 	"strings"
 )
 
-type confPatchFieldSpec[T any] struct {
-	key        string
-	patchField string
-	parse      confPatchValueParser[T]
-	target     confPatchValueRef[T]
-	apply      confPatchApplyValueFn[T]
-	hasUpdates func(T) bool
-	merge      confPatchMergeFn
-}
+type configPatchConfigFieldRef[T any] func(*structs.SysConfig) *T
 
-func configPatchFieldFromSpec[T any](spec confPatchFieldSpec[T]) confPatchField {
-	apply := spec.apply
-	if apply == nil {
-		return confPatchField{
-			key:        spec.key,
-			patchField: spec.patchField,
-			initErr:    fmt.Errorf("patch field spec requires explicit apply handler for %q", spec.key),
-			hasUpdates: func(_ *ConfPatch) bool {
-				return false
-			},
-		}
-	}
-	if spec.target.setValue == nil && spec.target.getValue == nil {
-		return confPatchField{
-			key:        spec.key,
-			patchField: spec.patchField,
-			initErr:    fmt.Errorf("patch field spec requires explicit target accessor for %q", spec.key),
-			hasUpdates: func(_ *ConfPatch) bool {
-				return false
-			},
-		}
-	}
-	return newConfPatchField(
-		spec.key,
-		spec.patchField,
-		spec.parse,
-		spec.target,
-		apply,
-		spec.hasUpdates,
-		spec.merge,
-	)
-}
-
-type confPatchConfigFieldRef[T any] func(*structs.SysConfig) *T
-
-type confPatchFieldBinding[T any] struct {
+type configPatchFieldBinding[T any] struct {
 	key         string
 	patchField  string
-	parse       confPatchValueParser[T]
-	target      confPatchValueRef[T]
-	configField confPatchConfigFieldRef[T]
-	apply       confPatchApplyValueFn[T]
+	parse       configPatchValueParser[T]
+	target      configPatchValueRef[T]
+	configField configPatchConfigFieldRef[T]
+	apply       configPatchApplyValueFn[T]
 	hasUpdates  func(T) bool
-	merge       confPatchMergeFn
+	merge       configPatchMergeFn
 }
 
-func sectionField[Section any, T any](section func(*structs.SysConfig) *Section, field func(*Section) *T) confPatchConfigFieldRef[T] {
+func sectionField[Section any, T any](section func(*structs.SysConfig) *Section, field func(*Section) *T) configPatchConfigFieldRef[T] {
 	return func(cfg *structs.SysConfig) *T {
 		return field(section(cfg))
 	}
 }
 
-func applyPatchField[T any](field confPatchConfigFieldRef[T]) confPatchApplyValueFn[T] {
-	return func(target confPatchApplyTarget, value T) error {
+func applyPatchField[T any](field configPatchConfigFieldRef[T]) configPatchApplyValueFn[T] {
+	return func(target configPatchApplyTarget, value T) error {
 		if target == nil || field == nil {
 			return nil
 		}
@@ -82,67 +39,93 @@ func applyPatchField[T any](field confPatchConfigFieldRef[T]) confPatchApplyValu
 	}
 }
 
-func parseStringField(key string) confPatchValueParser[string] {
+func parseStringField(key string) configPatchValueParser[string] {
 	return func(value interface{}) (string, error) {
 		return parseStringValue(key, value)
 	}
 }
 
-func parseBoolField(key string) confPatchValueParser[bool] {
+func parseBoolField(key string) configPatchValueParser[bool] {
 	return func(value interface{}) (bool, error) {
 		return parseBoolValue(key, value)
 	}
 }
 
-func parseIntField(key string) confPatchValueParser[int] {
+func parseIntField(key string) configPatchValueParser[int] {
 	return func(value interface{}) (int, error) {
 		return parseIntValue(key, value)
 	}
 }
 
-func configPatchFieldFromBinding[T any](spec confPatchFieldBinding[T]) confPatchField {
+func parseStringSliceField(key string) configPatchValueParser[[]string] {
+	return func(value interface{}) ([]string, error) {
+		return parseStringSliceValue(key, value)
+	}
+}
+
+func configPatchFieldFromBinding[T any](spec configPatchFieldBinding[T]) configPatchField {
 	apply := spec.apply
 	if apply == nil {
 		apply = applyPatchField(spec.configField)
 	}
-	return configPatchFieldFromSpec(confPatchFieldSpec[T]{
-		key:        spec.key,
-		patchField: spec.patchField,
-		parse:      spec.parse,
-		target:     spec.target,
-		apply:      apply,
-		hasUpdates: spec.hasUpdates,
-		merge:      spec.merge,
-	})
+	if apply == nil {
+		return configPatchField{
+			key:        spec.key,
+			patchField: spec.patchField,
+			initErr:    fmt.Errorf("patch field binding requires explicit apply handler for %q", spec.key),
+			hasUpdates: func(_ *ConfPatch) bool {
+				return false
+			},
+		}
+	}
+	if spec.target.setValue == nil && spec.target.getValue == nil {
+		return configPatchField{
+			key:        spec.key,
+			patchField: spec.patchField,
+			initErr:    fmt.Errorf("patch field binding requires explicit target accessor for %q", spec.key),
+			hasUpdates: func(_ *ConfPatch) bool {
+				return false
+			},
+		}
+	}
+	return newConfigPatchField(
+		spec.key,
+		spec.patchField,
+		spec.parse,
+		spec.target,
+		apply,
+		spec.hasUpdates,
+		spec.merge,
+	)
 }
 
-type confPatchFieldOptions[T any] struct {
-	apply      confPatchApplyValueFn[T]
+type configPatchFieldOptions[T any] struct {
+	apply      configPatchApplyValueFn[T]
 	hasUpdates func(T) bool
-	merge      confPatchMergeFn
+	merge      configPatchMergeFn
 }
 
-type confPatchSectionBuilder[Section any] struct {
+type configPatchSectionBuilder[Section any] struct {
 	configSection func(*structs.SysConfig) *Section
 }
 
-func newConfPatchSection[Section any](section func(*structs.SysConfig) *Section) confPatchSectionBuilder[Section] {
-	return confPatchSectionBuilder[Section]{
+func newConfigPatchSection[Section any](section func(*structs.SysConfig) *Section) configPatchSectionBuilder[Section] {
+	return configPatchSectionBuilder[Section]{
 		configSection: section,
 	}
 }
 
 func patchConfigFieldFromSection[Section any, T any](
-	builder confPatchSectionBuilder[Section],
+	builder configPatchSectionBuilder[Section],
 	key string,
 	patchField string,
-	target confPatchValueRef[T],
-	parse confPatchValueParser[T],
+	target configPatchValueRef[T],
+	parse configPatchValueParser[T],
 	cfgField func(*Section) *T,
-	options confPatchFieldOptions[T],
-) confPatchField {
+	options configPatchFieldOptions[T],
+) configPatchField {
 	configField := sectionField(builder.configSection, cfgField)
-	return configPatchFieldFromBinding(confPatchFieldBinding[T]{
+	return configPatchFieldFromBinding(configPatchFieldBinding[T]{
 		key:         key,
 		patchField:  patchField,
 		target:      target,
@@ -154,61 +137,71 @@ func patchConfigFieldFromSection[Section any, T any](
 	})
 }
 
-func (builder confPatchSectionBuilder[Section]) boolField(
+func (builder configPatchSectionBuilder[Section]) boolField(
 	key string,
 	patchField string,
-	target confPatchValueRef[bool],
+	target configPatchValueRef[bool],
 	cfgField func(*Section) *bool,
-	options confPatchFieldOptions[bool],
-) confPatchField {
+	options configPatchFieldOptions[bool],
+) configPatchField {
 	return patchConfigFieldFromSection(builder, key, patchField, target, parseBoolField(key), cfgField, options)
 }
 
-func (builder confPatchSectionBuilder[Section]) intField(
+func (builder configPatchSectionBuilder[Section]) intField(
 	key string,
 	patchField string,
-	target confPatchValueRef[int],
+	target configPatchValueRef[int],
 	cfgField func(*Section) *int,
-	options confPatchFieldOptions[int],
-) confPatchField {
+	options configPatchFieldOptions[int],
+) configPatchField {
 	return patchConfigFieldFromSection(builder, key, patchField, target, parseIntField(key), cfgField, options)
 }
 
-func (builder confPatchSectionBuilder[Section]) stringField(
+func (builder configPatchSectionBuilder[Section]) stringSliceField(
 	key string,
 	patchField string,
-	target confPatchValueRef[string],
+	target configPatchValueRef[[]string],
+	cfgField func(*Section) *[]string,
+	options configPatchFieldOptions[[]string],
+) configPatchField {
+	return patchConfigFieldFromSection(builder, key, patchField, target, parseStringSliceField(key), cfgField, options)
+}
+
+func (builder configPatchSectionBuilder[Section]) stringField(
+	key string,
+	patchField string,
+	target configPatchValueRef[string],
 	cfgField func(*Section) *string,
-	options confPatchFieldOptions[string],
-) confPatchField {
+	options configPatchFieldOptions[string],
+) configPatchField {
 	return patchConfigFieldFromSection(builder, key, patchField, target, parseStringField(key), cfgField, options)
 }
 
-func (builder confPatchSectionBuilder[Section]) boolOrConfigField(cfgField func(*Section) *bool) confPatchMergeFn {
-	return mergeBoolOrConfigField(sectionField(builder.configSection, cfgField))
-}
-
-func (builder confPatchSectionBuilder[Section]) boolSetField(cfgField func(*Section) *bool) confPatchMergeFn {
+func (builder configPatchSectionBuilder[Section]) boolSetField(cfgField func(*Section) *bool) configPatchMergeFn {
 	return mergeBoolSetRef(sectionField(builder.configSection, cfgField))
 }
 
-func (builder confPatchSectionBuilder[Section]) stringSetIfNonEmptyField(cfgField func(*Section) *string) confPatchMergeFn {
+func (builder configPatchSectionBuilder[Section]) boolSetDirectField(cfgField func(*Section) *bool) configPatchMergeFn {
+	return mergeBoolSetDirectRef(sectionField(builder.configSection, cfgField))
+}
+
+func (builder configPatchSectionBuilder[Section]) stringSetIfNonEmptyField(cfgField func(*Section) *string) configPatchMergeFn {
 	return mergeStringSetIfNonEmptyRef(sectionField(builder.configSection, cfgField))
 }
 
-func (builder confPatchSectionBuilder[Section]) stringSetDirectField(cfgField func(*Section) *string) confPatchMergeFn {
+func (builder configPatchSectionBuilder[Section]) stringSetDirectField(cfgField func(*Section) *string) configPatchMergeFn {
 	return mergeStringSetDirectRef(sectionField(builder.configSection, cfgField))
 }
 
-func (builder confPatchSectionBuilder[Section]) intSetIfNonZeroField(cfgField func(*Section) *int) confPatchMergeFn {
+func (builder configPatchSectionBuilder[Section]) intSetIfNonZeroField(cfgField func(*Section) *int) configPatchMergeFn {
 	return mergeIntSetIfNonZeroRef(sectionField(builder.configSection, cfgField))
 }
 
-func (builder confPatchSectionBuilder[Section]) stringSliceIfNonEmptyField(cfgField func(*Section) *[]string) confPatchMergeFn {
+func (builder configPatchSectionBuilder[Section]) stringSliceIfNonEmptyField(cfgField func(*Section) *[]string) configPatchMergeFn {
 	return mergeStringSliceSetIfNonEmptyRef(sectionField(builder.configSection, cfgField))
 }
 
-func mergeIfString(configField confPatchConfigFieldRef[string], shouldMerge func(string) bool) confPatchMergeFn {
+func mergeIfString(configField configPatchConfigFieldRef[string], shouldMerge func(string) bool) configPatchMergeFn {
 	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
 		if shouldMerge == nil {
 			shouldMerge = func(_ string) bool { return true }
@@ -224,7 +217,7 @@ func mergeIfString(configField confPatchConfigFieldRef[string], shouldMerge func
 	}
 }
 
-func mergeIfInt(configField confPatchConfigFieldRef[int], shouldMerge func(int) bool) confPatchMergeFn {
+func mergeIfInt(configField configPatchConfigFieldRef[int], shouldMerge func(int) bool) configPatchMergeFn {
 	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
 		if shouldMerge == nil {
 			shouldMerge = func(_ int) bool { return true }
@@ -240,7 +233,7 @@ func mergeIfInt(configField confPatchConfigFieldRef[int], shouldMerge func(int) 
 	}
 }
 
-func mergeIfBool(configField confPatchConfigFieldRef[bool], shouldMerge func(bool) bool) confPatchMergeFn {
+func mergeIfBool(configField configPatchConfigFieldRef[bool], shouldMerge func(bool) bool) configPatchMergeFn {
 	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
 		if shouldMerge == nil {
 			shouldMerge = func(_ bool) bool { return true }
@@ -251,25 +244,12 @@ func mergeIfBool(configField confPatchConfigFieldRef[bool], shouldMerge func(boo
 		}
 		destination := configField(mergedConfig)
 		if destination != nil {
-			*destination = *value
+			*destination = *destination || *value
 		}
 	}
 }
 
-func mergeBoolOrConfigField(configField confPatchConfigFieldRef[bool]) confPatchMergeFn {
-	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
-		value := configField(&customConfig)
-		if value == nil || !*value {
-			return
-		}
-		destination := configField(mergedConfig)
-		if destination != nil {
-			*destination = true
-		}
-	}
-}
-
-func mergeSliceWhen[T any](configField confPatchConfigFieldRef[[]T], shouldMerge func([]T) bool) confPatchMergeFn {
+func mergeSliceWhen[T any](configField configPatchConfigFieldRef[[]T], shouldMerge func([]T) bool) configPatchMergeFn {
 	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
 		if shouldMerge == nil {
 			shouldMerge = func(_ []T) bool { return true }
@@ -286,23 +266,36 @@ func mergeSliceWhen[T any](configField confPatchConfigFieldRef[[]T], shouldMerge
 	}
 }
 
-func mergeStringSetIfNonEmptyRef(configField confPatchConfigFieldRef[string]) confPatchMergeFn {
+func mergeStringSetIfNonEmptyRef(configField configPatchConfigFieldRef[string]) configPatchMergeFn {
 	return mergeIfString(configField, func(value string) bool { return value != "" })
 }
 
-func mergeStringSetDirectRef(configField confPatchConfigFieldRef[string]) confPatchMergeFn {
+func mergeStringSetDirectRef(configField configPatchConfigFieldRef[string]) configPatchMergeFn {
 	return mergeIfString(configField, nil)
 }
 
-func mergeIntSetIfNonZeroRef(configField confPatchConfigFieldRef[int]) confPatchMergeFn {
+func mergeIntSetIfNonZeroRef(configField configPatchConfigFieldRef[int]) configPatchMergeFn {
 	return mergeIfInt(configField, func(value int) bool { return value != 0 })
 }
 
-func mergeBoolSetRef(configField confPatchConfigFieldRef[bool]) confPatchMergeFn {
+func mergeBoolSetRef(configField configPatchConfigFieldRef[bool]) configPatchMergeFn {
 	return mergeIfBool(configField, nil)
 }
 
-func mergeStringSliceSetIfNonEmptyRef(configField confPatchConfigFieldRef[[]string]) confPatchMergeFn {
+func mergeBoolSetDirectRef(configField configPatchConfigFieldRef[bool]) configPatchMergeFn {
+	return func(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+		value := configField(&customConfig)
+		if value == nil {
+			return
+		}
+		destination := configField(mergedConfig)
+		if destination != nil {
+			*destination = *value
+		}
+	}
+}
+
+func mergeStringSliceSetIfNonEmptyRef(configField configPatchConfigFieldRef[[]string]) configPatchMergeFn {
 	return mergeSliceWhen(configField, func(value []string) bool { return len(value) > 0 })
 }
 
@@ -320,7 +313,10 @@ func mergeLinuxUpdates(_ structs.SysConfig, customConfig structs.SysConfig, merg
 func mergeSetupFromConfig(_ structs.SysConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
 	if customConfig.AuthSession.PwHash == "" {
 		mergedConfig.Runtime.Setup = "start"
-		mergedConfig.AuthSession.Salt = RandString(32)
+		salt, err := RandStringWithError(32)
+		if err == nil {
+			mergedConfig.AuthSession.Salt = salt
+		}
 		return
 	}
 
@@ -366,38 +362,34 @@ func mergePenpaiActive(_ structs.SysConfig, customConfig structs.SysConfig, merg
 	}
 }
 
-func allConfPatchFields() []confPatchField {
-	connectivity := newConfPatchSection(func(cfg *structs.SysConfig) *structs.ConnectivityConfig {
+func allConfigPatchFields() []configPatchField {
+	connectivity := newConfigPatchSection(func(cfg *structs.SysConfig) *structs.ConnectivityConfig {
 		return &cfg.Connectivity
 	})
-	startram := newConfPatchSection(func(cfg *structs.SysConfig) *structs.StartramConfig {
+	startram := newConfigPatchSection(func(cfg *structs.SysConfig) *structs.StartramConfig {
 		return &cfg.Startram
 	})
-	runtime := newConfPatchSection(func(cfg *structs.SysConfig) *structs.RuntimeConfig {
+	runtime := newConfigPatchSection(func(cfg *structs.SysConfig) *structs.RuntimeConfig {
 		return &cfg.Runtime
 	})
-	penpai := newConfPatchSection(func(cfg *structs.SysConfig) *structs.PenpaiConfig {
+	penpai := newConfigPatchSection(func(cfg *structs.SysConfig) *structs.PenpaiConfig {
 		return &cfg.Penpai
 	})
-	authSession := newConfPatchSection(func(cfg *structs.SysConfig) *structs.AuthSessionConfig {
+	authSession := newConfigPatchSection(func(cfg *structs.SysConfig) *structs.AuthSessionConfig {
 		return &cfg.AuthSession
 	})
 
-	fields := []confPatchField{
-		patchConfigFieldFromSection(
-			connectivity,
+	fields := []configPatchField{
+		connectivity.stringSliceField(
 			"piers",
 			"Piers",
-			confPatchPointerRef(func(patch *ConfPatch) **[]string {
+			configPatchPointerRef(func(patch *ConfPatch) **[]string {
 				return &patch.Piers
 			}),
-			func(value interface{}) ([]string, error) {
-				return parseStringSliceValue("piers", value)
-			},
 			func(cfg *structs.ConnectivityConfig) *[]string {
 				return &cfg.Piers
 			},
-			confPatchFieldOptions[[]string]{
+			configPatchFieldOptions[[]string]{
 				hasUpdates: func(value []string) bool {
 					return len(value) > 0
 				},
@@ -409,14 +401,14 @@ func allConfPatchFields() []confPatchField {
 		connectivity.boolField(
 			"wgOn",
 			"WgOn",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.WgOn
 			}),
 			func(cfg *structs.ConnectivityConfig) *bool {
 				return &cfg.WgOn
 			},
-			confPatchFieldOptions[bool]{
-				merge: connectivity.boolOrConfigField(func(cfg *structs.ConnectivityConfig) *bool {
+			configPatchFieldOptions[bool]{
+				merge: connectivity.boolSetField(func(cfg *structs.ConnectivityConfig) *bool {
 					return &cfg.WgOn
 				}),
 			},
@@ -424,29 +416,29 @@ func allConfPatchFields() []confPatchField {
 		connectivity.stringField(
 			"endpointUrl",
 			"EndpointURL",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.EndpointURL
 			}),
 			func(cfg *structs.ConnectivityConfig) *string {
-				return &cfg.EndpointUrl
+				return &cfg.EndpointURL
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
-					return &cfg.EndpointUrl
+					return &cfg.EndpointURL
 				}),
 			},
 		),
 		connectivity.boolField(
 			"wgRegistered",
 			"WgRegistered",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.WgRegistered
 			}),
 			func(cfg *structs.ConnectivityConfig) *bool {
 				return &cfg.WgRegistered
 			},
-			confPatchFieldOptions[bool]{
-				merge: connectivity.boolOrConfigField(func(cfg *structs.ConnectivityConfig) *bool {
+			configPatchFieldOptions[bool]{
+				merge: connectivity.boolSetField(func(cfg *structs.ConnectivityConfig) *bool {
 					return &cfg.WgRegistered
 				}),
 			},
@@ -454,13 +446,13 @@ func allConfPatchFields() []confPatchField {
 		connectivity.stringField(
 			"remoteBackupPassword",
 			"RemoteBackupPassword",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.RemoteBackupPassword
 			}),
 			func(cfg *structs.ConnectivityConfig) *string {
 				return &cfg.RemoteBackupPassword
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: connectivity.stringSetDirectField(func(cfg *structs.ConnectivityConfig) *string {
 					return &cfg.RemoteBackupPassword
 				}),
@@ -469,13 +461,13 @@ func allConfPatchFields() []confPatchField {
 		connectivity.stringField(
 			"netCheck",
 			"NetCheck",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.NetCheck
 			}),
 			func(cfg *structs.ConnectivityConfig) *string {
 				return &cfg.NetCheck
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
 					return &cfg.NetCheck
 				}),
@@ -484,13 +476,13 @@ func allConfPatchFields() []confPatchField {
 		connectivity.stringField(
 			"updateMode",
 			"UpdateMode",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.UpdateMode
 			}),
 			func(cfg *structs.ConnectivityConfig) *string {
 				return &cfg.UpdateMode
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
 					return &cfg.UpdateMode
 				}),
@@ -498,29 +490,29 @@ func allConfPatchFields() []confPatchField {
 		),
 		connectivity.stringField(
 			"updateUrl",
-			"UpdateUrl",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
-				return &patch.UpdateUrl
+			"UpdateURL",
+			configPatchPointerRef(func(patch *ConfPatch) **string {
+				return &patch.UpdateURL
 			}),
 			func(cfg *structs.ConnectivityConfig) *string {
-				return &cfg.UpdateUrl
+				return &cfg.UpdateURL
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
-					return &cfg.UpdateUrl
+					return &cfg.UpdateURL
 				}),
 			},
 		),
 		connectivity.stringField(
 			"updateBranch",
 			"UpdateBranch",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.UpdateBranch
 			}),
 			func(cfg *structs.ConnectivityConfig) *string {
 				return &cfg.UpdateBranch
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
 					return &cfg.UpdateBranch
 				}),
@@ -529,13 +521,13 @@ func allConfPatchFields() []confPatchField {
 		connectivity.stringField(
 			"apiVersion",
 			"ApiVersion",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.ApiVersion
 			}),
 			func(cfg *structs.ConnectivityConfig) *string {
 				return &cfg.ApiVersion
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: connectivity.stringSetIfNonEmptyField(func(cfg *structs.ConnectivityConfig) *string {
 					return &cfg.ApiVersion
 				}),
@@ -543,30 +535,30 @@ func allConfPatchFields() []confPatchField {
 		),
 		connectivity.intField(
 			"c2cInterval",
-			"C2cInterval",
-			confPatchPointerRef(func(patch *ConfPatch) **int {
-				return &patch.C2cInterval
+			"C2CInterval",
+			configPatchPointerRef(func(patch *ConfPatch) **int {
+				return &patch.C2CInterval
 			}),
 			func(cfg *structs.ConnectivityConfig) *int {
-				return &cfg.C2cInterval
+				return &cfg.C2CInterval
 			},
-			confPatchFieldOptions[int]{
+			configPatchFieldOptions[int]{
 				merge: connectivity.intSetIfNonZeroField(func(cfg *structs.ConnectivityConfig) *int {
-					return &cfg.C2cInterval
+					return &cfg.C2CInterval
 				}),
 			},
 		),
-		configPatchFieldFromBinding(confPatchFieldBinding[map[string]structs.DiskWarning]{
+		configPatchFieldFromBinding(configPatchFieldBinding[map[string]structs.DiskWarning]{
 			key:        "diskWarning",
 			patchField: "DiskWarning",
-			target:     confPatchPointerRef(func(patch *ConfPatch) **map[string]structs.DiskWarning { return &patch.DiskWarning }),
+			target:     configPatchPointerRef(func(patch *ConfPatch) **map[string]structs.DiskWarning { return &patch.DiskWarning }),
 			parse: func(value interface{}) (map[string]structs.DiskWarning, error) {
 				return parseDiskWarningMap("diskWarning", value)
 			},
 			hasUpdates: func(warnings map[string]structs.DiskWarning) bool {
 				return len(warnings) > 0
 			},
-			apply: func(target confPatchApplyTarget, value map[string]structs.DiskWarning) error {
+			apply: func(target configPatchApplyTarget, value map[string]structs.DiskWarning) error {
 				if target == nil {
 					return nil
 				}
@@ -579,14 +571,14 @@ func allConfPatchFields() []confPatchField {
 		startram.boolField(
 			"startramSetReminderOne",
 			"StartramReminderOne",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.StartramReminderOne
 			}),
 			func(cfg *structs.StartramConfig) *bool {
 				return &cfg.StartramSetReminder.One
 			},
-			confPatchFieldOptions[bool]{
-				merge: startram.boolOrConfigField(func(cfg *structs.StartramConfig) *bool {
+			configPatchFieldOptions[bool]{
+				merge: startram.boolSetField(func(cfg *structs.StartramConfig) *bool {
 					return &cfg.StartramSetReminder.One
 				}),
 			},
@@ -594,14 +586,14 @@ func allConfPatchFields() []confPatchField {
 		startram.boolField(
 			"startramSetReminderThree",
 			"StartramReminderThree",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.StartramReminderThree
 			}),
 			func(cfg *structs.StartramConfig) *bool {
 				return &cfg.StartramSetReminder.Three
 			},
-			confPatchFieldOptions[bool]{
-				merge: startram.boolOrConfigField(func(cfg *structs.StartramConfig) *bool {
+			configPatchFieldOptions[bool]{
+				merge: startram.boolSetField(func(cfg *structs.StartramConfig) *bool {
 					return &cfg.StartramSetReminder.Three
 				}),
 			},
@@ -609,14 +601,14 @@ func allConfPatchFields() []confPatchField {
 		startram.boolField(
 			"startramSetReminderSeven",
 			"StartramReminderSeven",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.StartramReminderSeven
 			}),
 			func(cfg *structs.StartramConfig) *bool {
 				return &cfg.StartramSetReminder.Seven
 			},
-			confPatchFieldOptions[bool]{
-				merge: startram.boolOrConfigField(func(cfg *structs.StartramConfig) *bool {
+			configPatchFieldOptions[bool]{
+				merge: startram.boolSetField(func(cfg *structs.StartramConfig) *bool {
 					return &cfg.StartramSetReminder.Seven
 				}),
 			},
@@ -624,13 +616,13 @@ func allConfPatchFields() []confPatchField {
 		startram.stringField(
 			"pubkey",
 			"Pubkey",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.Pubkey
 			}),
 			func(cfg *structs.StartramConfig) *string {
 				return &cfg.Pubkey
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: startram.stringSetIfNonEmptyField(func(cfg *structs.StartramConfig) *string {
 					return &cfg.Pubkey
 				}),
@@ -639,13 +631,13 @@ func allConfPatchFields() []confPatchField {
 		startram.stringField(
 			"privkey",
 			"Privkey",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.Privkey
 			}),
 			func(cfg *structs.StartramConfig) *string {
 				return &cfg.Privkey
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: startram.stringSetIfNonEmptyField(func(cfg *structs.StartramConfig) *string {
 					return &cfg.Privkey
 				}),
@@ -654,13 +646,13 @@ func allConfPatchFields() []confPatchField {
 		startram.boolField(
 			"disableSlsa",
 			"DisableSlsa",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.DisableSlsa
 			}),
 			func(cfg *structs.StartramConfig) *bool {
 				return &cfg.DisableSlsa
 			},
-			confPatchFieldOptions[bool]{
+			configPatchFieldOptions[bool]{
 				merge: startram.boolSetField(func(cfg *structs.StartramConfig) *bool {
 					return &cfg.DisableSlsa
 				}),
@@ -670,14 +662,14 @@ func allConfPatchFields() []confPatchField {
 		runtime.boolField(
 			"gracefulExit",
 			"GracefulExit",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.GracefulExit
 			}),
 			func(cfg *structs.RuntimeConfig) *bool {
 				return &cfg.GracefulExit
 			},
-			confPatchFieldOptions[bool]{
-				merge: runtime.boolOrConfigField(func(cfg *structs.RuntimeConfig) *bool {
+			configPatchFieldOptions[bool]{
+				merge: runtime.boolSetField(func(cfg *structs.RuntimeConfig) *bool {
 					return &cfg.GracefulExit
 				}),
 			},
@@ -685,13 +677,13 @@ func allConfPatchFields() []confPatchField {
 		runtime.intField(
 			"swapVal",
 			"SwapVal",
-			confPatchPointerRef(func(patch *ConfPatch) **int {
+			configPatchPointerRef(func(patch *ConfPatch) **int {
 				return &patch.SwapVal
 			}),
 			func(cfg *structs.RuntimeConfig) *int {
 				return &cfg.SwapVal
 			},
-			confPatchFieldOptions[int]{
+			configPatchFieldOptions[int]{
 				merge: runtime.intSetIfNonZeroField(func(cfg *structs.RuntimeConfig) *int {
 					return &cfg.SwapVal
 				}),
@@ -700,28 +692,28 @@ func allConfPatchFields() []confPatchField {
 		runtime.stringField(
 			"swapFile",
 			"SwapFile",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.SwapFile
 			}),
 			func(cfg *structs.RuntimeConfig) *string {
 				return &cfg.SwapFile
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
 					return &cfg.SwapFile
 				}),
 			},
 		),
-		configPatchFieldFromBinding(confPatchFieldBinding[linuxUpdatesPatch]{
+		configPatchFieldFromBinding(configPatchFieldBinding[linuxUpdatesPatch]{
 			key:        "linuxUpdates",
 			patchField: "LinuxUpdates",
-			target: confPatchPointerRef(func(patch *ConfPatch) **linuxUpdatesPatch {
+			target: configPatchPointerRef(func(patch *ConfPatch) **linuxUpdatesPatch {
 				return &patch.LinuxUpdates
 			}),
 			parse: func(value interface{}) (linuxUpdatesPatch, error) {
 				return parseLinuxUpdatesValue("linuxUpdates", value)
 			},
-			apply: func(target confPatchApplyTarget, value linuxUpdatesPatch) error {
+			apply: func(target configPatchApplyTarget, value linuxUpdatesPatch) error {
 				if target == nil {
 					return nil
 				}
@@ -739,13 +731,13 @@ func allConfPatchFields() []confPatchField {
 		runtime.stringField(
 			"dockerData",
 			"DockerData",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.DockerData
 			}),
 			func(cfg *structs.RuntimeConfig) *string {
 				return &cfg.DockerData
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
 					return &cfg.DockerData
 				}),
@@ -754,26 +746,26 @@ func allConfPatchFields() []confPatchField {
 		runtime.stringField(
 			"setup",
 			"Setup",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.Setup
 			}),
 			func(cfg *structs.RuntimeConfig) *string {
 				return &cfg.Setup
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: mergeSetupFromConfig,
 			},
 		),
 		runtime.stringField(
 			"cfgDir",
 			"CfgDir",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.CfgDir
 			}),
 			func(cfg *structs.RuntimeConfig) *string {
 				return &cfg.CfgDir
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
 					return &cfg.CfgDir
 				}),
@@ -782,13 +774,13 @@ func allConfPatchFields() []confPatchField {
 		runtime.intField(
 			"updateInterval",
 			"UpdateInterval",
-			confPatchPointerRef(func(patch *ConfPatch) **int {
+			configPatchPointerRef(func(patch *ConfPatch) **int {
 				return &patch.UpdateInterval
 			}),
 			func(cfg *structs.RuntimeConfig) *int {
 				return &cfg.UpdateInterval
 			},
-			confPatchFieldOptions[int]{
+			configPatchFieldOptions[int]{
 				merge: runtime.intSetIfNonZeroField(func(cfg *structs.RuntimeConfig) *int {
 					return &cfg.UpdateInterval
 				}),
@@ -797,14 +789,14 @@ func allConfPatchFields() []confPatchField {
 		runtime.boolField(
 			"disable502",
 			"Disable502",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.Disable502
 			}),
 			func(cfg *structs.RuntimeConfig) *bool {
 				return &cfg.Disable502
 			},
-			confPatchFieldOptions[bool]{
-				merge: runtime.boolOrConfigField(func(cfg *structs.RuntimeConfig) *bool {
+			configPatchFieldOptions[bool]{
+				merge: runtime.boolSetField(func(cfg *structs.RuntimeConfig) *bool {
 					return &cfg.Disable502
 				}),
 			},
@@ -812,13 +804,13 @@ func allConfPatchFields() []confPatchField {
 		runtime.intField(
 			"snapTime",
 			"SnapTime",
-			confPatchPointerRef(func(patch *ConfPatch) **int {
+			configPatchPointerRef(func(patch *ConfPatch) **int {
 				return &patch.SnapTime
 			}),
 			func(cfg *structs.RuntimeConfig) *int {
 				return &cfg.SnapTime
 			},
-			confPatchFieldOptions[int]{
+			configPatchFieldOptions[int]{
 				merge: runtime.intSetIfNonZeroField(func(cfg *structs.RuntimeConfig) *int {
 					return &cfg.SnapTime
 				}),
@@ -827,13 +819,13 @@ func allConfPatchFields() []confPatchField {
 		runtime.stringField(
 			"lastKnownMDNS",
 			"LastKnownMDNS",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.LastKnownMDNS
 			}),
 			func(cfg *structs.RuntimeConfig) *string {
 				return &cfg.LastKnownMDNS
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
 					return &cfg.LastKnownMDNS
 				}),
@@ -842,13 +834,13 @@ func allConfPatchFields() []confPatchField {
 		runtime.stringField(
 			"gsVersion",
 			"GSVersion",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.GSVersion
 			}),
 			func(cfg *structs.RuntimeConfig) *string {
 				return &cfg.GsVersion
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
 					return &cfg.GsVersion
 				}),
@@ -857,13 +849,13 @@ func allConfPatchFields() []confPatchField {
 		runtime.stringField(
 			"binHash",
 			"BinHash",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.BinHash
 			}),
 			func(cfg *structs.RuntimeConfig) *string {
 				return &cfg.BinHash
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: runtime.stringSetIfNonEmptyField(func(cfg *structs.RuntimeConfig) *string {
 					return &cfg.BinHash
 				}),
@@ -873,14 +865,14 @@ func allConfPatchFields() []confPatchField {
 		penpai.boolField(
 			"penpaiAllow",
 			"PenpaiAllow",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.PenpaiAllow
 			}),
 			func(cfg *structs.PenpaiConfig) *bool {
 				return &cfg.PenpaiAllow
 			},
-			confPatchFieldOptions[bool]{
-				merge: penpai.boolOrConfigField(func(cfg *structs.PenpaiConfig) *bool {
+			configPatchFieldOptions[bool]{
+				merge: penpai.boolSetField(func(cfg *structs.PenpaiConfig) *bool {
 					return &cfg.PenpaiAllow
 				}),
 			},
@@ -888,14 +880,14 @@ func allConfPatchFields() []confPatchField {
 		penpai.boolField(
 			"penpaiRunning",
 			"PenpaiRunning",
-			confPatchPointerRef(func(patch *ConfPatch) **bool {
+			configPatchPointerRef(func(patch *ConfPatch) **bool {
 				return &patch.PenpaiRunning
 			}),
 			func(cfg *structs.PenpaiConfig) *bool {
 				return &cfg.PenpaiRunning
 			},
-			confPatchFieldOptions[bool]{
-				merge: penpai.boolSetField(func(cfg *structs.PenpaiConfig) *bool {
+			configPatchFieldOptions[bool]{
+				merge: penpai.boolSetDirectField(func(cfg *structs.PenpaiConfig) *bool {
 					return &cfg.PenpaiRunning
 				}),
 			},
@@ -903,13 +895,13 @@ func allConfPatchFields() []confPatchField {
 		penpai.intField(
 			"penpaiCores",
 			"PenpaiCores",
-			confPatchPointerRef(func(patch *ConfPatch) **int {
+			configPatchPointerRef(func(patch *ConfPatch) **int {
 				return &patch.PenpaiCores
 			}),
 			func(cfg *structs.PenpaiConfig) *int {
 				return &cfg.PenpaiCores
 			},
-			confPatchFieldOptions[int]{
+			configPatchFieldOptions[int]{
 				merge: penpai.intSetIfNonZeroField(func(cfg *structs.PenpaiConfig) *int {
 					return &cfg.PenpaiCores
 				}),
@@ -918,24 +910,24 @@ func allConfPatchFields() []confPatchField {
 		penpai.stringField(
 			"penpaiActive",
 			"PenpaiActive",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.PenpaiActive
 			}),
 			func(cfg *structs.PenpaiConfig) *string {
 				return &cfg.PenpaiActive
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: mergePenpaiActive,
 			},
 		),
-		configPatchFieldFromBinding(confPatchFieldBinding[[]structs.Penpai]{
+		configPatchFieldFromBinding(configPatchFieldBinding[[]structs.Penpai]{
 			key:        "penpaiModels",
 			patchField: "PenpaiModels",
-			target:     confPatchValueAccessor(func(patch *ConfPatch) *[]structs.Penpai { return &patch.PenpaiModels }),
+			target:     configPatchValueAccessor(func(patch *ConfPatch) *[]structs.Penpai { return &patch.PenpaiModels }),
 			parse: func(value interface{}) ([]structs.Penpai, error) {
 				return parsePenpaiModels("penpaiModels", value)
 			},
-			apply: func(target confPatchApplyTarget, value []structs.Penpai) error {
+			apply: func(target configPatchApplyTarget, value []structs.Penpai) error {
 				if target == nil {
 					return nil
 				}
@@ -951,26 +943,26 @@ func allConfPatchFields() []confPatchField {
 		authSession.stringField(
 			"salt",
 			"Salt",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.Salt
 			}),
 			func(cfg *structs.AuthSessionConfig) *string {
 				return &cfg.Salt
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: mergeAuthSessionSalt,
 			},
 		),
 		authSession.stringField(
 			"keyFile",
 			"KeyFile",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.KeyFile
 			}),
 			func(cfg *structs.AuthSessionConfig) *string {
 				return &cfg.KeyFile
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: authSession.stringSetIfNonEmptyField(func(cfg *structs.AuthSessionConfig) *string {
 					return &cfg.KeyFile
 				}),
@@ -979,26 +971,26 @@ func allConfPatchFields() []confPatchField {
 		authSession.stringField(
 			"pwHash",
 			"PwHash",
-			confPatchPointerRef(func(patch *ConfPatch) **string {
+			configPatchPointerRef(func(patch *ConfPatch) **string {
 				return &patch.PwHash
 			}),
 			func(cfg *structs.AuthSessionConfig) *string {
 				return &cfg.PwHash
 			},
-			confPatchFieldOptions[string]{
+			configPatchFieldOptions[string]{
 				merge: authSession.stringSetIfNonEmptyField(func(cfg *structs.AuthSessionConfig) *string {
 					return &cfg.PwHash
 				}),
 			},
 		),
-		configPatchFieldFromBinding(confPatchFieldBinding[map[string]structs.SessionInfo]{
+		configPatchFieldFromBinding(configPatchFieldBinding[map[string]structs.SessionInfo]{
 			key:        "authorizedSessions",
 			patchField: "AuthorizedSessions",
-			target:     confPatchValueAccessor(func(patch *ConfPatch) *map[string]structs.SessionInfo { return &patch.AuthorizedSessions }),
+			target:     configPatchValueAccessor(func(patch *ConfPatch) *map[string]structs.SessionInfo { return &patch.AuthorizedSessions }),
 			parse: func(value interface{}) (map[string]structs.SessionInfo, error) {
 				return parseSessionMap("authorizedSessions", value)
 			},
-			apply: func(target confPatchApplyTarget, value map[string]structs.SessionInfo) error {
+			apply: func(target configPatchApplyTarget, value map[string]structs.SessionInfo) error {
 				if target == nil {
 					return nil
 				}
@@ -1010,14 +1002,14 @@ func allConfPatchFields() []confPatchField {
 			},
 			merge: mergeAuthSessionAuthorizedSessions,
 		}),
-		configPatchFieldFromBinding(confPatchFieldBinding[map[string]structs.SessionInfo]{
+		configPatchFieldFromBinding(configPatchFieldBinding[map[string]structs.SessionInfo]{
 			key:        "unauthorizedSessions",
 			patchField: "UnauthorizedSessions",
-			target:     confPatchValueAccessor(func(patch *ConfPatch) *map[string]structs.SessionInfo { return &patch.UnauthorizedSessions }),
+			target:     configPatchValueAccessor(func(patch *ConfPatch) *map[string]structs.SessionInfo { return &patch.UnauthorizedSessions }),
 			parse: func(value interface{}) (map[string]structs.SessionInfo, error) {
 				return parseSessionMap("unauthorizedSessions", value)
 			},
-			apply: func(target confPatchApplyTarget, value map[string]structs.SessionInfo) error {
+			apply: func(target configPatchApplyTarget, value map[string]structs.SessionInfo) error {
 				if target == nil {
 					return nil
 				}
@@ -1031,10 +1023,10 @@ func allConfPatchFields() []confPatchField {
 		}),
 	}
 
-	fields = append(fields, unsupportedPatchField(confPatchFieldBinding[string]{})...)
+	fields = append(fields, unsupportedPatchField(configPatchFieldBinding[string]{})...)
 	return fields
 }
 
-func unsupportedPatchField(_ confPatchFieldBinding[string]) []confPatchField {
-	return []confPatchField{unsupportedConfPatchField("isEMMCMachine")}
+func unsupportedPatchField(_ configPatchFieldBinding[string]) []configPatchField {
+	return []configPatchField{unsupportedConfigPatchField("isEMMCMachine")}
 }

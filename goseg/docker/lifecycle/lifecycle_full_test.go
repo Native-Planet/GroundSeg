@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"groundseg/docker/registry"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
@@ -61,8 +63,8 @@ func TestContainerPlanForPropagatesImageLookupAndPullErrors(t *testing.T) {
 		WithContainerConfigResolver(func(_, _ string) (container.Config, container.HostConfig, error) {
 			return container.Config{}, container.HostConfig{}, nil
 		}),
-		WithImageInfoLookup(func(_ string) (map[string]string, error) {
-			return nil, errors.New("lookup failed")
+		WithImageInfoLookup(func(_ string) (registry.ImageDescriptor, error) {
+			return registry.ImageDescriptor{}, errors.New("lookup failed")
 		}),
 	)
 	if _, err := rt.containerPlanFor("netdata", "netdata"); err == nil || !strings.Contains(err.Error(), "lookup latest image") {
@@ -73,10 +75,10 @@ func TestContainerPlanForPropagatesImageLookupAndPullErrors(t *testing.T) {
 		WithContainerConfigResolver(func(_, _ string) (container.Config, container.HostConfig, error) {
 			return container.Config{}, container.HostConfig{}, nil
 		}),
-		WithImageInfoLookup(func(_ string) (map[string]string, error) {
-			return map[string]string{"repo": "groundseg", "tag": "v1", "hash": "abc123"}, nil
+		WithImageInfoLookup(func(_ string) (registry.ImageDescriptor, error) {
+			return registry.ImageDescriptor{Repo: "groundseg", Tag: "v1", Hash: "abc123"}, nil
 		}),
-		WithImagePuller(func(image string, _ map[string]string) (bool, error) {
+		WithImagePuller(func(image string, _ registry.ImageDescriptor) (bool, error) {
 			if image != "groundseg:v1@sha256:abc123" {
 				t.Fatalf("unexpected desired image: %q", image)
 			}
@@ -96,10 +98,10 @@ func TestContainerPlanForReturnsExpectedValuesOnSuccess(t *testing.T) {
 			}
 			return container.Config{Image: "groundseg"}, container.HostConfig{}, nil
 		}),
-		WithImageInfoLookup(func(_ string) (map[string]string, error) {
-			return map[string]string{"repo": "groundseg", "tag": "v1", "hash": "abc123"}, nil
+		WithImageInfoLookup(func(_ string) (registry.ImageDescriptor, error) {
+			return registry.ImageDescriptor{Repo: "groundseg", Tag: "v1", Hash: "abc123"}, nil
 		}),
-		WithImagePuller(func(_ string, _ map[string]string) (bool, error) {
+		WithImagePuller(func(_ string, _ registry.ImageDescriptor) (bool, error) {
 			return true, nil
 		}),
 	)
@@ -213,14 +215,17 @@ func TestContainsAndPullImageWrapper(t *testing.T) {
 	}
 
 	called := false
-	rt := NewRuntime(WithImagePuller(func(image string, _ map[string]string) (bool, error) {
+	rt := NewRuntime(WithImagePuller(func(image string, _ registry.ImageDescriptor) (bool, error) {
 		called = true
 		if image != "groundseg:v1@sha256:abc123" {
 			t.Fatalf("unexpected image argument %q", image)
 		}
 		return true, nil
 	}))
-	if pulled, err := rt.PullImageIfNotExist("groundseg:v1@sha256:abc123", map[string]string{"repo": "groundseg", "tag": "v1", "hash": "abc123"}); err != nil {
+	if pulled, err := rt.PullImageIfNotExist(
+		"groundseg:v1@sha256:abc123",
+		registry.ImageDescriptor{Repo: "groundseg", Tag: "v1", Hash: "abc123"},
+	); err != nil {
 		t.Fatalf("unexpected pull error: %v", err)
 	} else if !pulled {
 		t.Fatalf("expected pulled=true")

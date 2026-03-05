@@ -3,11 +3,12 @@ package startram
 import (
 	"fmt"
 
-	"go.uber.org/zap"
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/startram/backup"
 	"groundseg/startram/backup/restore"
+
+	"go.uber.org/zap"
 )
 
 type RestoreBackupMode string

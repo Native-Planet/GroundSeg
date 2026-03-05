@@ -1,0 +1,49 @@
+{
+  "batch": "AI Debt & Migrations",
+  "batch_index": 3,
+  "assessments": {
+    "ai_generated_debt": 92.0,
+    "incomplete_migration": 90.0,
+    "low_level_elegance": 94.0
+  },
+  "dimension_notes": {
+    "ai_generated_debt": {
+      "evidence": [
+        "All four files contain only a concise package comment plus package declaration, with no verbose restating comments or pass-through wrapper code.",
+        "No debug-style logging, defensive overengineering, or repetitive boilerplate appears in the assigned files."
+      ],
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "The package comments are generic capability summaries and do not encode ownership boundaries or non-obvious constraints, which limits long-term maintainability signal."
+    },
+    "incomplete_migration": {
+      "evidence": [
+        "No TODO/FIXME/deprecated markers are present in goseg/shipworkflow/doc.go, goseg/startram/doc.go, goseg/system/doc.go, or goseg/uploadsvc/doc.go.",
+        "No old/new API coexistence indicators appear in these files; they are documentation-only package stubs."
+      ],
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "These files provide no explicit migration-status notes, deprecation policy references, or links to active migration tracking, so migration completeness is only weakly evidenced."
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "Each file is minimal, direct, and syntactically clean: one package doc comment and one package declaration.",
+        "No internal branching, side effects, or helper fragmentation exists in the reviewed scope."
+      ],
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Comments are concise but mostly descriptive; they do not capture sharper intent boundaries that would make these package entry points more self-explanatory under future change."
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "Documentation-only files in this batch provide limited observable evidence for migration risk, so confidence is constrained by scope rather than detected defects."
+    ],
+    "likely_symptoms": [],
+    "possible_false_positives": []
+  }
+}

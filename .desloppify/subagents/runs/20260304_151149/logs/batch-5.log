@@ -1,0 +1,889 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_151149/results/batch-5.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 5
+Batch name: Cross-cutting Sweep
+Batch dimensions: error_consistency
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+- goseg/broadcast/state.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/loop_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/importer/importer.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/routines/version.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/config/config.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/system/wifi_runtime_api.go
+- goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go
+- README.md
+- goseg/docker/lifecycle/client_close.go
+- goseg/exporter/exporter_test.go
+- goseg/config/config_update_schema.go
+- goseg/docker/lifecycle/lifecycle_full_test.go
+- goseg/handler/ship/urbit_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger_test.go
+- goseg/protocol/actions/actions_test.go
+- goseg/protocol/contracts/contracts_test.go
+- goseg/session/logstream_session_store.go
+- goseg/shipworkflow/urbit_operations_runtime.go
+- goseg/startram/backup_runtime_test.go
+- goseg/startram/state_sync_test.go
+- goseg/system/metrics/metrics_test.go
+- goseg/system/storage/storage_test.go
+- goseg/system/wifi_test.go
+- goseg/uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "HTTP upload handler forwards raw internal error text to clients (`failUploadRequest(..., err.Error(), ...)`) at multiple boundaries, including validation and pipeline failures.",
+        "Upload validation/runtime dependency failures are classified as `401 Unauthorized` because all `validateUploadRequest` errors are mapped to unauthorized, even when the cause is internal seam/runtime misconfiguration.",
+        "Long-running subsystem loops use inconsistent failure strategy: `check502Loop` logs and `continue`s on repeated operational errors while other loops (`CheckVersionLoopWithContext`, `OldLogsCleanerWithContext`) escalate after consecutive failures.",
+        "Transition/event bus saturation uses different error contracts in neighboring modules (exported sentinels in `docker/events` vs local wrapped error in subsystem events), reducing consistent caller handling with `errors.Is`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "upload_http_raw_error_exposure",
+      "summary": "Upload HTTP boundary leaks internal error details directly to client responses.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "`HTTPUploadHandler` passes `err.Error()` and `pipelineResult.err.Error()` into `failUploadRequest` (lines ~830, ~842, ~859), making internal wrapped errors client-visible.",
+        "Validation paths can produce internal runtime/seam messages (e.g., token validation seam missing), which are then returned to clients unchanged."
+      ],
+      "suggestion": "Introduce a stable API error mapping layer (public error code/message + internal cause). Keep detailed wrapped causes in logs/telemetry only, and update tests to assert public contract rather than raw internal text.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "upload_error_boundary_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "upload_error_classification_mismatch",
+      "summary": "Upload validation errors are over-bucketed as unauthorized, mixing auth failures with internal/runtime failures.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "`validateUploadRequest` can return auth errors and internal dependency/runtime errors, but `HTTPUploadHandler` maps all validation failures to `http.StatusUnauthorized`.",
+        "Pipeline fallback maps unclassified failures to `http.StatusBadRequest`, including non-client causes, creating inconsistent failure semantics across adjacent paths."
+      ],
+      "suggestion": "Define typed/sentinel upload errors (authn, authz, validation, transient infra, internal misconfiguration) and centralize status mapping so auth errors map to 401/403, client input to 400, and internal/runtime faults to 5xx.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "upload_error_boundary_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "background_loop_failure_policy_drift",
+      "summary": "Background loops apply inconsistent escalation rules, causing unpredictable failure visibility.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/routines/version.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`check502Loop` repeatedly logs operational errors (`GetShipStatusFn`, `LoadUrbitConfigFn`, HTTP polling) and continues indefinitely without a terminal error path.",
+        "`CheckVersionLoopWithContext` and `OldLogsCleanerWithContext` count consecutive failures and return explicit errors after threshold, surfacing sustained degradation."
+      ],
+      "suggestion": "Standardize loop error policy across subsystems: shared consecutive-failure budget, optional backoff, and explicit terminal/health signal behavior. Apply to 502 loop so persistent outages become observable and actionable.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "background_service_error_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "event_bus_error_contract_drift",
+      "summary": "Event bus saturation is represented by different non-interoperable error contracts across event modules.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "`docker/events` exposes reusable sentinel errors (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`) enabling `errors.Is` checks.",
+        "`subsystem_events` uses a private `errEventBusFull` wrapped into formatted errors (`docker event bus saturated: %w`), which callers cannot consistently classify against shared event sentinels."
+      ],
+      "suggestion": "Unify on exported shared sentinel/type errors for bus backpressure and publish/cancel conditions; wrap with context but preserve a common comparable cause for all event producers/consumers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "event_error_contract_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error handling policy is defined per module instead of via shared boundary contracts (HTTP mapping, loop escalation, event bus taxonomy).",
+      "Runtime seam architecture wraps many errors correctly but lacks a final normalization layer for externally visible behavior."
+    ],
+    "likely_symptoms": [
+      "upload_http_raw_error_exposure",
+      "upload_error_classification_mismatch",
+      "background_loop_failure_policy_drift",
+      "event_bus_error_contract_drift"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cb968-6b2f-76c0-bb2a-24da8f399cf0
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 5
+Batch name: Cross-cutting Sweep
+Batch dimensions: error_consistency
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+- goseg/broadcast/state.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/loop_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/importer/importer.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/routines/version.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/config/config.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/system/wifi_runtime_api.go
+- goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go
+- README.md
+- goseg/docker/lifecycle/client_close.go
+- goseg/exporter/exporter_test.go
+- goseg/config/config_update_schema.go
+- goseg/docker/lifecycle/lifecycle_full_test.go
+- goseg/handler/ship/urbit_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger_test.go
+- goseg/protocol/actions/actions_test.go
+- goseg/protocol/contracts/contracts_test.go
+- goseg/session/logstream_session_store.go
+- goseg/shipworkflow/urbit_operations_runtime.go
+- goseg/startram/backup_runtime_test.go
+- goseg/startram/state_sync_test.go
+- goseg/system/metrics/metrics_test.go
+- goseg/system/storage/storage_test.go
+- goseg/system/wifi_test.go
+- goseg/uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll run a focused read of the blind packet first to capture the exact review constraints, then inspect only the listed files for `error_consistency` issues and return strict JSON output.
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 5746
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture",
+    "error_consistency",
+    "abstraction_fitness",
+    "test_strategy",
+    "design_coherence"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+codex
+I’ve captured the packet constraints; next I’m scanning the assigned files for concrete error-handling patterns (ignored errors, context loss, mixed sentinel/string behavior) and then I’ll score strictly from that evidence.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/importer/importer.go && sed -n '1,260p' goseg/config/config.go && sed -n '1,260p' goseg/main.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg -n "if err != nil|return err|fmt'"\\.Errorf|errors\\.New|log\\.Printf|panic\\(|_ = .*err|json\\.Unmarshal|yaml|os\\.|ioutil|ReadFile|WriteFile|http\\.|resp\\.Body\\.Close\\(\\)\" goseg/broadcast/state.go goseg/broadcast/loop.go goseg/broadcast/transitions.go goseg/leak/broadcast.go goseg/importer/importer.go goseg/config/config.go goseg/system/wifi_runtime_api.go goseg/system/wifi_runtime_methods.go goseg/docker/orchestration/runtime_ops.go goseg/docker/orchestration/subsystem/subsystem_events.go goseg/docker/orchestration/subsystem/subsystem_health.go goseg/docker/network/network.go goseg/docker/lifecycle/planner.go goseg/docker/lifecycle/client_close.go goseg/routines/logstream/logs.go goseg/routines/system/system.go goseg/shipworkflow/operations_runtime.go goseg/shipworkflow/urbit_operations_runtime.go goseg/startuporchestrator/startup_orchestrator.go goseg/main.go goseg/session/logstream_session_store.go goseg/config/config_update_registry.go goseg/config/config_update_schema.go goseg/defaults/defaults.go goseg/docker/events/events.go goseg/rectify/rectify_services.go goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/docker/orchestration/subsystem/subsystem_events.go && sed -n '1,260p' goseg/docker/events/events.go && sed -n '1,260p' goseg/system/wifi_runtime_methods.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg -n "if err != nil|t'"\\.Fatal|t\\.Error|require\\.|assert\\.|NoError|Error\\(|panic\\(\" goseg/*/*_test.go goseg/*/*/*_test.go goseg/main_test.go goseg/system/wifi_test.go goseg/uploadsvc/service_test.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package importer
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/auth/tokens"
+	"groundseg/click/acme"
+	"groundseg/config"
+	"groundseg/docker/events"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/driveresolver"
+	"groundseg/internal/resource"
+	"groundseg/internal/seams"
+	"groundseg/lifecycle"
+	"groundseg/logger"
+	workflowOrchestration "groundseg/orchestration"
+	"groundseg/shipcleanup"
+	"groundseg/shipcreator"
+ succeeded in 50ms:
+Total output lines: 681
+
+goseg/broadcast/transitions.go:24:		return fmt.Errorf("broadcast runtime is required for transition")
+goseg/broadcast/transitions.go:28:		return fmt.Errorf("broadcast runtime is required for transition")
+goseg/broadcast/transitions.go:32:		return err
+goseg/broadcast/transitions.go:47:		return fmt.Errorf("broadcast runtime is required for mutation")
+goseg/broadcast/transitions.go:51:		return fmt.Errorf("broadcast runtime is required for mutation")
+goseg/shipworkflow/urbit_operations_runtime.go:48:		return fmt.Errorf("could not update urbit config: %w", err)
+goseg/shipworkflow/urbit_operations_runtime.go:86:		if err != nil {
+goseg/shipworkflow/urbit_operations_runtime.go:87:			return fmt.Errorf("failed to get ship status for %s: %w", patp, err)
+goseg/shipworkflow/urbit_operations_runtime.go:91:			return fmt.Errorf("running status for %s doesn't exist: %w", patp, errShipStatusNotFound)
+goseg/shipworkflow/urbit_operations_runtime.go:103:		return fmt.Errorf("could not update urbit config: %w", err)
+goseg/shipworkflow/urbit_operations_runtime.go:110:		return fmt.Errorf("failed to load fresh urbit config: %w", err)
+goseg/shipworkflow/urbit_operations_runtime.go:117:		return fmt.Errorf("could not update urbit config: %w", err)
+goseg/shipworkflow/urbit_operations_runtime.go:136:				if err != nil {
+goseg/shipworkflow/urbit_operations_runtime.go:137:					return fmt.Errorf("failed to check urbit domain alias for %s: %w", patp, err)
+goseg/shipworkflow/urbit_operations_runtime.go:140:					return fmt.Errorf("invalid urbit domain alias for %s", patp)
+goseg/shipworkflow/urbit_operations_runtime.go:143:					return fmt.Errorf("set urbit domain alias for %s: %w", patp, err)
+goseg/shipworkflow/urbit_operations_runtime.go:150:					return fmt.Errorf("could not update urbit config: %w", err)
+goseg/shipworkflow/urbit_operations_runtime.go:167:				if err != nil {
+ succeeded in 51ms:
+package subsystem
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+
+	"groundseg/dockerclient"
+	"groundseg/logger"
+	"groundseg/structs"
+	"groundseg/transition"
+
+	eventtypes "github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/client"
+)
+
+type dockerSubsystemRuntime struct {
+	eventBus           chan structs.Event
+ succeeded in 51ms:
+Total output lines: 3440
+
+goseg/accesspoint/accesspoint_test.go:21:		t.Fatalf("expected env override password, got %q", got)
+goseg/accesspoint/accesspoint_test.go:30:		t.Fatalf("expected derived password length 16, got %d (%q)", len(got), got)
+goseg/accesspoint/accesspoint_test.go:33:		t.Fatalf("expected derived password to start with np-, got %q", got)
+goseg/accesspoint/accesspoint_test.go:39:	if err != nil {
+goseg/accesspoint/accesspoint_test.go:40:		t.Fatalf("makeConfig returned error: %v", err)
+goseg/accesspoint/accesspoint_test.go:43:		t.Fatalf("expected interface stanza in config: %q", cfg)
+goseg/accesspoint/accesspoint_test.go:46:		t.Fatalf("expected ssid stanza in config: %q", cfg)
+goseg/accesspoint/accesspoint_test.go:49:		t.Fatalf("expected passphrase stanza in config: %q", cfg)
+goseg/accesspoint/accesspoint_test.go:84:				t.Fatal("expected makeConfig validation error")
+goseg/accesspoint/accesspoint_test.go:101:		t.Fatalf("writeHostapdConfig returned error: %v", err)
+goseg/accesspoint/accesspoint_test.go:104:	if err != nil {
+goseg/accesspoint/accesspoint_test.go:105:		t.Fatalf("read generated hostapd config: %v", err)
+goseg/accesspoint/accesspoint_test.go:109:		t.Fatalf("unexpected hostapd config contents: %q", cfg)
+goseg/accesspoint/accesspoint_test.go:123:		t.Fatal("expected valid IPv4 address")
+goseg/accesspoint/accesspoint_test.go:126:		t.Fatal("expected invalid IP to fail validation")
+goseg/accesspoint/accesspoint_test.go:129:		t.Fatal("expected IPv6 to fail IPv4-only validation")
+goseg/accesspoint/accesspoint_test.go:135:		t.Fatal("expected interface to be found")
+goseg/accesspoint/accesspoint_test.go:138:		t.Fatal("expected exact match check, not substring match")
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/docker/orchestration/subsystem/subsystem_health.go && sed -n '1,220p' goseg/docker/network/network.go && sed -n '1,240p' goseg/routines/system/system.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/leak/broadcast.go && sed -n '1,280p' goseg/broadcast/loop.go && sed -n '1,260p' goseg/broadcast/state.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,300p' goseg/startuporchestrator/startup_orchestrator.go && sed -n '300,640p' goseg/startuporchestrator/startup_orchestrator.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/system/wifi_runtime_api.go && sed -n '1,260p' goseg/routines/version.go && sed -n '1,240p' goseg/docker/lifecycle/client_close.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package subsystem
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"groundseg/internal/shipstatus"
+	"groundseg/internal/workflow"
+	"groundseg/logger"
+	"groundseg/transition"
+)
+
+// loop to make sure ships are reachable
+// if 502 2x in 2 min, restart wg container
+func Check502Loop(ctx context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+ succeeded in 51ms:
+package leak
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"groundseg/internal/resource"
+	"groundseg/structs"
+	"io"
+	"net"
+	"reflect"
+
+	"github.com/stevelacy/go-urbit/noun"
+	"go.uber.org/zap"
+)
+
+func listener(patp string, conn net.Conn, info LickStatus) {
+	lickMu.Lock()
+	BytesChan[patp] = make(chan string)
+	readChan := make(chan []byte)
+ succeeded in 51ms:
+package startuporchestrator
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/config"
+	"groundseg/docker/orchestration/subsystem"
+	"groundseg/exporter"
+	"groundseg/handler/router"
+	groundSystem "groundseg/handler/system"
+	"groundseg/importer"
+	"groundseg/internal/seams"
+	"groundseg/leak"
+	"groundseg/logger"
+	"groundseg/rectify"
+	"groundseg/routines"
+	"groundseg/routines/logstream"
+	"groundseg/session"
+ succeeded in 50ms:
+package system
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os/exec"
+	"strings"
+)
+
+var ErrWiFiInterfaceNotFound = errors.New("wifi interface not found")
+
+// ErrWifiInterfaceNotFound is kept as a compatibility alias.
+var ErrWifiInterfaceNotFound = ErrWiFiInterfaceNotFound
+
+type WiFiRuntimeService struct {
+	runtime wifiRuntime
+	state   *wifiRuntimeState
+}
+
+codex
+I’m now narrowing to material defects only: places where errors are silently dropped or exposed inconsistently across similar boundaries, especially in long-running loops and API-facing paths.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg -n \"_ =|return nil\\s*"'$|err := .*; err != nil '"\\{\\s*\\}|logger\\.(Errorf|Warnf|Error|Warn)\\(.*err.*\\).*continue|http\\.Error\\(|err\\.Error\\(\\)|fmt\\.Errorf\\(\\\"["'^'"\\\"]*\\\"\\)\" goseg/protocol/contracts/protocol_contracts.go goseg/protocol/contracts/startram_contracts.go goseg/broadcast/state.go goseg/rectify/rectify_services.go goseg/defaults/defaults.go goseg/broadcast/loop.go goseg/leak/broadcast.go goseg/docker/orchestration/wireguard.go goseg/system/wifi_runtime_methods.go goseg/broadcast/transitions.go goseg/config/config_update_registry.go goseg/importer/importer.go goseg/startuporchestrator/startup_orchestrator.go goseg/main.go goseg/routines/version.go goseg/docker/orchestration/subsystem/subsystem_events.go goseg/routines/logstream/logs.go goseg/docker/orchestration/runtime_ops.go goseg/docker/events/events.go goseg/config/config.go goseg/docker/lifecycle/planner.go goseg/routines/system/system.go goseg/docker/network/network.go goseg/shipworkflow/operations_runtime.go goseg/docker/orchestration/subsystem/subsystem_health.go goseg/system/wifi_runtime_api.go goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go goseg/docker/lifecycle/client_close.go goseg/session/logstream_session_store.go goseg/shipworkflow/urbit_operations_runtime.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/config/config_update_registry.go:74:			return nil
+goseg/config/config_update_registry.go:78:			return nil
+goseg/config/config_update_registry.go:81:		return nil
+goseg/config/config_update_registry.go:586:					return nil
+goseg/config/config_update_registry.go:589:				return nil
+goseg/config/config_update_registry.go:741:					return nil
+goseg/config/config_update_registry.go:750:				return nil
+goseg/config/config_update_registry.go:955:					return nil
+goseg/config/config_update_registry.go:958:				return nil
+goseg/config/config_update_registry.go:1018:					return nil
+goseg/config/config_update_registry.go:1021:				return nil
+goseg/config/config_update_registry.go:1037:					return nil
+goseg/config/config_update_registry.go:1040:				return nil
+goseg/broadcast/state.go:85:	return nil
+goseg/broadcast/state.go:94:		return nil
+goseg/broadcast/state.go:102:		return nil
+goseg/broadcast/state.go:164:		return fmt.Errorf("broadcast loop failed to start")
+goseg/broadcast/state.go:166:	return nil
+goseg/broadcast/state.go:188:	return nil
+goseg/broadcast/state.go:293:	return nil
+codex
+I’ve isolated three likely material issues; I’m validating exact line-level evidence now to avoid false positives and keep the findings tightly scoped.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/importer/importer.go | sed -n '820,875p' && nl -ba goseg/importer/importer.go | sed -n '930,980p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/startuporchestrator/startup_orchestrator.go | sed -n '35,90p' && nl -ba goseg/startuporchestrator/startup_orchestrator.go | sed -n '590,640p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/docker/events/events.go | sed -n '1,110p' && nl -ba goseg/docker/orchestration/subsystem/subsystem_events.go | sed -n '20,80p' && nl -ba goseg/docker/orchestration/subsystem/subsystem_events.go | sed -n '150,210p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/docker/orchestration/subsystem/subsystem_health.go | sed -n '35,110p' && nl -ba goseg/routines/version.go | sed -n '70,120p' && nl -ba goseg/routines/logstream/logs.go | sed -n '70,120p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+   820			return
+   821		}
+   822	
+   823		// Set timeouts on the request context
+   824		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+   825		defer cancel()
+   826		r = r.WithContext(ctx)
+   827	
+   828		validated, err := validateUploadRequest(r, uploadSession, patp, runtime...)
+   829		if err != nil {
+   830			responseWritten, handlerErr := failUploadRequest(w, http.StatusUnauthorized, err.Error(), runtime...)
+   831			if handlerErr != nil {
+   832				logger.Errorf("failed to handle upload validation failure: %v", handlerErr)
+   833				if !responseWritten {
+   834					http.Error(w, "failed to write upload response", http.StatusInternalServerError)
+   835				}
+   836			}
+   837			return
+   838		}
+   839	
+ succeeded in 51ms:
+    35	const (
+    36		startupSubsystemRequired startupSubsystemPolicy = "required"
+    37		startupSubsystemOptional startupSubsystemPolicy = "optional"
+    38		startupSubsystemDisabled startupSubsystemPolicy = "disabled"
+    39	)
+    40	
+    41	type startupSubsystemStep struct {
+    42		name   string
+    43		policy startupSubsystemPolicy
+    44		initFn func() error
+    45	}
+    46	
+    47	func runStartupSubsystem(step startupSubsystemStep) error {
+    48		if step.policy == startupSubsystemDisabled {
+    49			return nil
+    50		}
+    51		if step.initFn == nil {
+    52			if step.policy == startupSubsystemRequired {
+    53				return fmt.Errorf("%s initialization callback is not configured", step.name)
+    54			}
+ succeeded in 51ms:
+     1	package events
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"sync"
+     7	
+     8		"groundseg/structs"
+     9	)
+    10	
+    11	var (
+    12		ErrTransitionPublishTimeout = errors.New("transition publish cancelled before enqueue")
+    13		ErrTransitionBusFull        = errors.New("transition event bus is full")
+    14		errTransitionBusNotDefined  = errors.New("transition broker is not defined")
+    15	)
+    16	
+    17	var defaultEventRuntime = sync.OnceValue(newEventRuntime)
+    18	
+    19	type EventRuntime struct {
+    20		delegate                EventBroker
+ succeeded in 51ms:
+    35			}
+    36			if !sleepOrContextDone(ctx, rt.recovery.check502PollDelay) {
+    37				return
+    38			}
+    39			if ctx.Err() != nil {
+    40				return
+    41			}
+    42			threshold := rt.recovery.check502ConsecutiveFailures
+    43			if threshold < 1 {
+    44				threshold = 1
+    45			}
+    46			settings := rt.Check502SettingsSnapshotFn()
+    47			settings.Piers = append([]string(nil), settings.Piers...)
+    48			pierStatus, err := rt.GetShipStatusFn(settings.Piers)
+    49			if err != nil {
+    50				logger.Errorf("Couldn't get pier status: %v", err)
+    51				continue
+    52			}
+    53			for _, pier := range settings.Piers {
+    54				if ctx.Err() != nil {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/startuporchestrator/startup_orchestrator.go | sed -n '625,705p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+   625	func (services startupBackgroundServices) health(ctx context.Context) error {
+   626		if ctx == nil {
+   627			ctx = context.Background()
+   628		}
+   629		if err := services.waitForFailFastErrors(ctx); err != nil {
+   630			return err
+   631		}
+   632		for _, service := range services.services {
+   633			if service.err == nil {
+   634				continue
+   635			}
+   636			if service.failFast {
+   637				continue
+   638			}
+   639			select {
+   640			case <-ctx.Done():
+   641				return nil
+   642			case serviceErr, ok := <-service.err:
+   643				if ok && serviceErr != nil {
+   644					return serviceErr
+codex
+I’ve confirmed the first two findings with line evidence; I’m checking one more cross-module inconsistency candidate to keep the report complete but not noisy.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,220p' goseg/docker/orchestration/wireguard.go && sed -n '1,220p' goseg/docker/orchestration/runtime_ops.go && sed -n '1,220p' goseg/broadcast/transitions.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package orchestration
+
+import (
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"groundseg/docker/orchestration/container"
+	"groundseg/docker/orchestration/internal/artifactwriter"
+	"groundseg/internal/seams"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	dockerc "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"go.uber.org/zap"
+)
+
+func (rt WireguardRuntime) LoadWireguard() error {
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg -n "Status(BadRequest|Unauthorized|InternalServerError|RequestTimeout)|statusCode|runImportUploadPipeline|failUploadRequest|invalid upload session|upload session expired" goseg/importer/importer_test.go goseg/importer/extract_test.go' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+goseg/importer/importer_test.go:186:	written, err := failUploadRequest(recorder, http.StatusUnauthorized, "bad token")
+goseg/importer/importer_test.go:188:		t.Fatal("expected failUploadRequest to write a response")
+goseg/importer/importer_test.go:191:		t.Fatalf("failUploadRequest returned error: %v", err)
+goseg/importer/importer_test.go:194:	if recorder.Code != http.StatusUnauthorized {
+goseg/importer/importer_test.go:225:	written, err := failUploadRequest(recorder, http.StatusInternalServerError, "failed", runtime)
+goseg/importer/importer_test.go:227:		t.Fatal("expected failUploadRequest to write a response")
+goseg/importer/importer_test.go:230:		t.Fatalf("expected failUploadRequest to return publish failure, observed=%d transitions, err=%v", len(observed), err)
+goseg/importer/importer_test.go:238:	if recorder.Code != http.StatusInternalServerError {
+goseg/importer/importer_test.go:244:	statusCode int
+goseg/importer/importer_test.go:257:	w.statusCode = code
+goseg/importer/importer_test.go:277:	_, err := failUploadRequest(writer, http.StatusBadRequest, "oops")
+goseg/importer/importer_test.go:436:	if !strings.Contains(err.Error(), "invalid upload session key format") {
+codex
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "HTTP upload handler forwards raw internal error text to clients (`failUploadRequest(..., err.Error(), ...)`) at multiple boundaries, including validation and pipeline failures.",
+        "Upload validation/runtime dependency failures are classified as `401 Unauthorized` because all `validateUploadRequest` errors are mapped to unauthorized, even when the cause is internal seam/runtime misconfiguration.",
+        "Long-running subsystem loops use inconsistent failure strategy: `check502Loop` logs and `continue`s on repeated operational errors while other loops (`CheckVersionLoopWithContext`, `OldLogsCleanerWithContext`) escalate after consecutive failures.",
+        "Transition/event bus saturation uses different error contracts in neighboring modules (exported sentinels in `docker/events` vs local wrapped error in subsystem events), reducing consistent caller handling with `errors.Is`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "upload_http_raw_error_exposure",
+      "summary": "Upload HTTP boundary leaks internal error details directly to client responses.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "`HTTPUploadHandler` passes `err.Error()` and `pipelineResult.err.Error()` into `failUploadRequest` (lines ~830, ~842, ~859), making internal wrapped errors client-visible.",
+        "Validation paths can produce internal runtime/seam messages (e.g., token validation seam missing), which are then returned to clients unchanged."
+      ],
+      "suggestion": "Introduce a stable API error mapping layer (public error code/message + internal cause). Keep detailed wrapped causes in logs/telemetry only, and update tests to assert public contract rather than raw internal text.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "upload_error_boundary_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "upload_error_classification_mismatch",
+      "summary": "Upload validation errors are over-bucketed as unauthorized, mixing auth failures with internal/runtime failures.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "`validateUploadRequest` can return auth errors and internal dependency/runtime errors, but `HTTPUploadHandler` maps all validation failures to `http.StatusUnauthorized`.",
+        "Pipeline fallback maps unclassified failures to `http.StatusBadRequest`, including non-client causes, creating inconsistent failure semantics across adjacent paths."
+      ],
+      "suggestion": "Define typed/sentinel upload errors (authn, authz, validation, transient infra, internal misconfiguration) and centralize status mapping so auth errors map to 401/403, client input to 400, and internal/runtime faults to 5xx.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "upload_error_boundary_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "background_loop_failure_policy_drift",
+      "summary": "Background loops apply inconsistent escalation rules, causing unpredictable failure visibility.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/routines/version.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`check502Loop` repeatedly logs operational errors (`GetShipStatusFn`, `LoadUrbitConfigFn`, HTTP polling) and continues indefinitely without a terminal error path.",
+        "`CheckVersionLoopWithContext` and `OldLogsCleanerWithContext` count consecutive failures and return explicit errors after threshold, surfacing sustained degradation."
+      ],
+      "suggestion": "Standardize loop error policy across subsystems: shared consecutive-failure budget, optional backoff, and explicit terminal/health signal behavior. Apply to 502 loop so persistent outages become observable and actionable.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "background_service_error_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "event_bus_error_contract_drift",
+      "summary": "Event bus saturation is represented by different non-interoperable error contracts across event modules.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "`docker/events` exposes reusable sentinel errors (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`) enabling `errors.Is` checks.",
+        "`subsystem_events` uses a private `errEventBusFull` wrapped into formatted errors (`docker event bus saturated: %w`), which callers cannot consistently classify against shared event sentinels."
+      ],
+      "suggestion": "Unify on exported shared sentinel/type errors for bus backpressure and publish/cancel conditions; wrap with context but preserve a common comparable cause for all event producers/consumers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "event_error_contract_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error handling policy is defined per module instead of via shared boundary contracts (HTTP mapping, loop escalation, event bus taxonomy).",
+      "Runtime seam architecture wraps many errors correctly but lacks a final normalization layer for externally visible behavior."
+    ],
+    "likely_symptoms": [
+      "upload_http_raw_error_exposure",
+      "upload_error_classification_mismatch",
+      "background_loop_failure_policy_drift",
+      "event_bus_error_contract_drift"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+100,963
+

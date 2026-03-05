@@ -4,11 +4,11 @@ package config
 
 import (
 	"fmt"
+	"groundseg/config/runtimecontext"
 	"groundseg/defaults"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 
@@ -18,9 +18,6 @@ import (
 var (
 	// global settings config (accessed via funcs)
 	globalConfig structs.SysConfig
-	// cached /retrieve blob
-	startramConfig        structs.StartramRetrieve
-	startramConfigUpdated time.Time
 	// struct of minio passwords
 	minIOPasswords = make(map[string]string)
 	Ready          = false
@@ -31,7 +28,6 @@ var (
 	confMutex     sync.RWMutex
 	contMutex     sync.RWMutex
 	minioPwdMutex sync.Mutex
-	startramMu    sync.RWMutex
 	initOnce      sync.Once
 	initErr       error
 	mkdirAllFn    = os.MkdirAll
@@ -50,7 +46,7 @@ func initializeConfig() error {
 		return fmt.Errorf("default version metadata is invalid: %w", err)
 	}
 
-	setDebugMode()
+	initializeDebugMode()
 	initializePaths()
 	ctx := RuntimeContextSnapshot()
 	isEMMCMachine = checkIsEMMCMachine()
@@ -84,13 +80,13 @@ func initializeConfig() error {
 		return fmt.Errorf("ensure session key: %w", err)
 	}
 
-	currentConf := Conf()
+	currentConf := Config()
 	if currentConf.AuthSession.KeyFile == "" {
 		keyPath := SessionKeyPath()
 		if err := ensureSessionKeyExists(); err != nil {
 			return fmt.Errorf("ensure session key: %w", err)
 		}
-		if err := UpdateConfTyped(WithKeyfile(keyPath)); err != nil {
+		if err := UpdateConfigTyped(WithKeyfile(keyPath)); err != nil {
 			return fmt.Errorf("set session key path: %w", err)
 		}
 	}
@@ -100,49 +96,26 @@ func initializeConfig() error {
 }
 
 func initializePaths() {
-	setRuntimeContextBasePath(getBasePath())
+	SetBasePath(runtimecontext.BasePathFromEnv())
 }
 
-// return the global conf var
-func Conf() structs.SysConfig {
+// Config returns a snapshot of the package-level config state.
+func Config() structs.SysConfig {
 	confMutex.RLock()
 	defer confMutex.RUnlock()
 	return globalConfig
 }
 
 func GetWgPrivkey() string {
-	return Conf().Startram.Privkey
+	return Config().Startram.Privkey
 }
 
-// tell if we're amd64 or arm64
-func getArchitecture() string {
-	switch runtime.GOARCH {
-	case "arm64", "aarch64":
-		return "arm64"
-	default:
-		return "amd64"
+func initializeDebugMode() {
+	debugMode := runtimecontext.DebugModeFromArgs(os.Args[1:])
+	if debugMode {
+		zap.L().Info("Starting GroundSeg in debug mode")
 	}
-}
-
-func getBasePath() string {
-	switch os.Getenv("GS_BASE_PATH") {
-	case "":
-		return "/opt/nativeplanet/groundseg"
-	default:
-		return os.Getenv("GS_BASE_PATH")
-	}
-}
-
-func setDebugMode() {
-	debugMode := false
-	for _, arg := range os.Args[1:] {
-		// trigger this with `./groundseg dev`
-		if arg == "dev" {
-			zap.L().Info("Starting GroundSeg in debug mode")
-			debugMode = true
-		}
-	}
-	setRuntimeContextDebugMode(debugMode)
+	SetDebugMode(debugMode)
 }
 
 // ConfigFilePath returns the current system config path computed from the active context.

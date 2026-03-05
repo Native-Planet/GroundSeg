@@ -1,0 +1,72 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 78.6
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "The packet structure data shows `goseg/protocol/contracts/` at 11 files, crossing the >10-file flat-directory threshold; in this batch those files mix protocol action contracts (`protocol_contracts.go`) and StarTram-specific contracts (`startram_contracts.go`) under one folder.",
+        "`README.md` routes governance to both `goseg/protocol/contracts/GOVERNANCE.md` and `goseg/startram/GOVERNANCE.md`, while StarTram contract identifiers/messages are physically defined in `goseg/protocol/contracts/startram_contracts.go`, splitting a single ownership concept across two package locations.",
+        "Action vocabulary is split across `goseg/protocol/actionids/actionids.go` (raw tokens), `goseg/protocol/contracts/protocol_contracts.go` (typed re-exposure + contract IDs), and `goseg/protocol/conformance/fixtures_test.go` (validates via `protocol/actions` symbols), increasing navigation hops for one change boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "contracts_family_mixed_domain_placement",
+      "summary": "Protocol and StarTram contract families are colocated in one flat contracts package, obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`goseg/protocol/contracts/protocol_contracts.go` defines websocket protocol action contracts and governance owners like `uploadsvc`/`system/wifi`.",
+        "`goseg/protocol/contracts/startram_contracts.go` defines StarTram error contracts (`APIConnectionError`) in the same package despite StarTram having its own top-level domain package and governance doc reference in `README.md`.",
+        "Packet directory profile marks `goseg/protocol/contracts/` as 11 files, indicating flat-folder overload where mixed contract families now share one location."
+      ],
+      "suggestion": "Staged reorg plan: (1) create target folders `goseg/protocol/contracts/protocol/` and `goseg/protocol/contracts/startram/` plus a small root `registry.go` facade in `goseg/protocol/contracts`; (2) move `protocol_contracts.go` first into `.../protocol/`, update internal references, then move `startram_contracts.go` into `.../startram/`; (3) keep exported access through root facade functions to avoid immediate downstream churn; (4) run import/validation commands: `cd goseg && gofmt -w protocol/contracts && go test ./protocol/contracts/... ./protocol/conformance/... ./startram/...` and finally `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_boundary_fragmentation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "action_token_source_fragmentation",
+      "summary": "Canonical action tokens are split across micro-packages, creating a fragmented change boundary for protocol contract updates.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/actionids/actionids.go` contains only string constants (namespace/actions), but `goseg/protocol/contracts/protocol_contracts.go` immediately re-wraps those constants into contract-facing types and IDs.",
+        "`goseg/protocol/conformance/fixtures_test.go` verifies fixture coverage via `protocol/actions` constants, meaning one protocol action change spans at least three locations/packages to confirm full consistency.",
+        "This distribution makes ownership/navigation unclear for contributors trying to modify action naming or compatibility metadata in one pass."
+      ],
+      "suggestion": "Staged reorg plan: (1) establish a single target vocabulary package, e.g. `goseg/protocol/actionspec/`, that owns namespace/action tokens plus typed aliases currently split between `actionids` and contracts; (2) move constants from `actionids` first and add temporary type aliases/shims in old package to keep callers compiling; (3) update `protocol_contracts.go` and conformance fixtures to consume `actionspec` directly, then remove shim usage; (4) run import/validation commands: `cd goseg && gofmt -w protocol/actionids protocol/contracts protocol/conformance && go test ./protocol/actions/... ./protocol/contracts/... ./protocol/conformance/... ./uploadsvc/...` followed by `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_boundary_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance artifacts are organized by implementation history rather than by stable domain ownership boundaries.",
+      "Canonical protocol vocabulary lacks a single authoritative package boundary."
+    ],
+    "likely_symptoms": [
+      "contracts_family_mixed_domain_placement",
+      "action_token_source_fragmentation"
+    ],
+    "possible_false_positives": []
+  }
+}

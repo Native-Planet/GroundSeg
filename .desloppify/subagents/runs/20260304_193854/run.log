@@ -1,0 +1,5 @@
+2026-03-04T19:38:56+00:00 run-start runner=codex parallel=False max_parallel=3 timeout=1200s heartbeat=15.0s stall_warning=0s stall_kill=120s retries=1 retry_backoff=2.0s upper_bound=140m selected=[1, 2, 3, 4, 5, 6, 7]
+2026-03-04T19:38:56+00:00 run-path /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_193854
+2026-03-04T19:38:56+00:00 packet /Users/chuah/NP/GroundSeg/.desloppify/review_packets/holistic_packet_20260304_193854.json
+2026-03-04T19:38:56+00:00 blind-packet /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+2026-03-04T19:38:56+00:00 run-finished dry-run

@@ -18,8 +18,8 @@ import (
 )
 
 type loggerRuntimeState struct {
-	initMu        sync.Mutex
-	loggerInitErr error
+	initMu          sync.Mutex
+	loggerInitErr   error
 	loggerInitState loggerInitLifecycle
 
 	sysLogPath   string

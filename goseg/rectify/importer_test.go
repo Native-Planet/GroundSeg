@@ -65,3 +65,53 @@ func TestImportShipTransitionHandlerIgnoresUnknownTransitionTypes(t *testing.T) 
 		t.Fatalf("unexpected upload state change for unknown transition: got %+v want %+v", state.Upload, initial.Upload)
 	}
 }
+
+func TestImportShipTransitionHandlerReturnsWhenContextCanceled(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := ImportShipTransitionHandlerWithContextAndRuntime(
+		ctx,
+		broadcast.NewBroadcastStateRuntime(),
+		events.NewEventRuntime(),
+	)
+	if err != nil {
+		t.Fatalf("expected canceled-context handler to return nil, got %v", err)
+	}
+}
+
+func TestImportShipTransitionHandlerUsesInjectedEventRuntime(t *testing.T) {
+	runtime := broadcast.NewBroadcastStateRuntime()
+	runtime.UpdateBroadcast(structs.AuthBroadcast{})
+	eventRuntime := events.NewEventRuntime()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- ImportShipTransitionHandlerWithContextAndRuntime(ctx, runtime, eventRuntime)
+	}()
+
+	suffix := strconv.FormatInt(time.Now().UnixNano(), 10)
+	wantStatus := "uploading-" + suffix
+	eventRuntime.PublishImportShipTransition(context.Background(), structs.UploadTransition{
+		Type:  "status",
+		Event: wantStatus,
+	})
+
+	testutil.WaitForCondition(t, func() bool {
+		state := runtime.GetState()
+		return state.Upload.Status == wantStatus
+	}, "injected event runtime transition was not applied")
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("expected handler shutdown to return nil, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for handler shutdown after cancel")
+	}
+}

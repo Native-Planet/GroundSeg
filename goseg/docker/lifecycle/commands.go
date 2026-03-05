@@ -13,12 +13,12 @@ import (
 )
 
 // ExecDockerCommand executes a command inside a container and returns stdout/stderr plus the exit code.
-func (runtime *Runtime) ExecDockerCommand(containerName string, cmd []string) (string, int, error) {
+func (runtime *Runtime) ExecDockerCommand(containerName string, cmd []string) (output string, exitCode int, err error) {
 	cli, err := runtime.dockerClientNew()
 	if err != nil {
 		return "", -1, fmt.Errorf("unable to create docker client: %w", err)
 	}
-	defer cli.Close()
+	defer closeRuntimeDockerClient(cli, "docker command exec", &err)
 
 	execConfig := container.ExecOptions{AttachStdout: true, AttachStderr: true, Cmd: cmd}
 	ctx := context.Background()
@@ -38,10 +38,11 @@ func (runtime *Runtime) ExecDockerCommand(containerName string, cmd []string) (s
 	}
 	defer hijackedResp.Close()
 
-	output, err := ioutil.ReadAll(hijackedResp.Reader)
+	rawOutput, err := ioutil.ReadAll(hijackedResp.Reader)
 	if err != nil {
-		return "", -1, fmt.Errorf("read exec output from %s: %w", containerName, err)
+		return output, -1, fmt.Errorf("read exec output from %s: %w", containerName, err)
 	}
+	output = string(rawOutput)
 	execID := resp.ID
 	deadline := time.Now().Add(30 * time.Second)
 	for {

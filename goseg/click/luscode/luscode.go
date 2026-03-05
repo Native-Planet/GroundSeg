@@ -50,7 +50,7 @@ func GetLusCode(patp string) (string, error) {
 	)
 	if err != nil {
 		storeLusCodeError(patp)
-		return "", fmt.Errorf("Click +code failed to get exec: %v", err)
+		return "", fmt.Errorf("Click +code failed to get exec: %w", err)
 	}
 	if !success {
 		storeLusCodeError(patp)

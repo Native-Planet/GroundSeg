@@ -2,7 +2,7 @@ package driveresolver
 
 import (
 	"fmt"
-	"groundseg/system"
+	systemdisk "groundseg/system/disk"
 	"regexp"
 )
 
@@ -14,8 +14,8 @@ type Resolution struct {
 
 var (
 	groundsegMountpointPattern = regexp.MustCompile(`^/groundseg-\d+$`)
-	listHardDisks              = system.ListHardDisks
-	createGroundSegFilesystem  = system.CreateGroundSegFilesystem
+	listHardDisks              = systemdisk.ListHardDisks
+	createGroundSegFilesystem  = systemdisk.CreateGroundSegFilesystem
 )
 
 func Resolve(selectedDrive string) (Resolution, error) {

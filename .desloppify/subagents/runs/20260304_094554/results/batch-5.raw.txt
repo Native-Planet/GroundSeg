@@ -1,0 +1,113 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 68.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Importer and cleanup code paths silently drop I/O failure signals in some branches (e.g., temp file/archive cleanup in `goseg/importer/importer.go`) while similar operations in other branches return wrapped errors.",
+        "Wi-Fi parser helpers have diverging error contracts for similar malformed-input scenarios (`parseNmcliWifiDeviceRecords` returns an error, while `parseNmcliWifiScanResults` discards parsing issues and returns partial data).",
+        "Several resource cleanup calls in Docker/network paths use deferred `Close()` without handling returned errors, producing hidden resource-release failures and no caller visibility."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": [
+        "Normalize error return behavior for similarly scoped failures across importer, parser, and runtime/network helpers.",
+        "Require cleanup/close failure handling via explicit reporting or explicit policy (must-fail vs best-effort) and document it."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "imp_tmp_cleanup_drop_errors",
+      "summary": "Importer silently drops temp-file removal failures when copy/close operations fail, which can hide partial-import state corruption.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "In `goseg/importer/importer.go` around lines 658-665, the code path that handles `io.CopyBuffer`/close errors invokes `os.Remove(tempFilePath)` without checking its return value.",
+        "Because these branches return early on import failure, unobserved temp-file cleanup failures can accumulate stale work directories/files without surfacing to callers."
+      ],
+      "suggestion": "Capture and propagate remove errors in the same branch (or aggregate with existing import error). Prefer a helper like `defer cleanupTemp(tempFilePath)` plus `errors.Join` so callers can detect cleanup regressions under failure conditions.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_contract_erosion"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "imp_archive_cleanup_best_effort_vs_contract",
+      "summary": "Archive removal is treated as best-effort in success path, creating inconsistency with other critical error paths and potentially leaving inconsistent import state.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "At `goseg/importer/importer.go` lines 1370-1373, `os.Remove(ctx.ArchivePath)` errors are only logged and do not affect function return status.",
+        "The same operation often participates in an import lifecycle where callers treat returned errors as gating conditions, so silently ignoring cleanup failures creates mixed failure semantics."
+      ],
+      "suggestion": "Define explicit cleanup policy for importer lifecycle: either (a) make cleanup failures fatal and return wrapped error, or (b) classify as best-effort but still emit structured diagnostic that callers/tests assert. Implement consistently across all cleanup points.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_contract_erosion"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "net_docker_close_err_ignored",
+      "summary": "Docker client close errors are ignored in multiple runtime paths, reducing observability of resource-release failures.",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "In `goseg/docker/network/network.go`, several functions defer `cli.Close()` without checking returned error (including lines 47, 80, 99, 116, 132, and 154+).",
+        "No call-site-level compensation or logging appears for close failures, so callers cannot distinguish operational success from teardown failure in these branches."
+      ],
+      "suggestion": "Replace bare `defer cli.Close()` with deferred wrappers that capture and either return close errors when primary operation succeeded or aggregate them with `errors.Join`; consider a shared helper to standardize close handling.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_erosion"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "wifi_parse_inconsistent_error_contracts",
+      "summary": "Wi-Fi parsing functions in the same module have divergent behavior for malformed input, leading to inconsistent upstream recovery behavior.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`parseNmcliWifiDeviceRecords` (around lines 108-129) preserves parse errors and returns an error when no valid device records are parsed.",
+        "`parseNmcliWifiScanResults` (around lines 132-149) logs parse issues but continues, returning partial scan records without surfacing an error.",
+        "`parseNmcliWifiSSIDs` (around lines 201-207) then discards parser error context by returning only SSIDs."
+      ],
+      "suggestion": "Unify parser semantics by making both scanners return `(result, err)` consistently; introduce explicit parse error modes (strict vs tolerant) and use one policy across callers in `wifi_runtime_api.go`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_erosion"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Inconsistent error contracts across adjacent control paths (cleanup, parser helpers, resource teardown) with no centralized error-handling policy.",
+      "Implicit best-effort cleanup semantics used ad hoc without module-wide documentation or enforced patterns."
+    ],
+    "likely_symptoms": [
+      "imp_tmp_cleanup_drop_errors",
+      "imp_archive_cleanup_best_effort_vs_contract",
+      "net_docker_close_err_ignored",
+      "wifi_parse_inconsistent_error_contracts"
+    ],
+    "possible_false_positives": [
+      "Imported or test code paths may intentionally tolerate some cleanup failures; if intentional, they should be made explicit via comments or typed policy enums."
+    ]
+  }
+}

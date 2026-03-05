@@ -1,0 +1,380 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 62.4,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 62.0,
+        "Indirection Cost": 46.0,
+        "Interface Honesty": 68.0
+      }
+    },
+    "cross_module_architecture": 84.5,
+    "design_coherence": 62.3,
+    "test_strategy": 77.4
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "contract IDs encode wire format inline as strings in `goseg/protocol/contracts/protocol_contracts.go` (e.g., `protocol.actions.upload.open-endpoint`) and `ActionToken` values are derived with fixed-string slicing offsets.",
+        "The protocol package\u2019s catalog construction depends on duplicated textual namespace assumptions (`protocol.actions.upload.` and `protocol.actions.c2c.`) rather than a shared contract-domain abstraction.",
+        "README's governance guidance explicitly treats typed contract identifiers and namespace/action APIs as API contracts, increasing the risk of boundary drift when one side changes and another does not."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "No automated boundary guard exists here for ID/token schema drift between contract identity and action token derivation; a single changed naming convention requires coordinated updates across multiple modules without compile-time protection."
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`StartVersionSubsystemWithContext` starts two independent workers (`CheckVersionLoopWithContext` and `AptUpdateLoopWithContext`) and returns on first worker error without an owned cancellation path for the sibling worker.",
+        "`StartDockerSubsystem` and the startup background service launcher both create goroutines via `superviseBackgroundService`, but failure paths in their coordinators return before all child goroutines are explicitly stopped via a shared shutdown contract.",
+        "`startBackgroundServicesWithRuntime` builds and starts service handles sequentially, then checks fail-fast completion using each handle's error channel but does not stop already-started services if a fail-fast start fails.",
+        "The background-runtime wiring layer (many callback structs + ad-hoc supervisors in `startuporchestrator`) adds orchestration layers that mostly forward calls (`startFn` closures and thin wrappers) without enforcing strong lifecycle semantics in one place."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 62.0,
+        "indirection_cost": 46.0,
+        "interface_honesty": 68.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "README mandates contract-gate coverage and explicit per-contract lifecycle-policy assertions for changed catalog entries in `goseg/protocol/contracts/contracts_test.go` and related contract files.",
+        "In scope, `goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/contracts/startram_contracts.go` only define catalog specs and metadata wiring, with no local assertions protecting contract compatibility policy or lifecycle semantics.",
+        "README treats these contract surfaces as governance-critical boundaries for upload/C2C/StarTram flows, but the files themselves have no immediate self-documenting test hooks or invariant checks."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": ""
+    },
+    "design_coherence": {
+      "evidence": [
+        "In `goseg/shipworkflow/urbit_operations_runtime_handlers.go`, `runTogglePowerTransition` and `runToggleNetworkTransition` both embed the same structural pattern: read state, persist transition-driven config, optionally mutate runtime/docker state, and then conditionally trigger container start logic via repeated branch code.",
+        "`goseg/rectify/rectify_services.go` and `goseg/shipworkflow/urbit_operations_runtime.go` both orchestrate transition-like behavior inline (decisioning + state mutation + persistence + publication/restart hooks) rather than through a centralized transition policy layer.",
+        "`goseg/config/urbit.go` and `goseg/rectify/rectify_services.go` each define their own generic `adaptUrbitSectionMutation` adapter with the same typed assertion + callback pattern, increasing duplicate maintenance surface.",
+        "The batch includes pre-existing signals that these files have disconnected/misaligned responsibility clusters (large test modules in this scope also show multiple unrelated concern clusters), consistent with mixed abstraction boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "version_subsystem_missing_sibling_cancellation",
+      "summary": "Version subsystem returns on one loop error while the other loop keeps running, leaking background work after caller aborts.",
+      "related_files": [
+        "goseg/routines/version.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`StartVersionSubsystemWithContext` launches `CheckVersionLoopWithContext` and `AptUpdateLoopWithContext` in separate goroutines and returns immediately on first error from the shared `errs` channel.",
+        "Both loops consume a context argument, but the function never derives a cancelable context or cancels the sibling loop when the other loop errors.",
+        "This makes the abstraction claim of a single version-runtime subsystem misleading because lifecycle responsibility is split across independent goroutines without a shared stop contract."
+      ],
+      "suggestion": "Introduce a derived cancel context in `StartVersionSubsystemWithContext` and pass it to both loops; on first error, call `cancel()` and drain/ignore late errors before returning a wrapped shutdown error. This keeps the abstraction boundary of a managed subsystem with deterministic teardown.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "background_service_lifecycle_leak"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "docker_subsystem_start_on_error_leaves_workers_running",
+      "summary": "Docker subsystem startup stops only health-loop bookkeeping and leaves subscription/listener work alive when one worker errors.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/orchestration/subsystem/docker_facade_test.go"
+      ],
+      "evidence": [
+        "`StartDockerSubsystem` starts `dockerListenerWithContext` and `dockerSubscriptionHandler` with a shared `errs` channel and returns on first received error.",
+        "Only `defer StopDockerHealthLoops()` is executed on return; there is no cancellation call that guarantees both long-running worker goroutines stop in the same failure path.",
+        "The same pattern appears in tests only as a cancel-path smoke test, not asserting cleanup of both worker goroutines."
+      ],
+      "suggestion": "Refactor `StartDockerSubsystem` to create and use a `context.WithCancel` for both workers, call `cancel()` on any worker error, and ensure both goroutines exit before returning. Consider returning a composite error that includes shutdown failures.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "background_service_lifecycle_leak"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "startup_background_supervisor_drops_services_on_failfast_error",
+      "summary": "Fail-fast startup services can abort orchestration while already-started background loops remain active.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "`startBackgroundServicesWithRuntime` starts each service handle then, for fail-fast specs, waits briefly on `handle.err` and returns the first error if present.",
+        "When fail-fast returns early, the function does not stop previously started services or cancel the shared runtime context used by those services.",
+        "This undermines interface honesty for background-service orchestration: callers expect a startup transaction, but the abstraction may leave partial background state active after a failed init."
+      ],
+      "suggestion": "Before returning from fail-fast failure, call `services.stop()` (or equivalent stop-all) and cancel any shared start context to make startup deterministic; then return the failing reason. Also add regression tests proving no active background handles remain after fail-fast failure.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "background_service_lifecycle_leak"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "protocol-token-prefix-derivation",
+      "summary": "Contract token derivation is coupled to literal namespace prefixes, creating cross-module contract-shape fragility.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines `actionTokenOpenEndpoint`, `actionTokenReset`, and `actionTokenConnect` by slicing hardcoded prefixes from `UploadActionOpenEndpoint`, `UploadActionReset`, and `C2CConnectAction`.",
+        "This embeds textual wire-level shape (`protocol.actions.upload.`, `protocol.actions.c2c.`) into action-token generation logic instead of using a single contract constructor or schema-level API."
+      ],
+      "suggestion": "Replace manual prefix slicing with a central contract constructor/parser in the contracts package (e.g., `actionTokenFromContractID` with compile-time tests) and have all protocol and StarTram entries use it so namespace/ID changes cannot desynchronize action tokens.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_schema_duplication"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract-governance-gap",
+      "summary": "Contract lifecycle/compatibility expectations in governance docs are not locally enforced at the contract surface.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README lists a strict contract governance contract for protocol/StarTram surfaces (including explicit lifecycle-policy checks, gate coverage, and compatibility descriptor assertions).",
+        "The two contract surface files only expose static descriptors and delegated metadata lookups and do not include direct invariants for required lifecycle fields."
+      ],
+      "suggestion": "Add focused unit tests adjacent to the contract package (in existing contract test file) that assert descriptor completeness and compatibility policy invariants per contract ID, so updates to these tables fail fast before entering CI and before downstream consumers diverge.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_schema_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_orchestration_boilerplate",
+      "summary": "Toggle transition handlers duplicate configuration/containers orchestration logic instead of sharing a transition policy.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime_handlers.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`runTogglePowerTransition` and `runToggleNetworkTransition` each repeat state read + section persistence + lifecycle cleanup/start sequencing with nearly identical branch structure.",
+        "`buildTogglePowerSteps` and `buildToggleNetworkSteps` only wrap those dedicated run functions, so transition-specific side effects are still scattered across files rather than policy-driven.",
+        "The code now requires independent updates in multiple files for changes to common transition semantics."
+      ],
+      "suggestion": "Introduce a shared transition execution primitive in shipworkflow (e.g., a transition policy table + `applyTransitionPolicy` helper) that centralizes: section update strategy, restart side effects, and event/error policy, then dispatch both handlers through this single path.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transition_orchestration_boilerplate"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "reconcile_mixed_responsibility",
+      "summary": "Startram reconcile performs policy decisions, mutation, persistence, and transition emission in one loop.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "`StartramRetrieveReconciler.Reconcile` in `goseg/rectify/rectify_services.go` combines remote-state correlation, local mutation flags, disk/config persistence calls (`updateWebConfig`, `updateNetworkConfig`), and transition publication (`publishRegistrationTransition`) in a single pass.",
+        "The reconcile flow intermixes read/write responsibilities (`loadAndRefresh`) with error joining/policy decisions (`serviceCreated`, `published`, `modified`, `persistNetwork`, `persistWeb`) rather than separating change plan from execution.",
+        "This pattern increases the risk of persistence side effects being coupled to transient policy details and makes behavior drift likely when transition rules evolve."
+      ],
+      "suggestion": "Split reconcile into: (1) compute a typed reconciliation plan from remote/local snapshots, (2) validate/apply that plan in a dedicated persistence layer, and (3) publish transitions in a separate explicit side-effect stage.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transition_orchestration_boilerplate"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_config_section_adapter",
+      "summary": "Config section mutation adapters are duplicated across config-management layers instead of shared by design.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`goseg/config/urbit.go` defines `adaptUrbitSectionMutation[T any]` and `goseg/rectify/rectify_services.go` defines an identical generic helper with the same cast/mutate structure.",
+        "`rectify_services.go` then wraps mutators through this local copy instead of reusing a shared implementation in the config layer, creating parallel behavior definitions.",
+        "A failure or type-safety tweak in one copy would not automatically apply to the other."
+      ],
+      "suggestion": "Extract the adapter and error formatting contract into a shared config package helper and replace both local implementations with that single helper to preserve type assertions and error semantics consistently.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_section_abstraction_drift"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 4,
+    "dimension_coverage": 0.312,
+    "evidence_density": 1.917,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 17.01,
+    "dimensions_with_findings": 4
+  },
+  "review_scope": {
+    "reviewed_files_count": 62,
+    "successful_batch_count": 4,
+    "full_sweep_included": false,
+    "total_files": 575,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "test_strategy"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/contracts/protocol_contracts.go",
+    "goseg/protocol/contracts/startram_contracts.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/broadcast/loop.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/importer/importer.go",
+    "goseg/defaults/version.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/main.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/main_test.go",
+    "goseg/routines/version.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/config/config.go",
+    "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+    "README.md",
+    "goseg/exporter/exporter_test.go",
+    "goseg/shipworkflow/urbit_operations_runtime_handlers.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/config/urbit.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_083124",
+    "created_at": "2026-03-04T08:32:38+00:00",
+    "batch_count": 4,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "828edae5c7b1ebc8383ef6b58562292d556a5689bf38649b311eb05c591939a2"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "test_strategy"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "test_strategy"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

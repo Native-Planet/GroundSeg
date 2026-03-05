@@ -1,0 +1,118 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.8
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime dependency structs are very wide and sliced repeatedly by scope: `startupInitRuntime`/`startBackgroundServicesRuntime` in `goseg/startuporchestrator/startup_orchestrator.go`, `importerRuntime` + `initRuntime/workflowRuntime/publishRuntime` + `resolveImporterRuntimeFor(scope)` in `goseg/importer/importer.go`.",
+        "Broadcast flow uses stacked pass-through wrappers with minimal policy gain: `bootstrapBroadcastState` -> `bootstrapBroadcastStateWithRuntime`, `LoadStartramRegionsWithRuntime` -> `LoadStartramRegionsWithRuntimeState`, and `construct*WithRuntime` wrappers that only delegate to collector contracts in `goseg/broadcast/state_lifecycle.go` and `goseg/broadcast/loop.go`.",
+        "Configuration remains exposed as broad bags (`structs.SysConfig`) while many callers read deep nested fields directly (`conf.Runtime.UpdateInterval`, `conf.Connectivity.UpdateBranch`, `conf.Connectivity.Piers`) in `goseg/routines/version.go`, despite narrower snapshots existing in `goseg/config/config.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 69.0,
+        "indirection_cost": 74.0,
+        "interface_honesty": 76.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_capability_bags_overfragmented",
+      "summary": "Large callback-bag runtimes are repeatedly projected into scope-specific wrappers with little new behavior",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`startBackgroundServicesRuntime` carries many callbacks and `startupServiceSpecs` mostly maps names to those fields, creating a wiring matrix rather than domain abstractions.",
+        "`importerRuntime` is split into embedded sub-runtimes, then re-projected via `initRuntime()`, `workflowRuntime()`, `publishRuntime()`, plus `resolveImporterRuntimeFor(scope)` switch dispatch.",
+        "`runtime_ops.go` defines many operation bags (`RuntimeContainerOps`, `RuntimeSnapshotOps`, `RuntimeStartupOps`, etc.) that are assembled centrally and passed through modules, increasing indirection and coupling to seam shape."
+      ],
+      "suggestion": "Replace callback-bag structs with smaller capability interfaces or collaborators per workflow (init, upload, workflow, publish). Construct each collaborator directly for that flow and remove projection helpers that only copy fields.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "broadcast_wrapper_chain_low_leverage",
+      "summary": "Broadcast lifecycle has multiple pass-through wrappers that add call depth but little policy",
+      "related_files": [
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "`bootstrapBroadcastState` and `LoadStartramRegionsWithRuntime` each forward directly to similarly named runtime-state variants after near-duplicate nil checks.",
+        "`constructPierInfoWithRuntime`, `constructAppsInfoWithRuntime`, `constructProfileInfoWithRuntime`, and `constructSystemInfoWithRuntime` are thin delegates to collector contracts.",
+        "`newBroadcastLoopRuntimeWithController` closures call those wrappers, while `runBroadcastTickWithRuntime` does additional runtime resolution/nil checks (`resolveBroadcastLoopRuntime`), compounding indirection across a single tick path."
+      ],
+      "suggestion": "Collapse duplicate wrapper tiers into one runtime API per operation, keep nil-validation at boundary entrypoints, and pass collector interfaces directly into loop construction so tick code invokes concrete capabilities without extra adapter hops.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_omnibus_bag_leaks_domain_boundaries",
+      "summary": "Omnibus config bags are still consumed directly across subsystems, weakening abstraction boundaries",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/routines/version.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`structs.SysConfig` aggregates many domains and exposes section mutators/getters, making it easy for unrelated modules to reach into broad config state.",
+        "`routines/version.go` reads nested runtime/connectivity fields directly from full config snapshots in update orchestration paths.",
+        "At the same time, `config/config.go` already introduces narrower settings snapshots (`UpdateSettings`, `StartupSettings`, `ImportSettings`, `C2CSettings`), showing an incomplete abstraction migration."
+      ],
+      "suggestion": "Finish migration to bounded settings DTOs per subsystem (version, startup, importer, C2C) and prohibit direct `SysConfig` consumption in orchestrators/routines. Keep full `SysConfig` at persistence boundaries only.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_boundary_leakage"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "event_broker_delegate_duplicates_publish_seam",
+      "summary": "Event delegate abstraction overlaps with transition emitter seam and adds low-value indirection",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`EventRuntime` already implements publish/read channels, but also supports optional `delegate EventBroker`, causing each publish/read path to branch through generic delegate wrappers (`publishTransition`, `runtimeTransitionSource`).",
+        "`workflowRuntime` injects both `EventRuntime events.EventBroker` and a separate `TransitionEmitter` callback, creating overlapping abstraction surfaces for transition publication.",
+        "`importer` publishes via `events.DefaultEventRuntime().PublishImportShipTransition`, indicating dominant in-process broker usage while delegate indirection remains on the hot API surface."
+      ],
+      "suggestion": "Unify on one publication seam per workflow: either inject `EventBroker` directly or inject typed emitter functions, not both. If delegate swapping is test-only, move it behind test constructors and keep production runtime concrete.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overfragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Seam-heavy design favors callback registries and projection helpers even when call sites do not gain policy or variability.",
+      "Partial migration toward bounded settings objects left coexistence with broad config bags, so abstractions are inconsistent across subsystems."
+    ],
+    "likely_symptoms": [
+      "broadcast_wrapper_chain_low_leverage",
+      "event_broker_delegate_duplicates_publish_seam"
+    ],
+    "possible_false_positives": []
+  }
+}

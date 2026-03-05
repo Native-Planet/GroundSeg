@@ -7,10 +7,10 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
+
+	"groundseg/internal/testruntime"
 
 	"github.com/mdlayher/wifi"
-	"groundseg/protocol/actions"
 )
 
 func resetWifiSeamsForTest(t *testing.T) {
@@ -18,32 +18,35 @@ func resetWifiSeamsForTest(t *testing.T) {
 }
 
 func testWifiRuntime(overrides wifiRuntime) wifiRuntime {
-	runtime := wifiRuntime{}
-	runtime.ExecCommand = overrides.ExecCommand
-	runtime.RunCommand = overrides.RunCommand
-	runtime.NewWifiClient = overrides.NewWifiClient
-	runtime.ClientInterfacesFn = overrides.ClientInterfacesFn
-	runtime.ClientBSSFn = overrides.ClientBSSFn
-	return runtime
+	return testruntime.Apply(wifiRuntime{}, func(runtime *wifiRuntime) {
+		runtime.ExecCommand = overrides.ExecCommand
+		runtime.RunCommand = overrides.RunCommand
+		runtime.NewWifiClient = overrides.NewWifiClient
+		runtime.ClientInterfacesFn = overrides.ClientInterfacesFn
+		runtime.ClientBSSFn = overrides.ClientBSSFn
+	})
 }
 
 func TestGetWifiDeviceParsesAndTrimsOutput(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
 	runtime := testWifiRuntime(wifiRuntime{
-		ExecCommand: func(name string, args ...string) *exec.Cmd {
-			if name != "sh" {
-				t.Fatalf("unexpected command: %s", name)
+		RunCommand: func(command string, args ...string) (string, error) {
+			if command != "nmcli" {
+				t.Fatalf("unexpected command: %s", command)
 			}
-			return exec.Command("sh", "-c", "printf 'wlan0\\n wlan1 \\n\\n'")
+			if strings.Join(args, " ") != "-t -f DEVICE,TYPE device status" {
+				t.Fatalf("unexpected nmcli args: %q", strings.Join(args, " "))
+			}
+			return "wlan0:wifo\n wlan1 :wifi\neth0:ethernet\nwlan2:wifi\n", nil
 		},
 	})
 
 	devices, err := runtime.wifiDevices()
 	if err != nil {
-		t.Fatalf("getWifiDevice returned error: %v", err)
+		t.Fatalf("wifiDevices returned error: %v", err)
 	}
-	want := []string{"wlan0", "wlan1"}
+	want := []string{"wlan1", "wlan2"}
 	if !reflect.DeepEqual(devices, want) {
 		t.Fatalf("unexpected wifi devices: got %v want %v", devices, want)
 	}
@@ -72,7 +75,7 @@ func TestGetConnectedSSIDReturnsErrorForMissingInterface(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected getConnectedSSID to fail when interface is missing")
 	}
-	if !errors.Is(err, ErrWifiInterfaceNotFound) {
+	if !errors.Is(err, ErrWiFiInterfaceNotFound) {
 		t.Fatalf("expected wifi interface not found error, got: %v", err)
 	}
 	if ssid != "" {
@@ -90,27 +93,74 @@ func TestGetWifiDeviceReturnsErrorForFailureOrEmptyResult(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
 	runtime := testWifiRuntime(wifiRuntime{
-		ExecCommand: func(name string, args ...string) *exec.Cmd {
+		RunCommand: func(command string, args ...string) (string, error) {
+			_ = command
 			_ = args
-			return exec.Command("false")
+			return "", errors.New("failure")
 		},
 	})
 	if _, err := runtime.wifiDevices(); err == nil {
-		t.Fatal("expected getWifiDevice to fail when command execution fails")
+		t.Fatal("expected wifiDevices to fail when command execution fails")
 	}
 
 	runtime = testWifiRuntime(wifiRuntime{
-		ExecCommand: func(name string, args ...string) *exec.Cmd {
-			_ = name
+		RunCommand: func(command string, args ...string) (string, error) {
+			_ = command
 			_ = args
-			return exec.Command("sh", "-c", "printf '\\n'")
+			return "\n", nil
 		},
 	})
 	if _, err := runtime.wifiDevices(); err == nil {
-		t.Fatal("expected getWifiDevice to fail when no devices are listed")
+		t.Fatal("expected wifiDevices to fail when no devices are listed")
 	}
-	if _, err := runtime.wifiDevices(); err != nil && !errors.Is(err, ErrWifiInterfaceNotFound) {
+	if _, err := runtime.wifiDevices(); err != nil && !errors.Is(err, ErrWiFiInterfaceNotFound) {
 		t.Fatalf("expected wifi interface not found error when no devices are listed, got: %v", err)
+	}
+}
+
+func TestParseNmcliWifiDeviceRecordRequiresDeviceAndTypeFields(t *testing.T) {
+	record, err := parseNmcliWifiDeviceRecord("wlan0", 0)
+	if err == nil {
+		t.Fatalf("expected malformed wifi device record to fail, got %#v", record)
+	}
+	if _, ok := err.(wifiNmcliParseError); !ok {
+		t.Fatalf("expected parse error, got %T: %v", err, err)
+	}
+
+	record, err = parseNmcliWifiDeviceRecord("wlan0:wifi", 1)
+	if err != nil {
+		t.Fatalf("expected valid wifi device record to parse, got: %v", err)
+	}
+	if record.name != "wlan0" || record.typ != "wifi" {
+		t.Fatalf("unexpected parsed device record: %#v", record)
+	}
+}
+
+func TestParseNmcliWifiScanResultRecordSkipsMalformedRows(t *testing.T) {
+	record, err := parseNmcliWifiScanResultRecord("a:b:c", 0)
+	if err == nil {
+		t.Fatalf("expected malformed scan row to fail, got %#v", record)
+	}
+	if _, ok := err.(wifiNmcliParseError); !ok {
+		t.Fatalf("expected parse error, got %T: %v", err, err)
+	}
+
+	record2, err := parseNmcliWifiScanResultRecord("a:b:c:d:e:f:g:HomeWiFi", 1)
+	if err != nil {
+		t.Fatalf("expected valid scan record to parse, got: %v", err)
+	}
+	if record2.ssid != "HomeWiFi" {
+		t.Fatalf("unexpected parsed ssid: %#v", record2)
+	}
+}
+
+func TestParseNmcliWifiDevicesReturnsParseErrorWhenOnlyMalformedRows(t *testing.T) {
+	_, err := parseNmcliWifiDevices("malformed-row\na:b")
+	if err == nil {
+		t.Fatalf("expected parse error for malformed records when no valid devices are found")
+	}
+	if _, ok := err.(wifiNmcliParseError); !ok {
+		t.Fatalf("expected parse error type, got %T: %v", err, err)
 	}
 }
 
@@ -118,10 +168,10 @@ func TestPrimaryWifiDeviceReturnsFirstDevice(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
 	runtime := testWifiRuntime(wifiRuntime{
-		ExecCommand: func(name string, args ...string) *exec.Cmd {
-			_ = name
+		RunCommand: func(command string, args ...string) (string, error) {
+			_ = command
 			_ = args
-			return exec.Command("sh", "-c", "printf 'wlan0\\nwlan1\\n'")
+			return "wlan0:wifi\nwlan1:wifi\n", nil
 		},
 	})
 
@@ -151,11 +201,39 @@ func TestListWifiSSIDsParsesValidEntriesAndSkipsMalformed(t *testing.T) {
 
 	ssids, err := runtime.listSSIDs("wlan0")
 	if err != nil {
-		t.Fatalf("ListWifiSSIDs returned error: %v", err)
+		t.Fatalf("listSSIDs returned error: %v", err)
 	}
 	want := []string{"HomeWiFi"}
 	if !reflect.DeepEqual(ssids, want) {
 		t.Fatalf("unexpected ssid list: got %v want %v", ssids, want)
+	}
+}
+
+func TestListWifiSSIDsSkipsUnderLengthNmcliRows(t *testing.T) {
+	resetWifiSeamsForTest(t)
+
+	runtime := testWifiRuntime(wifiRuntime{
+		RunCommand: func(command string, args ...string) (string, error) {
+			_ = command
+			_ = args
+			return strings.Join([]string{
+				"malformed",
+				"a:b:c",
+				"a:b:c:d:e:f:g",
+				"",
+			}, "\n"), nil
+		},
+	})
+
+	ssids, err := runtime.listSSIDs("wlan0")
+	if err == nil {
+		t.Fatal("expected malformed rows to produce a parse error")
+	}
+	if _, ok := err.(wifiNmcliParseError); !ok {
+		t.Fatalf("expected parse error type, got %T: %v", err, err)
+	}
+	if len(ssids) != 0 {
+		t.Fatalf("expected malformed rows to be ignored when parse fails, got %#v", ssids)
 	}
 }
 
@@ -167,7 +245,7 @@ func TestListWifiSSIDsPropagatesScanFailures(t *testing.T) {
 		},
 	})
 	if _, err := runtime.listSSIDs("wlan0"); err == nil {
-		t.Fatal("expected ListWifiSSIDs to return an error")
+		t.Fatal("expected listSSIDs to return an error")
 	}
 }
 
@@ -190,7 +268,7 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 			return "", errors.New("unexpected command: " + call)
 		},
 	})
-	wifiEnabled, err := runtime.ifCheck()
+	wifiEnabled, err := runtime.isWiFiRadioEnabled()
 	if err != nil {
 		t.Fatalf("ifCheck returned error: %v", err)
 	}
@@ -199,7 +277,7 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 	}
 
 	if err := runtime.toggleDevice("wlan0"); err != nil {
-		t.Fatalf("ToggleDevice(off) returned error: %v", err)
+		t.Fatalf("toggleDevice(off) returned error: %v", err)
 	}
 
 	runtime = testWifiRuntime(wifiRuntime{
@@ -216,7 +294,7 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 		},
 	})
 	if err := runtime.toggleDevice("wlan0"); err != nil {
-		t.Fatalf("ToggleDevice(on) returned error: %v", err)
+		t.Fatalf("toggleDevice(on) returned error: %v", err)
 	}
 
 	wantCalls := map[string]struct{}{
@@ -233,7 +311,7 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 	runtime = testWifiRuntime(wifiRuntime{
 		RunCommand: func(string, ...string) (string, error) { return "", errors.New("nmcli error") },
 	})
-	wifiEnabled, err = runtime.ifCheck()
+	wifiEnabled, err = runtime.isWiFiRadioEnabled()
 	if err == nil {
 		t.Fatal("expected ifCheck to return error when command fails")
 	}
@@ -258,7 +336,7 @@ func TestConnectToWifiUsesNmcliAndPropagatesErrors(t *testing.T) {
 		},
 	})
 	if err := runtime.connect("HomeWiFi", "secret"); err != nil {
-		t.Fatalf("ConnectToWifi returned error: %v", err)
+		t.Fatalf("ConnectToWiFi returned error: %v", err)
 	}
 	if len(calls) != 1 || !strings.Contains(calls[0], "nmcli dev wifi connect HomeWiFi password secret") {
 		t.Fatalf("unexpected nmcli invocation: %v", calls)
@@ -277,7 +355,7 @@ func TestConnectToWifiUsesNmcliAndPropagatesErrors(t *testing.T) {
 		},
 	})
 	if err := runtime.connect("HomeWiFi", "secret"); err == nil {
-		t.Fatal("expected ConnectToWifi to return command failure")
+		t.Fatal("expected ConnectToWiFi to return command failure")
 	}
 }
 
@@ -290,178 +368,7 @@ func TestDisconnectWifiUsesInjectedClientFactoryError(t *testing.T) {
 		},
 	})
 	if err := runtime.disconnect("wlan0"); err == nil {
-		t.Fatal("expected DisconnectWifi to return client creation error")
-	}
-}
-
-func TestParseC2CAction(t *testing.T) {
-	resetWifiSeamsForTest(t)
-	action, err := actions.ParseC2CAction(string(c2cActionConnect))
-	if err != nil {
-		t.Fatalf("expected connect action to parse: %v", err)
-	}
-	if action != c2cActionConnect {
-		t.Fatalf("unexpected action: %v", action)
-	}
-}
-
-func TestParseC2CActionRejectsUnsupportedAction(t *testing.T) {
-	resetWifiSeamsForTest(t)
-	if _, err := actions.ParseC2CAction("unsupported"); err == nil {
-		t.Fatal("expected parse failure for unsupported action")
-	}
-}
-
-func TestProcessMessageRoutesSupportedAction(t *testing.T) {
-	resetWifiSeamsForTest(t)
-	adapter := newCaptiveTransportAdapter(defaultC2CServiceDeps())
-	var callCount int
-	adapter.processC2CMessage = func(msg []byte) error {
-		callCount++
-		if string(msg) != `{"type":"c2c","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}` {
-			t.Fatalf("unexpected payload: %s", msg)
-		}
-		return nil
-	}
-
-	msg := `{"type":"c2c","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}`
-	if err := adapter.processMessage([]byte(msg)); err != nil {
-		t.Fatalf("processMessage failed: %v", err)
-	}
-	if callCount != 1 {
-		t.Fatalf("expected c2c message processor to run once; got %d", callCount)
-	}
-}
-
-func TestProcessMessageRejectsUnsupportedAction(t *testing.T) {
-	resetWifiSeamsForTest(t)
-	adapter := newCaptiveTransportAdapter(defaultC2CServiceDeps())
-
-	msg := `{"type":"c2c","payload":{"action":"unsupported","ssid":"HomeWiFi","password":"secret"}}`
-	processErr := adapter.processMessage([]byte(msg))
-	if processErr == nil {
-		t.Fatal("expected unsupported action error")
-	}
-	if _, ok := processErr.(actions.UnsupportedActionError); !ok {
-		t.Fatalf("expected unsupported action error, got %T: %v", processErr, processErr)
-	}
-}
-
-func TestProcessMessageRejectsWrongEnvelopeType(t *testing.T) {
-	resetWifiSeamsForTest(t)
-	adapter := newCaptiveTransportAdapter(defaultC2CServiceDeps())
-
-	msg := `{"type":"auth","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}`
-	processErr := adapter.processMessage([]byte(msg))
-	if processErr == nil {
-		t.Fatal("expected wrong envelope type error")
-	}
-}
-
-func TestProcessC2CMessageForAdapter(t *testing.T) {
-	resetWifiSeamsForTest(t)
-	connectCalled := false
-	restartCalled := false
-	deps := c2cServiceDeps{
-		connectToWiFi: func(ssid, password string) error {
-			connectCalled = true
-			if ssid != "HomeWiFi" || password != "secret" {
-				t.Fatalf("unexpected credentials: %s / %s", ssid, password)
-			}
-			return nil
-		},
-		restartGroundSeg: func() error {
-			restartCalled = true
-			return nil
-		},
-	}
-	msg := `{"type":"c2c","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}`
-	if err := processC2CMessageForAdapterWithDeps([]byte(msg), deps); err != nil {
-		t.Fatalf("processC2CMessageForAdapter failed: %v", err)
-	}
-	if !connectCalled || !restartCalled {
-		t.Fatalf("expected connect and restart to be called")
-	}
-}
-
-func TestC2CServiceExecutesConnectAndRestart(t *testing.T) {
-	resetWifiSeamsForTest(t)
-	connectCalled := false
-	restartCalled := false
-	deps := c2cServiceDeps{
-		connectToWiFi: func(ssid, password string) error {
-			connectCalled = true
-			if ssid != "HomeWiFi" || password != "secret" {
-				t.Fatalf("unexpected credentials: %s / %s", ssid, password)
-			}
-			return nil
-		},
-		restartGroundSeg: func() error {
-			restartCalled = true
-			return nil
-		},
-	}
-	service, err := newC2CServiceForAdapterWithDeps(deps)
-	if err != nil {
-		t.Fatalf("newC2CServiceForAdapterWithDeps failed: %v", err)
-	}
-
-	if err := service.Execute(c2cActionConnect, "HomeWiFi", "secret"); err != nil {
-		t.Fatalf("execute failed: %v", err)
-	}
-	if !connectCalled || !restartCalled {
-		t.Fatalf("expected connect and restart to be called")
-	}
-}
-
-func TestNewC2CServiceForAdapterWithDepsRejectsNilDependencies(t *testing.T) {
-	resetWifiSeamsForTest(t)
-
-	_, err := newC2CServiceForAdapterWithDeps(c2cServiceDeps{
-		restartGroundSeg: func() error { return nil },
-	})
-	if err == nil {
-		t.Fatal("expected constructor to fail when connect callback is nil")
-	}
-
-	_, err = newC2CServiceForAdapterWithDeps(c2cServiceDeps{
-		connectToWiFi: func(_, _ string) error { return nil },
-	})
-	if err == nil {
-		t.Fatal("expected constructor to fail when restart callback is nil")
-	}
-}
-
-func TestProcessC2CMessageForAdapterReportsMissingServiceOnConstructorFailure(t *testing.T) {
-	resetWifiSeamsForTest(t)
-
-	msg := `{"type":"c2c","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}`
-	deps := c2cServiceDeps{
-		connectToWiFi: nil,
-	}
-
-	err := processC2CMessageForAdapterWithDeps([]byte(msg), deps)
-	if err == nil {
-		t.Fatal("expected processC2CMessageForAdapter to fail when dependencies are nil")
-	}
-	if !strings.Contains(err.Error(), "c2c service is required") {
-		t.Fatalf("expected service requirement error, got %v", err)
-	}
-}
-
-func TestC2CActionBindingsCoverKnownActions(t *testing.T) {
-	resetWifiSeamsForTest(t)
-	foundConnect := false
-	for _, action := range supportedC2CActions() {
-		if _, err := actions.ParseC2CAction(string(action)); err != nil {
-			t.Fatalf("action %v should be supported by parser", action)
-		}
-		if action == c2cActionConnect {
-			foundConnect = true
-		}
-	}
-	if !foundConnect {
-		t.Fatalf("expected connect action binding")
+		t.Fatal("expected DisconnectWiFi to return client creation error")
 	}
 }
 
@@ -472,7 +379,7 @@ func TestConstructWifiInfoNilReceiverNoPanic(t *testing.T) {
 		}
 	}()
 	var service *WiFiRuntimeService
-	if err := service.ConstructWifiInfo(""); err == nil {
+	if err := service.RefreshWiFiInfo(""); err == nil {
 		t.Fatal("expected nil receiver error")
 	}
 }
@@ -487,10 +394,10 @@ func TestStartWiFiInfoLoopNilReceiverReturnsError(t *testing.T) {
 func TestStartWiFiInfoLoopStateNilInitializesAndCanStop(t *testing.T) {
 	service := &WiFiRuntimeService{
 		runtime: NewWiFiRuntimeWith(wifiRuntime{
-			ExecCommand: func(name string, args ...string) *exec.Cmd {
-				return exec.Command("sh", "-c", "printf 'wlan0\\n'")
-			},
 			RunCommand: func(command string, args ...string) (string, error) {
+				if command == "nmcli" && len(args) == 5 && args[0] == "-t" && args[1] == "-f" && args[2] == "DEVICE,TYPE" && args[3] == "device" && args[4] == "status" {
+					return "wlan0:wifi\n", nil
+				}
 				if command == "nmcli" && len(args) == 2 && args[0] == "radio" && args[1] == "wifi" {
 					return "disabled\n", nil
 				}
@@ -504,7 +411,9 @@ func TestStartWiFiInfoLoopStateNilInitializesAndCanStop(t *testing.T) {
 	if service.state == nil {
 		t.Fatal("expected service state to be initialized when nil")
 	}
-	service.StopWiFiInfoLoop()
+	if err := service.StopWiFiInfoLoop(); err != nil {
+		t.Fatalf("expected StopWiFiInfoLoop to return nil, got %v", err)
+	}
 }
 
 func TestStopWiFiInfoLoopNilReceiverDoesNotPanic(t *testing.T) {
@@ -514,14 +423,16 @@ func TestStopWiFiInfoLoopNilReceiverDoesNotPanic(t *testing.T) {
 		}
 	}()
 	var service *WiFiRuntimeService
-	service.StopWiFiInfoLoop()
+	if err := service.StopWiFiInfoLoop(); err == nil {
+		t.Fatal("expected StopWiFiInfoLoop to return an error for nil receiver")
+	}
 }
 
 func TestConstructWifiInfoInitializesRuntimeAndState(t *testing.T) {
 	service := &WiFiRuntimeService{
 		state: &wifiRuntimeState{},
 	}
-	if err := service.ConstructWifiInfo(""); err == nil {
+	if err := service.RefreshWiFiInfo(""); err == nil {
 		t.Fatal("expected construct wifi info to fail when device is unresolved")
 	}
 	if service.state == nil {
@@ -559,7 +470,7 @@ func TestConstructWifiInfoRefreshesWithCustomRuntime(t *testing.T) {
 		runtime: runtime,
 		state:   state,
 	}
-	if err := service.ConstructWifiInfo(""); err != nil {
+	if err := service.RefreshWiFiInfo(""); err != nil {
 		t.Fatalf("expected construct info to succeed: %v", err)
 	}
 	info := WifiInfoSnapshot(state)
@@ -574,77 +485,22 @@ func TestConstructWifiInfoRefreshesWithCustomRuntime(t *testing.T) {
 	}
 }
 
-type wifiRadioConnectErrorService struct {
-	connectedDevice string
-	connectErr      error
-}
-
-func (s wifiRadioConnectErrorService) PrimaryDevice() (string, error) {
-	return s.connectedDevice, nil
-}
-
-func (s wifiRadioConnectErrorService) RefreshInfo(_ string) {}
-
-func (s wifiRadioConnectErrorService) Enable() error {
-	return nil
-}
-
-func (s wifiRadioConnectErrorService) SetLinkUp(_ string) error {
-	return nil
-}
-
-func (s wifiRadioConnectErrorService) Connect(_, _ string) error {
-	return s.connectErr
-}
-
-func (s wifiRadioConnectErrorService) ListSSIDs(_ string) ([]string, error) {
-	return nil, nil
-}
-
-type accessPointLifecycleNoop struct{}
-
-func (accessPointLifecycleNoop) Start(_ string) error { return nil }
-func (accessPointLifecycleNoop) Stop(_ string) error  { return nil }
-
-func TestC2CConnectWrapsConnectAndRestoreErrors(t *testing.T) {
+func TestNewWiFiRuntimeServiceMergesPartialOverridesWithDefaults(t *testing.T) {
 	resetWifiSeamsForTest(t)
-	connectErr := errors.New("connect failure")
-	c2cRestoreErr := errors.New("restore failure")
-
-	flow := newC2CModeFlowWithDependencies(c2cModeDependencies{
-		c2cModeServiceDependencies: c2cModeServiceDependencies{
-			radio: wifiRadioConnectErrorService{
-				connectedDevice: "wlan0",
-				connectErr:      connectErr,
-			},
-			accessPoint: accessPointLifecycleNoop{},
-			getStoredSSIDs: func(_ []string) {
-			},
-		},
-		c2cModeLifecycleDependencies: c2cModeLifecycleDependencies{
-			startResolved: func() error {
-				return nil
-			},
-			stopResolved: func() error {
-				return c2cRestoreErr
-			},
-			rebootSystem: func() error {
-				return nil
-			},
-			pause: func(_ time.Duration) {},
-			publishInterval: func(_ string) {
-			},
+	runtime := NewWiFiRuntimeWith(wifiRuntime{
+		ExecCommand: func(name string, args ...string) *exec.Cmd {
+			return exec.Command(name, args...)
 		},
 	})
-
-	err := flow.ConnectToNetwork("HomeWiFi", "secret")
-	if err == nil {
-		t.Fatal("expected C2CConnect to return combined error")
+	service := &WiFiRuntimeService{
+		runtime: runtime,
 	}
-	if !errors.Is(err, connectErr) {
-		t.Fatalf("expected connect error in chain, got %v", err)
+	resolved, _, err := service.prepareForUse()
+	if err != nil {
+		t.Fatalf("prepareForUse returned error: %v", err)
 	}
-	if !errors.Is(err, c2cRestoreErr) {
-		t.Fatalf("expected C2C mode restore error in chain, got %v", err)
+	if resolved.ExecCommand == nil || resolved.RunCommand == nil || resolved.RunNmcliFn == nil || resolved.NewWifiClient == nil ||
+		resolved.ClientInterfacesFn == nil || resolved.ClientBSSFn == nil || resolved.WifiInfoTicker == nil {
+		t.Fatal("expected partial wifi runtime override to be completed with defaults")
 	}
 }

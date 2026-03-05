@@ -7,6 +7,8 @@ import (
 	"groundseg/click"
 	"groundseg/docker/orchestration"
 	"groundseg/shipworkflow"
+	"groundseg/shipworkflow/adapters/lifecyclebridge"
+	"groundseg/shipworkflow/lifecyclewait"
 	"groundseg/structs"
 	"time"
 
@@ -18,10 +20,10 @@ var (
 	urbitDeleteContainer   = orchestration.DeleteContainer
 	urbitBarExit           = click.BarExit
 	urbitSleep             = time.Sleep
-	waitCompletePoller     = shipworkflow.PollWithTimeout
+	waitCompletePoller     = lifecyclebridge.PollWithTimeout
 	areSubdomainsAliasesFn = shipworkflow.AreSubdomainsAliases
 	waitCompleteFn         = func(patp string) error {
-		return shipworkflow.WaitForUrbitStop(patp, urbitGetShipStatus, waitCompletePoller)
+		return lifecyclewait.WaitForUrbitStop(patp, urbitGetShipStatus, waitCompletePoller)
 	}
 	urbitCleanDeleteFn = shipworkflow.UrbitCleanDelete
 )

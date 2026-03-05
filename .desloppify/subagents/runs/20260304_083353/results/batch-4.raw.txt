@@ -1,0 +1,89 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "goseg/config/urbit.go and goseg/rectify/rectify_services.go both ship their own `adaptUrbitSectionMutation` implementations instead of sharing one utility.",
+        "Urbit config sections are modeled twice (`UrbitConfigSection`) in `goseg/config/urbit.go` (typed int enum) and `goseg/structs/configs.go` (typed string enum), requiring coordinated manual updates across packages.",
+        "The Startram reconcile path in `goseg/rectify/rectify_services.go` mixes discovery, service registration, and persistence decisions inside one function, making mutation policy hard to reason about and extend."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_section_mutation_utility_duplication",
+      "summary": "Duplicate urbit section mutation adapters are duplicated across config and reconcile packages.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`config/urbit.go` defines `adaptUrbitSectionMutation[T any]` as a package-private generic section adapter.",
+        "`rectify/rectify_services.go` redefines the same generic adapter function with identical behavior and same error string pattern.",
+        "This helper is only kept in sync by convention, so behavior changes in one location are easy to miss in the other."
+      ],
+      "suggestion": "Extract a single shared typed helper (for example in an internal package) and use it from both call sites; keep section-specific wrappers in each package if needed but avoid duplicated casting/validation logic.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "urbit_config_mutation_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_config_section_model_split",
+      "summary": "Urbit section enums are defined in two separate type systems, creating drift-prone duplication.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`goseg/config/urbit.go` declares `type UrbitConfigSection int` with constants `{Runtime, Network, Schedule, ...}`.",
+        "`goseg/structs/configs.go` separately declares `type UrbitConfigSection string` with the same domain labels and string values.",
+        "Any new section or semantic rename requires two independent updates and tests currently do not enforce cross-type parity."
+      ],
+      "suggestion": "Define a canonical `UrbitConfigSection` representation once (or shared generated mapping) and consume it across config runtime + serialized models, with a compile-time or startup check that enforces the canonical section set.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "urbit_config_mutation_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "startram_reconcile_overloaded_single_loop",
+      "summary": "Startram retrieve reconciliation mixes discovery, service creation, and persistence orchestration in one oversized control path.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`StartramRetrieveReconciler.Reconcile` first scans the same `Subdomains` list to infer existing service presence, then rescans it for web/network reconciliation.",
+        "The function also performs config loading/persistence decisions (`updateWebConfig`, `updateNetworkConfig`) and publishes registration transitions in-line with low-level per-remote branching.",
+        "This broad responsibility boundary makes it difficult to add service-type-specific reconciliation without expanding a high-coupling function."
+      ],
+      "suggestion": "Split `Reconcile` into explicit phases: collect expected/existing subdomain index, compute a diff, then apply persistence and transition publication through dedicated coordinators so each concern (discovery, decision, mutation, side effects) is independently testable.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "phase_split_for_reconciliation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Cross-file duplication of shared domain logic (adapter helpers and section metadata) rather than introducing a canonical shared abstraction.",
+      "Monolithic reconcile and transition handlers that combine multiple responsibilities in single flows."
+    ],
+    "likely_symptoms": [
+      "Inconsistent behavior if section enum lists or mutation helper contracts change in one module but not another.",
+      "Frequent local edits required to support a new urbit/Startram section or service type, with higher regression risk."
+    ],
+    "possible_false_positives": []
+  }
+}

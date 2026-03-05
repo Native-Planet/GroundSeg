@@ -1,0 +1,136 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 71.2
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Large, high-cluster test and runtime modules in scope still exhibit cohesion drift: `goseg/accesspoint/accesspoint_test.go` is 943 lines with multiple reset helpers, and `goseg/importer/importer_test.go` is 924 lines with repeated runtime fixture builders (`defaultImporterRuntime`, `resetUploadSessionsForTest`, `initRuntime`, `uploadRuntime`, `provisionRuntime`).",
+        "`goseg/shipworkflow/urbit_operations_runtime.go` defines many transition entrypoints and multiple step-builder helpers in one file, and mechanical signals flag mixed-responsibility clusters there.",
+        "`goseg/docker/orchestration/runtime_ops.go` aggregates broad cross-cutting seam concerns (runtime, snapshots, urbit, image, volume, wireguard, minio, startup, health) in one contract surface with repeated callback-field patterns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_fixture_sprawl",
+      "summary": "Test scaffolding patterns are duplicated across unrelated test suites instead of a shared harness.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`accesspoint_test.go` defines `resetParameterGlobalsForTest` and `resetRouterGlobalsForTest` with repeated `testseams.WithRestore` calls.",
+        "`importer_test.go` defines multiple runtime fixture builders and guards (`defaultImporterRuntime`, `initRuntime`, `uploadRuntime`, `provisionRuntime`) that replicate setup/restore mechanics also seen in other tests.",
+        "`main_test.go` includes repeated bootstrap runtime constructors (`c2cTestRuntime`, `bootstrapRuntimeWith`) plus callback assertions for equivalent orchestration behavior."
+      ],
+      "suggestion": "Create a test utility package in `goseg/internal/testutil` (or existing shared test seams package) that centralizes global restore helpers and runtime fixture constructors, then rewrite these tests to compose fixtures from shared helpers instead of duplicating the same restore/override patterns.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_support_abstraction_gap"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "shipworkflow_transition_fat_file",
+      "summary": "Ship workflow transitions mix too many transition concerns in one module.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime_handlers.go"
+      ],
+      "evidence": [
+        "`urbit_operations_runtime.go` includes many independent toggles (`toggleAlias`, `toggleNetwork`, `togglePower`, etc.) and matching `build*Transition` helpers in one large file.",
+        "Mechanical concern context already flags this file for responsibility_cohesion (`11 disconnected function clusters`), indicating the function grouping is not aligned by subsystem ownership.",
+        "Handlers continue to embed detailed transition workflows in this same domain area (`runTogglePowerTransition`, `runToggleNetworkTransition`), so orchestration, config persistence, and process control remain tightly coupled."
+      ],
+      "suggestion": "Split this module into focused files by concern (e.g., `runtime_toggle_power.go`, `runtime_toggle_network.go`, `runtime_config_handlers.go`) and register them through a small dispatch map to reduce semantic coupling and ease testing per transition domain.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transition_domain_fusion"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wide_runtime_seam_api",
+      "summary": "Runtime seam bundle and operation structs mix unrelated domains into one interface surface.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/system/metrics/metrics_test.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` declares a broad matrix of unrelated ops structs (`RuntimeContainerOps`, `RuntimeSnapshotOps`, `RuntimeUrbitOps`, `RuntimeWireguardOps`, `RuntimeNetdataOps`, `RuntimeMinioOps`, `StartupLoadOps`, etc.) with shared seam plumbing.",
+        "The same file builds defaults for many independent concerns in a monolithic `buildRuntimeSeamBundle` flow.",
+        "Global review notes indicate runtime seam struct breadth and duplicated callback transport across import boundaries; this file is the likely concentration point."
+      ],
+      "suggestion": "Partition seam contracts into domain-specific seam interfaces/packages (runtime/container, urbit, persistence/snapshot, bootstrap/system, networking/security) and inject only the required interface into each caller instead of passing a broad bundle.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_contract_bloat"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_schema_model_cohabitation",
+      "summary": "Configuration model, patch schema parsing, and apply semantics live in overly broad single modules.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "`structs/configs.go` is 666 lines and defines multiple domain config sections, marshal/unmarshal behavior, section helpers, and many domain-specific mutators in one place.",
+        "`config_update_schema.go` is 440 lines with parser/validator/build-merge logic and many patch field abstractions in the same package surface.",
+        "This pairing forces tests and callers to touch a shared, high-entropy config module for many independent concerns rather than clear domain ownership."
+      ],
+      "suggestion": "Refactor config into domain modules (connectivity, runtime, startram, auth session, penpai) with explicit interfaces for parse/patch/apply per domain, then orchestrate composition at a thin root layer.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "cross_domain_config_monolith"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "boilerplate_state_listener_handlers",
+      "summary": "Boilerplate event and callback logic appears duplicated rather than extracted into a reusable adapter.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/shipworkflow/urbit_operations_runtime_handlers.go"
+      ],
+      "evidence": [
+        "Packet-level concern log records boilerplate duplication across `subsystem_events.go` and `urbit_operations_runtime_handlers.go`.",
+        "Both areas implement near-identical patterns for callback-style orchestration plus transition/result handling without a shared adapter layer.",
+        "The resulting duplication makes updates to transition/error handling conventions harder to apply consistently."
+      ],
+      "suggestion": "Introduce a tiny handler utility for transition execution/error wrapping and event action dispatching, then replace duplicated local patterns in both files with that utility.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boilerplate_duplication_systemic"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "shared test support and runtime construction helpers were inlined repeatedly instead of centralized",
+      "cross-cutting runtime/config seams were flattened into monolithic structs/modules",
+      "transition and orchestration logic remained grouped by function count rather than domain ownership",
+      "copy-paste orchestration boilerplate was accepted in multiple files instead of extracted adapters"
+    ],
+    "likely_symptoms": [
+      "slow, brittle test maintenance due to fixture duplication",
+      "increased onboarding cost for workflow/config changes",
+      "hidden coupling when modifying one callback/seam affects many unrelated behaviors",
+      "inconsistent transition behavior as duplicate error-handling logic diverges"
+    ],
+    "possible_false_positives": [
+      "single-file responsibilities in small utility tests may look verbose but not truly defective",
+      "zonal test style differences where duplication is intentionally explicit for readability in edge-case coverage"
+    ]
+  }
+}

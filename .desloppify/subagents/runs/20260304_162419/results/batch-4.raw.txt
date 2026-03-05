@@ -1,0 +1,114 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 68.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Configuration mutation/parsing uses two divergent structural approaches: a large hand-written key switch in `structs.UrbitDocker.UnmarshalJSON` (`goseg/structs/configs.go:344-614`) and a generic schema/registry pipeline in `config_update_schema` (`goseg/config/config_update_schema.go:103-160`, `234-260`).",
+        "Runtime orchestration is spread across broad function-bag registries and command wrappers with little behavior, e.g. `Runtime*Ops` and default builders in `goseg/docker/orchestration/runtime_ops.go:17-350` plus many pass-through transition wrappers in `goseg/shipworkflow/urbit_operations_runtime.go:53-131`.",
+        "State/event files combine several responsibilities each (state storage, lifecycle bootstrapping, event transport, worker management, and serialization), especially `goseg/broadcast/state.go:22-227` and `goseg/docker/orchestration/subsystem/subsystem_events.go:53-239`.",
+        "Large test files build bespoke mini-frameworks repeatedly (`goseg/importer/importer_test.go:27-159`, `goseg/startuporchestrator/startup_orchestrator_test.go:17-111`, `goseg/main_test.go:18-55`, `goseg/system/wifi_test.go:14-26`), indicating missing shared testing composition patterns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_schema_strategy_split",
+      "summary": "Config update logic is split between a data-driven schema engine and a separate giant key-switch parser, creating structural drift.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`UrbitDocker.UnmarshalJSON` manually iterates `map[string]any` with dozens of `case` branches (`goseg/structs/configs.go:344-614`), each repeating parse-and-assign structure.",
+        "`confPatchField` in `config_update_schema` already implements centralized parse/apply/merge behavior (`goseg/config/config_update_schema.go:103-160`, `234-260`), but this mechanism is not used for `UrbitDocker` shape parsing.",
+        "Both files solve similar \"typed field extraction and assignment\" concerns using incompatible patterns, increasing maintenance and making new config fields easy to miss in one path."
+      ],
+      "suggestion": "Converge on one field-schema model for config decoding and patching. Extract a shared field descriptor table for `UrbitDocker` (key, parser, setter, default behavior) and reuse the existing conf-patch style pipeline or a sibling generic helper to remove switch-based duplication.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_model_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_indirection_without_policy",
+      "summary": "Runtime operation layers accumulate pass-through indirection that adds mapping overhead more than domain behavior.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many large function-bag structs and default constructors (`goseg/docker/orchestration/runtime_ops.go:17-350`), most entries directly map external package functions with no transformation/policy.",
+        "`urbit_operations_runtime.go` contains multiple thin wrappers that only map command names to transition constants (`setUrbitDomain`, `setMinIODomain`, `togglePower`, `toggleDevMode`, etc. at `goseg/shipworkflow/urbit_operations_runtime.go:53-131`).",
+        "This pattern spreads behavior across registry tables and trivial wrapper functions, increasing call-surface and update points for each new operation."
+      ],
+      "suggestion": "Collapse trivial wrappers into declarative command-to-transition maps and keep explicit functions only where policy differs. In runtime ops, group related operations behind smaller domain-specific interfaces or bundles with documented invariants, and avoid adding fields that are pure aliases.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "registry_overgrowth"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "state_and_lifecycle_mixed_in_single_units",
+      "summary": "Core files combine state management with orchestration/event-loop concerns, reducing unit focus.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`broadcast/state.go` contains mutable store logic, cloning/serialization helpers, collector wiring, startup bootstrapping, and loop startup (`goseg/broadcast/state.go:22-227`).",
+        "`subsystem_events.go` combines health-loop lifecycle control, worker orchestration, Docker event subscription, event queueing, and transition failure-window policy in one unit (`goseg/docker/orchestration/subsystem/subsystem_events.go:53-248`).",
+        "`logstream_session_store.go` mixes session collection semantics with message bus publication (`goseg/session/logstream_session_store.go:26-219`), reinforcing the pattern of state containers owning transport concerns."
+      ],
+      "suggestion": "Split each unit into focused components: store/state-only types, lifecycle runners, and transport adapters. Keep event-loop policy (retry windows, worker supervision) in dedicated orchestrator modules and expose narrower interfaces from state stores.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "mixed_responsibility_runtime_objects"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_runtime_harness_fragmentation",
+      "summary": "Large tests repeatedly construct bespoke runtime/setup helpers instead of using shared test composition primitives.",
+      "related_files": [
+        "goseg/importer/importer_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main_test.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`importer_test.go` builds many custom setup utilities (`importerRuntimeWith`, `resetUploadSessionsForTest`, `initRuntime/uploadRuntime/provisionRuntime` at `goseg/importer/importer_test.go:27-159`).",
+        "`startup_orchestrator_test.go` introduces separate option plumbing and callback-setter registries (`goseg/startuporchestrator/startup_orchestrator_test.go:17-111`).",
+        "`main_test.go` and `wifi_test.go` define additional local runtime constructors (`goseg/main_test.go:18-55`, `goseg/system/wifi_test.go:18-26`) following similar ad-hoc patterns.",
+        "Repeated local harness design increases cognitive load and encourages inconsistent fixture semantics across modules."
+      ],
+      "suggestion": "Create a small shared internal test harness package for runtime option application, callback injection, and state reset utilities. Keep module-specific helpers thin adapters over those primitives and cap per-file helper count through shared builders.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_harness_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single canonical pattern for config field parsing/mutation, so modules evolved independent approaches.",
+      "Function-bag runtime seams scaled by accretion, creating many low-value indirection points.",
+      "State containers and orchestration loops are not consistently separated across subsystems."
+    ],
+    "likely_symptoms": [
+      "runtime_indirection_without_policy",
+      "test_runtime_harness_fragmentation"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,417 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_083124/results/batch-3.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 86.0,
+    "test_strategy": 82.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "contract IDs encode wire format inline as strings in `goseg/protocol/contracts/protocol_contracts.go` (e.g., `protocol.actions.upload.open-endpoint`) and `ActionToken` values are derived with fixed-string slicing offsets.",
+        "The protocol package’s catalog construction depends on duplicated textual namespace assumptions (`protocol.actions.upload.` and `protocol.actions.c2c.`) rather than a shared contract-domain abstraction.",
+        "README's governance guidance explicitly treats typed contract identifiers and namespace/action APIs as API contracts, increasing the risk of boundary drift when one side changes and another does not."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "No automated boundary guard exists here for ID/token schema drift between contract identity and action token derivation; a single changed naming convention requires coordinated updates across multiple modules without compile-time protection."
+    },
+    "test_strategy": {
+      "evidence": [
+        "README mandates contract-gate coverage and explicit per-contract lifecycle-policy assertions for changed catalog entries in `goseg/protocol/contracts/contracts_test.go` and related contract files.",
+        "In scope, `goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/contracts/startram_contracts.go` only define catalog specs and metadata wiring, with no local assertions protecting contract compatibility policy or lifecycle semantics.",
+        "README treats these contract surfaces as governance-critical boundaries for upload/C2C/StarTram flows, but the files themselves have no immediate self-documenting test hooks or invariant checks."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "protocol-token-prefix-derivation",
+      "summary": "Contract token derivation is coupled to literal namespace prefixes, creating cross-module contract-shape fragility.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines `actionTokenOpenEndpoint`, `actionTokenReset`, and `actionTokenConnect` by slicing hardcoded prefixes from `UploadActionOpenEndpoint`, `UploadActionReset`, and `C2CConnectAction`.",
+        "This embeds textual wire-level shape (`protocol.actions.upload.`, `protocol.actions.c2c.`) into action-token generation logic instead of using a single contract constructor or schema-level API."
+      ],
+      "suggestion": "Replace manual prefix slicing with a central contract constructor/parser in the contracts package (e.g., `actionTokenFromContractID` with compile-time tests) and have all protocol and StarTram entries use it so namespace/ID changes cannot desynchronize action tokens.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_schema_duplication"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract-governance-gap",
+      "summary": "Contract lifecycle/compatibility expectations in governance docs are not locally enforced at the contract surface.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README lists a strict contract governance contract for protocol/StarTram surfaces (including explicit lifecycle-policy checks, gate coverage, and compatibility descriptor assertions).",
+        "The two contract surface files only expose static descriptors and delegated metadata lookups and do not include direct invariants for required lifecycle fields."
+      ],
+      "suggestion": "Add focused unit tests adjacent to the contract package (in existing contract test file) that assert descriptor completeness and compatibility policy invariants per contract ID, so updates to these tables fail fast before entering CI and before downstream consumers diverge.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_schema_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "String-shape coupling between contract IDs and action tokens, rather than explicit contract-domain abstractions.",
+      "Governance policy is centrally documented but not mirrored as immediate invariants in contract declaration modules."
+    ],
+    "likely_symptoms": [
+      "protocol-token-prefix-derivation",
+      "contract-governance-gap"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex-spark
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cb7f9-2c14-7100-93fe-7b4a0d0d4883
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll load the blind packet and the three assigned files once, then produce batch JSON with findings plus per-dimension notes and scores constrained to `cross_module_architecture` and `test_strategy` only.
+exec
+/opt/homebrew/bin/zsh -lc "cat /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json && echo '---' && cat README.md && echo '---' && cat goseg/protocol/contracts/protocol_contracts.go && echo '---' && cat goseg/protocol/contracts/startram_contracts.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 6180
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "abstraction_fitness",
+    "cross_module_architecture",
+    "design_coherence",
+    "test_strategy"
+  ],
+  "dimension_prompts": {
+    "abstraction_fitness": {
+      "description": "Abstractions that pay for themselves with real leverage",
+      "look_for": [
+        "Pass-through wrappers or interfaces that add no behavior, policy, or translation",
+        "Cross-cutting wrapper chains where call depth increases without added value",
+        "Interface/protocol families where most declared contracts have only one implementation",
+        "Systemic util/helper dumping grounds that create low cohesion across modules",
+codex
+I’ve pulled the packet and the three target files. Next I’ll inspect the blind packet for any prior findings tied to these files/dimensions so we can validate whether they still apply.
+exec
+/opt/homebrew/bin/zsh -lc 'rg -n "Governance|cross_module_architecture|test_strategy|protocol_contracts.go|startram_contracts.go|contracts.*go" /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+7:    "cross_module_architecture",
+9:    "test_strategy"
+28:        "If the core issue is dependency direction or cycles, use cross_module_architecture"
+31:    "cross_module_architecture": {
+69:    "test_strategy": {
+101:          "file": "goseg/protocol/contracts/protocol_contracts.go",
+106:          "file": "goseg/protocol/contracts/protocol_contracts.go",
+111:          "file": "goseg/protocol/contracts/protocol_contracts.go",
+116:          "file": "goseg/protocol/contracts/startram_contracts.go",
+3460:            "contracts.go",
+3461:            "contracts_test.go",
+3462:            "protocol_contracts.go",
+3463:            "protocol_contracts_test.go",
+3464:            "startram_contracts.go",
+3465:            "startram_contracts_test.go"
+3982:            "contracts.go",
+3983:            "contracts_test.go",
+4725:      "goseg/transition/contracts.go": [
+5186:      "goseg/protocol/contracts/contracts.go": [
+5202:      "goseg/protocol/contracts/protocol_contracts.go": [
+codex
+I’ve found the packet includes the governance batch definition plus the global review prompt. I’ll now confirm whether it contains any prior issue entries for these exact files/dimensions before finalizing findings.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '5200,5820p' /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 621
+
+        "unused: Unused import: com/Native-Planet/perigee/libprg"
+      ],
+      "goseg/protocol/contracts/protocol_contracts.go": [
+        "subjective_review: File changed since last review \u2014 re-review recommended"
+      ],
+      "goseg/config/config_update_registry.go": [
+        "structural: Needs decomposition: large (1040 LOC)"
+      ],
+      "goseg/auth/client_session.go": [
+        "unused: Unused import: com/gorilla/websocket",
+        "unused: Unused import: org/zap",
+        "signature: 'RemoveFromAuthMap' has 3 different signatures across 3 files",
+        "signature: 'AddToAuthMap' has 2 different signatures across 3 files"
+      ],
+      "goseg/leak/handler_dispatch.go": [
+        "unused: Unused import: org/zap",
+        "subjective_review: No design review on record \u2014 run `desloppify review --prepare`"
+      ],
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 86.0,
+    "test_strategy": 82.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "contract IDs encode wire format inline as strings in `goseg/protocol/contracts/protocol_contracts.go` (e.g., `protocol.actions.upload.open-endpoint`) and `ActionToken` values are derived with fixed-string slicing offsets.",
+        "The protocol package’s catalog construction depends on duplicated textual namespace assumptions (`protocol.actions.upload.` and `protocol.actions.c2c.`) rather than a shared contract-domain abstraction.",
+        "README's governance guidance explicitly treats typed contract identifiers and namespace/action APIs as API contracts, increasing the risk of boundary drift when one side changes and another does not."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "No automated boundary guard exists here for ID/token schema drift between contract identity and action token derivation; a single changed naming convention requires coordinated updates across multiple modules without compile-time protection."
+    },
+    "test_strategy": {
+      "evidence": [
+        "README mandates contract-gate coverage and explicit per-contract lifecycle-policy assertions for changed catalog entries in `goseg/protocol/contracts/contracts_test.go` and related contract files.",
+        "In scope, `goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/contracts/startram_contracts.go` only define catalog specs and metadata wiring, with no local assertions protecting contract compatibility policy or lifecycle semantics.",
+        "README treats these contract surfaces as governance-critical boundaries for upload/C2C/StarTram flows, but the files themselves have no immediate self-documenting test hooks or invariant checks."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "protocol-token-prefix-derivation",
+      "summary": "Contract token derivation is coupled to literal namespace prefixes, creating cross-module contract-shape fragility.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines `actionTokenOpenEndpoint`, `actionTokenReset`, and `actionTokenConnect` by slicing hardcoded prefixes from `UploadActionOpenEndpoint`, `UploadActionReset`, and `C2CConnectAction`.",
+        "This embeds textual wire-level shape (`protocol.actions.upload.`, `protocol.actions.c2c.`) into action-token generation logic instead of using a single contract constructor or schema-level API."
+      ],
+      "suggestion": "Replace manual prefix slicing with a central contract constructor/parser in the contracts package (e.g., `actionTokenFromContractID` with compile-time tests) and have all protocol and StarTram entries use it so namespace/ID changes cannot desynchronize action tokens.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_schema_duplication"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract-governance-gap",
+      "summary": "Contract lifecycle/compatibility expectations in governance docs are not locally enforced at the contract surface.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README lists a strict contract governance contract for protocol/StarTram surfaces (including explicit lifecycle-policy checks, gate coverage, and compatibility descriptor assertions).",
+        "The two contract surface files only expose static descriptors and delegated metadata lookups and do not include direct invariants for required lifecycle fields."
+      ],
+      "suggestion": "Add focused unit tests adjacent to the contract package (in existing contract test file) that assert descriptor completeness and compatibility policy invariants per contract ID, so updates to these tables fail fast before entering CI and before downstream consumers diverge.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_schema_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "String-shape coupling between contract IDs and action tokens, rather than explicit contract-domain abstractions.",
+      "Governance policy is centrally documented but not mirrored as immediate invariants in contract declaration modules."
+    ],
+    "likely_symptoms": [
+      "protocol-token-prefix-derivation",
+      "contract-governance-gap"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+32,441
+

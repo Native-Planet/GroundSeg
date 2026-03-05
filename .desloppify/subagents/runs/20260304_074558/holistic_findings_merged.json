@@ -1,0 +1,226 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 78.6,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 78.0,
+        "Indirection Cost": 67.0,
+        "Interface Honesty": 74.0
+      }
+    },
+    "cross_module_architecture": 94.4,
+    "test_strategy": 79.5
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "The two files only contain package-local contract metadata and catalog-builder helpers with no imports and no calls into external packages.",
+        "All contract identifiers are declared centrally in `protocol_contracts.go` and `startram_contracts.go`, and catalog entries are constructed directly from package-local constants/types.",
+        "There is no visible import-time registration, mutable global state, or initialization side-effect in either file."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "No material boundary regression is present, but adding a compile-time/registry-level test to enforce completeness of contract-ID usage could increase assurance without changing architecture."
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`runServer` in `main.go` wires the websocket listener address as a hardcoded `\":3000\"` instead of deriving it from startup/runtime input (`appStartupOptions.httpPort`, `StartupOptions`, or a runtime seam), so caller code cannot fully control or swap server transport endpoints.",
+        "`bootstrapRuntime` in `main.go` already treats HTTP listen as configurable through the startup options, but the websocket side channel is not modeled as part of the same abstraction boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Runtime seam exposes HTTP port configurability but not websocket bind contract, creating an inconsistent and partially configurable server abstraction that makes deployment and orchestration harder to adapt.",
+      "sub_axes": {
+        "abstraction_leverage": 78.0,
+        "indirection_cost": 67.0,
+        "interface_honesty": 74.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "`README.md` states contract surfaces should have paired tests and path-aware contract gate coverage for changed catalog entries and lifecycle assertions.",
+        "The reviewed contract files are definition-only (`protocol_contracts.go`, `startram_contracts.go`) with no direct deterministic contract assertions in this scope to validate descriptor/message/version behavior on each change."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "fixed_websocket_listener_port",
+      "summary": "Server abstraction is partially leaky: websocket bind address is hardcoded to `:3000`, preventing callers from controlling both listeners through the startup/runtime seam.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "In `main.go`, `runServer` creates HTTP server with runtime-configured `httpPort` but creates websocket server with `Addr: \":3000\"`.",
+        "`main.go` bootstrap path already passes startup configuration into `runBootstrapSubsystems`, yet websocket binding is not represented in those options."
+      ],
+      "suggestion": "Add websocket listener bind address/port to startup options and/or the server runtime contract, thread it through bootstrap startup options, and use that value in `runServer` (with default `\":3000\"` for backward compatibility). Consider validating both endpoints and supporting a single configurable listener for environments that require unified port bindings.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fixed_listener_contract"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract_tests_missing",
+      "summary": "Protocol and StarTram contract definitions can change without adjacent deterministic contract assertions in this package.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`README.md` explicitly requires runtime contract gate coverage and deterministic per-catalog assertions for changed contract entries.",
+        "`goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/contracts/startram_contracts.go` currently only define constants/metadata entries and do not include in-package tests that prove compatibility policy, namespace binding, and message semantics for these descriptors."
+      ],
+      "suggestion": "Add/extend `goseg/protocol/contracts/contracts_test.go` with table-driven tests covering each contract in both files: ID format, namespace/action alignment, descriptor metadata presence, compatibility policy (`contractMetadataFor` output), and masked-error message stability for StarTram. Add targeted tests in CI path checks if behavior changes should fail fast.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_test_gap"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 3,
+    "dimension_coverage": 0.444,
+    "evidence_density": 3.0,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 5.292,
+    "dimensions_with_findings": 2
+  },
+  "review_scope": {
+    "reviewed_files_count": 41,
+    "successful_batch_count": 3,
+    "full_sweep_included": false,
+    "total_files": 574,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "test_strategy"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/contracts/protocol_contracts.go",
+    "goseg/protocol/contracts/startram_contracts.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/broadcast/loop.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/importer/importer.go",
+    "goseg/defaults/version.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/main.go",
+    "goseg/main_test.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/routines/version.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/config/config.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "README.md"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_074558",
+    "created_at": "2026-03-04T07:46:22+00:00",
+    "batch_count": 3,
+    "batch_indexes": [
+      1,
+      2,
+      3
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "6b4ce83c4ecd404659e11dce3584f7f7af0438d79973a023c91236c2ceb68e0e"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "test_strategy"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "test_strategy"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

@@ -1,0 +1,968 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_184451/results/batch-4.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 4
+Batch name: Design coherence — Mechanical Concern Signals
+Batch dimensions: design_coherence
+Batch rationale: mechanical detectors identified structural patterns needing judgment; concern types: duplication_design, mixed_responsibilities, systemic_pattern
+
+Files assigned:
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/exporter/exporter_test.go
+- goseg/system/disk/adapter.go
+- goseg/accesspoint/accesspoint.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/broadcast/loop_test.go
+- goseg/broadcast/state_test.go
+- goseg/config/config.go
+- goseg/config/config_test.go
+- goseg/config/config_update_schema.go
+- goseg/docker/lifecycle/lifecycle_full_test.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/handler/ship/urbit_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer_test.go
+- goseg/leak/broadcast_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger_test.go
+- goseg/main_test.go
+- goseg/protocol/actions/actions.go
+- goseg/protocol/actions/actions_test.go
+- goseg/protocol/contracts/contracts_test.go
+- goseg/session/logstream_session_store.go
+- goseg/shipworkflow/urbit_operations_runtime.go
+- goseg/startram/backup_runtime_test.go
+- goseg/startram/state_sync_test.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/structs/configs.go
+- goseg/system/metrics/metrics_test.go
+- goseg/system/storage/storage_test.go
+- goseg/system/wifi_c2c_flow_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/system/wifi_test.go
+- goseg/uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 71.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Global mutable runtime seams are repeatedly reset per-test (`resetExporterState`, `resetUploadSessionsForTest`, `resetLeakStateForTest`, `resetLoggerInitForTest`), indicating behavior depends on package-level state rather than scoped test/runtime objects.",
+        "Core runtime files combine multiple concern layers in single units: `accesspoint.go` mixes config/default resolution, process probing/matching, shell execution, and lifecycle entrypoints; `urbit_operations_runtime.go` mixes transition registry, config mutation orchestration, external service calls, and post-transition broadcasting.",
+        "Configuration handling remains structurally broad and repetitive: `structs.SysConfig` and section update APIs are duplicated by section, while tests in `config_test.go` require very large hand-built config fixtures to exercise merge logic."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "global_test_state_coupling",
+      "summary": "Test design relies on shared package-global mutation across modules, creating systemic coupling and weak isolation boundaries.",
+      "related_files": [
+        "goseg/exporter/exporter_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/leak/broadcast_test.go",
+        "goseg/logger/logger_test.go"
+      ],
+      "evidence": [
+        "`resetExporterState` rewires package globals (`mkdirAllForExporter`, `getStoragePathForExporter`, `openForExporter`, `whitelist`) for each test.",
+        "`resetUploadSessionsForTest` mutates global `uploadSessions` under `uploadMu` and restores via cleanup.",
+        "`resetLeakStateForTest` swaps global `BytesChan` and `lickStatuses`, restoring later, and multiple tests depend on this side effect.",
+        "`resetLoggerInitForTest` mutates global logger init state (`setLoggerInitState`, `setLoggerInitErr`) for test behavior."
+      ],
+      "suggestion": "Introduce explicit runtime/store instances per subsystem (exporter, importer, leak, logger) and pass them through constructors/handlers; keep one compatibility default for production, but have tests instantiate isolated runtimes instead of mutating globals.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_files_mix_multiple_layers",
+      "summary": "Operational orchestration files mix unrelated responsibilities, reducing structural focus and increasing change blast radius.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "`accesspoint.go` contains runtime seam wiring, config/default normalization, password derivation, process matching/parsing, dependency checks, and shell execution in one file.",
+        "`urbit_operations_runtime.go` contains command registry mapping, transition step construction, config mutation orchestration (`runShipConfigTransition`), external side effects (docker/click/startram), and schedule publishing logic.",
+        "`subsystem_events.go` combines health-loop lifecycle control, event listener transport wiring, event-bus backpressure policy, and transition execution/retry-window policy."
+      ],
+      "suggestion": "Split each file into role-focused modules: runtime wiring/defaults, domain transition planning, and side-effect executors; define narrow coordinators that compose these parts so policy changes do not require touching transport/parsing/process code together.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_runtime_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_monolith_drives_fixture_duplication",
+      "summary": "Config modeling remains monolithic, which drives repetitive per-field setup and duplicated section-level update scaffolding.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_test.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`structs/configs.go` repeats near-identical section accessor/update methods (`ConnectivitySection`, `StartramSection`, etc. and corresponding `Update*Config`).",
+        "`config_test.go` builds very large default/custom config fixtures field-by-field in multiple tests (e.g., migration and override tests), indicating missing reusable builders/fixtures and high schema coupling in tests.",
+        "`config_update_schema.go` maintains key-to-parser/apply registries and specialized parse helpers, which amplifies maintenance when schema evolves."
+      ],
+      "suggestion": "Introduce canonical config fixture builders per section and table-driven patch cases; consolidate section update/access patterns via generic helpers or a section registry to reduce manual repetition when fields evolve.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_schema_surface_area"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit global runtime/seam pattern instead of explicit dependency ownership",
+      "Policy/orchestration logic co-located with low-level transport/process concerns",
+      "Large config surface without strong fixture/builder abstraction"
+    ],
+    "likely_symptoms": [
+      "global_test_state_coupling",
+      "runtime_files_mix_multiple_layers",
+      "config_monolith_drives_fixture_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cba2b-9ce1-7ee3-871c-ac3a79661b68
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 4
+Batch name: Design coherence — Mechanical Concern Signals
+Batch dimensions: design_coherence
+Batch rationale: mechanical detectors identified structural patterns needing judgment; concern types: duplication_design, mixed_responsibilities, systemic_pattern
+
+Files assigned:
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/exporter/exporter_test.go
+- goseg/system/disk/adapter.go
+- goseg/accesspoint/accesspoint.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/broadcast/loop_test.go
+- goseg/broadcast/state_test.go
+- goseg/config/config.go
+- goseg/config/config_test.go
+- goseg/config/config_update_schema.go
+- goseg/docker/lifecycle/lifecycle_full_test.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/handler/ship/urbit_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer_test.go
+- goseg/leak/broadcast_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger_test.go
+- goseg/main_test.go
+- goseg/protocol/actions/actions.go
+- goseg/protocol/actions/actions_test.go
+- goseg/protocol/contracts/contracts_test.go
+- goseg/session/logstream_session_store.go
+- goseg/shipworkflow/urbit_operations_runtime.go
+- goseg/startram/backup_runtime_test.go
+- goseg/startram/state_sync_test.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/structs/configs.go
+- goseg/system/metrics/metrics_test.go
+- goseg/system/storage/storage_test.go
+- goseg/system/wifi_c2c_flow_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/system/wifi_test.go
+- goseg/uploadsvc/service_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll review the blind packet constraints first, then inspect only the listed files for `design_coherence` signals and produce a JSON assessment with evidence-backed findings.
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg --files goseg/docker/orchestration/subsystem/subsystem_events.go goseg/exporter/exporter_test.go goseg/system/disk/adapter.go goseg/accesspoint/accesspoint.go goseg/accesspoint/accesspoint_test.go goseg/broadcast/loop_test.go goseg/broadcast/state_test.go goseg/config/config.go goseg/config/config_test.go goseg/config/config_update_schema.go goseg/docker/lifecycle/lifecycle_full_test.go goseg/docker/orchestration/runtime_ops.go goseg/handler/ship/urbit_test.go goseg/handler/systemsvc/system_test.go goseg/importer/extract_test.go goseg/importer/importer_test.go goseg/leak/broadcast_test.go goseg/leak/handler_test.go goseg/logger/logger_test.go goseg/main_test.go goseg/protocol/actions/actions.go goseg/protocol/actions/actions_test.go goseg/protocol/contracts/contracts_test.go goseg/session/logstream_session_store.go goseg/shipworkflow/urbit_operations_runtime.go goseg/startram/backup_runtime_test.go goseg/startram/state_sync_test.go goseg/startuporchestrator/startup_orchestrator_test.go goseg/structs/configs.go goseg/system/metrics/metrics_test.go goseg/system/storage/storage_test.go goseg/system/wifi_c2c_flow_test.go goseg/system/wifi_runtime_methods.go goseg/system/wifi_test.go goseg/uploadsvc/service_test.go' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 6133
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "abstraction_fitness",
+    "design_coherence",
+    "package_organization",
+    "naming_quality"
+  ],
+  "dimension_prompts": {
+    "abstraction_fitness": {
+      "description": "Abstractions that pay for themselves with real leverage",
+      "look_for": [
+        "Pass-through wrappers or interfaces that add no behavior, policy, or translation",
+        "Cross-cutting wrapper chains where call depth increases without added value",
+        "Interface/protocol families where most declared contracts have only one implementation",
+        "Systemic util/helper dumping grounds that create low cohesion across modules",
+ succeeded in 50ms:
+goseg/startram/backup_runtime_test.go
+goseg/handler/systemsvc/system_test.go
+goseg/exporter/exporter_test.go
+goseg/shipworkflow/urbit_operations_runtime.go
+goseg/handler/ship/urbit_test.go
+goseg/docker/orchestration/subsystem/subsystem_events.go
+goseg/startram/state_sync_test.go
+goseg/system/disk/adapter.go
+goseg/importer/extract_test.go
+goseg/importer/importer_test.go
+goseg/accesspoint/accesspoint.go
+goseg/startuporchestrator/startup_orchestrator_test.go
+goseg/leak/broadcast_test.go
+goseg/accesspoint/accesspoint_test.go
+goseg/structs/configs.go
+goseg/leak/handler_test.go
+goseg/broadcast/loop_test.go
+goseg/system/metrics/metrics_test.go
+goseg/logger/logger_test.go
+goseg/broadcast/state_test.go
+codex
+I’ve loaded the packet and file scope. Next I’m mapping structural patterns (especially repeated test harness/setup and mixed responsibilities) across the listed files so findings are evidence-based and non-duplicative.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg -n \"t\\.Setenv|os\\.Setenv|filepath\\.Join\\(t\\.TempDir|httptest\\.NewServer|newTest|testRuntime|fake|stub|mock|must\" goseg/exporter/exporter_test.go goseg/accesspoint/accesspoint_test.go goseg/broadcast/loop_test.go goseg/broadcast/state_test.go goseg/config/config_test.go goseg/docker/lifecycle/lifecycle_full_test.go goseg/handler/ship/urbit_test.go goseg/handler/systemsvc/system_test.go goseg/importer/extract_test.go goseg/importer/importer_test.go goseg/leak/broadcast_test.go goseg/leak/handler_test.go goseg/logger/logger_test.go goseg/main_test.go goseg/protocol/actions/actions_test.go goseg/protocol/contracts/contracts_test.go goseg/startram/backup_runtime_test.go goseg/startram/state_sync_test.go goseg/startuporchestrator/startup_orchestrator_test.go goseg/system/metrics/metrics_test.go goseg/system/storage/storage_test.go goseg/system/wifi_c2c_flow_test.go goseg/system/wifi_test.go goseg/uploadsvc/service_test.go" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+goseg/startram/backup_runtime_test.go:21:type stubAPIClient struct {
+goseg/startram/backup_runtime_test.go:26:func (s stubAPIClient) Get(url string) (*http.Response, error) {
+goseg/startram/backup_runtime_test.go:33:func (s stubAPIClient) Post(url, contentType string, body io.Reader) (*http.Response, error) {
+goseg/startram/backup_runtime_test.go:40:type stubBackupInfrastructureService struct {
+goseg/startram/backup_runtime_test.go:45:func (s stubBackupInfrastructureService) GetBackup(ship, timestamp, backupPassword, pubkey, endpointURL string) (string, error) {
+goseg/startram/backup_runtime_test.go:52:func (s stubBackupInfrastructureService) UploadBackup(ship, privateKey, filePath string) error {
+goseg/startram/backup_runtime_test.go:56:func (s stubBackupInfrastructureService) Restore(req RestoreBackupRequest) error {
+goseg/startram/backup_runtime_test.go:63:type stubConfigService struct {
+goseg/startram/backup_runtime_test.go:68:func (s stubConfigService) StartramSettingsSnapshot() config.StartramSettings {
+goseg/startram/backup_runtime_test.go:72:func (s stubConfigService) IsWgRegistered() bool {
+goseg/startram/backup_runtime_test.go:76:func (s stubConfigService) SetWgRegistered(bool) error {
+goseg/startram/backup_runtime_test.go:80:func (s stubConfigService) SetStartramConfig(structs.StartramRetrieve) {}
+goseg/startram/backup_runtime_test.go:82:func (s stubConfigService) RuntimeContext() config.RuntimeContext {
+goseg/startram/backup_runtime_test.go:100:	defaultBackupInfrastructureService = stubBackupInfrastructureService{
+goseg/startram/backup_runtime_test.go:134:	defaultAPIClient = stubAPIClient{
+goseg/startram/backup_runtime_test.go:162:	defaultAPIClient = stubAPIClient{
+goseg/startram/backup_runtime_test.go:171:	defaultAPIClient = stubAPIClient{
+goseg/startram/backup_runtime_test.go:223:	defaultAPIClient = stubAPIClient{
+goseg/startram/backup_runtime_test.go:253:	defaultConfigService = stubConfigService{
+goseg/startram/backup_runtime_test.go:262:	defaultAPIClient = stubAPIClient{
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && for f in goseg/docker/orchestration/subsystem/subsystem_events.go goseg/exporter/exporter_test.go goseg/system/disk/adapter.go goseg/accesspoint/accesspoint.go goseg/accesspoint/accesspoint_test.go goseg/broadcast/loop_test.go goseg/broadcast/state_test.go goseg/config/config.go goseg/config/config_test.go goseg/config/config_update_schema.go goseg/docker/lifecycle/lifecycle_full_test.go goseg/docker/orchestration/runtime_ops.go goseg/handler/ship/urbit_test.go goseg/handler/systemsvc/system_test.go goseg/importer/extract_test.go goseg/importer/importer_test.go goseg/leak/broadcast_test.go goseg/leak/handler_test.go goseg/logger/logger_test.go goseg/main_test.go goseg/protocol/actions/actions.go goseg/protocol/actions/actions_test.go goseg/protocol/contracts/contracts_test.go goseg/session/logstream_session_store.go goseg/shipworkflow/urbit_operations_runtime.go goseg/startram/backup_runtime_test.go goseg/startram/state_sync_test.go goseg/startuporchestrator/startup_orchestrator_test.go goseg/structs/configs.go goseg/system/metrics/metrics_test.go goseg/system/storage/storage_test.go goseg/system/wifi_c2c_flow_test.go goseg/system/wifi_runtime_methods.go goseg/system/wifi_test.go goseg/uploadsvc/service_test.go; do echo "==== $f"; rg -n "''^func (Test|Benchmark|Fuzz|new|setup|build|make|create)|''^func [A-Za-z0-9_]+'"\\(\" \""'$f"; done' in /Users/chuah/NP/GroundSeg succeeded in 67ms:
+28:func TestSmartResultsSnapshotCopiesCurrentState(t *testing.T) {
+50:func TestListHardDisks(t *testing.T) {
+81:func TestIsDevMounted(t *testing.T) {
+91:func TestSmartCheckAllDrives(t *testing.T) {
+123:func TestSetupTmpDirSkipsWhenNotMountedMMC(t *testing.T) {
+149:func TestSetupTmpDirReplacesNonSymlinkMmcMount(t *testing.T) {
+193:func TestSetupTmpDirPreservesExistingSymlink(t *testing.T) {
+220:func TestIsMountedMMC(t *testing.T) {
+251:func TestIsMountedMMCPropagatesListError(t *testing.T) {
+264:func TestRemoveMultipartFiles(t *testing.T) {
+296:func TestRemoveMultipartFilesError(t *testing.T) {
+313:func TestParseFstabLineContractMatrix(t *testing.T) {
+332:func TestReconcileFstabLinesContractMatrix(t *testing.T) {
+391:func TestReadWriteFstabLines(t *testing.T) {
+425:func TestNextGroundSegPath(t *testing.T) {
+446:func TestNextGroundSegPathPropagatesStatError(t *testing.T) {
+457:func TestFilePathExists(t *testing.T) {
+479:func TestFormatGroundSegFilesystem(t *testing.T) {
+504:func TestReconcileGroundSegFstabWritesAndMounts(t *testing.T) {
+550:func TestReconcileGroundSegFstabSkipsMissingDevice(t *testing.T) {
+codex
+I’ve identified candidate hotspots; now I’m reading the key runtime and high-churn test files to confirm whether these are real coherence issues versus acceptable test scaffolding.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/shipworkflow/urbit_operations_runtime.go | sed -n '1,320p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/accesspoint/accesspoint.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/system/wifi_runtime_methods.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package system
+     2	
+     3	import (
+     4		"fmt"
+     5		"os/exec"
+     6		"strings"
+     7		"time"
+     8	
+     9		"groundseg/internal/resource"
+    10		"groundseg/internal/seams"
+    11	
+    12		"github.com/mdlayher/wifi"
+    13		"go.uber.org/zap"
+    14	)
+    15	
+    16	type wifiRuntime struct {
+    17		ExecCommand        func(string, ...string) *exec.Cmd
+    18		RunCommand         func(string, ...string) (string, error)
+    19		RunNmcliFn         func(args ...string) (string, error)
+    20		NewWifiClient      func() (*wifi.Client, error)
+ succeeded in 53ms:
+     1	package accesspoint
+     2	
+     3	import (
+     4		"bytes"
+     5		"crypto/sha256"
+     6		"fmt"
+     7		"net"
+     8		"os"
+     9		"os/exec"
+    10		"path/filepath"
+    11		"regexp"
+    12		"strings"
+    13	
+    14		"go.uber.org/zap"
+    15	)
+    16	
+    17	type AccessPointRuntime struct {
+    18		Wlan                 string
+    19		Inet                 string
+    20		IP                   string
+ succeeded in 53ms:
+     1	package shipworkflow
+     2	
+     3	import (
+     4		"fmt"
+     5		"strings"
+     6	
+     7		"groundseg/broadcast"
+     8		"groundseg/click"
+     9		"groundseg/docker"
+    10		dockerOrchestration "groundseg/docker/orchestration"
+    11		"groundseg/startram"
+    12		"groundseg/structs"
+    13		"groundseg/transition"
+    14	)
+    15	
+    16	type urbitTransitionRuntime struct {
+    17		publishSchedulePack func(string) error
+    18	}
+    19	
+    20	type aliasTransitionPolicy struct {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/shipworkflow/urbit_operations_runtime.go | sed -n '320,620p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+   320		if err := persistShipUrbitSectionConfig[structs.UrbitFeatureConfig](patp, dockerOrchestration.UrbitConfigSectionFeature, func(conf *structs.UrbitFeatureConfig) error {
+   321			conf.MinIOLinked = true
+   322			return nil
+   323		}); err != nil {
+   324			return fmt.Errorf("could not update urbit config: %w", err)
+   325		}
+   326		return nil
+   327	}
+   328	
+   329	func handleLoom(patp string, urbitPayload structs.WsUrbitPayload) error {
+   330		err := runUrbitTransitionFromCommand(patp, transition.UrbitTransitionLoom, urbitPayload)
+   331		if err != nil {
+   332			return fmt.Errorf("failed to handle loom transition for %s: %w", patp, err)
+   333		}
+   334		return nil
+   335	}
+   336	
+   337	func handleSnapTime(patp string, urbitPayload structs.WsUrbitPayload) error {
+   338		err := runUrbitTransitionFromCommand(patp, transition.UrbitTransitionSnapTime, urbitPayload)
+   339		if err != nil {
+codex
+I confirmed one production hotspot in `shipworkflow`; next I’m validating whether similar structural duplication exists in `protocol/actions` and `config` paths so findings can be clustered by root cause.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/protocol/actions/actions.go | sed -n '1,460p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/config/config_update_schema.go | sed -n '220,520p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/config/config.go | sed -n '100,300p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package actions
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"sync"
+     7	
+     8		"groundseg/protocol/actionids"
+     9		"groundseg/protocol/contracts"
+    10	)
+    11	
+    12	// Namespace groups action enums by transport domain.
+    13	type Namespace = contracts.ActionNamespace
+    14	
+    15	const (
+    16		NamespaceUpload Namespace = Namespace(actionids.NamespaceUpload)
+    17		NamespaceC2C    Namespace = Namespace(actionids.NamespaceC2C)
+    18	)
+    19	
+    20	// Action is a transport action contract token.
+ succeeded in 50ms:
+   100	type RuntimeContext struct {
+   101		BasePath     string
+   102		Architecture string
+   103		DebugMode    bool
+   104		DockerDir    string
+   105	}
+   106	
+   107	var (
+   108		basePathDefault     = getBasePath
+   109		architectureDefault = getArchitecture
+   110		defaultDebugMode    = func() bool { return false }
+   111		dockerDirDefault    = func() string { return defaults.DockerData("volumes") + "/" }
+   112		runtimeContextMu    sync.Mutex
+   113		runtimeContextValue atomic.Pointer[RuntimeContext]
+   114	)
+   115	
+   116	// RuntimeContextSnapshot returns an immutable runtime context for the current
+   117	// process state. Callers should pass this into orchestration boundaries instead
+   118	// of reaching into package-level mutable config state.
+   119	func RuntimeContextSnapshot() RuntimeContext {
+ succeeded in 50ms:
+   220	
+   221	func configPatchValueAccessor[T any](getTarget func(*ConfPatch) *T) configPatchValueRef[T] {
+   222		var zero T
+   223		return configPatchValueRef[T]{
+   224			getValue: func(patch *ConfPatch) (T, bool) {
+   225				if getTarget == nil {
+   226					return zero, false
+   227				}
+   228				return *getTarget(patch), true
+   229			},
+   230			setValue: func(patch *ConfPatch, value T) {
+   231				*getTarget(patch) = value
+   232			},
+   233		}
+   234	}
+   235	
+   236	func newConfigPatchField[T any](
+   237		key, patchField string,
+   238		parseValue configPatchValueParser[T],
+   239		target configPatchValueRef[T],
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/docker/orchestration/subsystem/subsystem_events.go | sed -n '1,320p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/docker/orchestration/runtime_ops.go | sed -n '1,420p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/session/logstream_session_store.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package subsystem
+     2	
+     3	import (
+     4		"context"
+     5		"fmt"
+     6		"sync"
+     7		"time"
+     8	
+     9		"groundseg/docker/internal/closeutil"
+    10		"groundseg/dockerclient"
+    11		"groundseg/logger"
+    12		"groundseg/structs"
+    13		"groundseg/transition"
+    14	
+    15		eventtypes "github.com/docker/docker/api/types/events"
+    16	)
+    17	
+    18	type dockerSubsystemRuntime struct {
+    19		events dockerSubsystemEventBus
+    20		health dockerHealthLoopState
+ succeeded in 53ms:
+     1	package orchestration
+     2	
+     3	import (
+     4		"errors"
+     5	
+     6		"groundseg/click"
+     7		"groundseg/config"
+     8		"groundseg/docker/network"
+     9		"groundseg/docker/orchestration/container"
+    10		"groundseg/docker/registry"
+    11		"groundseg/startram"
+    12		"groundseg/structs"
+    13		"os"
+    14		"time"
+    15	)
+    16	
+    17	type RuntimeContainerOps struct {
+    18		StartContainerFn            func(name string, ctype string) (structs.ContainerState, error) `runtime:"importer-provision,workflow,rectify" runtime_name:"start container callback"`
+    19		StopContainerByNameFn       func(name string) error                                         `runtime:"workflow" runtime_name:"stop container callback"`
+    20		CreateContainerFn           func(name string, ctype string) (structs.ContainerState, error)
+ succeeded in 52ms:
+     1	package session
+     2	
+     3	import (
+     4		"sync"
+     5	
+     6		"github.com/gorilla/websocket"
+     7	)
+     8	
+     9	type LogstreamRuntime interface {
+    10		SysLogSessions() []*websocket.Conn
+    11		SetSysLogSessions([]*websocket.Conn)
+    12		SysSessionsToRemove() []*websocket.Conn
+    13		SetSysSessionsToRemove([]*websocket.Conn)
+    14		AddSysLogSession(*websocket.Conn)
+    15		RemoveSysLogSessions()
+    16		AddSysSessionToRemove(*websocket.Conn)
+    17		DockerLogSessions() map[string]map[*websocket.Conn]bool
+    18		SetDockerLogSessions(map[string]map[*websocket.Conn]bool)
+    19		SetDockerLogSession(string, *websocket.Conn, bool)
+    20		SetDockerLogSessionLive(string, *websocket.Conn, bool)
+codex
+I’ve verified runtime wiring files; now I’m checking whether test files show recurring duplicated harness patterns that indicate missing shared test abstractions rather than isolated one-offs.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/leak/handler_test.go | sed -n '1,320p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/accesspoint/accesspoint.go | sed -n '260,520p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/leak/broadcast_test.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+   260		return isRunningWithRuntime(accessPointRuntime())
+   261	}
+   262	
+   263	type processProbeMatchKind string
+   264	
+   265	const (
+   266		processMatchKindExact processProbeMatchKind = "exact"
+   267		processMatchKindRegex processProbeMatchKind = "regex"
+   268	)
+   269	
+   270	type processProbeMatcher struct {
+   271		kind            processProbeMatchKind
+   272		normalizedTerms []string
+   273		regexes         []*regexp.Regexp
+   274	}
+   275	
+   276	func newProcessProbeMatcher(kind processProbeMatchKind, terms ...string) (processProbeMatcher, error) {
+   277		if len(terms) == 0 {
+   278			return processProbeMatcher{}, fmt.Errorf("process matcher: missing terms")
+   279		}
+ succeeded in 51ms:
+     1	package leak
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"errors"
+     6		"io"
+     7		"net"
+     8		"reflect"
+     9		"testing"
+    10		"time"
+    11	
+    12		"groundseg/structs"
+    13	)
+    14	
+    15	func resetLeakStateForTest(t *testing.T) {
+    16		t.Helper()
+    17		originalBytes := BytesChan
+    18		lickMu.Lock()
+    19		originalStatuses := lickStatuses
+    20		lickMu.Unlock()
+ succeeded in 51ms:
+     1	package leak
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"math/big"
+     6		"reflect"
+     7		"testing"
+     8		"time"
+     9	
+    10		"groundseg/leakchannel"
+    11		"groundseg/structs"
+    12	
+    13		"github.com/stevelacy/go-urbit/noun"
+    14	)
+    15	
+    16	func mustReceiveLeakAction(t *testing.T, name string) leakchannel.ActionChannel {
+    17		t.Helper()
+    18		select {
+    19		case action := <-leakchannel.LeakAction:
+    20			return action
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/importer/importer_test.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/exporter/exporter_test.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/logger/logger_test.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package logger
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"errors"
+     6		"fmt"
+     7		"os"
+     8		"path/filepath"
+     9		"reflect"
+    10		"strings"
+    11		"testing"
+    12		"time"
+    13	
+    14		"go.uber.org/zap"
+    15		"go.uber.org/zap/zapcore"
+    16	)
+    17	
+    18	type testSystemLogSink struct {
+    19		ch chan []byte
+    20	}
+ succeeded in 53ms:
+     1	package exporter
+     2	
+     3	import (
+     4		"archive/zip"
+     5		"bytes"
+     6		"context"
+     7		"encoding/json"
+     8		"errors"
+     9		"io"
+    10		"net/http"
+    11		"net/http/httptest"
+    12		"os"
+    13		"path/filepath"
+    14		"strings"
+    15		"testing"
+    16	
+    17		"groundseg/config"
+    18		"groundseg/defaults"
+    19		"groundseg/docker/orchestration"
+    20		"groundseg/structs"
+ succeeded in 53ms:
+     1	package importer
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7		"net/http"
+     8		"net/http/httptest"
+     9		"os"
+    10		"path/filepath"
+    11		"strconv"
+    12		"strings"
+    13		"testing"
+    14		"time"
+    15	
+    16		"groundseg/auth/tokens"
+    17		"groundseg/docker/events"
+    18		"groundseg/internal/testruntime"
+    19		"groundseg/lifecycle"
+    20		"groundseg/orchestration"
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/config/config_test.go | sed -n '40,260p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+    40		}
+    41	}
+    42	
+    43	func TestMergeConfigsNewInstallSetupAndSalt(t *testing.T) {
+    44		defaultCfg := structs.SysConfig{}
+    45		defaultCfg.Runtime.Setup = "complete"
+    46		defaultCfg.Connectivity.EndpointUrl = "default.endpoint"
+    47		customCfg := structs.SysConfig{}
+    48		customCfg.AuthSession.PwHash = ""
+    49	
+    50		merged := mergeConfigs(defaultCfg, customCfg)
+    51		if merged.Runtime.Setup != "start" {
+    52			t.Fatalf("expected setup=start for new install, got %q", merged.Runtime.Setup)
+    53		}
+    54		if merged.AuthSession.Salt == "" {
+    55			t.Fatal("expected salt to be generated for new install")
+    56		}
+    57	}
+    58	
+    59	func TestMergeConfigsPrefersCustomEndpoint(t *testing.T) {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/structs/configs.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package structs
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"time"
+     7	)
+     8	
+     9	type DiskWarning struct {
+    10		// true if warning has been sent
+    11		// resets to false when disk goes below 80% usage
+    12		// 95% will send a recurring warning
+    13		Eighty     bool      `json:"eighty"`
+    14		Ninety     bool      `json:"ninety"`
+    15		NinetyFive time.Time `json:"ninetyFive"`
+    16	}
+    17	
+    18	// system.json config struct grouped by domain
+    19	type SysConfig struct {
+    20		Connectivity ConnectivityConfig `json:"-"`
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/system/disk/adapter.go | sed -n '1,140p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package disk
+     2	
+     3	import (
+     4		"groundseg/structs"
+     5		"groundseg/system/storage"
+     6	)
+     7	
+     8	// FstabRecord remains source-compatible with storage while the system boundary migrates.
+     9	type FstabRecord = storage.FstabRecord
+    10	
+    11	func ParseFstabLine(raw string) (FstabRecord, bool) {
+    12		return storage.ParseFstabLine(raw)
+    13	}
+    14	
+    15	func ReconcileFstabLines(lines []string, desired FstabRecord) ([]string, bool) {
+    16		return storage.ReconcileFstabLines(lines, desired)
+    17	}
+    18	
+    19	func ReadFstabLines(path string) ([]string, error) {
+    20		return storage.ReadFstabLines(path, storage.DefaultSeams())
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg -n "func mustReceiveString|func mustReceive|timed out waiting" goseg/broadcast/loop_test.go goseg/broadcast/state_test.go goseg/importer/extract_test.go goseg/importer/importer_test.go goseg/leak/broadcast_test.go goseg/leak/handler_test.go goseg/logger/logger_test.go goseg/startram/state_sync_test.go goseg/uploadsvc/service_test.go goseg/system/wifi_test.go' in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/logger/logger_test.go:74:		t.Fatal("timed out waiting for system log sink write")
+goseg/leak/broadcast_test.go:41:func mustReceiveString(t *testing.T, ch <-chan string, name string) string {
+goseg/leak/broadcast_test.go:47:		t.Fatalf("timed out waiting for %s", name)
+goseg/leak/broadcast_test.go:266:		t.Fatal("timed out waiting for jammed payload")
+goseg/leak/broadcast_test.go:332:		t.Fatal("timed out waiting for listener broadcast")
+goseg/leak/handler_test.go:16:func mustReceiveLeakAction(t *testing.T, name string) leakchannel.ActionChannel {
+goseg/leak/handler_test.go:22:		t.Fatalf("timed out waiting for leak action: %s", name)
+goseg/leak/handler_test.go:37:	t.Fatalf("timed out waiting for auth state %v for %s", want, patp)
+goseg/leak/handler_test.go:240:		t.Fatal("timed out waiting for handleAction to return")
+goseg/leak/handler_test.go:289:				t.Fatal("timed out waiting for handleAction to return")
+goseg/importer/importer_test.go:50:			t.Fatalf("timed out waiting for import transition %d", i+1)
+codex
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 71.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Global mutable runtime seams are repeatedly reset per-test (`resetExporterState`, `resetUploadSessionsForTest`, `resetLeakStateForTest`, `resetLoggerInitForTest`), indicating behavior depends on package-level state rather than scoped test/runtime objects.",
+        "Core runtime files combine multiple concern layers in single units: `accesspoint.go` mixes config/default resolution, process probing/matching, shell execution, and lifecycle entrypoints; `urbit_operations_runtime.go` mixes transition registry, config mutation orchestration, external service calls, and post-transition broadcasting.",
+        "Configuration handling remains structurally broad and repetitive: `structs.SysConfig` and section update APIs are duplicated by section, while tests in `config_test.go` require very large hand-built config fixtures to exercise merge logic."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "global_test_state_coupling",
+      "summary": "Test design relies on shared package-global mutation across modules, creating systemic coupling and weak isolation boundaries.",
+      "related_files": [
+        "goseg/exporter/exporter_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/leak/broadcast_test.go",
+        "goseg/logger/logger_test.go"
+      ],
+      "evidence": [
+        "`resetExporterState` rewires package globals (`mkdirAllForExporter`, `getStoragePathForExporter`, `openForExporter`, `whitelist`) for each test.",
+        "`resetUploadSessionsForTest` mutates global `uploadSessions` under `uploadMu` and restores via cleanup.",
+        "`resetLeakStateForTest` swaps global `BytesChan` and `lickStatuses`, restoring later, and multiple tests depend on this side effect.",
+        "`resetLoggerInitForTest` mutates global logger init state (`setLoggerInitState`, `setLoggerInitErr`) for test behavior."
+      ],
+      "suggestion": "Introduce explicit runtime/store instances per subsystem (exporter, importer, leak, logger) and pass them through constructors/handlers; keep one compatibility default for production, but have tests instantiate isolated runtimes instead of mutating globals.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_files_mix_multiple_layers",
+      "summary": "Operational orchestration files mix unrelated responsibilities, reducing structural focus and increasing change blast radius.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "`accesspoint.go` contains runtime seam wiring, config/default normalization, password derivation, process matching/parsing, dependency checks, and shell execution in one file.",
+        "`urbit_operations_runtime.go` contains command registry mapping, transition step construction, config mutation orchestration (`runShipConfigTransition`), external side effects (docker/click/startram), and schedule publishing logic.",
+        "`subsystem_events.go` combines health-loop lifecycle control, event listener transport wiring, event-bus backpressure policy, and transition execution/retry-window policy."
+      ],
+      "suggestion": "Split each file into role-focused modules: runtime wiring/defaults, domain transition planning, and side-effect executors; define narrow coordinators that compose these parts so policy changes do not require touching transport/parsing/process code together.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_runtime_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_monolith_drives_fixture_duplication",
+      "summary": "Config modeling remains monolithic, which drives repetitive per-field setup and duplicated section-level update scaffolding.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_test.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`structs/configs.go` repeats near-identical section accessor/update methods (`ConnectivitySection`, `StartramSection`, etc. and corresponding `Update*Config`).",
+        "`config_test.go` builds very large default/custom config fixtures field-by-field in multiple tests (e.g., migration and override tests), indicating missing reusable builders/fixtures and high schema coupling in tests.",
+        "`config_update_schema.go` maintains key-to-parser/apply registries and specialized parse helpers, which amplifies maintenance when schema evolves."
+      ],
+      "suggestion": "Introduce canonical config fixture builders per section and table-driven patch cases; consolidate section update/access patterns via generic helpers or a section registry to reduce manual repetition when fields evolve.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_schema_surface_area"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit global runtime/seam pattern instead of explicit dependency ownership",
+      "Policy/orchestration logic co-located with low-level transport/process concerns",
+      "Large config surface without strong fixture/builder abstraction"
+    ],
+    "likely_symptoms": [
+      "global_test_state_coupling",
+      "runtime_files_mix_multiple_layers",
+      "config_monolith_drives_fixture_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+99,311
+

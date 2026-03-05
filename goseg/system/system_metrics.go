@@ -1,9 +1,9 @@
 package system
 
 import (
+	"groundseg/system/metrics"
 	"regexp"
 	"strconv"
-	"groundseg/system/metrics"
 )
 
 // GetMemory returns memory totals using the host metrics service.

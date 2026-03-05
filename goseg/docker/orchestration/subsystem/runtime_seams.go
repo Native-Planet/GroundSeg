@@ -65,7 +65,7 @@ func newDockerRoutineRuntime() dockerRoutineRuntime {
 			updateBroadcastFn:   func(state structs.AuthBroadcast) { broadcast.DefaultBroadcastStateRuntime().UpdateBroadcast(state) },
 			broadcastClientsFn:  broadcast.BroadcastToClients,
 			updateWgOnFn: func(enabled bool) error {
-				return config.UpdateConfTyped(config.WithWgOn(enabled))
+				return config.UpdateConfigTyped(config.WithWgOn(enabled))
 			},
 			setStartramRunningFn: broadcast.SetStartramRunning,
 		},
@@ -109,10 +109,10 @@ func newDockerRoutineRuntimeForTests() dockerRoutineRuntime {
 	rt.ShipSettingsSnapshotFn = func() config.ShipSettings { return config.ShipSettings{} }
 	rt.Check502SettingsSnapshotFn = func() config.Check502Settings { return config.Check502Settings{} }
 	rt.broadcastOps = dockerRoutineBroadcastOps{
-		getBroadcastStateFn: func() structs.AuthBroadcast { return structs.AuthBroadcast{} },
-		updateBroadcastFn:   func(structs.AuthBroadcast) {},
-		broadcastClientsFn:  func() error { return nil },
-		updateWgOnFn:        func(bool) error { return nil },
+		getBroadcastStateFn:  func() structs.AuthBroadcast { return structs.AuthBroadcast{} },
+		updateBroadcastFn:    func(structs.AuthBroadcast) {},
+		broadcastClientsFn:   func() error { return nil },
+		updateWgOnFn:         func(bool) error { return nil },
 		setStartramRunningFn: func(bool) error { return nil },
 	}
 	rt.wireguardOps = dockerRoutineWireguardOps{

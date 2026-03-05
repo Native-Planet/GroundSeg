@@ -1,0 +1,116 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "naming_quality": 78.4
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "Acronym/casing conventions drift across the same domains: `EndpointURL` in config-facing settings vs `EndpointUrl` in persisted structs and local variable `endpointUrl` (`goseg/config/config.go`, `goseg/structs/configs.go`, `goseg/rectify/rectify_services.go`).",
+        "Wireguard/WiFi naming mixes `Wg`, `WG`, `Wireguard`, `Wifi`, and `WiFi` in public/runtime symbols (`goseg/docker/orchestration/runtime_ops.go`, `goseg/docker/orchestration/wireguard.go`, `goseg/system/wifi_runtime_api.go`, `goseg/system/wifi_runtime_methods.go`).",
+        "Legacy `Conf*` aliases remain alongside `Config*` names (`Conf`, `StartConfEventLoop`, `ConfChannel`) which duplicates vocabulary for the same behavior (`goseg/config/config.go`, `goseg/config/config_events.go`).",
+        "Leak subsystem intermixes `leak` and `lick` terminology for the same concept (`GetLickStatuses`, `lickStatuses`, `listener`) and this propagates into broadcast runtime seam names (`getLickStatusesFn`) (`goseg/leak/broadcast.go`, `goseg/leak/leak_test.go`, `goseg/broadcast/loop.go`)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "naming_quality",
+      "identifier": "acronym_casing_drift_url_wg_wifi",
+      "summary": "Acronym casing is inconsistent (URL/Url, WG/Wg, WiFi/Wifi), reducing symbol predictability.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/structs/configs.go",
+        "goseg/rectify/rectify_services.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`StartramSettings` uses `EndpointURL`, while `ConnectivityConfig` uses `EndpointUrl`, and `startramEndpointRoot` introduces `endpointUrl` local spelling.",
+        "Wireguard callbacks alternate between `CreateDefaultWGConfFn` / `WriteWgConfFn`, and WiFi types/methods alternate between `WiFiRuntimeService`, `WifiInfoTicker`, and `NewWifiClient`."
+      ],
+      "suggestion": "Adopt a single acronym policy for exported and internal names (e.g., `URL`, `WG`, `WiFi`) and apply it consistently across runtime structs, config DTOs, and helpers; keep backward compatibility via deprecated wrappers/type aliases where external call sites depend on old names.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_style_guide_absent"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "conf_vs_config_dual_vocabulary",
+      "summary": "Legacy `Conf*` aliases create parallel naming for the same config/event API surface.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/config_events.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`Config()` and `Conf()` both exist for the same snapshot behavior.",
+        "`StartConfigEventLoop*` exists alongside `StartConfEventLoop*`, and `ConfChannel()` is another alias for the same startup path."
+      ],
+      "suggestion": "Choose `Config` as canonical naming, keep `Conf*` only as explicitly deprecated compatibility shims with removal timeline, and migrate internal call sites to canonical names to reduce vocabulary branching.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "legacy_alias_retention"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "leak_lick_term_collision",
+      "summary": "The leak subsystem mixes `leak` and `lick` terms for one concept, obscuring intent.",
+      "related_files": [
+        "goseg/leak/broadcast.go",
+        "goseg/leak/leak_test.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "Within package `leak`, symbols like `lickStatuses`, `GetLickStatuses`, and log lines about `lick channel` coexist with `leak` naming.",
+        "Broadcast runtime consumes `getLickStatusesFn`, spreading the mixed term outside the leak package."
+      ],
+      "suggestion": "Standardize on one domain term (either keep protocol term `lick` everywhere with package-level docs, or rename to `leakSession/status` everywhere) and rename seam fields/functions consistently so call sites do not carry both vocabularies.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "domain_term_unification_gap"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "runtime_callback_name_shape_drift",
+      "summary": "Runtime callback field naming shape is inconsistent, making seam APIs harder to scan.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "Runtime structs mix `*Fn` and non-`Fn` callback names in the same type (`RuntimeStartupOps` has `UpdateConfigTypedFn` and `WithWireguardEnabledFn` but also mixed abbreviation-heavy fields like `LoadMCFn`, `SvcDeleteFn`).",
+        "Across subsystems, equivalent callback intent appears with different naming shapes (e.g., `Initialize*Fn`, `Start*Fn`, bare verbs in startup helper structs)."
+      ],
+      "suggestion": "Define one seam-field naming contract (e.g., verb-based + `Fn` suffix, full words over abbreviations) and enforce it for new runtime structs; then batch-rename existing runtime callback fields per subsystem with compatibility adapters in constructors.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_naming_governance_missing"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No enforced acronym/casing convention across packages and DTO boundaries.",
+      "Long-lived backward-compatibility aliases were retained without a clear deprecation lifecycle.",
+      "Runtime seam structs evolved independently, so callback naming contracts diverged."
+    ],
+    "likely_symptoms": [
+      "acronym_casing_drift_url_wg_wifi",
+      "conf_vs_config_dual_vocabulary",
+      "runtime_callback_name_shape_drift"
+    ],
+    "possible_false_positives": [
+      "leak_lick_term_collision may be partially intentional if `lick` is treated as protocol terminology; still needs explicit naming/documentation policy."
+    ]
+  }
+}

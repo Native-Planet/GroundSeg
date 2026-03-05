@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"groundseg/dockerclient"
+	"groundseg/internal/resource"
 	"groundseg/logger"
 	"groundseg/session"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -35,6 +35,8 @@ const (
 	maxLogCleanerConsecutiveFailures = 3
 	maxDockerLogConsecutiveFailures  = 5
 )
+
+var legacyLogFileNamePattern = regexp.MustCompile(`^\d{4}-\d{2}\.log$`)
 
 type LogstreamRuntime struct {
 	sessionRuntime             session.LogstreamRuntime
@@ -70,11 +72,13 @@ func Configure(logRuntime session.LogstreamRuntime, systemLogMessages <-chan []b
 	return NewLogstreamRuntime(logRuntime, systemLogMessages)
 }
 
-func OldLogsCleaner() error {
-	return OldLogsCleanerWithContext(context.Background())
+// RunOldLogsCleanupLoop runs periodic log cleanup until context cancellation.
+func RunOldLogsCleanupLoop() error {
+	return RunOldLogsCleanupLoopWithContext(context.Background())
 }
 
-func OldLogsCleanerWithContext(ctx context.Context) error {
+// RunOldLogsCleanupLoopWithContext runs periodic log cleanup until context cancellation.
+func RunOldLogsCleanupLoopWithContext(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -100,17 +104,14 @@ func OldLogsCleanerWithContext(ctx context.Context) error {
 }
 
 func runLogCleanupCycle() error {
-	files, err := ioutil.ReadDir(logger.LogPath())
+	files, err := os.ReadDir(logger.LogPath())
 	if err != nil {
 		return fmt.Errorf("read logs directory %q: %w", logger.LogPath(), err)
 	}
 	var splitErrs []error
 	for _, file := range files {
 		fn := file.Name()
-		matched, err := regexp.MatchString(`^\d{4}-\d{2}\.log$`, filepath.Base(fn))
-		if err != nil {
-			return fmt.Errorf("compile log filename regex: %w", err)
-		}
+		matched := legacyLogFileNamePattern.MatchString(filepath.Base(fn))
 		if !matched {
 			continue
 		}
@@ -127,11 +128,6 @@ func runLogCleanupCycle() error {
 		splitErrs = append(splitErrs, fmt.Errorf("clear old logs: %w", err))
 	}
 	return errors.Join(splitErrs...)
-}
-
-// zap
-func SysLogStreamer() error {
-	return SysLogStreamerWithRuntime(context.Background(), nil)
 }
 
 func SysLogStreamerWithRuntime(ctx context.Context, runtime *LogstreamRuntime) error {
@@ -185,14 +181,6 @@ func SysLogStreamerWithRuntime(ctx context.Context, runtime *LogstreamRuntime) e
 			}
 		}
 	}
-}
-
-func SysLogStreamerWithContext(ctx context.Context) error {
-	return SysLogStreamerWithRuntime(ctx, nil)
-}
-
-func DockerLogStreamer() error {
-	return DockerLogStreamerWithRuntime(context.Background(), nil)
 }
 
 func DockerLogStreamerWithRuntime(ctx context.Context, runtime *LogstreamRuntime) error {
@@ -262,14 +250,6 @@ func DockerLogStreamerWithRuntime(ctx context.Context, runtime *LogstreamRuntime
 	}
 }
 
-func DockerLogStreamerWithContext(ctx context.Context) error {
-	return DockerLogStreamerWithRuntime(ctx, nil)
-}
-
-func DockerLogConnRemover() error {
-	return DockerLogConnRemoverWithRuntime(context.Background(), nil)
-}
-
 func DockerLogConnRemoverWithRuntime(ctx context.Context, runtime *LogstreamRuntime) error {
 	runtime = resolveLogstreamRuntime(runtime)
 	if ctx == nil {
@@ -287,17 +267,13 @@ func DockerLogConnRemoverWithRuntime(ctx context.Context, runtime *LogstreamRunt
 	}
 }
 
-func DockerLogConnRemoverWithContext(ctx context.Context) error {
-	return DockerLogConnRemoverWithRuntime(ctx, nil)
-}
-
 func streamToConn(containerName string, conn *websocket.Conn) {
 	if err := streamToConnWithRuntime(context.Background(), containerName, conn, nil); err != nil {
 		zap.L().Warn(fmt.Sprintf("stream docker logs for %s: %v", containerName, err))
 	}
 }
 
-func streamToConnWithRuntime(ctx context.Context, containerName string, conn *websocket.Conn, runtime *LogstreamRuntime) error {
+func streamToConnWithRuntime(ctx context.Context, containerName string, conn *websocket.Conn, runtime *LogstreamRuntime) (err error) {
 	runtime = resolveLogstreamRuntime(runtime)
 	if ctx == nil {
 		ctx = context.Background()
@@ -308,7 +284,9 @@ func streamToConnWithRuntime(ctx context.Context, containerName string, conn *we
 	defer func() {
 		runtime.dockerLogCancelChannel <- DockerCancel{Container: containerName, Conn: conn}
 	}()
-	defer conn.Close()
+	defer func() {
+		err = resource.JoinCloseError(err, conn, "close docker log websocket connection")
+	}()
 
 	options := container.LogsOptions{
 		ShowStdout: true,
@@ -321,13 +299,17 @@ func streamToConnWithRuntime(ctx context.Context, containerName string, conn *we
 	if err != nil {
 		return fmt.Errorf("create docker client for %s: %w", containerName, err)
 	}
-	defer cli.Close()
+	defer func() {
+		err = resource.JoinCloseError(err, cli, "close docker client")
+	}()
 
 	out, err := cli.ContainerLogs(ctx, containerName, options)
 	if err != nil {
 		return fmt.Errorf("read docker logs for %s: %w", containerName, err)
 	}
-	defer out.Close()
+	defer func() {
+		err = resource.JoinCloseError(err, out, "close docker log stream")
+	}()
 
 	scanner := bufio.NewScanner(out)
 	for scanner.Scan() {
@@ -342,9 +324,13 @@ func streamToConnWithRuntime(ctx context.Context, containerName string, conn *we
 		}
 		line = strings.ReplaceAll(line, "\\", "\\\\")
 		logJSON := []byte(fmt.Sprintf(`{"type":"%s","history":false,"log":"%s"}`, containerName, line))
-		if err := conn.WriteMessage(1, logJSON); err != nil {
-			_ = conn.Close()
-			return fmt.Errorf("write docker log websocket message for %s: %w", containerName, err)
+		if connWriteErr := conn.WriteMessage(1, logJSON); connWriteErr != nil {
+			err = resource.JoinCloseError(
+				fmt.Errorf("write docker log websocket message for %s: %w", containerName, connWriteErr),
+				conn,
+				"close docker log websocket connection",
+			)
+			return err
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -359,7 +345,9 @@ func splitLogFile(inputFile string) error {
 	if err != nil {
 		return fmt.Errorf("open legacy log file %s: %w", inputFile, err)
 	}
-	defer file.Close()
+	defer func() {
+		err = resource.JoinCloseError(err, file, "close legacy log file")
+	}()
 
 	reader := bufio.NewReader(file)
 
@@ -370,6 +358,25 @@ func splitLogFile(inputFile string) error {
 		partNumber  int
 		currentSize int
 	)
+	closeChunk := func() error {
+		if chunkWriter == nil || chunkFile == nil {
+			return nil
+		}
+		if flushErr := chunkWriter.Flush(); flushErr != nil {
+			return fmt.Errorf("flush split log file chunk %s-part-%d.log: %w", baseName, partNumber, flushErr)
+		}
+		if closeErr := chunkFile.Close(); closeErr != nil {
+			return fmt.Errorf("close split log file chunk %s-part-%d.log: %w", baseName, partNumber, closeErr)
+		}
+		chunkWriter = nil
+		chunkFile = nil
+		return nil
+	}
+	defer func() {
+		if chunkCloseErr := closeChunk(); chunkCloseErr != nil {
+			err = errors.Join(err, chunkCloseErr)
+		}
+	}()
 
 	for {
 		line, readErr := reader.ReadString('\n')
@@ -379,11 +386,8 @@ func splitLogFile(inputFile string) error {
 
 		if chunkFile == nil || currentSize+len(line) > MaxChunkSize {
 			if chunkWriter != nil {
-				if flushErr := chunkWriter.Flush(); flushErr != nil {
-					return fmt.Errorf("flush split log file chunk %s-part-%d.log: %w", baseName, partNumber-1, flushErr)
-				}
-				if closeErr := chunkFile.Close(); closeErr != nil {
-					return fmt.Errorf("close split log file chunk %s-part-%d.log: %w", baseName, partNumber-1, closeErr)
+				if err := closeChunk(); err != nil {
+					return err
 				}
 			}
 
@@ -413,11 +417,8 @@ func splitLogFile(inputFile string) error {
 	}
 
 	if chunkWriter != nil {
-		if flushErr := chunkWriter.Flush(); flushErr != nil {
-			return fmt.Errorf("flush split log file chunk %s-part-%d.log: %w", baseName, partNumber-1, flushErr)
-		}
-		if closeErr := chunkFile.Close(); closeErr != nil {
-			return fmt.Errorf("close split log file chunk %s-part-%d.log: %w", baseName, partNumber-1, closeErr)
+		if err := closeChunk(); err != nil {
+			return err
 		}
 	}
 
@@ -426,12 +427,16 @@ func splitLogFile(inputFile string) error {
 
 // Function to keep only the 10 most recent log files in a directory
 func keepMostRecentFiles(dirPath string) error {
-	files, err := ioutil.ReadDir(dirPath)
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		return fmt.Errorf("failed to read directory: %w", err)
 	}
+	fileInfos, err := dirEntriesToFileInfos(files)
+	if err != nil {
+		return fmt.Errorf("failed to convert log directory entries to file info: %w", err)
+	}
 
-	recentFiles := logger.MostRecentPartedLogPaths(dirPath, files, 10)
+	recentFiles := logger.MostRecentPartedLogPaths(dirPath, fileInfos, 10)
 
 	for _, file := range files {
 		fullPath := filepath.Join(dirPath, file.Name())
@@ -452,4 +457,16 @@ func logContains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func dirEntriesToFileInfos(entries []os.DirEntry) ([]os.FileInfo, error) {
+	fileInfos := make([]os.FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		fileInfo, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		fileInfos = append(fileInfos, fileInfo)
+	}
+	return fileInfos, nil
 }

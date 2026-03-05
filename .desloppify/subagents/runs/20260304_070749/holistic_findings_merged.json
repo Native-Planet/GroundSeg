@@ -1,0 +1,324 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 56.8,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 58.0,
+        "Indirection Cost": 54.5,
+        "Interface Honesty": 51.0
+      }
+    },
+    "design_coherence": 76.0,
+    "error_consistency": 73.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Rectify and startup orchestration layers rely on long, manual `*_WithDefaults` style runtime-merging functions that assign dozens of fields individually instead of using a composable merge/constructor abstraction.",
+        "Manual merge code paths are spread across assigned modules, increasing chance of duplicate/missing assignments (a duplicated assignment appears in startup background service defaults wiring, and importer defaults wiring uses repeated boilerplate for every callback field).",
+        "The reconcile path in `rectify` emits the same registration transition call twice in one control path, which is consistent with call-path complexity from layered wrappers rather than a single-responsibility transition strategy.",
+        "Tests and production files in this batch also reflect heavy state/config parameter threading, confirming that abstractions have become context bags with broad read/write responsibility rather than narrowly modeled dependencies."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "The batch contains repeated seam-style default-merging boilerplate and at least one duplicate transition emission side effect, which directly reduces abstraction leverage and adds avoidable indirection risk.",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 54.5,
+        "interface_honesty": 51.0
+      }
+    },
+    "design_coherence": {
+      "evidence": [
+        "config/config_update_schema.go defines a generic patch pipeline (ConfPatch + confPatchField + confPatchApplyValueFn) intended to centralize config mutation behavior.",
+        "config/urbit.go then exposes the same behavior through six near-identical section-specific wrappers (UpdateUrbitRuntimeConfig, UpdateUrbitNetworkConfig, UpdateUrbitScheduleConfig, UpdateUrbitFeatureConfig, UpdateUrbitWebConfig, UpdateUrbitBackupConfig), each delegating to UpdateUrbit with a section-specific mutate callback.",
+        "docker/orchestration/runtime_ops.go mirrors these again as RuntimeUrbitOps with separate function fields for each section-specific updater, creating another manual mapping layer between the seam and concrete config mutators."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "`goseg/broadcast/loop.go` has a fire-and-forget tick entrypoint (`runBroadcastTick`) that intentionally drops the `runBroadcastTickWithRuntime` error path and returns no signal to callers.",
+        "`goseg/routines/version.go` and `goseg/routines/logstream/logs.go` use multiple deferred/explicit close calls without checking returned errors, which creates silent cleanup failures at I/O boundaries that can hide partial-write and shutdown issues.",
+        "`goseg/system/wifi_runtime_methods.go` also defers `client.Close()` without surfacing possible close failures on the same error-returning path."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "rectify_double_transition_emit",
+      "summary": "Rectify reconcile emits the same transition twice in one reconciliation loop, likely producing duplicate state transitions.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/rectify/rectify_test.go"
+      ],
+      "evidence": [
+        "Inside `StartramRetrieveReconciler.Reconcile` the current-state transition publisher is invoked twice consecutively with identical arguments during the same iteration path."
+      ],
+      "suggestion": "Remove the duplicate publish call and consolidate transition emission to one explicit edge per reconciliation outcome, optionally guarding with a helper that can only publish once per service state transition.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "duplicate_publish_in_wrapper_chain"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "startup_defaults_dup_assignment",
+      "summary": "Background startup runtime defaults merge contains duplicate field assignment, indicating fragile hand-maintained wiring.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`startBackgroundServicesRuntimeWithDefaults` assigns the same override field twice in sequence (`StartDiskUsageWarningFn`), while surrounding default merge logic is manually repeated field-by-field.",
+        "The same pattern of copy-forward defaults appears across related reconciler/startup wiring paths, suggesting a brittle abstraction boundary."
+      ],
+      "suggestion": "Run a static consistency pass on all `*_WithDefaults` builders, remove duplicate assignments, and replace repetitive per-field assignment with a shared merge helper that clearly names precedence and preserves explicitness.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "manual_runtime_merge_fragility"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "importer_runtime_merge_brittle",
+      "summary": "Runtime-seam default merging is manually replicated and brittle, with large manual callback-field mapping that offers low abstraction leverage.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/defaults/defaults.go"
+      ],
+      "evidence": [
+        "`importerRuntimeWithDefaults` builds an effective runtime by long, repetitive per-field override copies for many dependencies instead of a reusable composition pattern.",
+        "Similar `WithDefaults` merge shapes exist in startup initialization/wiring, increasing the shared maintenance burden and making it easy to miss newly added dependencies."
+      ],
+      "suggestion": "Introduce a typed merge helper (or constructor-based defaults) for runtime dependency bundles and apply it across importer/startup/default wiring so adding new seam callbacks is centrally declared and mechanically validated.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_runtime_merge_fragility"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "section_specific_urbit_update_duplication",
+      "summary": "Urbit config update seam is split into duplicate section-specific APIs across layers, causing repeated edits and coupling whenever a new section is introduced.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/urbit.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/structs/configs.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "config/config_update_schema.go already has generic conf patch structures for key-to-field parsing, has-updates checks, and apply/merge behavior.",
+        "config/urbit.go hand-maintains separate wrappers per Urbit subsection (UpdateUrbitRuntimeConfig, UpdateUrbitNetworkConfig, UpdateUrbitScheduleConfig, UpdateUrbitFeatureConfig, UpdateUrbitWebConfig, UpdateUrbitBackupConfig).",
+        "docker/orchestration/runtime_ops.go repeats the same subsection split by exposing six runtime seam callbacks for Urbit section updates.",
+        "shipworkflow code uses the section-specific callbacks as control points for mutations, so the same conceptual operation is now represented in multiple API surfaces."
+      ],
+      "suggestion": "Introduce one canonical Urbit config mutation seam (e.g., typed `UpdateUrbitSection(pier, section, mutateFn)` and `UrbitPatch`-style payload) used by config, workflow, and orchestration layers, then generate/compose section-specific convenience adapters only where call sites require ergonomics.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime-urbit-config-seam-fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast_tick_error_dropped",
+      "summary": "Broadcast tick failures are dropped in the public tick wrapper, breaking consistent error observability",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/loop_test.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/loop.go:143` calls `runBroadcastTickWithRuntime(newBroadcastLoopRuntime())` with `_ =`, discarding all returned errors.",
+        "`runBroadcastLoop` handles runtime errors from `runBroadcastTickWithRuntime`, but `runBroadcastTick` exposes a no-error API, so callers using this helper never see failures."
+      ],
+      "suggestion": "Either change `runBroadcastTick` to return `error` and propagate it to all callers, or make the wrapper explicitly log and increment a dedicated failure metric so errors are observable and test-assertable.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_cleanup_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "deferred_close_errors_suppressed",
+      "summary": "Cleanup errors are dropped in multiple runtime paths, losing failure signal and weakening diagnostics",
+      "related_files": [
+        "goseg/routines/version.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "`goseg/routines/version.go` defers `resp.Body.Close()`, `file.Close()`, and `provenanceFile.Close()` without checking returned errors in binary/provenance update paths.",
+        "`goseg/routines/logstream/logs.go` defers `conn.Close()`, `cli.Close()`, and `out.Close()` without checking close errors; write failure path also closes without checking the final close result.",
+        "`goseg/system/wifi_runtime_methods.go` defers `client.Close()` in `disconnect` without inspecting potential failure."
+      ],
+      "suggestion": "Introduce a shared close-policy helper (for example, `closeQuietly` + `closeWithErr`) and return or aggregate close errors in these functions so transient I/O or client-shutdown failures are not silently lost. For critical updates, fail the operation on close/writeback failure or record an explicit warning with context.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_cleanup_inconsistency"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 3,
+    "dimension_coverage": 0.333,
+    "evidence_density": 1.944,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 13.264,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 58,
+    "successful_batch_count": 3,
+    "full_sweep_included": false,
+    "total_files": 574,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/broadcast/loop.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/config/config_test.go",
+    "goseg/importer/importer.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/defaults/version.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/main.go",
+    "goseg/main_test.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/routines/version.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/config/config.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/config/urbit.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/connection_registry.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_070749",
+    "created_at": "2026-03-04T07:09:01+00:00",
+    "batch_count": 3,
+    "batch_indexes": [
+      1,
+      2,
+      3
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "9b4ad399ad66a47793dbf40e7b2b5a442d1e9f2588dc6c33f88c0556b76ff88a"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "error_consistency",
+      "design_coherence",
+      "abstraction_fitness"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

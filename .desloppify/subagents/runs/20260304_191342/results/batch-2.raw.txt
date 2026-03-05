@@ -1,0 +1,150 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 2,
+  "assessments": {
+    "api_surface_coherence": 76.0,
+    "naming_quality": 71.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "The broadcast runtime entrypoints use mixed shapes for equivalent operations: `bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` and `LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime)` are variadic optional-runtime forms, while `ReloadUrbitsWithRuntime(runtime *broadcastStateRuntime)` requires a single pointer.",
+        "Version/docker startup APIs use the same `Start*` naming for different lifecycle contracts: `StartDockerHealthLoopsWithRuntime` launches goroutines and returns quickly, while `StartDockerSubsystemWithRuntime` and `StartVersionSubsystemWithContext` block until cancellation/error.",
+        "Transition/event APIs rely on positional string tuples instead of typed contracts, e.g. `RunTransitionedOperation(patp, transitionType, startEvent, successEvent string, ...)` and `emitWorkflowTransition(runtime, patp, transitionType, event string)`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "naming_quality": {
+      "evidence": [
+        "Initialism casing is inconsistent in exported and semi-public APIs: `GetStateJson` vs tests named `TestGetStateJSON...`; `DefaultWgConfig`/`WgOn`/`WgRegistered` coexists with `copyWGFileToVolume`; config fields use `EndpointUrl` and `ApiVersion`.",
+        "Wi-Fi naming conventions drift between `WiFi` and `Wifi` forms in the same subsystem (`WiFiRuntimeService`, `NewWiFiRuntime`, `NewWifiClient`, `WifiInfoTicker`).",
+        "Leak subsystem mixes two near-homophone vocabularies (`LickStatus`, `GetLickStatuses`, `lickStatuses`) inside the `leak` package and messages, making API intent harder to infer at call sites."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "runtime_injection_shape_drift",
+      "summary": "Equivalent runtime-injected APIs use conflicting call shapes (variadic optional pointer vs required pointer), making broadcast entrypoints non-uniform.",
+      "related_files": [
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "`bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` and `LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime)` accept variadic runtime and manually check first element.",
+        "`ReloadUrbitsWithRuntime(runtime *broadcastStateRuntime)` uses a non-variadic required pointer shape in the same file.",
+        "Other broadcast APIs choose different runtime passing conventions again (`StartBroadcastLoopWithRuntime(runtime *broadcastLoopRuntime)` and `ApplyBroadcastTransition(..., runtime *BroadcastStateRuntime)`), forcing callers to remember per-function conventions."
+      ],
+      "suggestion": "Standardize runtime-injection APIs in broadcast to one convention (prefer explicit `*Runtime` parameter or a consistent `ResolveRuntime` helper), then provide thin legacy wrappers for compatibility until call sites are migrated.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "start_api_lifecycle_ambiguity",
+      "summary": "`Start*` APIs encode different blocking/async/error semantics without naming distinction, reducing lifecycle predictability.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/routines/version.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`StartDockerHealthLoopsWithRuntime` starts a goroutine and returns immediately once loop launch succeeds.",
+        "`StartDockerSubsystemWithRuntime` starts workers and blocks until context cancellation or worker error.",
+        "`StartVersionSubsystemWithContext` also blocks and aggregates worker errors, while `CheckVersionLoop()` is a no-error fire-and-log wrapper."
+      ],
+      "suggestion": "Split lifecycle verbs to communicate contract (`StartAsync*`, `Run*`, `Serve*`) and standardize return/error behavior; document blocking semantics in package-level API comments and harmonize wrappers.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "initialism_casing_inconsistency",
+      "summary": "Initialism casing conventions (`JSON`, `URL`, `API`, `WiFi`, `WG`) are inconsistently applied across adjacent APIs.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/state_test.go",
+        "goseg/structs/configs.go",
+        "goseg/defaults/defaults.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "Implementation exports `GetStateJson`, while tests use `TestGetStateJSON...`, indicating unresolved naming convention drift.",
+        "Config/domain names mix forms such as `EndpointUrl`, `ApiVersion`, `WgOn`, `WgRegistered`, and `DefaultWgConfig` while other code uses `WG` and `WiFi` forms.",
+        "Wi-Fi runtime APIs combine `WiFiRuntimeService`/`NewWiFiRuntime` with fields `NewWifiClient`/`WifiInfoTicker` in the same subsystem."
+      ],
+      "suggestion": "Adopt one project-wide initialism policy (Go style: all-caps initialisms in identifiers), then batch-rename with compatibility shims/deprecation wrappers where exported identifiers are affected.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_convention_fragmentation"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "leak_lick_vocabulary_collision",
+      "summary": "The leak subsystem uses both `leak` and `lick` terminology for the same domain concept, obscuring intent.",
+      "related_files": [
+        "goseg/leak/broadcast.go",
+        "goseg/leak/broadcast_test.go",
+        "goseg/leak/leak_test.go"
+      ],
+      "evidence": [
+        "Core functions in package `leak` operate on `LickStatus`, `GetLickStatuses`, `lickStatuses`, and logs like \"Closing lick channel\".",
+        "Tests reinforce the divergent naming (`setLickStatusesForTest`, `TestGetLickStatusesReflectsCurrentState`) instead of clarifying a distinct concept boundary.",
+        "No parallel type family in these files indicates `lick` is a separate domain object; terms appear interchangeable with leak socket/session state."
+      ],
+      "suggestion": "Rename `Lick*` identifiers to a single domain term (`Leak*` or a clearer protocol-specific noun), and keep a short transitional alias layer only where external callers depend on old names.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_convention_fragmentation"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "stringly_typed_transition_contracts",
+      "summary": "Transition-publishing APIs expose multiple positional string parameters, making misuse easy and contracts hard to validate.",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/leak/broadcast.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "`RunTransitionedOperation` and `emitWorkflowTransition` pass transition identity and event semantics as raw strings.",
+        "Leak broadcast envelopes are assembled with literal string values for `Type`/`AuthLevel` in `updateBroadcast`, rather than shared typed enums.",
+        "Broadcast transition APIs are typed for mutation behavior but still depend on external string event naming conventions downstream."
+      ],
+      "suggestion": "Introduce typed transition/event identifiers (small enums or dedicated types) and replace multi-string positional APIs with request structs so compile-time checks enforce valid combinations.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single API contract standard for runtime injection and lifecycle methods across subsystems.",
+      "Naming policy for initialisms/domain vocabulary is not centrally enforced during refactors and wrapper introductions."
+    ],
+    "likely_symptoms": [
+      "runtime_injection_shape_drift",
+      "start_api_lifecycle_ambiguity",
+      "stringly_typed_transition_contracts",
+      "initialism_casing_inconsistency",
+      "leak_lick_vocabulary_collision"
+    ],
+    "possible_false_positives": []
+  }
+}

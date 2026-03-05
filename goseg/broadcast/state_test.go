@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"groundseg/structs"
+	"groundseg/transition"
 )
 
 func TestCloneBroadcastStateDeepCopiesMutableFields(t *testing.T) {
@@ -102,10 +103,7 @@ func TestCloneBroadcastStateDeepCopiesMutableFields(t *testing.T) {
 }
 
 func TestGetStateReturnsClone(t *testing.T) {
-	original := DefaultBroadcastStateRuntime().GetState()
-	t.Cleanup(func() {
-		DefaultBroadcastStateRuntime().UpdateBroadcast(original)
-	})
+	runtime := withIsolatedBroadcastDefaults(t)
 
 	state := structs.AuthBroadcast{
 		Urbits: map[string]structs.Urbit{
@@ -116,15 +114,15 @@ func TestGetStateReturnsClone(t *testing.T) {
 	urbit.Info.RemoteTlonBackups = []structs.BackupObject{{Timestamp: 1}}
 	state.Urbits["~zod"] = urbit
 	state.System.Info.Usage.RAM = []uint64{1}
-	DefaultBroadcastStateRuntime().UpdateBroadcast(state)
+	runtime.UpdateBroadcast(state)
 
-	copyOne := DefaultBroadcastStateRuntime().GetState()
+	copyOne := runtime.GetState()
 	mutated := copyOne.Urbits["~zod"]
 	mutated.Info.RemoteTlonBackups[0].Timestamp = 99
 	copyOne.Urbits["~zod"] = mutated
 	copyOne.System.Info.Usage.RAM[0] = 42
 
-	copyTwo := DefaultBroadcastStateRuntime().GetState()
+	copyTwo := runtime.GetState()
 	gotUrbit := copyTwo.Urbits["~zod"]
 	if gotUrbit.Info.RemoteTlonBackups[0].Timestamp != 1 {
 		t.Fatalf("expected stored state to remain unchanged, got %+v", gotUrbit.Info.RemoteTlonBackups)
@@ -135,7 +133,7 @@ func TestGetStateReturnsClone(t *testing.T) {
 }
 
 func TestGetStateJSONInjectsStructureMetadata(t *testing.T) {
-	data, err := GetStateJson(structs.AuthBroadcast{})
+	data, err := GetStateJson(structs.AuthBroadcast{}, transition.BroadcastAuthLevelAuthorized)
 	if err != nil {
 		t.Fatalf("GetStateJson returned error: %v", err)
 	}
@@ -152,6 +150,21 @@ func TestGetStateJSONInjectsStructureMetadata(t *testing.T) {
 	}
 }
 
+func TestGetStateJSONUsesProvidedAuthLevel(t *testing.T) {
+	data, err := GetStateJson(structs.AuthBroadcast{}, transition.BroadcastAuthLevelUnauthorized)
+	if err != nil {
+		t.Fatalf("GetStateJson returned error: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to decode state json: %v", err)
+	}
+	if decoded["auth_level"] != "unauthorized" {
+		t.Fatalf("expected auth_level=unauthorized, got %v", decoded["auth_level"])
+	}
+}
+
 func TestGetStateJsonReturnsContextualErrorOnMarshalFailure(t *testing.T) {
 	badBroadcast := structs.AuthBroadcast{}
 	badUrbit := structs.Urbit{}
@@ -160,7 +173,7 @@ func TestGetStateJsonReturnsContextualErrorOnMarshalFailure(t *testing.T) {
 		"~zod": badUrbit,
 	}
 
-	_, err := GetStateJson(badBroadcast)
+	_, err := GetStateJson(badBroadcast, transition.BroadcastAuthLevelAuthorized)
 	if err == nil {
 		t.Fatal("expected json marshal error for invalid broadcast payload")
 	}
@@ -174,23 +187,67 @@ func TestGetStateJsonReturnsContextualErrorOnMarshalFailure(t *testing.T) {
 }
 
 func TestSetStartramRunningUsesTransitionPath(t *testing.T) {
-	previousState := DefaultBroadcastStateRuntime().GetState()
-	t.Cleanup(func() {
-		DefaultBroadcastStateRuntime().UpdateBroadcast(previousState)
-	})
+	runtime := withIsolatedBroadcastDefaults(t)
 
 	initial := structs.AuthBroadcast{}
 	initial.Profile.Startram.Info.Running = false
 	initial.Profile.Startram.Transition.Restart = "running"
-	DefaultBroadcastStateRuntime().UpdateBroadcast(initial)
+	runtime.UpdateBroadcast(initial)
 	if err := SetStartramRunning(true); err != nil {
 		t.Fatalf("SetStartramRunning returned error: %v", err)
 	}
-	got := DefaultBroadcastStateRuntime().GetState()
+	got := runtime.GetState()
 	if !got.Profile.Startram.Info.Running {
 		t.Fatal("expected startram running state to be true after transition")
 	}
 	if got.Profile.Startram.Transition.Restart != "running" {
 		t.Fatalf("expected existing startram transition state to remain, got %q", got.Profile.Startram.Transition.Restart)
+	}
+}
+
+func TestUpdateBroadcastClonesWriterInput(t *testing.T) {
+	runtime := NewBroadcastStateRuntime()
+	urbit := structs.Urbit{}
+	urbit.Info.RemoteTlonBackups = []structs.BackupObject{{Timestamp: 123}}
+	input := structs.AuthBroadcast{
+		Urbits: map[string]structs.Urbit{
+			"~zod": urbit,
+		},
+	}
+
+	runtime.UpdateBroadcast(input)
+
+	cached := runtime.GetState()
+	cloned := cached
+	cloneUrbit := cloned.Urbits["~zod"]
+	cloneUrbit.Info.RemoteTlonBackups[0].Timestamp = 321
+	cloned.Urbits["~zod"] = cloneUrbit
+
+	observed := runtime.GetState()
+	if observed.Urbits["~zod"].Info.RemoteTlonBackups[0].Timestamp != 123 {
+		t.Fatalf("expected broadcast runtime state to remain isolated from caller mutation, got %+v", observed.Urbits["~zod"].Info.RemoteTlonBackups)
+	}
+}
+
+func TestAddSystemTransitionErrorCullsOldErrors(t *testing.T) {
+	runtime := NewBroadcastStateRuntime()
+	base := runtime.GetState()
+	base.System.Transition.Error = []string{
+		"e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7",
+	}
+	runtime.UpdateBroadcast(base)
+
+	runtime.AddSystemTransitionError("newest-1")
+	runtime.AddSystemTransitionError("newest-2")
+
+	got := runtime.GetState().System.Transition.Error
+	if len(got) != 8 {
+		t.Fatalf("expected error history to be capped at 8 entries, got %d", len(got))
+	}
+	expected := []string{"newest-2", "newest-1", "e0", "e1", "e2", "e3", "e4", "e5"}
+	for i, want := range expected {
+		if got[i] != want {
+			t.Fatalf("unexpected transition error index %d: got %q want %q", i, got[i], want)
+		}
 	}
 }

@@ -1,0 +1,52 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 79.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/protocol/contracts/contracts.go: ContractDescriptorFor ignores registry initialization errors and collapses them into the same false return as a missing contract (`return ContractDescriptor{}, false`).",
+        "goseg/protocol/contracts/contracts.go: MustContractDescriptor converts resolved contract lookup/init failures into panics (`panic(fmt.Sprintf(...))`) instead of returning an error for caller handling.",
+        "goseg/protocol/contracts/contracts_test.go: tests explicitly expect panic behavior for unknown IDs, indicating this panic path is part of the API surface and not strictly test-only."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "contract_registry_error_policy_inconsistent",
+      "summary": "Contract catalog lookup APIs mix silent bool-only failures and panic-on-fail APIs, making initialization and missing-descriptor errors indistinguishable to callers.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go",
+        "goseg/protocol/contracts/contracts_test.go"
+      ],
+      "evidence": [
+        "ContractDescriptorFor(name) swallows `defaultRegistrySnapshot()` errors and returns `(zero, false)` when registry initialization fails.",
+        "MustContractDescriptor wraps the same underlying condition in `panic` for both init failures and missing IDs.",
+        "The test for missing contract expects panic (`TestMustContractDescriptorPanicsForUnknownID`), so both recoverable and non-recoverable paths are exposed as first-class behavior."
+      ],
+      "suggestion": "Unify the contract API contract so lookup failures consistently return explicit errors at boundaries: keep only one fallible API for runtime lookups (`ContractDescriptorForWithError`) and make the boolean API return distinct categories (e.g., `exists`, `err`) or document/test it as intentionally lossy, while changing `Must...` to a very narrowly-used startup helper that is clearly documented and isolated to init-time callers.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_error_strategy_mixing"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Inconsistent error-policy design in protocol contract lookup API: recoverable and unrecoverable outcomes are represented by incompatible mechanisms (false-return vs panic), blurring caller decision logic."
+    ],
+    "likely_symptoms": [
+      "Callers cannot reliably distinguish transient contract-registry initialization failure from a genuine unknown contract in production logs/handlers.",
+      "Startup or request paths can crash unexpectedly when a stricter contract accessor is used instead of a recoverable variant."
+    ],
+    "possible_false_positives": [
+      "If MustContractDescriptor is intentionally intended as an explicit fail-fast helper and not part of request/handler paths, impact is limited."
+    ]
+  }
+}

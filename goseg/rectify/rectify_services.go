@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"go.uber.org/zap"
 	"groundseg/config"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/transition"
+
+	"go.uber.org/zap"
 )
 
 type UrbitTransitionApplier struct{}
@@ -89,71 +90,120 @@ func (reconciler *StartramRetrieveReconciler) Reconcile(current *structs.AuthBro
 	startramConfig := runtime.GetStartramConfigFn()
 	var reconcileErr error
 	for patp := range runtime.UrbitConfAllFn() {
-		modified := false
-		serviceCreated := true
+		published := false
+		publishRegistrationTransition := func(serviceCreated bool) {
+			if published {
+				return
+			}
+			publishUrbitServiceRegistrationTransitionWithCurrentState(current, patp, serviceCreated)
+			published = true
+		}
+
 		local, err := reconciler.syncer.loadAndRefresh(patp)
 		if err != nil {
 			zap.L().Warn(fmt.Sprintf("Retrieve: unable to refresh urbit config for %s: %v", patp, err))
 			reconcileErr = errors.Join(reconcileErr, fmt.Errorf("unable to refresh urbit config for %s: %w", patp, err))
-			publishUrbitServiceRegistrationTransitionWithCurrentState(current, patp, serviceCreated)
+			publishRegistrationTransition(false)
 			continue
 		}
-		persistNetwork := false
-		persistWeb := false
 
-		found := false
-		for _, remote := range startramConfig.Subdomains {
-			endpointUrl := strings.Split(startramSettings.EndpointURL, ".")
-			if len(endpointUrl) < 2 {
-				continue
-			}
-			rootUrl := strings.Join(endpointUrl[1:len(endpointUrl)], ".")
-			if patp+"."+rootUrl == remote.URL {
-				found = true
-				break
-			}
-		}
-		if !found {
-			zap.L().Info(fmt.Sprintf("Registering missing StarTram service for %v", patp))
-			startram.SvcCreate(patp, "urbit")
-			startram.SvcCreate("s3."+patp, "minio")
+		plan, err := reconciler.reconcilePatpState(patp, local, startramConfig.Subdomains, startramSettings)
+		if err != nil {
+			zap.L().Warn(fmt.Sprintf("Retrieve: unable to reconcile %s startram state: %v", patp, err))
+			reconcileErr = errors.Join(reconcileErr, err)
+			publishRegistrationTransition(false)
+			continue
 		}
 
-		for _, remote := range startramConfig.Subdomains {
-			if remote.Status == string(transition.StartramServiceStatusCreating) {
-				serviceCreated = false
-			}
-			parts := strings.Split(remote.URL, ".")
-			if len(parts) < 2 {
-				continue
-			}
-			if reconciler.reconcileUrbitWebService(patp, remote, &local, &modified, &persistWeb, &persistNetwork) {
-				continue
-			}
-			if reconciler.reconcileUrbitNetworkServices(patp, remote, parts, &local, &modified, &persistNetwork) {
-				continue
-			}
+		if err := reconciler.persistPatpState(patp, plan); err != nil {
+			reconcileErr = errors.Join(reconcileErr, err)
 		}
-
-		if modified {
-			if persistWeb {
-				if err := reconciler.syncer.updateWebConfig(patp, &local); err != nil {
-					zap.L().Warn(fmt.Sprintf("Retrieve: unable to persist %s web config updates: %v", patp, err))
-					reconcileErr = errors.Join(reconcileErr, fmt.Errorf("unable to persist %s web config updates: %w", patp, err))
-				}
-			}
-
-			if persistNetwork {
-				if err := reconciler.syncer.updateNetworkConfig(patp, &local); err != nil {
-					zap.L().Warn(fmt.Sprintf("Retrieve: unable to persist %s network config updates: %v", patp, err))
-					reconcileErr = errors.Join(reconcileErr, fmt.Errorf("unable to persist %s network config updates: %w", patp, err))
-				}
-			}
-		}
-		publishUrbitServiceRegistrationTransitionWithCurrentState(current, patp, serviceCreated)
-		publishUrbitServiceRegistrationTransitionWithCurrentState(current, patp, serviceCreated)
+		publishRegistrationTransition(plan.serviceCreated)
 	}
 	return reconcileErr
+}
+
+type startramPatpReconcilePlan struct {
+	local          structs.UrbitDocker
+	modified       bool
+	serviceCreated bool
+	persistWeb     bool
+	persistNetwork bool
+}
+
+func (reconciler *StartramRetrieveReconciler) reconcilePatpState(patp string, local structs.UrbitDocker, subdomains []structs.Subdomain, startramSettings config.StartramSettings) (startramPatpReconcilePlan, error) {
+	plan := startramPatpReconcilePlan{local: local, serviceCreated: true}
+
+	endpointRoot, ok := startramEndpointRoot(startramSettings.EndpointURL)
+	if !ok {
+		return plan, fmt.Errorf("invalid startram endpoint URL %q for %s", startramSettings.EndpointURL, patp)
+	}
+
+	if !isStartramPatpRegistered(patp, endpointRoot, subdomains) {
+		zap.L().Info(fmt.Sprintf("Registering missing StarTram service for %v", patp))
+		startram.SvcCreate(patp, "urbit")
+		startram.SvcCreate("s3."+patp, "minio")
+	}
+
+	for _, remote := range subdomains {
+		if remote.Status == string(transition.StartramServiceStatusCreating) {
+			plan.serviceCreated = false
+		}
+		parts := strings.Split(remote.URL, ".")
+		if len(parts) < 2 {
+			continue
+		}
+		if reconciler.reconcileUrbitWebService(patp, remote, &plan.local, &plan.modified, &plan.persistWeb, &plan.persistNetwork) {
+			continue
+		}
+		if reconciler.reconcileUrbitNetworkServices(patp, remote, parts, &plan.local, &plan.modified, &plan.persistNetwork) {
+			continue
+		}
+	}
+
+	return plan, nil
+}
+
+func (reconciler *StartramRetrieveReconciler) persistPatpState(patp string, plan startramPatpReconcilePlan) error {
+	if !plan.modified {
+		return nil
+	}
+	var reconcileErr error
+
+	if plan.persistWeb {
+		if err := reconciler.syncer.updateWebConfig(patp, &plan.local); err != nil {
+			reconcileErr = errors.Join(reconcileErr, fmt.Errorf("unable to persist %s web config updates: %w", patp, err))
+		}
+	}
+
+	if plan.persistNetwork {
+		if err := reconciler.syncer.updateNetworkConfig(patp, &plan.local); err != nil {
+			reconcileErr = errors.Join(reconcileErr, fmt.Errorf("unable to persist %s network config updates: %w", patp, err))
+		}
+	}
+
+	if reconcileErr != nil {
+		zap.L().Warn(fmt.Sprintf("Retrieve: unable to persist reconciled state for %s: %v", patp, reconcileErr))
+	}
+	return reconcileErr
+}
+
+func isStartramPatpRegistered(patp, endpointRoot string, subdomains []structs.Subdomain) bool {
+	expected := patp + "." + endpointRoot
+	for _, remote := range subdomains {
+		if remote.URL == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func startramEndpointRoot(endpointURL string) (string, bool) {
+	endpointParts := strings.Split(endpointURL, ".")
+	if len(endpointParts) < 2 {
+		return "", false
+	}
+	return strings.Join(endpointParts[1:], "."), true
 }
 
 type urbitConfigSyncService struct {
@@ -169,25 +219,33 @@ func (service *urbitConfigSyncService) loadAndRefresh(patp string) (structs.Urbi
 }
 
 func (service *urbitConfigSyncService) updateWebConfig(patp string, local *structs.UrbitDocker) error {
-	if err := service.runtime.UpdateUrbitWebConfigFn(patp, func(webConfig *structs.UrbitWebConfig) error {
-		webConfig.CustomUrbitWeb = local.CustomUrbitWeb
-		return nil
-	}); err != nil {
+	if err := service.runtime.UpdateUrbitSectionFn(
+		patp,
+		config.UrbitConfigSectionWeb,
+		config.AdaptUrbitSectionMutation(func(webConfig *structs.UrbitWebConfig) error {
+			webConfig.CustomUrbitWeb = local.CustomUrbitWeb
+			return nil
+		}),
+	); err != nil {
 		return fmt.Errorf("persisting web config for %s: %w", patp, err)
 	}
 	return nil
 }
 
 func (service *urbitConfigSyncService) updateNetworkConfig(patp string, local *structs.UrbitDocker) error {
-	if err := service.runtime.UpdateUrbitNetworkConfigFn(patp, func(networkConfig *structs.UrbitNetworkConfig) error {
-		networkConfig.WgHTTPPort = local.WgHTTPPort
-		networkConfig.WgAmesPort = local.WgAmesPort
-		networkConfig.WgS3Port = local.WgS3Port
-		networkConfig.WgConsolePort = local.WgConsolePort
-		networkConfig.WgURL = local.WgURL
-		networkConfig.Network = local.Network
-		return nil
-	}); err != nil {
+	if err := service.runtime.UpdateUrbitSectionFn(
+		patp,
+		config.UrbitConfigSectionNetwork,
+		config.AdaptUrbitSectionMutation(func(networkConfig *structs.UrbitNetworkConfig) error {
+			networkConfig.WgHTTPPort = local.WgHTTPPort
+			networkConfig.WgAmesPort = local.WgAmesPort
+			networkConfig.WgS3Port = local.WgS3Port
+			networkConfig.WgConsolePort = local.WgConsolePort
+			networkConfig.WgURL = local.WgURL
+			networkConfig.Network = local.Network
+			return nil
+		}),
+	); err != nil {
 		return fmt.Errorf("persisting network config for %s: %w", patp, err)
 	}
 	return nil

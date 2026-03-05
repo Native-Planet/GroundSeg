@@ -83,9 +83,9 @@ func RunFstabLineParseMatrix(t *testing.T, cases []ParseBoolLineCase) {
 }
 
 type ReconcileFstabCase struct {
-	Name     string
-	Run      func() ([]string, bool)
-	Assert   func(t *testing.T, reconciled []string, changed bool)
+	Name   string
+	Run    func() ([]string, bool)
+	Assert func(t *testing.T, reconciled []string, changed bool)
 }
 
 func RunReconcileFstabMatrix(t *testing.T, cases []ReconcileFstabCase) {

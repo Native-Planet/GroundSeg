@@ -20,8 +20,8 @@ type versionHTTPDoer interface {
 }
 
 type versionRuntime struct {
-	stateMu               sync.RWMutex
-	opsMu                 sync.Mutex
+	stateMu                sync.RWMutex
+	opsMu                  sync.Mutex
 	versionStore           VersionStore
 	versionHTTPClient      versionHTTPDoer
 	versionFetchRetryCount int
@@ -188,7 +188,7 @@ func fetchVersionFromServer(conf structs.SysConfig) (structs.Version, error) {
 	if retries < 1 {
 		retries = 1
 	}
-	url := globalConfig.Connectivity.UpdateUrl
+	url := globalConfig.Connectivity.UpdateURL
 	client := versionHTTPClientSnapshot()
 	if client == nil {
 		client = http.DefaultClient
@@ -274,7 +274,7 @@ func CheckVersionWithError() (structs.Channel, error) {
 	runtime.opsMu.Lock()
 	defer runtime.opsMu.Unlock()
 
-	conf := Conf()
+	conf := Config()
 	_, channel, err := ResolveLatestChannel(conf)
 	if err != nil {
 		return GetVersionChannel(), fmt.Errorf("resolve latest version channel: %w", err)
@@ -303,7 +303,7 @@ func SyncVersionInfoWithError() (structs.Channel, error) {
 	runtime.opsMu.Lock()
 	defer runtime.opsMu.Unlock()
 
-	conf := Conf()
+	conf := Config()
 	fetchedVersion, channel, err := ResolveLatestChannel(conf)
 	if err != nil {
 		zap.L().Warn(fmt.Sprintf("Unable to resolve latest version channel: %v", err))
@@ -322,8 +322,7 @@ func SyncVersionInfoWithError() (structs.Channel, error) {
 
 // write the defaults.VersionInfo value to disk
 func CreateDefaultVersion() error {
-	var versionInfo structs.Version
-	err := json.Unmarshal([]byte(defaults.DefaultVersionText), &versionInfo)
+	versionInfo, err := defaults.DefaultVersionDefaults()
 	if err != nil {
 		return err
 	}
@@ -342,8 +341,8 @@ func CreateDefaultVersion() error {
 // return the existing local version info or create default
 func LocalVersion() structs.Version {
 	defaultVersion := func() structs.Version {
-		var fallback structs.Version
-		if err := json.Unmarshal([]byte(defaults.DefaultVersionText), &fallback); err != nil {
+		fallback, err := defaults.DefaultVersionDefaults()
+		if err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to decode embedded default version metadata: %v", err))
 		}
 		return fallback

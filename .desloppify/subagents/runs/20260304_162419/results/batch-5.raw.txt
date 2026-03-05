@@ -1,0 +1,87 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 79.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Error context is inconsistently preserved: `goseg/importer/importer.go` returns opaque parsing errors (`\"invalid chunk index\"`, `\"invalid total chunk count\"`) without `%w` or offending input details, while nearby functions in the same codebase preserve cause chains.",
+        "Low-level artifact operations in `goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go` return raw upstream errors (`return err`) from volume checks/creates and tar archive operations, reducing diagnosability at module boundaries.",
+        "Startup/server lifecycle uses mixed failure strategies: `goseg/startuporchestrator/startup_orchestrator.go` suppresses optional init failures silently in `runInitPhase`, while other phases log optional failures; `goseg/main.go` has one shutdown path that only logs errors and another that aggregates/returns them."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "context_loss_in_parsers_and_artifact_io",
+      "summary": "Multiple boundary functions drop error cause/context, producing hard-to-trace failures.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go"
+      ],
+      "evidence": [
+        "`parseUploadChunkMetadata` returns `fmt.Errorf(\"invalid chunk index\")` and `fmt.Errorf(\"invalid total chunk count\")` after `strconv.Atoi` failures, discarding both source error and raw input.",
+        "`EnsureContainerVolumes` and `TarArchiveForSingleFile` return raw errors (`return err`) for several failure points (volume existence/create, open/stat/copy/close), so callers often lose operation/file context."
+      ],
+      "suggestion": "Standardize boundary wrapping: include operation + key identifiers (file path, volume name, input field/value) and preserve root causes with `%w` in both importer parsing and artifactwriter helpers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_context_erosion"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_failure_policy_in_startup_paths",
+      "summary": "Startup paths mix silent suppression, log-only handling, and propagated errors for similar lifecycle failures.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`runInitPhase` ignores non-required init errors without logging (`if task.required { return ... }` else no action), while `start` and `health` log optional failures via `logOptionalStartupFailure`.",
+        "In `main.go`, `shutdownServers` logs shutdown failures and discards them, but the context-cancel shutdown branch collects and returns joined shutdown errors."
+      ],
+      "suggestion": "Define one explicit lifecycle error policy (required/optional/fail-fast classes), then enforce it uniformly: optional errors should at least emit structured telemetry, and comparable shutdown paths should either both propagate aggregated errors or both intentionally downgrade with documented rationale.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "failure_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "unwrapped_transition_errors",
+      "summary": "Broadcast transition application returns implementation errors without boundary context.",
+      "related_files": [
+        "goseg/broadcast/transitions.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`ApplyBroadcastTransition` returns `transition.Apply` errors directly (`return err`) with no transition type or operation context.",
+        "Adjacent broadcast code (`buildBroadcastTickState`) wraps errors with contextual operation labels (e.g., `\"unable to build pier info: %w\"`), demonstrating inconsistent boundary behavior within the same subsystem."
+      ],
+      "suggestion": "Wrap transition application failures with transition identity and operation context, e.g. `fmt.Errorf(\"apply broadcast transition %T: %w\", transition, err)`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_context_erosion"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No enforced, shared contract for when to wrap vs forward errors at module boundaries.",
+      "Lifecycle codepaths evolved with different local error policies (log-only vs propagate), creating semantic drift."
+    ],
+    "likely_symptoms": [
+      "context_loss_in_parsers_and_artifact_io",
+      "mixed_failure_policy_in_startup_paths",
+      "unwrapped_transition_errors"
+    ],
+    "possible_false_positives": []
+  }
+}

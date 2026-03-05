@@ -14,53 +14,52 @@ type AccessPointRuntimeCoordinator interface {
 
 type accessPointLifecycleCoordinator struct{}
 
-func accessPointStartRouterWithRuntime(rt AccessPointRuntime) error {
-	if rt.UseDefaultStartFn {
-		return startRouterWithRuntime(rt)
-	}
-	if rt.StartRouterFn != nil {
-		return rt.StartRouterFn(rt)
+func accessPointStartRouterWithRuntime(resolved resolvedAccessPointRuntime) error {
+	if resolved.runtime.StartRouterFn != nil {
+		return resolved.runtime.StartRouterFn(resolved.runtime)
 	}
 	return nil
 }
 
-func accessPointStopRouterWithRuntime(rt AccessPointRuntime) error {
-	if rt.UseDefaultStopFn {
-		return stopRouterWithRuntime(rt)
-	}
-	if rt.StopRouterFn != nil {
-		return rt.StopRouterFn(rt)
+func accessPointStopRouterWithRuntime(resolved resolvedAccessPointRuntime) error {
+	if resolved.runtime.StopRouterFn != nil {
+		return resolved.runtime.StopRouterFn(resolved.runtime)
 	}
 	return nil
 }
 
 func (accessPointLifecycleCoordinator) Start(rt AccessPointRuntime) error {
+	return accessPointLifecycleCoordinator{}.StartResolved(resolveAccessPointRuntime(rt))
+}
+
+func (accessPointLifecycleCoordinator) StartResolved(resolved resolvedAccessPointRuntime) error {
+	rt := resolved.runtime
 	zapLogger := zap.L()
 	zapLogger.Info(fmt.Sprintf("Starting router on %v", rt.Wlan))
 
 	if rt.EnsureRootDirFn == nil {
-		return errors.New("missing root directory init runtime")
+		return errors.New("missing root directory strategy")
 	}
 	if err := rt.EnsureRootDirFn(rt.RootDir); err != nil {
 		return err
 	}
 	// make sure dependencies are met
 	if rt.CheckDependenciesFn == nil {
-		return errors.New("missing dependency runtime")
+		return errors.New("missing dependency strategy")
 	}
 	if err := rt.CheckDependenciesFn(); err != nil {
 		return err
 	}
 	// make sure params are set (maybe not needed)
 	if rt.CheckParametersFn == nil {
-		return errors.New("missing parameter validation runtime")
+		return errors.New("missing parameter validation strategy")
 	}
 	if err := rt.CheckParametersFn(rt); err != nil {
 		return err
 	}
 	// check if AP already running
 	if rt.IsRunningFn == nil {
-		return errors.New("missing status runtime")
+		return errors.New("missing status strategy")
 	}
 	running, err := rt.IsRunningFn(rt)
 	if err != nil {
@@ -76,34 +75,39 @@ func (accessPointLifecycleCoordinator) Start(rt AccessPointRuntime) error {
 	}
 	// dump config to file
 	if rt.WriteHostapdConfigFn == nil {
-		return errors.New("missing hostapd config runtime")
+		return errors.New("missing hostapd config strategy")
 	}
 	if err := rt.WriteHostapdConfigFn(rt.HostapdConfigPath, rt.Wlan, rt.SSID, rt.Password); err != nil {
 		return err
 	}
 	// start the router
 	if rt.StartRouterFn == nil {
-		return errors.New("missing router start runtime")
+		return errors.New("missing router start strategy")
 	}
-	if err := accessPointStartRouterWithRuntime(rt); err != nil {
+	if err := accessPointStartRouterWithRuntime(resolved); err != nil {
 		return fmt.Errorf("start router: %w", err)
 	}
 	return nil
 }
 
 func (accessPointLifecycleCoordinator) Stop(rt AccessPointRuntime) error {
+	return accessPointLifecycleCoordinator{}.StopResolved(resolveAccessPointRuntime(rt))
+}
+
+func (accessPointLifecycleCoordinator) StopResolved(resolved resolvedAccessPointRuntime) error {
+	rt := resolved.runtime
 	zapLogger := zap.L()
 	zapLogger.Info(fmt.Sprintf("Stopping router on %v", rt.Wlan))
 
 	if rt.CheckParametersFn == nil {
-		return errors.New("missing parameter validation runtime")
+		return errors.New("missing parameter validation strategy")
 	}
 	if err := rt.CheckParametersFn(rt); err != nil {
 		return err
 	}
 	// check if AP is running
 	if rt.IsRunningFn == nil {
-		return errors.New("missing status runtime")
+		return errors.New("missing status strategy")
 	}
 	running, err := rt.IsRunningFn(rt)
 	if err != nil {
@@ -112,9 +116,9 @@ func (accessPointLifecycleCoordinator) Stop(rt AccessPointRuntime) error {
 	// stop the router
 	if running {
 		if rt.StopRouterFn == nil {
-			return errors.New("missing router stop runtime")
+			return errors.New("missing router stop strategy")
 		}
-		if err := accessPointStopRouterWithRuntime(rt); err != nil {
+		if err := accessPointStopRouterWithRuntime(resolved); err != nil {
 			return fmt.Errorf("stop router: %w", err)
 		}
 	} else {

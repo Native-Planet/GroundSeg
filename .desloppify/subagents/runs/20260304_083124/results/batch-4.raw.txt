@@ -1,0 +1,94 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 83.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "In `goseg/shipworkflow/urbit_operations_runtime_handlers.go`, `runTogglePowerTransition` and `runToggleNetworkTransition` both embed the same structural pattern: read state, persist transition-driven config, optionally mutate runtime/docker state, and then conditionally trigger container start logic via repeated branch code.",
+        "`goseg/rectify/rectify_services.go` and `goseg/shipworkflow/urbit_operations_runtime.go` both orchestrate transition-like behavior inline (decisioning + state mutation + persistence + publication/restart hooks) rather than through a centralized transition policy layer.",
+        "`goseg/config/urbit.go` and `goseg/rectify/rectify_services.go` each define their own generic `adaptUrbitSectionMutation` adapter with the same typed assertion + callback pattern, increasing duplicate maintenance surface.",
+        "The batch includes pre-existing signals that these files have disconnected/misaligned responsibility clusters (large test modules in this scope also show multiple unrelated concern clusters), consistent with mixed abstraction boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_orchestration_boilerplate",
+      "summary": "Toggle transition handlers duplicate configuration/containers orchestration logic instead of sharing a transition policy.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime_handlers.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`runTogglePowerTransition` and `runToggleNetworkTransition` each repeat state read + section persistence + lifecycle cleanup/start sequencing with nearly identical branch structure.",
+        "`buildTogglePowerSteps` and `buildToggleNetworkSteps` only wrap those dedicated run functions, so transition-specific side effects are still scattered across files rather than policy-driven.",
+        "The code now requires independent updates in multiple files for changes to common transition semantics."
+      ],
+      "suggestion": "Introduce a shared transition execution primitive in shipworkflow (e.g., a transition policy table + `applyTransitionPolicy` helper) that centralizes: section update strategy, restart side effects, and event/error policy, then dispatch both handlers through this single path.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transition_orchestration_boilerplate"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "reconcile_mixed_responsibility",
+      "summary": "Startram reconcile performs policy decisions, mutation, persistence, and transition emission in one loop.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "`StartramRetrieveReconciler.Reconcile` in `goseg/rectify/rectify_services.go` combines remote-state correlation, local mutation flags, disk/config persistence calls (`updateWebConfig`, `updateNetworkConfig`), and transition publication (`publishRegistrationTransition`) in a single pass.",
+        "The reconcile flow intermixes read/write responsibilities (`loadAndRefresh`) with error joining/policy decisions (`serviceCreated`, `published`, `modified`, `persistNetwork`, `persistWeb`) rather than separating change plan from execution.",
+        "This pattern increases the risk of persistence side effects being coupled to transient policy details and makes behavior drift likely when transition rules evolve."
+      ],
+      "suggestion": "Split reconcile into: (1) compute a typed reconciliation plan from remote/local snapshots, (2) validate/apply that plan in a dedicated persistence layer, and (3) publish transitions in a separate explicit side-effect stage.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transition_orchestration_boilerplate"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_config_section_adapter",
+      "summary": "Config section mutation adapters are duplicated across config-management layers instead of shared by design.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`goseg/config/urbit.go` defines `adaptUrbitSectionMutation[T any]` and `goseg/rectify/rectify_services.go` defines an identical generic helper with the same cast/mutate structure.",
+        "`rectify_services.go` then wraps mutators through this local copy instead of reusing a shared implementation in the config layer, creating parallel behavior definitions.",
+        "A failure or type-safety tweak in one copy would not automatically apply to the other."
+      ],
+      "suggestion": "Extract the adapter and error formatting contract into a shared config package helper and replace both local implementations with that single helper to preserve type assertions and error semantics consistently.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_section_abstraction_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Repeated transition orchestration boilerplate across shipworkflow/rectify modules instead of a shared policy-driven transition runner.",
+      "Coupling of decisioning, mutation, persistence, and event publication in single-pass reconcile handlers.",
+      "Small shared abstractions reimplemented in neighboring files, creating drift risk."
+    ],
+    "likely_symptoms": [
+      "Inconsistent transition behavior when one path is updated and another is missed.",
+      "Harder reasoning about side effects during ship workflow changes.",
+      "Increased chance of config mutation/transition behavior drift across modules."
+    ],
+    "possible_false_positives": [
+      "If these duplicated helpers are intentionally kept separate for package-level versioning constraints, some duplication may be deliberate."
+    ]
+  }
+}

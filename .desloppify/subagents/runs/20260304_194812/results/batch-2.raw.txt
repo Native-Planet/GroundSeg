@@ -1,0 +1,94 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract action identity is split across packages: `goseg/protocol/contracts/protocol_contracts.go` binds contract actions from `actionids`, while `goseg/protocol/conformance/fixtures_test.go` validates fixtures against `protocol/actions` constants.",
+        "The conformance guard named `TestActionContractFixturesCoverCanonicalBindings` only hard-requires C2C presence and non-empty upload namespace checks, but does not assert one-to-one coverage for all action IDs defined in `goseg/protocol/actionids/actionids.go`.",
+        "`goseg/protocol/contracts/protocol_contracts.go` retains backward-compatible alias IDs (`UploadActionOpenEndpoint`, `UploadActionReset`) while specs and runtime IDs use newer names, and no governance/test rule in the assigned files enforces deprecation timelines or internal-only usage limits.",
+        "README quality-gate commands (`README.md`) require protocol contract/conformance tests but do not define an explicit architecture gate ensuring docs/runtime compatibility policy for alias retirement or cross-package action identity parity."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_action_identity_authority",
+      "summary": "Action identity authority is fragmented between `protocol/actions` and `protocol/actionids` without a direct parity contract.",
+      "related_files": [
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "`fixtures_test.go` validates fixture namespace/action against `groundseg/protocol/actions` symbols.",
+        "`protocol_contracts.go` defines contract namespace/action symbols from `groundseg/protocol/actionids` symbols.",
+        "No assigned-file test asserts that `actions` and `actionids` remain equivalent for the governed action set, so boundary drift can occur silently until a higher-level failure."
+      ],
+      "suggestion": "Establish one canonical action-ID authority (preferably a single package), then add a conformance test that verifies exact parity between runtime action constants and contract-bound action constants across all governed actions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_single_source_of_truth_for_contract_identity"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "partial_contract_fixture_coverage_gate",
+      "summary": "Current fixture conformance tests enforce partial presence checks instead of full canonical binding coverage.",
+      "related_files": [
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "`TestActionContractFixturesCoverCanonicalBindings` requires only one specific fixture (`c2c connect`) plus generic validation loop.",
+        "`TestValidateFixturesForNamespace` asserts upload fixture count is non-zero, not complete (both `open-endpoint` and `reset`).",
+        "Assigned canonical action set includes three actions in `actionids.go` and contract specs in `protocol_contracts.go`, but tests do not assert exhaustive equality between expected and fixture bindings."
+      ],
+      "suggestion": "Replace presence/count checks with an exact set-equality assertion between expected canonical bindings (derived from contract specs or action IDs) and fixture bindings, failing on both missing and extra entries.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_single_source_of_truth_for_contract_identity"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "unbounded_alias_compatibility_path",
+      "summary": "Backward-compatible contract ID aliases are kept without an enforced retirement or containment policy, increasing long-term boundary ambiguity.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` exposes alias IDs (`UploadActionOpenEndpoint`, `UploadActionReset`) mapped to newer IDs.",
+        "`family_specs_test.go` still uses legacy alias naming in test setup (`UploadActionOpenEndpoint`), reinforcing dual-path internal usage.",
+        "README quality-gate and policy references do not define an explicit check that compatibility aliases are deprecated, constrained, or scheduled for removal."
+      ],
+      "suggestion": "Add a governance rule and test gate that marks alias contracts as compatibility-only (with deprecation metadata and sunset version), then prohibit new internal references to alias names outside compatibility adapters.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_single_source_of_truth_for_contract_identity"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract/action governance lacks a single enforced authority for action identity and compatibility lifecycle.",
+      "Quality gates emphasize package test execution but not architecture-invariant assertions (set equality, alias retirement policy)."
+    ],
+    "likely_symptoms": [
+      "split_action_identity_authority",
+      "partial_contract_fixture_coverage_gate",
+      "unbounded_alias_compatibility_path"
+    ],
+    "possible_false_positives": []
+  }
+}

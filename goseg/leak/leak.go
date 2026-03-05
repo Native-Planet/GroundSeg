@@ -21,7 +21,7 @@ var (
 
 	leakNow             = time.Now
 	leakSleep           = time.Sleep
-	leakConf            = config.Conf
+	leakConf            = config.Config
 	leakUrbitConf       = config.UrbitConf
 	leakLookupEnv       = os.LookupEnv
 	leakStat            = os.Stat
@@ -106,7 +106,7 @@ func LookForPortsWithContext(ctx context.Context) {
 				}
 			}
 			// check for every ship that exists in groundseg
-		for _, patp := range conf.Connectivity.Piers {
+			for _, patp := range conf.Connectivity.Piers {
 				// decide based on existence of info
 				info, exists := statuses[patp]
 				if exists {

@@ -9,9 +9,15 @@ import (
 	wifiService "groundseg/system/wifi/service"
 )
 
-const c2cActionConnect actions.Action = actions.ActionC2CConnect
+var c2cActionConnect = actions.ActionC2CConnect
 
-var supportedC2CActions = actions.SupportedC2CActions
+var supportedC2CActions = func() []actions.Action {
+	supported, err := actions.SupportedActions(actions.NamespaceC2C)
+	if err != nil {
+		return nil
+	}
+	return supported
+}
 
 type c2cServiceDeps struct {
 	connectToWiFi    func(string, string) error
@@ -24,14 +30,14 @@ func processC2CMessageForAdapter(msg []byte) error {
 }
 
 func processC2CMessageForAdapterWithDeps(msg []byte, deps c2cServiceDeps) error {
-	var payload structs.WsC2cPayload
+	var payload structs.WsC2CPayload
 	if err := json.Unmarshal(msg, &payload); err != nil {
 		return fmt.Errorf("unmarshal c2c payload: %w", err)
 	}
 	if payload.Type != "c2c" {
 		return fmt.Errorf("unsupported c2c payload type: %q", payload.Type)
 	}
-	action, err := actions.ParseC2CAction(payload.Payload.Action)
+	action, err := actions.ParseAction(actions.NamespaceC2C, payload.Payload.Action)
 	if err != nil {
 		return err
 	}
@@ -45,7 +51,7 @@ func processC2CMessageForAdapterWithDeps(msg []byte, deps c2cServiceDeps) error 
 
 func defaultC2CServiceDeps() c2cServiceDeps {
 	return c2cServiceDeps{
-		connectToWiFi:    func(ssid, password string) error { return NewWiFiRuntimeService().ConnectToWifi(ssid, password) },
+		connectToWiFi:    func(ssid, password string) error { return NewWiFiRuntimeService().ConnectToWiFi(ssid, password) },
 		restartGroundSeg: restartGroundSegService,
 	}
 }

@@ -24,7 +24,7 @@ var (
 	UploadLatestBackupForRoutine        = backupsvc.UploadLatestBackup
 	LatestDailyBackupForRoutine         = backupsvc.MostRecentDailyBackupTime
 	GetStartramConfigSnapshotForRoutine = config.GetStartramConfigSnapshot
-	ConfForRoutine                      = config.Conf
+	ConfForRoutine                      = config.Config
 	UrbitConfForRoutine                 = config.UrbitConf
 	SleepForRoutine                     = time.Sleep
 	NowForRoutine                       = time.Now
@@ -94,9 +94,10 @@ func RunLocalBackupPass() {
 	}
 }
 
-func StartBackupRoutines() {
+func StartBackupRoutines() error {
 	go TlonBackupRemote()
 	go TlonBackupLocal()
+	return nil
 }
 
 func TlonBackupRemote() {

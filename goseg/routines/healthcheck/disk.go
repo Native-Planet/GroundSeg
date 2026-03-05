@@ -7,6 +7,7 @@ import (
 	"groundseg/config"
 	"groundseg/structs"
 	"groundseg/system"
+	systemdisk "groundseg/system/disk"
 	"math"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 
 var (
 	updateDiskWarningInConf = func(warnings map[string]structs.DiskWarning) error {
-		return config.UpdateConfTyped(config.WithDiskWarning(warnings))
+		return config.UpdateConfigTyped(config.WithDiskWarning(warnings))
 	}
 	getHealthCheckSettings         = config.HealthCheckSettingsSnapshot
 	sendNotificationForDiskWarning = click.SendNotification
@@ -23,12 +24,12 @@ var (
 
 func SmartDiskCheck() {
 	for {
-		disks, err := system.ListHardDisks()
+		disks, err := systemdisk.ListHardDisks()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("smart disk check error: %v", err))
 		} else {
-			res := system.SmartCheckAllDrives(disks)
-			system.SetSmartResults(res)
+			res := systemdisk.SmartCheckAllDrives(disks)
+			systemdisk.SetSmartResults(res)
 			settings := getHealthCheckSettings()
 			for k, v := range res {
 				if !v {
@@ -46,12 +47,12 @@ func SmartDiskCheckWithContext(ctx context.Context) error {
 		ctx = context.Background()
 	}
 	for {
-		disks, err := system.ListHardDisks()
+		disks, err := systemdisk.ListHardDisks()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("smart disk check error: %v", err))
 		} else {
-			res := system.SmartCheckAllDrives(disks)
-			system.SetSmartResults(res)
+			res := systemdisk.SmartCheckAllDrives(disks)
+			systemdisk.SetSmartResults(res)
 			settings := getHealthCheckSettings()
 			for k, v := range res {
 				if !v {

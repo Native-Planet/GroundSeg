@@ -13,6 +13,9 @@ func TestSysConfigDefaults(t *testing.T) {
 	if cfg.Runtime.Setup != "start" {
 		t.Fatalf("expected default setup=start, got %q", cfg.Runtime.Setup)
 	}
+	if cfg.Runtime.DockerData != DockerData(basePath) {
+		t.Fatalf("expected DockerData to follow supplied base path, got %q", cfg.Runtime.DockerData)
+	}
 	if cfg.AuthSession.KeyFile != filepath.Join(basePath, "settings", "session.key") {
 		t.Fatalf("unexpected keyFile path: %q", cfg.AuthSession.KeyFile)
 	}

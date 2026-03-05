@@ -39,15 +39,15 @@ func ToggleAlias(patp string) error {
 }
 
 func SetUrbitDomain(patp string, payload structs.WsUrbitPayload) error {
-	return setUrbitDomain(patp, payload)
+	return runUrbitTransitionCommand(patp, "set-urbit-domain", payload)
 }
 
 func SetMinIODomain(patp string, payload structs.WsUrbitPayload) error {
-	return setMinIODomain(patp, payload)
+	return runUrbitTransitionCommand(patp, "set-minio-domain", payload)
 }
 
 func ToggleChopOnVereUpdate(patp string) error {
-	return toggleChopOnVereUpdate(patp)
+	return runUrbitTransitionCommand(patp, "toggle-chop-on-upgrade", structs.WsUrbitPayload{})
 }
 
 func DeleteShip(patp string) error {
@@ -63,19 +63,19 @@ func ExportBucket(patp string, payload structs.WsUrbitPayload) error {
 }
 
 func TogglePower(patp string) error {
-	return togglePower(patp)
+	return runUrbitTransitionCommand(patp, "toggle-power", structs.WsUrbitPayload{})
 }
 
 func ToggleDevMode(patp string) error {
-	return toggleDevMode(patp)
+	return runUrbitTransitionCommand(patp, "toggle-dev-mode", structs.WsUrbitPayload{})
 }
 
 func RebuildContainer(patp string) error {
-	return rebuildContainer(patp)
+	return runUrbitTransitionCommand(patp, "rebuild-container", structs.WsUrbitPayload{})
 }
 
 func ToggleNetwork(patp string) error {
-	return toggleNetwork(patp)
+	return runUrbitTransitionCommand(patp, "toggle-network", structs.WsUrbitPayload{})
 }
 
 func ToggleBootStatus(patp string) error {
@@ -87,7 +87,7 @@ func ToggleAutoReboot(patp string) error {
 }
 
 func ToggleMinIOLink(patp string) error {
-	return toggleMinIOLink(patp)
+	return runUrbitTransitionCommand(patp, "toggle-minio-link", structs.WsUrbitPayload{})
 }
 
 func SetLoom(patp string, payload structs.WsUrbitPayload) error {

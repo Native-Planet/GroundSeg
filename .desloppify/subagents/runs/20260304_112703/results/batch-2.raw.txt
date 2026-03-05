@@ -1,0 +1,93 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 82.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "shipworkflow transition handlers repeatedly re-implement the same config-update-and-reconcile flow (persist section config + cleanup + restart/start decisions) across multiple transition paths, with duplicated branching branches and side effects spread across files.",
+        "broadcast loop/state management is implemented as package-level mutable singletons (default runtime factory/runtime and loop-running globals) instead of explicit lifecycle-owned state, which increases coupling between independent callers and test setups."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "shipworkflow_transition_orchestration_duplication",
+      "summary": "Transition handlers duplicate config persistence and cleanup logic, increasing drift risk when adding or changing transitions.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime_handlers.go"
+      ],
+      "evidence": [
+        "runTogglePowerTransition and runToggleNetworkTransition implement repeated patterns of config fetch, validation/persistence, ship cleanup, and restart logic inline.",
+        "runToggleNetworkTransition repeats the same persist+urbitCleanDelete block across multiple switch branches for different initial network states.",
+        "Other transitions in urbit_operations_runtime.go use similar bespoke orchestration patterns instead of shared transition helpers."
+      ],
+      "suggestion": "Create a dedicated transition orchestration helper (or policy-driven state machine) that accepts transition pre/post actions and error paths, then have all urbit transitions call a single sequencer function to apply config updates, optional cleanup, and restart behavior consistently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shipworkflow_transition_sequence_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_global_runtime_loop_state",
+      "summary": "Broadcast runtime and loop control use package-level mutable singletons that couple unrelated call paths and complicate composition.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`DefaultBroadcastStateRuntime` resolves through `defaultBroadcastStateRuntimeFactory`, and tests call `SetBroadcastStateRuntimeFactory` to override it globally without synchronization.",
+        "`loopRunning` and `loopStopChannel` in `loop.go` are global process state, so only one broadcast loop can be managed safely through this global channel without coordination.",
+        "Production and tests share the same mutable broadcast state pathways, which makes independent runtime instances hard to host."
+      ],
+      "suggestion": "Introduce an explicit `BroadcastCoordinator`/runtime owner that holds state runtime and loop control as instance fields, and avoid global mutable factory/runtime overrides except at process bootstrap points.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "shipbroadcast_singleton_coordination"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_responsibility_cohesion_sprawl",
+      "summary": "Large mixed-purpose test files combine multiple unrelated fixture setups and behavior clusters, slowing understanding and maintenance.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/handler/ship/urbit_test.go"
+      ],
+      "evidence": [
+        "accesspoint_test.go mixes command/argument helpers, config/password validation tests, process matching tests, router lifecycle behavior, and error path checks in one large file.",
+        "importer_test.go combines HTTP transport, runtime setup, session lifecycle management, transition counting, and archive-path behavior in a single suite.",
+        "ship/urbit handler tests contain protocol parsing, lifecycle seam reset helpers, and action-transition behavior in a broad single module."
+      ],
+      "suggestion": "Split these suites by behavioral concern (runtime construction, protocol parsing, lifecycle/error handling, transition dispatch) into smaller test modules with narrowly scoped fixtures and common shared helpers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "module",
+      "root_cause_cluster": "test_responsibility_cohesion_sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Lack of explicit orchestration abstractions for repeated transition side-effect sequences.",
+      "Use of process-global mutable state for runtime ownership/loop lifecycle instead of explicit dependency ownership.",
+      "Test files aggregating multiple behavioral concerns without stronger domain-level boundaries."
+    ],
+    "likely_symptoms": [
+      "Inconsistent cleanup/restart behavior across similar transitions",
+      "Hard-to-reason-about cross-test side effects when mutating global factories",
+      "Longer test maintenance cycles and hidden regressions in large mixed suites"
+    ],
+    "possible_false_positives": [
+      "If broadcast singleton design is intentionally required by runtime bootstrap architecture, the second finding may be stylistic rather than behavioral; still, it constrains concurrency and test isolation."
+    ]
+  }
+}

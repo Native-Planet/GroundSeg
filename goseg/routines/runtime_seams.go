@@ -19,7 +19,7 @@ func newVersionRuntime() versionRuntime {
 			setVersionChannelFn: config.SetVersionChannel,
 		},
 		configOps: versionConfigOps{
-			getConfFn:   config.Conf,
+			getConfFn:   config.Config,
 			getSha256Fn: getSha256,
 			architectureFn: func() string {
 				return config.RuntimeContextSnapshot().Architecture

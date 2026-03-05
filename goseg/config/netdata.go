@@ -9,13 +9,13 @@ import (
 )
 
 var (
-	confForNetdata              = Conf
+	confForNetdata              = Config
 	getVersionChannelForNetdata = GetVersionChannel
 )
 
 // write a hardcoded default conf to disk
 func CreateDefaultNetdataConf() error {
-	defaultConfig := defaults.NetdataConfig
+	defaultConfig := defaults.DefaultNetdataConfig()
 	path := filepath.Join(BasePath(), "settings", "netdata.json")
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
 		return err

@@ -19,7 +19,7 @@ func TestBuildConfigUsesDefaultsAndVersionOverrides(t *testing.T) {
 	}
 
 	config := BuildConfig(conf, version)
-	expected := defaults.WgConfig
+	expected := defaults.DefaultWgConfig()
 	expected.WireguardVersion = conf.Connectivity.UpdateBranch
 	expected.Repo = version.Wireguard.Repo
 	expected.Amd64Sha256 = version.Wireguard.Amd64Sha256
@@ -31,9 +31,9 @@ func TestBuildConfigUsesDefaultsAndVersionOverrides(t *testing.T) {
 		config.Arm64Sha256 != expected.Arm64Sha256 {
 		t.Fatalf("BuildConfig did not apply version overrides correctly: got %+v want %+v", config, expected)
 	}
-	if config.WireguardName != defaults.WgConfig.WireguardName ||
+	if config.WireguardName != defaults.DefaultWgConfig().WireguardName ||
 		config.Repo != expected.Repo {
-		t.Fatalf("BuildConfig changed invariant defaults: got %+v want wireguard name %s", config.WireguardName, defaults.WgConfig.WireguardName)
+		t.Fatalf("BuildConfig changed invariant defaults: got %+v want wireguard name %s", config.WireguardName, defaults.DefaultWgConfig().WireguardName)
 	}
 }
 
@@ -52,7 +52,7 @@ func TestBuildConfigCopiesDefaultSlices(t *testing.T) {
 	config.CapAdd[0] = "CHANGED"
 	config.Volumes[0] = "CHANGED"
 
-	if defaults.WgConfig.CapAdd[0] == "CHANGED" || defaults.WgConfig.Volumes[0] == "CHANGED" {
+	if defaults.DefaultWgConfig().CapAdd[0] == "CHANGED" || defaults.DefaultWgConfig().Volumes[0] == "CHANGED" {
 		t.Fatal("BuildConfig mutates default wireguard slices")
 	}
 }

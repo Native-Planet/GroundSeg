@@ -1,0 +1,73 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "high_level_elegance": 78.0
+  },
+  "dimension_notes": {
+    "high_level_elegance": {
+      "evidence": [
+        "Action identity ownership is split between `goseg/protocol/actionids/actionids.go` (namespace/action tokens) and `goseg/protocol/contracts/protocol_contracts.go` (re-exported namespace/action aliases plus ContractID constants).",
+        "`goseg/protocol/contracts/protocol_contracts.go` keeps backward-compatible alias IDs (`UploadActionOpenEndpoint`, `UploadActionReset`) alongside canonical IDs, increasing public-surface ambiguity about which identifiers are authoritative.",
+        "Governance metadata and compatibility versioning are hardcoded inside per-family spec builders (`protocol_contracts.go`, `startram_contracts.go`) and partially mirrored in tests (`family_specs_test.go`), indicating policy is distributed rather than centrally owned."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "split_action_contract_authority",
+      "summary": "Protocol action identity has no single authority, with duplicated token/ID ownership across actionids and contracts layers.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines canonical namespace/action strings, while `protocol_contracts.go` redefines typed aliases from them and derives separate ContractID constants.",
+        "`protocol_contracts.go` carries compatibility aliases for contract IDs, so multiple symbols can represent the same contract, which blurs the stable public surface.",
+        "Conformance checks in `fixtures_test.go` validate bindings through `actions` symbols, not a single registry exported by contracts, reinforcing split ownership boundaries."
+      ],
+      "suggestion": "Create one canonical protocol-contract registry module that owns namespace/action tokens, contract IDs, and metadata; make `actionids` or contracts a thin compatibility adapter (deprecated path) and migrate callers/tests to the single registry API.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fragmented_contract_governance"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "distributed_governance_policy",
+      "summary": "Contract governance policy is embedded per file/family, producing scattered ownership and versioning rules.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "Both protocol and startram spec builders hardcode `OwnerModule`, `Stability`, and `SinceVersion` literals in each entry.",
+        "`family_specs_test.go` reconstructs governance expectations inside ad-hoc specs, coupling tests to repeated policy fields rather than a shared policy source.",
+        "`actions_test.go` verifies action/contract alignment locally, adding another point where contract policy consistency is validated indirectly instead of via one governing catalog contract."
+      ],
+      "suggestion": "Introduce a shared governance policy layer (e.g., central metadata provider + validation rules) consumed by all family spec builders and alignment tests, so ownership/version policy changes are made once and enforced uniformly.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_contract_governance"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol contract concerns are partitioned by historical package boundaries instead of a single domain authority.",
+      "Governance metadata lifecycle is managed as inline literals rather than a centralized policy abstraction."
+    ],
+    "likely_symptoms": [
+      "split_action_contract_authority",
+      "distributed_governance_policy"
+    ],
+    "possible_false_positives": []
+  }
+}

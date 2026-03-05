@@ -32,7 +32,7 @@ func TestSetReminderUnknownTypeDoesNotUpdateConfig(t *testing.T) {
 	resetRenewalSeamsForTest(t)
 
 	called := false
-	updateConfTypedForRenewal = func(_ ...config.ConfUpdateOption) error {
+	updateConfTypedForRenewal = func(_ ...config.ConfigUpdateOption) error {
 		called = true
 		return nil
 	}
@@ -52,7 +52,7 @@ func TestSetReminderAppliesCorrectConfigPatch(t *testing.T) {
 		seven *bool
 	}
 	captured := []patchResult{}
-	updateConfTypedForRenewal = func(opts ...config.ConfUpdateOption) error {
+	updateConfTypedForRenewal = func(opts ...config.ConfigUpdateOption) error {
 		if len(opts) != 1 {
 			t.Fatalf("expected exactly one config option, got %d", len(opts))
 		}

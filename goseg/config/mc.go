@@ -8,14 +8,14 @@ import (
 )
 
 var (
-	confForMc              = Conf
+	confForMc              = Config
 	getVersionChannelForMc = GetVersionChannel
 	pathForMc              = func() string { return filepath.Join(BasePath(), "settings", "mc.json") }
-) 
+)
 
 // write a hardcoded default conf to disk
 func CreateDefaultMcConf() error {
-	defaultConfig := defaults.McConfig
+	defaultConfig := defaults.DefaultMcConfig()
 	path := pathForMc()
 	rawConfig, err := json.MarshalIndent(defaultConfig, "", "    ")
 	if err != nil {

@@ -1,0 +1,59 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 95.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files are pure contract-definition modules with only constant and descriptor values, with no direct imports or runtime side effects visible in these units.",
+        "In `goseg/protocol/contracts/protocol_contracts.go`, each action contract (`ContractID`, `ActionNamespace`, `ActionToken`) is manually written as separate string literals instead of being derived through a shared constructor or compile-time binding.",
+        "The two files encode protocol surface contracts independently, which works today but increases coupling risk if protocol naming conventions evolve because consistency is enforced socially rather than structurally."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "No automatic validation/lint path is present in this layer to guarantee namespace-token-ID consistency, so cross-module contract consumers remain exposed to silent drift if IDs/tokens diverge.",
+      "sub_axes": {
+        "abstraction_leverage": 94.0,
+        "indirection_cost": 96.0,
+        "interface_honesty": 93.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_id_contract_alignment",
+      "summary": "Contract ID strings are manually duplicated and can drift from namespace/token policy without structural enforcement.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` stores `ContractID`, `ActionNamespace`, and `ActionToken` as separate literals per action (e.g., open-endpoint upload variants).",
+        "`startram_contracts.go` separately defines error contract metadata and message literals, reinforcing the same pattern of manual contract catalog wiring.",
+        "There is no local helper/validator in these files to derive IDs and metadata from a single canonical contract specification."
+      ],
+      "suggestion": "Introduce a shared contract specification helper in `goseg/protocol/contracts` that requires namespace + token as inputs and derives `ContractID` centrally, and add an internal invariant test in the package that fails on malformed/mismatched contract strings before consumers import these contracts.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_contract_surface_encoding"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Manual protocol contract string assembly without central validation",
+      "Contract surface definition drift risk where consistency is documentation-based rather than mechanically enforced"
+    ],
+    "likely_symptoms": [
+      "contract_naming_inconsistency",
+      "cross_boundary_drift_in_contract_ids"
+    ],
+    "possible_false_positives": [
+      "security: hardcoded secret in variable 'ActionToken' from prior existing findings appears to be a likely detector false-positive in this context because values are protocol token strings, not secrets"
+    ]
+  }
+}

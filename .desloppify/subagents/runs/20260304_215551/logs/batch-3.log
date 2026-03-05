@@ -1,0 +1,647 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_215551/results/batch-3.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Package Organization
+Batch dimensions: package_organization
+Batch rationale: file placement, directory boundaries, architectural layering
+
+Files assigned:
+- goseg/shipworkflow/doc.go
+- goseg/shipworkflow/newship.go
+- goseg/shipworkflow/newship_service.go
+- goseg/config/bootstrap.go
+- goseg/config/bootstrap_test.go
+- goseg/config/config.go
+- goseg/docker/orchestration/container_bridge.go
+- goseg/docker/orchestration/container_bridge_test.go
+- goseg/docker/orchestration/container_config.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+9a. For package_organization, ground scoring in objective structure signals from `holistic_context.structure` (root_files fan_in/fan_out roles, directory_profiles, coupling_matrix). Prefer thresholded evidence (for example: fan_in < 5 for root stragglers, import-affinity > 60%, directories > 10 files with mixed concerns).
+9b. Suggestions must include a staged reorg plan (target folders, move order, and import-update/validation commands).
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Package Organization",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Package Organization",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 72.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows very large flat packages: goseg/shipworkflow/ has 51 files, goseg/config/ has 41 files, and goseg/docker/orchestration/ has 34 files (all above the >10 mixed-concern risk threshold in the prompt).",
+        "goseg/config/bootstrap.go combines bootstrap orchestration (Initialize/initializeConfig), runtime-context wiring (initializePaths/initializeDebugMode), and path helpers (ConfigFilePath/SessionKeyPath) in one root package file, while goseg/config/config.go also exposes runtimecontext and startramstate wrappers from the same root package.",
+        "goseg/docker/orchestration/container_bridge.go is a large adapter-assembly file that builds container runtime templates across llama/netdata/minio; goseg/docker/orchestration/container_config.go separately maps container-type routing/builders in the same flat directory, indicating orchestration runtime assembly and config-routing concerns are co-located rather than subpackaged.",
+        "goseg/shipworkflow/newship_service.go mixes external action routing/JSON ingress handling (HandleNewShip) with validation helpers and async workflow dispatch, while goseg/shipworkflow/newship.go wires provisioning runtime dependencies; both are placed in a broad shipworkflow root package already containing many unrelated transition/runtime files."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "flat_package_overload_shipworkflow_config_orchestration",
+      "summary": "Core directories are overloaded flat packages, obscuring ownership boundaries and making navigation change-hostile.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go"
+      ],
+      "evidence": [
+        "directory_profiles report 51 files in goseg/shipworkflow/, 41 in goseg/config/, and 34 in goseg/docker/orchestration/ (all beyond the prompt’s >10 files mixed-concern threshold).",
+        "Assigned files demonstrate mixed responsibilities within each root package (workflow ingress + provisioning wiring; config bootstrap + runtime context facade; orchestration runtime assembly + container type routing).",
+        "The current package shapes force unrelated concerns to share one import namespace, increasing blast radius for refactors and making logical ownership non-obvious."
+      ],
+      "suggestion": "Staged reorg plan: (1) create focused subpackages `goseg/shipworkflow/newship/`, `goseg/config/bootstrap/`, and `goseg/docker/orchestration/runtimebridge/` plus `goseg/docker/orchestration/containerconfig/`; (2) move `newship.go` and `newship_service.go` first into `shipworkflow/newship` and export a narrow facade from `shipworkflow`; (3) move `bootstrap.go` path/debug/bootstrap routines into `config/bootstrap` while keeping stable getters in `config`; (4) move `container_bridge.go` runtime-template assembly into `runtimebridge` and `container_config.go` builder dispatch into `containerconfig`; (5) run import updates and validation with `goimports -w goseg/shipworkflow goseg/config goseg/docker/orchestration`, `go test ./goseg/shipworkflow/... ./goseg/config/... ./goseg/docker/orchestration/...`, then `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_domain_aggregation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_runtime_and_bootstrap_boundary_blur",
+      "summary": "The config root package conflates runtime context, bootstrap lifecycle, and state facades that should be separated by directory boundary.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "bootstrap.go handles initialization lifecycle (`Initialize`, `initializeConfig`), runtime env/path derivation (`initializePaths`, `initializeDebugMode`), and path utility functions (`ConfigFilePath`, `SessionKeyPath`).",
+        "config.go also acts as a broad facade for runtimecontext setters/getters and startramstate snapshots in the same root package, increasing conceptual coupling with bootstrap internals.",
+        "bootstrap_test.go must test runtime path/debug helpers directly from the root package, indicating boundary leakage from bootstrap/runtimecontext concerns into the config package surface."
+      ],
+      "suggestion": "Staged reorg plan: (1) introduce `goseg/config/bootstrap/` with `initialize.go` and `paths.go`, leaving `config` as stable API facade; (2) move runtime-context proxy methods from `config.go` into `goseg/config/runtimecontextfacade/` or call `runtimecontext` directly where possible; (3) update tests to target new package paths (`bootstrap` tests colocated under `goseg/config/bootstrap`); (4) update imports with `goimports -w goseg/config`, then validate with `go test ./goseg/config/...` and a full `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_domain_aggregation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "orchestration_bridge_and_builder_dispatch_cohabitation",
+      "summary": "Orchestration runtime-bridge assembly and container-type dispatch live side-by-side in one package, weakening layering clarity.",
+      "related_files": [
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go",
+        "goseg/docker/orchestration/container_bridge_test.go"
+      ],
+      "evidence": [
+        "container_bridge.go defines `dockerContainerRuntimeInputs` and multiple runtime-template/apply functions for llama/netdata/minio, which is adapter assembly logic.",
+        "container_config.go defines container-type builder registration and public config selection APIs (`ContainerConfigForType*`), which is routing/factory logic.",
+        "The smoke-only `container_bridge_test.go` indicates this boundary currently lacks dedicated package-level test seams, consistent with blurred organization in the same directory."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/docker/orchestration/runtimebridge/` for runtime input collection/template application and `goseg/docker/orchestration/containerconfig/` for type-dispatch builders; (2) move bridge file first and keep thin wrappers in old package for compatibility; (3) move config-dispatch file next and update callers to typed entrypoints; (4) replace smoke placeholder with targeted tests in new directories; (5) run `goimports -w goseg/docker/orchestration`, `go test ./goseg/docker/orchestration/...`, then `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_domain_aggregation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Long-lived growth in root-level domain packages without periodic subpackage extraction has accumulated mixed concerns in single directories.",
+      "Facade-first evolution keeps adding wrappers in top-level packages, masking ownership boundaries rather than enforcing them."
+    ],
+    "likely_symptoms": [
+      "flat_package_overload_shipworkflow_config_orchestration",
+      "config_runtime_and_bootstrap_boundary_blur",
+      "orchestration_bridge_and_builder_dispatch_cohabitation"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cbada-daaf-7d31-84e6-296e1ae7aac9
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Package Organization
+Batch dimensions: package_organization
+Batch rationale: file placement, directory boundaries, architectural layering
+
+Files assigned:
+- goseg/shipworkflow/doc.go
+- goseg/shipworkflow/newship.go
+- goseg/shipworkflow/newship_service.go
+- goseg/config/bootstrap.go
+- goseg/config/bootstrap_test.go
+- goseg/config/config.go
+- goseg/docker/orchestration/container_bridge.go
+- goseg/docker/orchestration/container_bridge_test.go
+- goseg/docker/orchestration/container_config.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+9a. For package_organization, ground scoring in objective structure signals from `holistic_context.structure` (root_files fan_in/fan_out roles, directory_profiles, coupling_matrix). Prefer thresholded evidence (for example: fan_in < 5 for root stragglers, import-affinity > 60%, directories > 10 files with mixed concerns).
+9b. Suggestions must include a staged reorg plan (target folders, move order, and import-update/validation commands).
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Package Organization",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+Reviewing the blind packet constraints first, then I’ll inspect only the assigned files for package organization signals and produce a JSON-only assessment with evidence-backed findings.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/shipworkflow/newship.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/shipworkflow/doc.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/shipworkflow/newship_service.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package shipworkflow
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"groundseg/config"
+	"groundseg/docker/events"
+	"groundseg/docker/network"
+	"groundseg/docker/orchestration"
+	"groundseg/shipcleanup"
+	"groundseg/shipcreator"
+	"groundseg/shipworkflow/provisioning"
+	"groundseg/startram"
+	"groundseg/structs"
+
+	"go.uber.org/zap"
+)
+
+ succeeded in 52ms:
+// Package shipworkflow runs ship lifecycle flows such as create, recovery,
+// registration, and upload import transitions.
+//
+// Shared polling and lifecycle utilities are provided by lifecyclewait and
+// lifecyclebridge; shipworkflow owns ship-domain sequencing and transition
+// events only.
+package shipworkflow
+ succeeded in 51ms:
+package shipworkflow
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/Native-Planet/perigee/libprg"
+
+	"groundseg/docker/events"
+	"groundseg/driveresolver"
+	"groundseg/structs"
+)
+
+var (
+	decodeMasterTicketFn = libprg.Keyfile
+	resolveDriveFn       = driveresolver.Resolve
+ succeeded in 52ms:
+Total output lines: 6319
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "ai_generated_debt",
+    "cross_module_architecture",
+    "error_consistency",
+    "test_strategy",
+    "package_organization",
+    "api_surface_coherence"
+  ],
+  "dimension_prompts": {
+    "ai_generated_debt": {
+      "description": "LLM-hallmark patterns: restating comments, defensive overengineering, boilerplate",
+      "look_for": [
+        "Restating comments that echo the code without adding insight (// increment counter above i++)",
+        "Nosy debug logging: entry/exit logs on every function, full object dumps to console",
+codex
+I’ve loaded the packet and first three files; next I’m inspecting the config and docker/orchestration files to verify concrete placement and boundary issues before scoring.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/bootstrap.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/docker/orchestration/container_config.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/config/config.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/docker/orchestration/container_bridge.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/bootstrap_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/orchestration/container_bridge_test.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package orchestration
+
+import (
+	"fmt"
+
+	"groundseg/transition"
+
+	"github.com/docker/docker/api/types/container"
+)
+
+type containerConfigBuilder func(dockerRuntime, string) (container.Config, container.HostConfig, error)
+
+var containerConfigBuilders = map[transition.ContainerType]containerConfigBuilder{
+	transition.ContainerTypeVere:      urbitContainerConfigBuilder,
+	transition.ContainerTypeNetdata:   netdataContainerConfigBuilder,
+	transition.ContainerTypeMinio:     minioContainerConfigBuilder,
+	transition.ContainerTypeMinioMC:   mcContainerConfigBuilder,
+	transition.ContainerTypeWireguard: wgContainerConfigBuilder,
+	transition.ContainerTypeLlamaAPI:  llamaApiContainerConfigBuilder,
+}
+ succeeded in 52ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"fmt"
+	"groundseg/config/runtimecontext"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	// global settings config (accessed via funcs)
+	globalConfig structs.SysConfig
+ succeeded in 50ms:
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestInitializePathsUsesEnvBasePath(t *testing.T) {
+	originalBasePath := BasePath()
+	t.Cleanup(func() {
+		SetBasePath(originalBasePath)
+	})
+
+	expectedBasePath := filepath.Join(t.TempDir(), "groundseg")
+	t.Setenv("GS_BASE_PATH", expectedBasePath)
+
+	initializePaths()
+
+	if got := BasePath(); got != expectedBasePath {
+ succeeded in 51ms:
+package orchestration
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"groundseg/internal/seams"
+	"groundseg/structs"
+
+	"groundseg/config"
+	"groundseg/docker/registry"
+	"groundseg/docker/orchestration/container"
+)
+
+type netdataRuntimeOps = container.NetdataRuntime
+
+type dockerContainerRuntimeInputs struct {
+	shipSettingsSnapshotFn      func() config.ShipSettings
+	startramSettingsSnapshotFn  func() config.StartramSettings
+ succeeded in 52ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"groundseg/config/runtimecontext"
+	"groundseg/config/startramstate"
+
+	"groundseg/structs"
+)
+
+type StartramConfigSnapshot = startramstate.Snapshot
+
+type StartramSettings struct {
+	EndpointURL          string
+	Pubkey               string
+	RemoteBackupPassword string
+	WgRegistered         bool
+	WgOn                 bool
+	Piers                []string
+ succeeded in 51ms:
+package orchestration
+
+import "testing"
+
+func TestCoverageSmokeContainerBridge(t *testing.T) {
+	if false {
+		t.Fatal("placeholder")
+	}
+}
+codex
+I have the file contents; now I’m extracting objective structure metrics from the blind packet (`directory_profiles`, `coupling_matrix`, root/fan data) so the package score is threshold-grounded.
+exec
+/opt/homebrew/bin/zsh -lc "jq '.holistic_context.structure.root_files | to_entries[] | select(.key|test(\"goseg/(config|shipworkflow|docker/orchestration)\"))' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "jq '.holistic_context.structure' .desloppify/review_packet_blind.json | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "jq '.holistic_context.structure.coupling_matrix | to_entries[] | select(.key|test(\"goseg/(config|shipworkflow|docker/orchestration)\"))' .desloppify/review_packet_blind.json | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "jq '.holistic_context.structure.directory_profiles | to_entries[] | select(.key|test(\""'^goseg/(config|shipworkflow|docker/orchestration)/?$"))'"' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg exited 5 in 51ms:
+jq: error (at .desloppify/review_packet_blind.json:6319): null (null) has no keys
+ succeeded in 51ms:
+jq: error (at .desloppify/review_packet_blind.json:6319): null (null) has no keys
+ succeeded in 51ms:
+{
+  "key": "goseg/config/",
+  "value": {
+    "file_count": 41,
+    "files": [
+      "bootstrap.go",
+      "bootstrap_test.go",
+      "config.go",
+      "config_events.go",
+      "config_events_test.go",
+      "config_merge.go",
+      "config_merge_test.go",
+      "config_state.go",
+      "config_state_test.go",
+      "config_test.go",
+      "config_update.go",
+      "config_update_executor.go",
+      "config_update_executor_test.go",
+      "config_update_options.go",
+      "config_update_options_test.go",
+ succeeded in 51ms:
+{
+  "directory_profiles": {
+    "goseg/accesspoint/": {
+      "file_count": 11,
+      "files": [
+        "accesspoint.go",
+        "accesspoint_entrypoint_test.go",
+        "accesspoint_test.go",
+        "config.go",
+        "config_test.go",
+        "lifecycle_coordinator.go",
+        "lifecycle_coordinator_test.go",
+        "parameters.go",
+        "parameters_test.go",
+        "router.go",
+        "router_test.go"
+      ],
+      "total_loc": 2728,
+      "avg_fan_in": 0.0,
+      "avg_fan_out": 0.0,
+codex
+{
+  "batch": "Package Organization",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 72.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows very large flat packages: goseg/shipworkflow/ has 51 files, goseg/config/ has 41 files, and goseg/docker/orchestration/ has 34 files (all above the >10 mixed-concern risk threshold in the prompt).",
+        "goseg/config/bootstrap.go combines bootstrap orchestration (Initialize/initializeConfig), runtime-context wiring (initializePaths/initializeDebugMode), and path helpers (ConfigFilePath/SessionKeyPath) in one root package file, while goseg/config/config.go also exposes runtimecontext and startramstate wrappers from the same root package.",
+        "goseg/docker/orchestration/container_bridge.go is a large adapter-assembly file that builds container runtime templates across llama/netdata/minio; goseg/docker/orchestration/container_config.go separately maps container-type routing/builders in the same flat directory, indicating orchestration runtime assembly and config-routing concerns are co-located rather than subpackaged.",
+        "goseg/shipworkflow/newship_service.go mixes external action routing/JSON ingress handling (HandleNewShip) with validation helpers and async workflow dispatch, while goseg/shipworkflow/newship.go wires provisioning runtime dependencies; both are placed in a broad shipworkflow root package already containing many unrelated transition/runtime files."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "flat_package_overload_shipworkflow_config_orchestration",
+      "summary": "Core directories are overloaded flat packages, obscuring ownership boundaries and making navigation change-hostile.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go"
+      ],
+      "evidence": [
+        "directory_profiles report 51 files in goseg/shipworkflow/, 41 in goseg/config/, and 34 in goseg/docker/orchestration/ (all beyond the prompt’s >10 files mixed-concern threshold).",
+        "Assigned files demonstrate mixed responsibilities within each root package (workflow ingress + provisioning wiring; config bootstrap + runtime context facade; orchestration runtime assembly + container type routing).",
+        "The current package shapes force unrelated concerns to share one import namespace, increasing blast radius for refactors and making logical ownership non-obvious."
+      ],
+      "suggestion": "Staged reorg plan: (1) create focused subpackages `goseg/shipworkflow/newship/`, `goseg/config/bootstrap/`, and `goseg/docker/orchestration/runtimebridge/` plus `goseg/docker/orchestration/containerconfig/`; (2) move `newship.go` and `newship_service.go` first into `shipworkflow/newship` and export a narrow facade from `shipworkflow`; (3) move `bootstrap.go` path/debug/bootstrap routines into `config/bootstrap` while keeping stable getters in `config`; (4) move `container_bridge.go` runtime-template assembly into `runtimebridge` and `container_config.go` builder dispatch into `containerconfig`; (5) run import updates and validation with `goimports -w goseg/shipworkflow goseg/config goseg/docker/orchestration`, `go test ./goseg/shipworkflow/... ./goseg/config/... ./goseg/docker/orchestration/...`, then `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_domain_aggregation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_runtime_and_bootstrap_boundary_blur",
+      "summary": "The config root package conflates runtime context, bootstrap lifecycle, and state facades that should be separated by directory boundary.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "bootstrap.go handles initialization lifecycle (`Initialize`, `initializeConfig`), runtime env/path derivation (`initializePaths`, `initializeDebugMode`), and path utility functions (`ConfigFilePath`, `SessionKeyPath`).",
+        "config.go also acts as a broad facade for runtimecontext setters/getters and startramstate snapshots in the same root package, increasing conceptual coupling with bootstrap internals.",
+        "bootstrap_test.go must test runtime path/debug helpers directly from the root package, indicating boundary leakage from bootstrap/runtimecontext concerns into the config package surface."
+      ],
+      "suggestion": "Staged reorg plan: (1) introduce `goseg/config/bootstrap/` with `initialize.go` and `paths.go`, leaving `config` as stable API facade; (2) move runtime-context proxy methods from `config.go` into `goseg/config/runtimecontextfacade/` or call `runtimecontext` directly where possible; (3) update tests to target new package paths (`bootstrap` tests colocated under `goseg/config/bootstrap`); (4) update imports with `goimports -w goseg/config`, then validate with `go test ./goseg/config/...` and a full `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_domain_aggregation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "orchestration_bridge_and_builder_dispatch_cohabitation",
+      "summary": "Orchestration runtime-bridge assembly and container-type dispatch live side-by-side in one package, weakening layering clarity.",
+      "related_files": [
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go",
+        "goseg/docker/orchestration/container_bridge_test.go"
+      ],
+      "evidence": [
+        "container_bridge.go defines `dockerContainerRuntimeInputs` and multiple runtime-template/apply functions for llama/netdata/minio, which is adapter assembly logic.",
+        "container_config.go defines container-type builder registration and public config selection APIs (`ContainerConfigForType*`), which is routing/factory logic.",
+        "The smoke-only `container_bridge_test.go` indicates this boundary currently lacks dedicated package-level test seams, consistent with blurred organization in the same directory."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/docker/orchestration/runtimebridge/` for runtime input collection/template application and `goseg/docker/orchestration/containerconfig/` for type-dispatch builders; (2) move bridge file first and keep thin wrappers in old package for compatibility; (3) move config-dispatch file next and update callers to typed entrypoints; (4) replace smoke placeholder with targeted tests in new directories; (5) run `goimports -w goseg/docker/orchestration`, `go test ./goseg/docker/orchestration/...`, then `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_domain_aggregation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Long-lived growth in root-level domain packages without periodic subpackage extraction has accumulated mixed concerns in single directories.",
+      "Facade-first evolution keeps adding wrappers in top-level packages, masking ownership boundaries rather than enforcing them."
+    ],
+    "likely_symptoms": [
+      "flat_package_overload_shipworkflow_config_orchestration",
+      "config_runtime_and_bootstrap_boundary_blur",
+      "orchestration_bridge_and_builder_dispatch_cohabitation"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+29,413
+

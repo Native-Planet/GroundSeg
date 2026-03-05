@@ -6,8 +6,8 @@ import (
 	routinesystem "groundseg/routines/system"
 )
 
-func StartBackupRoutines() {
-	routinesystem.StartBackupRoutines()
+func StartBackupRoutines() error {
+	return routinesystem.StartBackupRoutines()
 }
 
 func TlonBackupRemote() {
@@ -18,8 +18,8 @@ func TlonBackupLocal() {
 	routinesystem.TlonBackupLocal()
 }
 
-func StartChopRoutines() {
-	routinesystem.StartChopRoutines()
+func StartChopRoutines() error {
+	return routinesystem.StartChopRoutines()
 }
 
 func StartChopRoutinesWithContext(ctx context.Context) error {

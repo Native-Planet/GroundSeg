@@ -3,8 +3,9 @@ package system
 import (
 	"fmt"
 
-	"go.uber.org/zap"
 	"groundseg/structs"
+
+	"go.uber.org/zap"
 )
 
 type wifiRadioService interface {
@@ -34,7 +35,7 @@ func (service nmcliWiFiRadioService) PrimaryDevice() (string, error) {
 
 func (service nmcliWiFiRadioService) RefreshInfo(device string) {
 	info := structs.SystemWifi{Status: false}
-	wifiEnabled, err := service.runtime.ifCheck()
+	wifiEnabled, err := service.runtime.isWiFiRadioEnabled()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("couldn't read wifi radio state: %v", err))
 		setWifiInfo(info, service.state)

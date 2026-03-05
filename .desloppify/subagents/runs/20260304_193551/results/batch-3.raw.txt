@@ -1,0 +1,113 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 76.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/shipworkflow/lifecycle.go compares timeout errors with `err == context.DeadlineExceeded` even though the injected poller interface allows wrapped timeout errors.",
+        "goseg/config/bootstrap.go uses package-level `initOnce` + `initErr`, so any transient initialization I/O failure is memoized and returned forever with no retry pathway.",
+        "Protocol validator tests in goseg/protocol/conformance/fixtures_test.go and goseg/protocol/contracts/family_specs_test.go assert generic non-nil or substring-based errors, while system/shipworkflow tests assert stable wrapping semantics with `errors.Is`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "wrapped_deadline_not_classified",
+      "summary": "Timeout classification in ship lifecycle uses direct equality, so wrapped deadline errors can follow the wrong failure path.",
+      "related_files": [
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go",
+        "goseg/system/disk_health_test.go"
+      ],
+      "evidence": [
+        "goseg/shipworkflow/lifecycle.go:62 checks `if err == context.DeadlineExceeded` on an error returned by injected `pollerFunc`.",
+        "The same function already wraps operational errors with `%w` (line 37), showing wrapped errors are expected in this flow.",
+        "Nearby tests in other modules use `errors.Is` for contract checks (goseg/system/disk_health_test.go:22,40; goseg/shipworkflow/lifecycle_test.go:19,29,63), creating inconsistent timeout/error matching behavior."
+      ],
+      "suggestion": "Change deadline handling to `errors.Is(err, context.DeadlineExceeded)` (or a dedicated timeout sentinel), and add a test where poller returns a wrapped deadline error to lock behavior.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_contract_assertion_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "init_failure_memoized_forever",
+      "summary": "Config bootstrap memoizes first initialization error indefinitely, making transient failures permanent and failure modes inconsistent with recoverable I/O operations.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/bootstrap_test.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "goseg/config/bootstrap.go:41-46 stores first `initializeConfig()` result in package-level `initErr` guarded by `sync.Once`.",
+        "initializeConfig performs multiple external I/O steps (`openOrCreateConfigFile`, `persistConfig`, `ensureSessionKeyExists`, `UpdateConfigTyped`) where transient errors are possible (lines 59-95).",
+        "No bootstrap test covers retry-after-failure semantics; current tests in goseg/config/bootstrap_test.go only cover environment and runtime-mode helpers."
+      ],
+      "suggestion": "Split permanent validation errors from transient I/O errors and allow retry on transient failures (for example via guarded state machine or resettable initializer used by startup orchestration), then add tests for first-call failure followed by successful retry.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "error_lifecycle_state_coupling"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "protocol_error_contracts_not_type_checked",
+      "summary": "Protocol conformance tests validate failure presence/messages but not stable error identity, leaving validator error contracts inconsistent and fragile.",
+      "related_files": [
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/system/disk_health_test.go"
+      ],
+      "evidence": [
+        "goseg/protocol/conformance/fixtures_test.go:35-37 only checks `err != nil` for unknown action fixture errors.",
+        "goseg/protocol/contracts/family_specs_test.go:71 and 95 rely on `strings.Contains(err.Error(), ...)` message matching.",
+        "By contrast, goseg/system/disk_health_test.go asserts wrapping semantics with `errors.Is`, indicating a stronger and more stable error contract style elsewhere."
+      ],
+      "suggestion": "Introduce exported sentinel/type errors for protocol validation failures (e.g., unknown action, unexpected ID, unknown deprecation target) and migrate tests to `errors.Is`/`errors.As` assertions instead of substring checks.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_assertion_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "disk_storage_error_paths_untested",
+      "summary": "Disk storage test coverage includes a placeholder smoke test, so error propagation contracts are not consistently enforced across disk entry points.",
+      "related_files": [
+        "goseg/system/disk_storage_test.go",
+        "goseg/system/disk_shims_test.go",
+        "goseg/system/disk_health_test.go"
+      ],
+      "evidence": [
+        "goseg/system/disk_storage_test.go:5-8 contains only an unreachable placeholder (`if false`) and no behavioral assertions.",
+        "Other disk shim tests (goseg/system/disk_health_test.go) explicitly verify wrapped command/stat error propagation, demonstrating stronger expectations in sibling tests.",
+        "The mismatch means some disk wrappers may regress in error shape/context without failing tests."
+      ],
+      "suggestion": "Replace the placeholder with table-driven tests for key disk-storage wrappers and assert error wrapping/identity consistently (including command failures, parse failures, and filesystem failures).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_assertion_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error contract standards are not codified uniformly: some modules enforce `errors.Is` contracts, others rely on message substrings or non-nil checks.",
+      "Initialization lifecycle state is tightly coupled to one-shot global state, conflating transient and permanent failures."
+    ],
+    "likely_symptoms": [
+      "wrapped_deadline_not_classified",
+      "protocol_error_contracts_not_type_checked",
+      "disk_storage_error_paths_untested"
+    ],
+    "possible_false_positives": []
+  }
+}

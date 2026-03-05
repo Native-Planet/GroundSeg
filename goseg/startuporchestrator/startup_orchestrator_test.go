@@ -11,69 +11,38 @@ import (
 	"time"
 
 	"groundseg/config"
+	"groundseg/internal/testruntime"
 	"groundseg/structs"
 )
 
 func withStartupRuntimeDefaults(overrides ...func(*StartupRuntime)) StartupRuntime {
-	runtime := defaultStartupRuntime()
-	for _, apply := range overrides {
-		apply(&runtime)
-	}
-	return runtime
+	return testruntime.Apply(defaultStartupRuntime(), overrides...)
 }
 
 type startBackgroundServicesRuntimeOption func(*startBackgroundServicesRuntime)
 
 func withStartBackgroundServicesRuntime(overrides ...startBackgroundServicesRuntimeOption) startBackgroundServicesRuntime {
-	runtime := startBackgroundServicesRuntimeWithDefaults(logstreamRuntimeFromContext(), startBackgroundServicesRuntime{})
+	runtime := startBackgroundServicesRuntimeWithDefaults(nil, startBackgroundServicesRuntime{})
 	for _, apply := range overrides {
+		if apply == nil {
+			continue
+		}
 		apply(&runtime)
 	}
 	return runtime
 }
 
+func withStartBackgroundServiceSpecs(specs ...backgroundServiceSpec) startBackgroundServicesRuntimeOption {
+	return func(runtime *startBackgroundServicesRuntime) {
+		runtime.overrideServiceSpecsFn = func(startramWgRegistered bool) []backgroundServiceSpec {
+			return specs
+		}
+	}
+}
+
 func withStartBackgroundServiceCallback(name startupBackgroundServiceName, callback func(context.Context) error) startBackgroundServicesRuntimeOption {
 	return func(runtime *startBackgroundServicesRuntime) {
-		switch name {
-		case startBackgroundServiceVersion:
-			runtime.StartVersionFn = callback
-		case startBackgroundServiceDocker:
-			runtime.StartDockerFn = callback
-		case startBackgroundServiceLeak:
-			runtime.StartLeakFn = callback
-		case startBackgroundServiceSysLogStreamer:
-			runtime.StartSysLogStreamerFn = callback
-		case startBackgroundServiceOldLogsCleaner:
-			runtime.StartOldLogsCleanerFn = callback
-		case startBackgroundServiceDiskUsageWarning:
-			runtime.StartDiskUsageWarningFn = callback
-		case startBackgroundServiceSmartDiskCheck:
-			runtime.StartSmartDiskCheckFn = callback
-		case startBackgroundServicePackSchedule:
-			runtime.StartPackScheduleFn = callback
-		case startBackgroundServiceChopRoutines:
-			runtime.StartChopRoutinesFn = callback
-		case startBackgroundServiceBackupRoutines:
-			runtime.StartBackupRoutinesFn = callback
-		case startBackgroundServiceUrbitTransition:
-			runtime.StartUrbitTransitionFn = callback
-		case startBackgroundServiceSystemTransition:
-			runtime.StartSystemTransitionFn = callback
-		case startBackgroundServiceNewShipTransition:
-			runtime.StartNewShipTransitionFn = callback
-		case startBackgroundServiceImportShipTransition:
-			runtime.StartImportShipTransitionFn = callback
-		case startBackgroundServiceRectify:
-			runtime.StartRectifyFn = callback
-		case startBackgroundServiceStartramSync:
-			runtime.StartStartramSyncFn = callback
-		case startBackgroundServiceStartramRenewal:
-			runtime.StartStartramRenewalFn = callback
-		case startBackgroundServiceDockerLogStreamer:
-			runtime.StartDockerLogStreamerFn = callback
-		case startBackgroundServiceDockerLogConnRemover:
-			runtime.StartDockerLogConnRemoverFn = callback
-		}
+		runtime.setServiceCallback(name, callback)
 	}
 }
 
@@ -83,7 +52,7 @@ func unsetStartupInitConfig(runtime *StartupRuntime) {
 
 func TestRunStartupSubsystemsSkipsOptionalFailures(t *testing.T) {
 	called := false
-	err := runStartupSubsystems([]startupSubsystemStep{
+	err := executeStartupSubsystems([]startupSubsystemStep{
 		{
 			name:   "optional failure",
 			policy: startupSubsystemOptional,
@@ -102,7 +71,7 @@ func TestRunStartupSubsystemsSkipsOptionalFailures(t *testing.T) {
 }
 
 func TestRunStartupSubsystemsReturnsRequiredFailure(t *testing.T) {
-	err := runStartupSubsystems([]startupSubsystemStep{
+	err := executeStartupSubsystems([]startupSubsystemStep{
 		{
 			name:   "required failure",
 			policy: startupSubsystemRequired,
@@ -121,7 +90,7 @@ func TestRunStartupSubsystemsReturnsRequiredFailure(t *testing.T) {
 
 func TestRunStartupSubsystemSkipsDisabledSubsystem(t *testing.T) {
 	called := false
-	err := runStartupSubsystem(startupSubsystemStep{
+	err := executeStartupSubsystem(startupSubsystemStep{
 		name:   "disabled subsystem",
 		policy: startupSubsystemDisabled,
 		initFn: func() error {
@@ -137,6 +106,53 @@ func TestRunStartupSubsystemSkipsDisabledSubsystem(t *testing.T) {
 	}
 }
 
+func startupInitStepByName(t *testing.T, runtime startupInitRuntime, name string) startupSubsystemStep {
+	t.Helper()
+	for _, step := range runtime.initSubsystems() {
+		if step.name == name {
+			return step
+		}
+	}
+	t.Fatalf("startup init step %q not found", name)
+	return startupSubsystemStep{}
+}
+
+func TestRunStartupSubsystemRequiresConfigureSwapCallbackWhenSwapConfigured(t *testing.T) {
+	runtime := startupInitRuntime{
+		startupInitStorageRuntime: startupInitStorageRuntime{
+			SwapSettingsFn: func() config.SwapSettings {
+				return config.SwapSettings{SwapFile: "/swapfile", SwapVal: 2}
+			},
+			ConfigureSwapFn: nil,
+		},
+	}
+
+	step := startupInitStepByName(t, runtime, "configure swap")
+	err := executeStartupSubsystem(step)
+	if err == nil {
+		t.Fatal("expected configure swap to fail when callback is missing and swap is configured")
+	}
+	if !strings.Contains(err.Error(), "configure swap callback is not configured") {
+		t.Fatalf("unexpected configure swap error: %v", err)
+	}
+}
+
+func TestRunStartupSubsystemSkipsConfigureSwapWhenSwapNotConfigured(t *testing.T) {
+	runtime := startupInitRuntime{
+		startupInitStorageRuntime: startupInitStorageRuntime{
+			SwapSettingsFn: func() config.SwapSettings {
+				return config.SwapSettings{}
+			},
+			ConfigureSwapFn: nil,
+		},
+	}
+
+	step := startupInitStepByName(t, runtime, "configure swap")
+	if err := executeStartupSubsystem(step); err != nil {
+		t.Fatalf("expected configure swap to be skipped when swap settings are empty: %v", err)
+	}
+}
+
 func TestBootstrapRequiresStartupRuntimeCallbacks(t *testing.T) {
 	runtime := withStartupRuntimeDefaults(func(startupRuntime *StartupRuntime) {
 		// initializeConfig intentionally omitted
@@ -147,7 +163,7 @@ func TestBootstrapRequiresStartupRuntimeCallbacks(t *testing.T) {
 	}
 	err := Bootstrap(context.Background(), StartupOptions{
 		HTTPPort: 8080,
-		StartServer: func(context.Context, int) error {
+		StartServer: func(context.Context, int, int) error {
 			return nil
 		},
 		StartupRuntime: runtime,
@@ -175,7 +191,7 @@ func TestStartBackgroundServicesWithRuntimeCallsExpectedServices(t *testing.T) {
 	services, err := startBackgroundServicesWithRuntime(context.Background(), true, func(_ context.Context) error {
 		c2cCalled <- struct{}{}
 		return nil
-	}, runtime)
+	}, runtime, nil)
 	if err != nil {
 		t.Fatalf("unexpected startup runtime callback validation error: %v", err)
 	}
@@ -208,6 +224,86 @@ func TestStartBackgroundServicesWithRuntimeCallsExpectedServices(t *testing.T) {
 	}
 }
 
+func TestStartBackgroundServicesWithRuntimeKeepsStartingAfterFailFastNil(t *testing.T) {
+	failfastStarted := make(chan struct{}, 1)
+	normalStarted := make(chan struct{}, 1)
+	runtime := withStartBackgroundServicesRuntime(
+		withStartBackgroundServiceSpecs(
+			backgroundServiceSpec{
+				name:     "failfast-success",
+				failFast: true,
+				startFn: func(context.Context) error {
+					failfastStarted <- struct{}{}
+					return nil
+				},
+			},
+			backgroundServiceSpec{
+				name:     "non-failfast",
+				failFast: false,
+				startFn: func(context.Context) error {
+					normalStarted <- struct{}{}
+					return nil
+				},
+			},
+		),
+	)
+
+	services, err := startBackgroundServicesWithRuntime(context.Background(), false, nil, runtime, nil)
+	if err != nil {
+		t.Fatalf("unexpected startup background services error: %v", err)
+	}
+	defer services.stop()
+
+	select {
+	case <-failfastStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for fail-fast service to start")
+	}
+	select {
+	case <-normalStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for normal service to start")
+	}
+}
+
+func TestStartBackgroundServicesHealthDetectsFailFastErrors(t *testing.T) {
+	failfastErr := errors.New("failfast startup fault")
+	failfastStarted := make(chan struct{}, 1)
+	runtime := withStartBackgroundServicesRuntime(
+		withStartBackgroundServiceSpecs(
+			backgroundServiceSpec{
+				name:     "slow-failfast",
+				failFast: true,
+				startFn: func(context.Context) error {
+					failfastStarted <- struct{}{}
+					time.Sleep(20 * time.Millisecond)
+					return failfastErr
+				},
+			},
+		),
+	)
+
+	services, err := startBackgroundServicesWithRuntime(context.Background(), false, nil, runtime, nil)
+	if err != nil {
+		t.Fatalf("unexpected startup background services error: %v", err)
+	}
+	defer services.stop()
+
+	select {
+	case <-failfastStarted:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for fail-fast service to start")
+	}
+
+	healthErr := services.health(context.Background())
+	if healthErr == nil {
+		t.Fatal("expected delayed fail-fast error to be detected by health")
+	}
+	if !strings.Contains(healthErr.Error(), "failfast startup fault") {
+		t.Fatalf("unexpected fail-fast error: %v", healthErr)
+	}
+}
+
 func TestStartBackgroundServicesSkipsStartramSyncWhenNotRegistered(t *testing.T) {
 	callCount := 0
 	runtime := withStartBackgroundServicesRuntime(
@@ -216,7 +312,7 @@ func TestStartBackgroundServicesSkipsStartramSyncWhenNotRegistered(t *testing.T)
 			return errors.New("unexpected sync call")
 		}),
 	)
-	services, err := startBackgroundServicesWithRuntime(context.Background(), false, nil, runtime)
+	services, err := startBackgroundServicesWithRuntime(context.Background(), false, nil, runtime, nil)
 	if err != nil {
 		t.Fatalf("unexpected startup runtime callback validation error: %v", err)
 	}
@@ -247,7 +343,7 @@ func TestStartBackgroundServicesRuntimeValidation(t *testing.T) {
 }
 
 func TestStartBackgroundServicesDefaultsApply(t *testing.T) {
-	_, err := startBackgroundServicesWithRuntime(context.Background(), true, nil, startBackgroundServicesRuntime{})
+	_, err := startBackgroundServicesWithRuntime(context.Background(), true, nil, startBackgroundServicesRuntime{}, nil)
 	if err != nil {
 		t.Fatalf("expected defaults to make empty background runtime valid, got %v", err)
 	}

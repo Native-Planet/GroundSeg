@@ -9,12 +9,20 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	executeClickCommandForRestore = runtime.ExecuteCommandWithSuccess
-	restoreAgentFn                = restoreAgent
-)
+type RestoreRuntime interface {
+	ExecuteCommandWithSuccess(string, string, string, string, string, string, func(string)) (string, error)
+	RestoreAgent(string, string) error
+}
 
-func restoreAgent(patp, agent string) error {
+type restoreRuntime struct {
+	executeCommandForRestore func(string, string, string, string, string, string, func(string)) (string, error)
+}
+
+func (runtime restoreRuntime) ExecuteCommandWithSuccess(patp, file, hoon, sourcePath, successToken, operation string, clearLusCode func(string)) (string, error) {
+	return runtime.executeCommandForRestore(patp, file, hoon, sourcePath, successToken, operation, clearLusCode)
+}
+
+func (runtime restoreRuntime) RestoreAgent(patp, agent string) error {
 	file := fmt.Sprintf("restore-%s", agent)
 	hoon := strings.Join([]string{
 		"=/", "m", "(strand ,vase)",
@@ -28,12 +36,41 @@ func restoreAgent(patp, agent string) error {
 		";<", "~", "bind:m", "(take-poke-ack /pokeas)",
 		"(pure:m !>('success'))",
 	}, " ")
-	_, err := executeClickCommandForRestore(patp, file, hoon, "", "success", fmt.Sprintf("Click %s", file), nil)
+	_, err := runtime.executeCommandForRestore(patp, file, hoon, "", "success", fmt.Sprintf("Click %s", file), nil)
 	if err != nil {
 		return err
 	}
 	zap.L().Info(fmt.Sprintf("Click %s restored agent %s on %s", file, agent, patp))
 	return nil
+}
+
+func defaultRestoreRuntime() restoreRuntime {
+	return restoreRuntime{
+		executeCommandForRestore: runtime.ExecuteCommandWithSuccess,
+	}
+}
+
+var runtimeRestore RestoreRuntime = defaultRestoreRuntime()
+
+// SetRuntime replaces the internal restore runtime used by restore helpers.
+func SetRuntime(handler RestoreRuntime) {
+	if handler == nil {
+		runtimeRestore = defaultRestoreRuntime()
+		return
+	}
+	runtimeRestore = handler
+}
+
+func resetRestoreRuntime() {
+	SetRuntime(nil)
+}
+
+func getRestoreRuntime() RestoreRuntime {
+	return runtimeRestore
+}
+
+func restoreAgent(patp, agent string) error {
+	return runtimeRestore.RestoreAgent(patp, agent)
 }
 
 func RestoreAgent(patp, agent string) error {
@@ -46,12 +83,12 @@ func RestoreTlon(patp string) error {
 		name string
 		err  error
 	}{
-		{"activity", restoreAgentFn(patp, "activity")},
-		{"channels", restoreAgentFn(patp, "channels")},
-		{"channels-server", restoreAgentFn(patp, "channels-server")},
-		{"groups", restoreAgentFn(patp, "groups")},
-		{"profile", restoreAgentFn(patp, "profile")},
-		{"chat", restoreAgentFn(patp, "chat")},
+		{"activity", restoreAgent(patp, "activity")},
+		{"channels", restoreAgent(patp, "channels")},
+		{"channels-server", restoreAgent(patp, "channels-server")},
+		{"groups", restoreAgent(patp, "groups")},
+		{"profile", restoreAgent(patp, "profile")},
+		{"chat", restoreAgent(patp, "chat")},
 	}
 
 	for _, component := range components {

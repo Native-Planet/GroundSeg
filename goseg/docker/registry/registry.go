@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -19,6 +20,23 @@ type imageMetadata struct {
 	repo string
 	tag  string
 	hash string
+}
+
+// ImageDescriptor is the canonical image metadata contract shared across
+// registry, lifecycle, and orchestration runtime seams.
+type ImageDescriptor struct {
+	Type string
+	Repo string
+	Tag  string
+	Hash string
+}
+
+func (descriptor ImageDescriptor) Reference() string {
+	return fmt.Sprintf("%s:%s@sha256:%s", descriptor.Repo, descriptor.Tag, descriptor.Hash)
+}
+
+func (descriptor ImageDescriptor) DigestReference() string {
+	return fmt.Sprintf("%s@sha256:%s", descriptor.Repo, descriptor.Hash)
 }
 
 type containerMetadataResolver struct {
@@ -74,21 +92,21 @@ func SetClientFactory(factory func(...client.Opt) (*client.Client, error)) {
 }
 
 // GetLatestContainerInfo returns image metadata for a specific container service.
-func GetLatestContainerInfo(containerType string) (map[string]string, error) {
+func GetLatestContainerInfo(containerType string) (ImageDescriptor, error) {
 	resolvedType := transition.ContainerType(containerType)
 	resolver, ok := containerMetadataResolvers[resolvedType]
 	if !ok {
-		return nil, fmt.Errorf("unsupported container type %q", containerType)
+		return ImageDescriptor{}, fmt.Errorf("unsupported container type %q", containerType)
 	}
 	metadata, err := resolveContainerImageMetadata(resolvedType, resolver)
 	if err != nil {
-		return nil, err
+		return ImageDescriptor{}, err
 	}
-	return map[string]string{
-		"tag":  metadata.tag,
-		"hash": metadata.hash,
-		"repo": metadata.repo,
-		"type": containerType,
+	return ImageDescriptor{
+		Type: containerType,
+		Repo: metadata.repo,
+		Tag:  metadata.tag,
+		Hash: metadata.hash,
 	}, nil
 }
 
@@ -128,13 +146,24 @@ func resolveContainerImageMetadata(containerType transition.ContainerType, resol
 }
 
 // PullImageIfNotExist downloads an image if it is not already available locally.
-func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
+func PullImageIfNotExist(desiredImage string, imageInfo ImageDescriptor) (pulled bool, err error) {
 	ctx := context.Background()
 	cli, err := dockerClientNew()
 	if err != nil {
 		return false, err
 	}
-	defer cli.Close()
+	defer func() {
+		closeErr := cli.Close()
+		if closeErr == nil {
+			return
+		}
+		closeErr = fmt.Errorf("close docker client during image pull: %w", closeErr)
+		if err == nil {
+			err = closeErr
+			return
+		}
+		err = errors.Join(err, closeErr)
+	}()
 
 	images, err := cli.ImageList(ctx, image.ListOptions{})
 	if err != nil {
@@ -143,12 +172,12 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 
 	for _, img := range images {
 		for _, digest := range img.RepoDigests {
-			if digest == fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]) {
+			if digest == imageInfo.DigestReference() {
 				return true, nil
 			}
 		}
 	}
-	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), image.PullOptions{})
+	resp, err := cli.ImagePull(ctx, imageInfo.DigestReference(), image.PullOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -164,5 +193,5 @@ func LatestContainerImage(containerType string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"]), nil
+	return containerInfo.Reference(), nil
 }

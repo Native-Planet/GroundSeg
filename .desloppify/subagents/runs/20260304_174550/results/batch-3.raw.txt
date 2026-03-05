@@ -1,0 +1,96 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 76.8
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows `goseg/system/` at 39 files, while related wifi code is also split into `goseg/system/wifi/service/` and `goseg/system/wifi/transport/`, indicating mixed flat+nested ownership.",
+        "`goseg/system/wifi_c2c_flow_test.go` is still in package `system` and exercises C2C wifi flow seams directly, while protocol governance metadata in `goseg/protocol/contracts/protocol_contracts.go` assigns C2C ownership to `system/wifi`.",
+        "`README.md` backend quality-gate commands run targeted integration tests for `./broadcast ./handler ./routines ./ws`, but do not include `./protocol/...` or `./system/wifi/...` despite governance-sensitive contract files (`goseg/protocol/contracts/*.go`) and wifi contract-coupled flow tests."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "wifi_ownership_boundary_split",
+      "summary": "WiFi C2C ownership is split between flat `system` files and nested `system/wifi` packages.",
+      "related_files": [
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` declares C2C governance owner as `system/wifi` for `C2CConnectAction`.",
+        "`wifi_c2c_flow_test.go` remains in `package system` and validates C2C flow behavior via root-level seams (`newC2CModeFlowWithDependencies`, `c2cServiceDeps`).",
+        "README points to `goseg/system/wifi/README.md` as policy documentation, but runtime/test placement still straddles root `system` and nested `system/wifi`."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/system/wifi/flow/` and move C2C flow runtime + tests from root `goseg/system/wifi_*` files that belong to C2C flow into that subtree; (2) leave thin compatibility shims in `goseg/system/` only for external callers, then remove them after callsites migrate; (3) keep protocol owner metadata aligned with final package path (`system/wifi/...`) and update README governance map to exact target folders. Validation/import update commands: `cd goseg && gofmt -w system/wifi/**/*.go system/*.go && go test ./system/... ./protocol/... && go test -tags=integration ./system/...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "wifi_boundary_governance_drift"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "quality_gate_scope_misses_contract_owners",
+      "summary": "Backend quality-gate scope in README does not map to contract-owning package boundaries.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "README backend gate runs `go test ./...` plus integration subset `./broadcast ./handler ./routines ./ws`.",
+        "Governance-critical contract definitions are in `goseg/protocol/contracts/*` with compatibility metadata and ownership fields.",
+        "C2C contract behavior is validated by wifi flow tests under `goseg/system/`, but those ownership boundaries are not reflected in the explicit integration subset."
+      ],
+      "suggestion": "Staged reorg plan for quality-gate/package alignment: (1) define package-boundary test tiers in README by ownership folder (`protocol/contracts`, `system/wifi`, `startram`, `uploadsvc`); (2) add a second explicit command block that targets those folders before broad integration suites; (3) keep move-order docs synchronized with folder moves from the wifi boundary refactor. Validation commands: `cd goseg && go test ./protocol/contracts ./system/wifi/... ./startram/... ./uploadsvc/...` then existing integration command.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wifi_boundary_governance_drift"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "protocol_action_identity_scattered",
+      "summary": "Protocol action identity is split across separate packages, increasing cross-file change churn.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines namespace/action literals, while `protocol_contracts.go` rebinds them into typed aliases and contract IDs.",
+        "A single action change (e.g., C2C connect) requires coordinated edits across action token constants, contract governance entries, and downstream flow tests (`wifi_c2c_flow_test.go`).",
+        "This split is manageable at small scale but creates package-level edit scatter for contract-governed actions."
+      ],
+      "suggestion": "Staged reorg plan: (1) introduce `goseg/protocol/contracts/actionspec/` (or `goseg/protocol/contracts/actiondefs/`) as the single source for action namespace+verb+contract metadata tuples; (2) generate/derive `actionids` constants and contract catalog entries from that source in move order: define tuples first, adapt `protocol_contracts.go`, then make `actionids.go` thin re-export or remove it; (3) update imports and run validations. Commands: `cd goseg && go test ./protocol/actions ./protocol/contracts ./system/...` and `rg \"NamespaceC2C|C2CConnect|UploadOpenEndpoint\" goseg/protocol goseg/system` to verify callsite updates.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_identity_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Ownership policy (contracts/docs) and physical package layout evolved independently, leaving boundary drift.",
+      "Governance metadata is centralized, but enforcement/test scoping remains organized by legacy directory habits."
+    ],
+    "likely_symptoms": [
+      "wifi_ownership_boundary_split",
+      "quality_gate_scope_misses_contract_owners",
+      "protocol_action_identity_scattered"
+    ],
+    "possible_false_positives": [
+      "protocol_action_identity_scattered may be an intentional separation if `actionids` is a stable public API boundary for other modules."
+    ]
+  }
+}

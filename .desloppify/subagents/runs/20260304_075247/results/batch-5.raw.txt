@@ -1,0 +1,75 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 78.4
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "startup background services are checked with a non-blocking read immediately after spawn, so a fail-fast background service that fails slightly later is not treated as a startup failure",
+        "I/O and lifecycle boundaries mix error strategies: some paths return/join close errors with context, while others only log close failures or silently ignore them",
+        "response body and embedded-file close operations are handled inconsistently across modules, which weakens error visibility and debugging consistency"
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "bg_service_failfast_race",
+      "summary": "Startup may proceed while a fail-fast background service fails after bootstrap returns",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`startBackgroundServicesWithRuntime` starts each service and immediately does a `select` with a `default` case for fail-fast services, so only already-ready failures are captured",
+        "The runtime startup task proceeds to container startup and health wiring after this immediate check, with no synchronization that fail-fast services actually reached running state",
+        "`main.go` treats server/bootstrap as the hard startup boundary; background fail-fast failures that occur after this check can be masked until runtime logs/health path sees them"
+      ],
+      "suggestion": "Replace the immediate poll with a deterministic startup error barrier for fail-fast services (for example, wait for either first error, first ready signal, or context timeout per service) and fail the bootstrap path consistently when startup contract violations occur.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "startup_error_visibility_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "close_error_policy_drift",
+      "summary": "Close/error handling policy differs across runtime boundaries, dropping cleanup failures in some places",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`importer.combineChunks` uses `resource.JoinCloseError` to ensure both copy/close failures are propagated as part of the returned error",
+        "`main.go` fallback file handler calls `resource.JoinCloseError` and only logs if non-nil, returning nil for the request path",
+        "`subsystem_health.go` calls `resp.Body.Close()` without checking close error, while other modules propagate close lifecycle errors explicitly",
+        "`wifi_runtime_methods.go` explicitly captures close errors in a deferred `JoinCloseError`-based return flow"
+      ],
+      "suggestion": "Adopt a single close/error policy for I/O boundaries: either propagate close failures (with context) or explicitly classify them as non-fatal with an explicit decision recorded in the return contract, then apply that policy consistently across these modules via shared helper(s).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "close_error_boundary_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Asymmetric startup contracts between orchestrator and runtime entrypoints around asynchronous failure propagation",
+      "No shared module-level policy for how cleanup failures (especially close errors) are categorized and returned"
+    ],
+    "likely_symptoms": [
+      "bg_service_failfast_race",
+      "close_error_policy_drift"
+    ],
+    "possible_false_positives": [
+      "Some ignored close errors may be intentionally treated as non-fatal in non-critical request/monitoring paths; verify intent before converting all to hard failures"
+    ]
+  }
+}

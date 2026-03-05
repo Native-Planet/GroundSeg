@@ -1,0 +1,377 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 47.0,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 68.0,
+        "Indirection Cost": 74.0,
+        "Interface Honesty": 71.0
+      }
+    },
+    "api_surface_coherence": 59.4,
+    "naming_quality": 61.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules use very large callback-bag runtimes as primary boundaries (e.g., `RuntimeContainerOps`/`RuntimeUrbitOps`/`RuntimeSnapshotOps` in `goseg/docker/orchestration/runtime_ops.go`, `workflowRuntime` in `goseg/shipworkflow/operations_runtime.go`, `startBackgroundServicesRuntime` in `goseg/startuporchestrator/startup_orchestrator.go`).",
+        "`importer/importer.go` layers additional scope runtimes (`importerRuntime`, `importerInitRuntime`, `importerWorkflowRuntime`, `importerPublishRuntime`) plus many resolver/validator wrappers that mostly route to the same underlying callbacks, increasing indirection without adding domain policy.",
+        "Global singleton runtimes are still used as behavioral dependencies (`defaultBroadcastStateRuntime` in `goseg/broadcast/state.go`, `defaultEventRuntime` in `goseg/docker/events/events.go`, `defaultDockerSubsystemRuntime` in `goseg/docker/orchestration/subsystem/subsystem_events.go`), so injected seams coexist with hidden process-wide state.",
+        "A wide configuration bag (`structs.SysConfig`) remains a cross-subsystem carrier (`goseg/structs/configs.go`, `goseg/defaults/defaults.go`, `goseg/config/config.go`, and downstream consumers in startup/main/subsystem code), indicating domain boundary leakage through shared config shape."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 68.0,
+        "indirection_cost": 74.0,
+        "interface_honesty": 71.0
+      }
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "The broadcast runtime entrypoints use mixed shapes for equivalent operations: `bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` and `LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime)` are variadic optional-runtime forms, while `ReloadUrbitsWithRuntime(runtime *broadcastStateRuntime)` requires a single pointer.",
+        "Version/docker startup APIs use the same `Start*` naming for different lifecycle contracts: `StartDockerHealthLoopsWithRuntime` launches goroutines and returns quickly, while `StartDockerSubsystemWithRuntime` and `StartVersionSubsystemWithContext` block until cancellation/error.",
+        "Transition/event APIs rely on positional string tuples instead of typed contracts, e.g. `RunTransitionedOperation(patp, transitionType, startEvent, successEvent string, ...)` and `emitWorkflowTransition(runtime, patp, transitionType, event string)`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "naming_quality": {
+      "evidence": [
+        "Initialism casing is inconsistent in exported and semi-public APIs: `GetStateJson` vs tests named `TestGetStateJSON...`; `DefaultWgConfig`/`WgOn`/`WgRegistered` coexists with `copyWGFileToVolume`; config fields use `EndpointUrl` and `ApiVersion`.",
+        "Wi-Fi naming conventions drift between `WiFi` and `Wifi` forms in the same subsystem (`WiFiRuntimeService`, `NewWiFiRuntime`, `NewWifiClient`, `WifiInfoTicker`).",
+        "Leak subsystem mixes two near-homophone vocabularies (`LickStatus`, `GetLickStatuses`, `lickStatuses`) inside the `leak` package and messages, making API intent harder to infer at call sites."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_sprawl",
+      "summary": "Runtime abstractions are dominated by large callback bags, creating high wiring overhead and weakly-typed module contracts.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeSnapshotOps`, `RuntimeStartupOps`, etc. split behavior into many function fields rather than cohesive service interfaces (`runtime_ops.go`).",
+        "`workflowRuntime` embeds multiple runtime bags plus custom callbacks and validates them via grouped reflection-style requirements, making contract correctness mostly runtime-checked (`operations_runtime.go`).",
+        "`startBackgroundServicesRuntime` contains a long list of one-function fields mirrored by a separate enum/spec table (`startup_orchestrator.go`), indicating abstraction overhead for simple orchestration.",
+        "`importerRuntime` embeds storage/upload/provision bags and then re-slices them into scope-specific structs; behavior remains callback routing rather than domain object methods (`importer.go`)."
+      ],
+      "suggestion": "Replace broad callback bags with a small number of cohesive interfaces per domain boundary (e.g., `ContainerService`, `ShipConfigService`, `TransitionPublisher`). Keep test seams at those interface boundaries and push validation to compile time by requiring concrete implementations in constructors.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "scope_runtime_wrapper_chain",
+      "summary": "Importer runtime scope wrappers add indirection layers that mostly forward existing callbacks without adding policy.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`importer.go` defines `resolveImporterRuntimeForInit/Upload/Workflow/Publish`, each producing narrower structs from the same root runtime and calling similar validators.",
+        "`importerRuntimeWithDefaults` merges nested runtime structs, then each call path re-validates required groups, creating repeated dispatch/validation logic around the same callback set.",
+        "Workflow dispatch in `shipworkflow` follows a similar pattern (`DispatchUploadImportWithCoordinator` -> runtime injection -> resolve/validate), reinforcing repeated wrapper style across modules."
+      ],
+      "suggestion": "Collapse scope-specific runtime wrappers into one validated runtime plus explicit operation-specific methods (or builders) that enforce required dependencies once per operation family. Keep a single resolver entrypoint per module and remove pass-through scope transformers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "singleton_runtime_leakage",
+      "summary": "Process-global default runtimes leak through abstraction boundaries, undermining dependency injection and increasing hidden coupling.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go",
+        "goseg/docker/events/events.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "`broadcast/state.go` exposes mutable global `defaultBroadcastStateRuntime`; `loop.go` uses `newBroadcastLoopRuntimeWithDefault()` and global controller fallback.",
+        "`events/events.go` uses `sync.OnceValue` singleton `defaultEventRuntime`, while still offering delegate-based runtime injection, creating dual dependency paths.",
+        "`subsystem_events.go` carries `defaultDockerSubsystemRuntime` and normalizes nil runtime to that singleton, allowing callers to bypass explicit runtime ownership."
+      ],
+      "suggestion": "Move singleton construction to process composition root (startup/main), inject runtime instances explicitly into subsystem constructors, and keep package-level defaults only for backward-compatible adapters marked deprecated.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_state_backdoor"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "sysconfig_boundary_leak",
+      "summary": "A broad `SysConfig` bag still acts as a cross-domain transport object, weakening abstraction boundaries between config, startup, and runtime subsystems.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/defaults/defaults.go",
+        "goseg/config/config.go",
+        "goseg/main.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go"
+      ],
+      "evidence": [
+        "`SysConfig` aggregates connectivity/startram/runtime/auth/penpai into one top-level struct with broad mutator methods (`structs/configs.go`).",
+        "`defaults.SysConfig(basePath)` materializes full-system defaults in one constructor (`defaults/defaults.go`), tying unrelated domains to a shared initialization artifact.",
+        "Downstream runtime snapshots split data later (`config/config.go` snapshot types), but consumers in startup/main/subsystem still depend on cross-cutting config access patterns rather than narrower domain contracts."
+      ],
+      "suggestion": "Introduce domain-specific config ports (e.g., `StartupConfig`, `NetworkHealthConfig`, `ImportConfig`) and restrict each subsystem to its own immutable view. Keep `SysConfig` as persistence DTO only, with explicit mapping at config boundaries.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "shared_config_bag"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "runtime_injection_shape_drift",
+      "summary": "Equivalent runtime-injected APIs use conflicting call shapes (variadic optional pointer vs required pointer), making broadcast entrypoints non-uniform.",
+      "related_files": [
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "`bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` and `LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime)` accept variadic runtime and manually check first element.",
+        "`ReloadUrbitsWithRuntime(runtime *broadcastStateRuntime)` uses a non-variadic required pointer shape in the same file.",
+        "Other broadcast APIs choose different runtime passing conventions again (`StartBroadcastLoopWithRuntime(runtime *broadcastLoopRuntime)` and `ApplyBroadcastTransition(..., runtime *BroadcastStateRuntime)`), forcing callers to remember per-function conventions."
+      ],
+      "suggestion": "Standardize runtime-injection APIs in broadcast to one convention (prefer explicit `*Runtime` parameter or a consistent `ResolveRuntime` helper), then provide thin legacy wrappers for compatibility until call sites are migrated.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "start_api_lifecycle_ambiguity",
+      "summary": "`Start*` APIs encode different blocking/async/error semantics without naming distinction, reducing lifecycle predictability.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/routines/version.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`StartDockerHealthLoopsWithRuntime` starts a goroutine and returns immediately once loop launch succeeds.",
+        "`StartDockerSubsystemWithRuntime` starts workers and blocks until context cancellation or worker error.",
+        "`StartVersionSubsystemWithContext` also blocks and aggregates worker errors, while `CheckVersionLoop()` is a no-error fire-and-log wrapper."
+      ],
+      "suggestion": "Split lifecycle verbs to communicate contract (`StartAsync*`, `Run*`, `Serve*`) and standardize return/error behavior; document blocking semantics in package-level API comments and harmonize wrappers.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "initialism_casing_inconsistency",
+      "summary": "Initialism casing conventions (`JSON`, `URL`, `API`, `WiFi`, `WG`) are inconsistently applied across adjacent APIs.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/state_test.go",
+        "goseg/structs/configs.go",
+        "goseg/defaults/defaults.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "Implementation exports `GetStateJson`, while tests use `TestGetStateJSON...`, indicating unresolved naming convention drift.",
+        "Config/domain names mix forms such as `EndpointUrl`, `ApiVersion`, `WgOn`, `WgRegistered`, and `DefaultWgConfig` while other code uses `WG` and `WiFi` forms.",
+        "Wi-Fi runtime APIs combine `WiFiRuntimeService`/`NewWiFiRuntime` with fields `NewWifiClient`/`WifiInfoTicker` in the same subsystem."
+      ],
+      "suggestion": "Adopt one project-wide initialism policy (Go style: all-caps initialisms in identifiers), then batch-rename with compatibility shims/deprecation wrappers where exported identifiers are affected.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_convention_fragmentation"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "leak_lick_vocabulary_collision",
+      "summary": "The leak subsystem uses both `leak` and `lick` terminology for the same domain concept, obscuring intent.",
+      "related_files": [
+        "goseg/leak/broadcast.go",
+        "goseg/leak/broadcast_test.go",
+        "goseg/leak/leak_test.go"
+      ],
+      "evidence": [
+        "Core functions in package `leak` operate on `LickStatus`, `GetLickStatuses`, `lickStatuses`, and logs like \"Closing lick channel\".",
+        "Tests reinforce the divergent naming (`setLickStatusesForTest`, `TestGetLickStatusesReflectsCurrentState`) instead of clarifying a distinct concept boundary.",
+        "No parallel type family in these files indicates `lick` is a separate domain object; terms appear interchangeable with leak socket/session state."
+      ],
+      "suggestion": "Rename `Lick*` identifiers to a single domain term (`Leak*` or a clearer protocol-specific noun), and keep a short transitional alias layer only where external callers depend on old names.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_convention_fragmentation"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "stringly_typed_transition_contracts",
+      "summary": "Transition-publishing APIs expose multiple positional string parameters, making misuse easy and contracts hard to validate.",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/leak/broadcast.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "`RunTransitionedOperation` and `emitWorkflowTransition` pass transition identity and event semantics as raw strings.",
+        "Leak broadcast envelopes are assembled with literal string values for `Type`/`AuthLevel` in `updateBroadcast`, rather than shared typed enums.",
+        "Broadcast transition APIs are typed for mutation behavior but still depend on external string event naming conventions downstream."
+      ],
+      "suggestion": "Introduce typed transition/event identifiers (small enums or dedicated types) and replace multi-string positional APIs with request structs so compile-time checks enforce valid combinations.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 2,
+    "dimension_coverage": 0.5,
+    "evidence_density": 1.1,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 25.07,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 39,
+    "successful_batch_count": 2,
+    "full_sweep_included": false,
+    "total_files": 615,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "api_surface_coherence",
+      "naming_quality"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state_lifecycle.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/broadcast/collectors/system_info_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/broadcast/loop.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/importer/importer.go",
+    "goseg/main.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/main_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/routines/version.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/docker/events/events.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/config/config.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/docker/network/network.go",
+    "goseg/config/config_events.go",
+    "goseg/system/wifi_runtime_api.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_191342",
+    "created_at": "2026-03-04T19:15:18+00:00",
+    "batch_count": 2,
+    "batch_indexes": [
+      1,
+      2
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "8eabd2a4172e7504eb2cbc9c14821f5dddc33779f22e59a611dce4290992962e"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "api_surface_coherence",
+      "abstraction_fitness",
+      "naming_quality"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "api_surface_coherence",
+      "naming_quality"
+    ],
+    "missing_dimensions": [
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

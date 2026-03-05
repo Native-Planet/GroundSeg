@@ -1,0 +1,239 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 7,
+  "assessments": {
+    "naming_quality": 81.0,
+    "logic_clarity": 86.0,
+    "type_safety": 88.0,
+    "contract_coherence": 78.0,
+    "error_consistency": 80.0,
+    "initialization_coupling": 74.0,
+    "convention_outlier": 82.0,
+    "api_surface_coherence": 76.0,
+    "authorization_consistency": 89.0
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "Blocking functions are named with a `Start*` prefix in `goseg/docker/orchestration/subsystem/subsystem_events.go` (`StartDockerSubsystem`, `StartDockerSubsystemWithRuntime`) while they call `RunDockerSubsystemWithRuntime` and inherit blocking semantics.",
+        "Action naming has parallel inverse aliases in `goseg/protocol/contracts/protocol_contracts.go` (`UploadOpenEndpointAction`, `UploadActionOpenEndpoint`) and `goseg/protocol/actions/actions.go` (`ActionUploadOpenEndpoint`, `UploadOpenEndpointAction`), increasing term ambiguity."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "logic_clarity": {
+      "evidence": [
+        "Broadcast loop control flow in `goseg/broadcast/loop.go` uses explicit guards and early returns (`StartBroadcastLoopWithRuntime`, `runBroadcastTickWithRuntime`) with consistent nil/runtime checks.",
+        "Transition application path in `goseg/broadcast/transitions.go` cleanly separates mutation and notify behavior, with deterministic branching for backpressure policy handling."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Several APIs still mix silent no-op returns and error returns for similar invalid states, which makes control-flow intent harder to reason about at call sites."
+    },
+    "type_safety": {
+      "evidence": [
+        "`goseg/system/wifi_runtime_api.go` maintains typed runtime and state seams and wraps errors with operation-specific context.",
+        "`goseg/config/config_update_registry.go` uses generics to bind patch fields and parsers, reducing untyped mutation paths."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Some wire payload boundaries still downcast typed action values to raw strings (`goseg/protocol/actions/actions.go`), reducing compile-time guarantees at protocol boundaries."
+    },
+    "contract_coherence": {
+      "evidence": [
+        "`StartDockerSubsystem` and `StartDockerSubsystemWithRuntime` in `goseg/docker/orchestration/subsystem/subsystem_events.go` are named as non-blocking starts but directly call blocking `RunDockerSubsystemWithRuntime`.",
+        "`StartConfigEventLoop` in `goseg/config/config_events.go` is actually non-blocking (spawns goroutine and returns), so similarly named `Start*` APIs expose inconsistent behavioral contracts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` returns `(value, false)` or `nil` on initialization failure in several API functions (`ContractForAction` path via `actionContractForAction`, `UploadActionContracts`, `C2CActionContracts`) without exposing the underlying initialization error.",
+        "`ParseAction` in the same file does return wrapped initialization errors, creating mixed failure signaling within one API family.",
+        "`goseg/config/config_events.go` logs update errors inside the background loop (`processConfigEvent`) but does not propagate failure to loop caller."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "`goseg/accesspoint/accesspoint.go` computes package-level `password` at import time using env/hostname (`resolveAPPassword()`), coupling behavior to process environment before explicit bootstrap.",
+        "`goseg/config/config.go` has `init()` that sets runtime context from defaults, and those defaults call environment-sensitive functions (`getBasePath`) via `defaultRuntimeContext()`."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "convention_outlier": {
+      "evidence": [
+        "Acronym casing drifts across related config and StarTram code: `EndpointURL` (`goseg/config/config.go`), `UpdateUrl` (`goseg/defaults/defaults.go` via runtime config field assignment), and local `endpointUrl` (`goseg/rectify/rectify_services.go`).",
+        "Action naming conventions drift between `Action<Domain><Verb>` and `<Domain><Verb>Action` forms across `goseg/protocol/actions/actions.go` and `goseg/protocol/contracts/protocol_contracts.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "In `goseg/protocol/actions/actions.go`, outwardly similar query APIs expose mixed contracts: some return typed errors (`ParseAction`), while others silently collapse initialization failures to empty results (`UploadActionContracts`, `actionContractsForNamespace`, `ContractForAction` via bool-only contract).",
+        "`goseg/docker/orchestration/subsystem/subsystem_events.go` exposes `Start*` and `Run*` names where both `StartDockerSubsystem*` variants are blocking, creating unstable mental model for callers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "authorization_consistency": {
+      "evidence": [
+        "`goseg/leak/broadcast.go` applies auth-level scoping for unauthorized channels by sending per-patp filtered payloads and full payloads only when `status.Auth` is true.",
+        "No direct contradictory authorization mechanism was observed in the reviewed cross-cutting files; transport-level filtering pattern appears consistent in the inspected leak/broadcast path."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Authorization decisions rely on shared runtime status maps and are not uniformly represented as explicit policy abstractions across all reviewed entry points."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "contract_coherence",
+      "identifier": "start_api_blocks_like_run",
+      "summary": "Docker subsystem `Start*` APIs violate their implied non-blocking contract by delegating to blocking `Run*` execution.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/config/config_events.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`StartDockerSubsystem` and `StartDockerSubsystemWithRuntime` directly call `RunDockerSubsystemWithRuntime`.",
+        "The same file documents `RunDockerSubsystemWithRuntime` as blocking until cancellation/failure.",
+        "Other `Start*` APIs in reviewed files (for example `StartConfigEventLoop`, `StartBroadcastLoop`) are non-blocking, so caller expectations are inconsistent."
+      ],
+      "suggestion": "Either rename blocking methods to `Run*` only and remove `Start*` aliases, or make `StartDockerSubsystem*` actually asynchronous by spawning goroutines and returning immediately with lifecycle handles.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "start_run_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "action_registry_init_errors_suppressed",
+      "summary": "Action contract APIs silently suppress initialization failures in several read paths, while siblings return explicit errors.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`ParseAction` returns initialization errors from `ensureActionContractsInitialized`.",
+        "`actionContractForAction`, `actionContractsForNamespace`, `UploadActionContracts`, and `C2CActionContracts` return false/nil when initialization fails, losing root cause context.",
+        "The contract subsystem performs strict validation and wraps rich errors, but those errors are not consistently surfaced through the actions API."
+      ],
+      "suggestion": "Standardize all public actions read APIs to return `(value, error)` (or typed result+error) and preserve initialization/validation errors consistently; keep bool-only results for pure membership checks only.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_contract_failures"
+    },
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "import_time_env_state_coupling",
+      "summary": "Environment- and host-dependent values are computed at package initialization time, coupling behavior to import order and process startup context.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap.go"
+      ],
+      "evidence": [
+        "`accesspoint` package-level `password` is initialized from `resolveAPPassword()` which reads env and hostname.",
+        "`config.init()` eagerly sets runtime context; default context uses environment-sensitive base path resolution through `getBasePath`.",
+        "These values are established before explicit bootstrap orchestration, making tests and embedding scenarios sensitive to import-time environment."
+      ],
+      "suggestion": "Move environment/hostname resolution into explicit bootstrap/runtime construction paths and keep package-level globals as inert defaults; inject resolved values through runtime structs.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_bootstrap"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "action_alias_name_inversion",
+      "summary": "Parallel inverse aliases for the same action concepts create ambiguous naming vocabulary across protocol layers.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/actionids/actionids.go"
+      ],
+      "evidence": [
+        "Both `ActionUploadOpenEndpoint` and `UploadOpenEndpointAction` exist in actions package.",
+        "Contracts package additionally exports `UploadOpenEndpointAction` and backward alias `UploadActionOpenEndpoint`.",
+        "The same semantic concept is represented in both `<Domain><Verb>Action` and `Action<Domain><Verb>` forms."
+      ],
+      "suggestion": "Pick one canonical naming order for action symbols across `actionids`, `actions`, and `contracts` packages and deprecate transitional aliases behind a documented migration window.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "action_vocabulary_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "mixed_failure_contracts_in_action_queries",
+      "summary": "The actions API exposes mixed query semantics (errorful vs silent) for similar contract lookup operations.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/actions/actions_test.go",
+        "goseg/protocol/contracts/contracts_test.go"
+      ],
+      "evidence": [
+        "`ParseAction` communicates initialization failure explicitly via error.",
+        "`SupportedActions`, `ActionMetas`, `ContractForAction`, and contract-slice helpers return empty/false results on hidden initialization failure paths.",
+        "Tests assert behavior for contract relationships but do not enforce a single error contract shape across all public query APIs."
+      ],
+      "suggestion": "Define one API contract rule for public action queries (for example, all initialization-dependent lookups return errors) and align tests to enforce that contract uniformly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_contract_failures"
+    },
+    {
+      "dimension": "convention_outlier",
+      "identifier": "acronym_casing_and_term_style_drift",
+      "summary": "Acronym and term style conventions drift across neighboring modules, creating style islands in core runtime/config code.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/defaults/defaults.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "Config-facing fields and locals vary between `EndpointURL`, `UpdateUrl`, and `endpointUrl` forms.",
+        "The inconsistency appears inside tightly related connectivity/startram config paths rather than isolated legacy adapters."
+      ],
+      "suggestion": "Adopt and enforce a single acronym casing convention (for example `URL`) across exported fields, locals, and config patch keys in config/defaults/rectify modules.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_convention_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Semantic drift between historical and newer runtime APIs (`Start` vs `Run`, bool-return lookups vs error-return lookups).",
+      "Global package initialization patterns still carry environment/state decisions that newer runtime-seam patterns are trying to isolate.",
+      "Backward-compatibility aliasing in protocol actions/contracts has not been consolidated into one canonical vocabulary."
+    ],
+    "likely_symptoms": [
+      "start_api_blocks_like_run",
+      "mixed_failure_contracts_in_action_queries",
+      "action_alias_name_inversion"
+    ],
+    "possible_false_positives": [
+      "Some `Start*` blocking behavior may be intentional for subsystem ownership despite naming mismatch.",
+      "Acronym casing differences may partially reflect upstream struct tags or compatibility with existing JSON field names."
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 82.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/broadcast/loop.go returns a freshly formatted string with fmt.Errorf(\"%s\", msg) after a pier-info failure, which strips original error type/chain before surfacing to callers.",
+        "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go drops the first file-write error when directory creation fails; the returned error becomes only the mkdir failure, not a chained cause.",
+        "Multiple production pathways across these files format upstream failures as context-only strings in places, which reduces recoverability and consistency of failure handling at higher layers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast_tick_loses_pier_error_cause",
+      "summary": "Broadcast loop converts pier-info failure to message-only error, discarding chain and classification.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/loop_test.go"
+      ],
+      "evidence": [
+        "runBroadcastTickWithRuntime constructs msg := fmt.Sprintf(\"unable to build pier info: %v\", err), records it, then returns fmt.Errorf(\"%s\", msg), which cannot be errors.Is/As matched by callers.",
+        "loop tests assert the exact string in TestRunBroadcastTickRecordsPierInfoError, encouraging string-coupled handling instead of typed/wrapped handling."
+      ],
+      "suggestion": "Return fmt.Errorf(\"unable to build pier info: %w\", err) and keep the stateTransition message logging separate; this preserves structured error handling for callers while retaining operator-readable context.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_chain_dropped"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "artifactwriter_masks_write_failure",
+      "summary": "Artifact write path drops the initial file-write error when mkdir recovery fails.",
+      "related_files": [
+        "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "artifactwriter.Write() attempts a direct file write, stores err; on mkdirAll failure it returns mkdirErr without preserving/wrapping the original write error.",
+        "wireguard.write path relies on this helper for fallback persistence and error surfacing, so this suppression affects production config/write diagnostics.",
+        "Dropped root failure can make triage misleading when write permission and directory-creation issues race; operators lose the primary failure reason."
+      ],
+      "suggestion": "When both write and fallback steps fail, combine errors (e.g., errors.Join(writeErr, mkdirErr) or wrap the mkdirErr with initial writeErr) so the first write failure remains observable while still surfacing fallback-path context.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_chain_dropped"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Shared tendency to prioritize human-readable message assembly over preserving wrapped root causes in error returns.",
+      "Fallback-heavy paths that recover from one failure into another often drop earlier errors instead of aggregating them."
+    ],
+    "likely_symptoms": [
+      "broadcast loop failures that cannot be categorized by tests or handlers expecting typed errors",
+      "configuration write failures where logs show directory/path issues but hide original I/O permission failures"
+    ],
+    "possible_false_positives": []
+  }
+}

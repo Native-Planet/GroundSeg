@@ -1,0 +1,221 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "naming_quality": 82.0,
+    "logic_clarity": 89.0,
+    "type_safety": 88.0,
+    "contract_coherence": 80.0,
+    "initialization_coupling": 81.0,
+    "convention_outlier": 79.0,
+    "api_surface_coherence": 78.0,
+    "authorization_consistency": 76.0
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "Wi-Fi API symbols mix `WiFi` and `Wifi` in the same surface (`WiFiRuntimeService`, `IsWifiEnabled`, `ListWifiSSIDs`, `ConnectToWifi`) in goseg/system/wifi_runtime_api.go.",
+        "Lower-level runtime keeps yet another mixed style (`newWiFiRuntime`, `parseNmcliWifiDevices`, `ErrWifiInterfaceNotFound`) in goseg/system/wifi_runtime_methods.go."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "logic_clarity": {
+      "evidence": [
+        "Broadcast transition and mutation paths in goseg/broadcast/transitions.go use direct guard clauses and straightforward state update flow.",
+        "Docker subsystem event loop and health loop in goseg/docker/orchestration/subsystem/subsystem_events.go and subsystem_health.go are generally linear, but repeated nil-context fallback branches add avoidable flow noise."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Repeated defensive `ctx == nil` fallbacks across long-running loops make lifecycle behavior harder to reason about."
+    },
+    "type_safety": {
+      "evidence": [
+        "Generic helpers in goseg/config/config_update_registry.go keep many patch handlers typed, but parsing still routes through `interface{}` entry points.",
+        "Wi-Fi runtime seam validation in goseg/system/wifi_runtime_api.go enforces callback presence, reducing nil-call runtime failure risk."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Config patch parsing remains runtime-typed at API boundaries, so incorrect shapes are detected late."
+    },
+    "contract_coherence": {
+      "evidence": [
+        "README mandates typed API usage including `ActionToken` (README.md:99), but contracts expose `ActionVerb` as the action token type (goseg/protocol/contracts/contracts.go:33-34).",
+        "Protocol contract definitions use `ActionVerb` consistently (goseg/protocol/contracts/protocol_contracts.go:9-11), reinforcing that README guidance is out of sync with the runtime contract API."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "Config runtime context is populated at package init time (`init` sets `setRuntimeContext(defaultRuntimeContext())`) in goseg/config/config.go:194-195.",
+        "Startup then mutates runtime context again (`setDebugMode`, `initializePaths`) in goseg/config/bootstrap.go:53 and :103, making effective runtime context depend on both import-time and startup-time ordering."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "convention_outlier": {
+      "evidence": [
+        "Acronym casing diverges across C2C APIs: `C2CConnectAction` in contracts vs `C2cCheckWith`, `RunC2cCheckFn`, `StartC2cCheck` in goseg/main.go and goseg/startuporchestrator/startup_orchestrator.go.",
+        "Wi-Fi naming also drifts between `WiFi` and `Wifi` forms in goseg/system/wifi_runtime_api.go and goseg/system/wifi_runtime_methods.go."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "Long-running APIs in subsystem and routines silently convert nil contexts to `context.Background()` (`startDockerHealthLoop`, `dockerListenerWithRuntime`, `dockerSubscriptionHandlerWithRuntime`, `Check502Loop`, `StartBackupRoutinesWithContext`) across goseg/docker/orchestration/subsystem/subsystem_events.go, goseg/docker/orchestration/subsystem/subsystem_health.go, and goseg/routines/system/system.go.",
+        "Other APIs reject missing runtime/context prerequisites explicitly (e.g. `ApplyBroadcastTransition` errors when runtime is missing in goseg/broadcast/transitions.go), creating inconsistent caller expectations for boundary contracts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "authorization_consistency": {
+      "evidence": [
+        "Upload session opening validates token with a nil request (`ValidateUploadSessionTokenFn(..., nil)`) in goseg/importer/importer.go:340.",
+        "Upload request validation later passes the real request (`ValidateUploadSessionTokenFn(..., r)`) in goseg/importer/importer.go:645, so auth behavior can differ between session creation and upload execution paths.",
+        "The open-endpoint action is a first-class protocol contract (`ActionUploadOpenEndpoint`) in goseg/protocol/contracts/protocol_contracts.go, so this divergence affects a defined external auth boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "naming_quality",
+      "identifier": "wifi_naming_casing_split",
+      "summary": "Wi-Fi API naming mixes `WiFi` and `Wifi`, reducing discoverability and grepability.",
+      "related_files": [
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "Service type is `WiFiRuntimeService` while public methods include `IsWifiEnabled`, `ListWifiSSIDs`, `ConnectToWifi` in wifi_runtime_api.go.",
+        "Runtime internals also use mixed forms (`newWiFiRuntime`, `parseNmcliWifiDevices`, `ErrWifiInterfaceNotFound`) in wifi_runtime_methods.go."
+      ],
+      "suggestion": "Standardize on one acronym convention (prefer `WiFi` consistently) and rename exported and internal symbols together in one refactor pass, with compatibility aliases only if external callers depend on old names.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_convention_drift"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "readme_action_type_drift",
+      "summary": "README typed-contract guidance references `ActionToken`, but code contracts expose `ActionVerb`.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/contracts.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "README lists typed APIs as `ContractID`, `ActionNamespace`, `ActionToken`, `ActionContractBinding` (README.md:99).",
+        "Contracts define action token type as `ActionVerb` (contracts.go:33-34), and protocol contract entries use `ActionVerb` constants (protocol_contracts.go:9-11)."
+      ],
+      "suggestion": "Align governance text with runtime types by replacing `ActionToken` with `ActionVerb` in README, or introduce a real `ActionToken` alias/type and migrate APIs consistently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "runtime_context_two_phase_init",
+      "summary": "Runtime context is initialized at import time and then mutated again during startup bootstrap.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/bootstrap.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Package init sets runtime context immediately (`init` + `setRuntimeContext(defaultRuntimeContext())`) in config.go.",
+        "Startup path calls `setDebugMode` and `initializePaths` to mutate context later in bootstrap.go, and main runtime snapshots consume context (`config.RuntimeContextSnapshot()`) in main.go."
+      ],
+      "suggestion": "Move runtime-context initialization to a single explicit bootstrap phase and keep package init side-effect free; make readers fail fast until bootstrap finalizes context.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_bootstrap_state"
+    },
+    {
+      "dimension": "convention_outlier",
+      "identifier": "acronym_style_drift_c2c_wifi",
+      "summary": "Acronym casing conventions drift (`C2C` vs `C2c`, `WiFi` vs `Wifi`) across sibling APIs.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "Protocol contracts use `C2CConnectAction`, while startup/main runtime hooks use `RunC2cCheckFn`, `StartC2cCheck`, `C2cCheckWith`.",
+        "Wi-Fi module mixes `WiFiRuntimeService` with `IsWifiEnabled`/`ConnectToWifi` method names."
+      ],
+      "suggestion": "Adopt and document a single acronym rule (for example, keep common initialisms fully capitalized) and apply it across C2C and Wi-Fi surfaces in one rename sweep.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_convention_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "nil_context_contract_ambiguity",
+      "summary": "Public long-running APIs inconsistently treat nil context as valid by silently using background context.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/routines/system/system.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "Subsystem and routine entrypoints repeatedly do `if ctx == nil { ctx = context.Background() }`, including event listeners and health loops.",
+        "Other boundary APIs (broadcast transitions) explicitly error on missing runtime dependency instead of silently defaulting, so caller expectations differ by module."
+      ],
+      "suggestion": "Define one boundary contract for lifecycle inputs (either reject nil context everywhere or consistently expose explicit `Background` wrappers) and refactor entrypoints to that contract.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_bootstrap_state"
+    },
+    {
+      "dimension": "authorization_consistency",
+      "identifier": "upload_auth_request_context_gap",
+      "summary": "Upload auth checks differ between session-open and upload-request paths due to nil request context.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "OpenUploadEndpoint authorizes with `ValidateUploadSessionTokenFn(expectedToken, token, nil)` (importer.go:340).",
+        "validateUploadRequest authorizes with full request object and token headers (importer.go:645), creating different auth input surface for the same upload session lifecycle.",
+        "Open endpoint is an explicit external contract action (`ActionUploadOpenEndpoint`) in protocol_contracts.go."
+      ],
+      "suggestion": "Unify upload authorization semantics by requiring request-bound validation data in both steps (or formally split preflight vs request auth contracts and enforce both explicitly).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "upload_auth_boundary_split"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit defaults at process boundaries (init-time state and nil-context fallback) create hidden contracts.",
+      "No enforced acronym/type naming governance across subsystem boundaries leads to drift between docs and code."
+    ],
+    "likely_symptoms": [
+      "wifi_naming_casing_split",
+      "acronym_style_drift_c2c_wifi",
+      "nil_context_contract_ambiguity"
+    ],
+    "possible_false_positives": [
+      "upload_auth_request_context_gap may be intentional if OpenUploadEndpoint is explicitly designed as a request-agnostic preflight step with compensating controls elsewhere."
+    ]
+  }
+}

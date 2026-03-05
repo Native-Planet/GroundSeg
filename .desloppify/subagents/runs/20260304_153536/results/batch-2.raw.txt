@@ -1,0 +1,81 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 82.0,
+    "test_strategy": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both goseg/protocol/contracts/protocol_contracts.go and goseg/protocol/contracts/startram_contracts.go implement parallel family-specific patterns (`*ContractCatalogSpecs`, `validate*ContractSpecs`) with hand-maintained invariants instead of a shared contract-family registration/validation mechanism.",
+        "README.md defines governance as a cross-file contract surface (contracts.go, contract_metadata.go, actions.go, family files), but family files still encode independent validation logic and naming conventions, increasing boundary drift risk as families expand."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md states quality gates rely on targeted contract tests and path-aware CI checks, but protocol_contracts.go and startram_contracts.go keep validation in passive helper functions (`validateProtocolContractSpecs`, `validateStartramContractSpecs`) with no local enforcement path visible in these files.",
+        "Critical contract invariants (ID formula parity, family prefix constraints, exact entry expectations) are encoded in helper validators, so confidence depends on external test wiring rather than self-enforcing runtime/compile-time checks in the contract definition modules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_family_validation_fragmentation",
+      "summary": "Contract families duplicate validation architecture, creating drift-prone governance boundaries.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` and `startram_contracts.go` each define bespoke catalog builders and validators with similar responsibilities but different enforcement details.",
+        "Governance in README prescribes a unified compatibility surface across multiple files, yet family validation remains decentralized and manually synchronized."
+      ],
+      "suggestion": "Introduce a shared family contract-definition API in the contracts package (e.g., declarative family specs plus common invariant checks) and migrate protocol/startram files to data-only definitions to keep contract governance logic centralized.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "decentralized_contract_governance"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "validator_execution_depends_on_external_wiring",
+      "summary": "Contract invariant checks appear test-dependent instead of locally enforced.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Invariant-heavy validation exists in unexported helper functions in both contract files, but these files do not show an intrinsic execution path for those checks.",
+        "README quality-gate language emphasizes CI and targeted tests, implying critical contract safety relies on pipeline/test discipline rather than guaranteed runtime catalog construction checks."
+      ],
+      "suggestion": "Wire validation into the canonical contract registration/build path so malformed family specs fail deterministically during package initialization or registry construction, then keep tests as regression coverage rather than the sole enforcement layer.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "decentralized_contract_governance"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance responsibilities are split between policy docs and family-local implementation patterns without a single enforcing abstraction.",
+      "Critical invariants are encoded but not clearly self-enforcing at the contract-definition boundary in the reviewed files."
+    ],
+    "likely_symptoms": [
+      "contract_family_validation_fragmentation",
+      "validator_execution_depends_on_external_wiring"
+    ],
+    "possible_false_positives": [
+      "Validator invocation may already be guaranteed in unreviewed files (outside this batch scope), which would reduce the severity of the test-strategy concern."
+    ]
+  }
+}

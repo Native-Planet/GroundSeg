@@ -1,0 +1,41 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 86.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Startup orchestration composes multiple runtime seam structs with many callback fields and tag metadata (for example `startuporchestrator/startupInitRuntime`, `startBackgroundServicesRuntime`, `startBackgroundServiceSpecs`, and runtime validation groups), creating a high-cost abstraction layer for dependency wiring.",
+        "Importer/runtime wiring mirrors the same callback-heavy pattern (`importerStorageRuntime`, `importerUploadRuntime`, `importerProvisionRuntime`) with separate validation paths and grouped requirements for each call site phase.",
+        "Tests repeatedly rely on helper adapters and setter maps to bind behavior into these seam-heavy structs (for example callback maps and `withStartBackgroundServiceCallback` style setup), increasing indirection and potential drift across similar abstractions.",
+        "Configuration and transition handling frequently passes large config/runtime structs through numerous generic helper wrappers (`runtime`-style seam structs and default/resolve/validate layers), which increases call depth without adding domain policy."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "The main abstraction debt is structural and non-blocking: callback-heavy seam layers improve testability but add constant boilerplate and indirection. Further gains require refactoring toward fewer lifecycle-specific runtime registries and shared composition helpers, which is a deliberate architectural cleanup beyond defect patching.",
+      "sub_axes": {
+        "abstraction_leverage": 88.0,
+        "indirection_cost": 74.0,
+        "interface_honesty": 90.0
+      }
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "runtime seam proliferation across packages (`startuporchestrator`, `importer`, `docker/orchestration`, `shipworkflow`) where testability goals and dependency injection are solved by repeatedly generating callback-only structs",
+      "repeated parallel registration patterns (`spec definitions` + resolver + callback setter maps/validation tags) that drift risk increases as services are added"
+    ],
+    "likely_symptoms": [
+      "longer onboarding for new services",
+      "fragile callback registration paths when lifecycle shapes change",
+      "cognitive overhead from many near-pass-through abstraction layers"
+    ],
+    "possible_false_positives": [
+      "Some abstraction layers are likely intentional for deterministic test seams and may be retained if testability is a primary design constraint"
+    ]
+  }
+}

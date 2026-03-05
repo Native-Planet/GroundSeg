@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"groundseg/docker/orchestration"
+	"groundseg/internal/seams"
 	"groundseg/internal/workflow"
 	"groundseg/structs"
 )
@@ -38,8 +39,42 @@ func NewWireguardRecoveryRuntime(runtime orchestration.Runtime) wireguardRecover
 	}
 }
 
+func (runtime wireguardRecoveryRuntime) validate() error {
+	if runtime.GetShipStatusFn == nil {
+		return seams.MissingRuntimeDependency("wireguard ship status callback", "")
+	}
+	if runtime.UrbitConfFn == nil {
+		return seams.MissingRuntimeDependency("wireguard urbit config callback", "")
+	}
+	if runtime.RestartContainerFn == nil {
+		return seams.MissingRuntimeDependency("wireguard restart container callback", "")
+	}
+	if runtime.BarExitFn == nil {
+		return seams.MissingRuntimeDependency("wireguard bar exit callback", "")
+	}
+	if runtime.WaitForShipExitFn == nil {
+		return seams.MissingRuntimeDependency("wireguard wait for ship exit callback", "")
+	}
+	if runtime.DeleteContainerFn == nil {
+		return seams.MissingRuntimeDependency("wireguard delete container callback", "")
+	}
+	if runtime.LoadUrbitsFn == nil {
+		return seams.MissingRuntimeDependency("wireguard load urbits callback", "")
+	}
+	if runtime.LoadMCFn == nil {
+		return seams.MissingRuntimeDependency("wireguard load mainchain callback", "")
+	}
+	if runtime.LoadMinIOsFn == nil {
+		return seams.MissingRuntimeDependency("wireguard load minio callback", "")
+	}
+	return nil
+}
+
 // RecoverWireguardFleet performs wireguard restart/recovery orchestration with consistent error accumulation.
 func RecoverWireguardFleet(runtime wireguardRecoveryRuntime, piers []string, deleteMinioClient bool) error {
+	if err := runtime.validate(); err != nil {
+		return err
+	}
 	wgShips := map[string]bool{}
 	steps := []workflow.Step{}
 

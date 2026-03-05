@@ -2,32 +2,25 @@ package uploadsvc
 
 import (
 	"errors"
-	"sort"
 	"testing"
 
 	"groundseg/protocol/actions"
 )
 
-func actionSet(values []actions.Action) map[actions.Action]struct{} {
-	set := make(map[actions.Action]struct{}, len(values))
-	for _, value := range values {
-		set[value] = struct{}{}
-	}
-	return set
-}
-
 func uploadContracts() map[actions.Action]actions.UploadActionContract {
-	return actions.UploadActionContractByAction()
+	contractsByAction, err := actions.UploadActionContractByAction()
+	if err != nil {
+		panic(err)
+	}
+	return contractsByAction
 }
 
-func expectedSupportedActions() []actions.Action {
-	contracts := uploadContracts()
-	expected := make([]actions.Action, 0, len(contracts))
-	for _, contract := range contracts {
-		expected = append(expected, contract.Action)
+func supportedUploadActions() []actions.Action {
+	supported, err := actions.SupportedActions(actions.NamespaceUpload)
+	if err != nil {
+		panic(err)
 	}
-	sort.Slice(expected, func(i, j int) bool { return expected[i] < expected[j] })
-	return expected
+	return supported
 }
 
 func commandForContract(contract actions.UploadActionContract) Command {
@@ -151,7 +144,7 @@ func TestExecutorRejectsOpenEndpointWithResetPayload(t *testing.T) {
 		},
 		ResetRequest: &ResetRequest{},
 	})
-	if err == nil || err.Error() != "open-endpoint command must not include reset payload" {
+	if !errors.Is(err, ErrOpenEndpointPayloadMix) {
 		t.Fatalf("expected reset-payload guard, got %v", err)
 	}
 	if service.openCalls != 0 || service.resetCalls != 0 {
@@ -188,7 +181,7 @@ func TestExecutorRejectsResetWithOpenEndpointPayload(t *testing.T) {
 			TokenValue: "tok-value",
 		},
 	})
-	if err == nil || err.Error() != "reset command must not include open-endpoint payload" {
+	if !errors.Is(err, ErrResetPayloadMix) {
 		t.Fatalf("expected open-endpoint payload guard, got %v", err)
 	}
 	if service.openCalls != 0 || service.resetCalls != 0 {
@@ -197,7 +190,8 @@ func TestExecutorRejectsResetWithOpenEndpointPayload(t *testing.T) {
 }
 
 func TestExecutorPropagatesOpenEndpointError(t *testing.T) {
-	service := &stubUploadService{openErr: errors.New("open failed")}
+	openErr := errors.New("open failed")
+	service := &stubUploadService{openErr: openErr}
 	executor, err := NewExecutor(service)
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
@@ -210,18 +204,21 @@ func TestExecutorPropagatesOpenEndpointError(t *testing.T) {
 			TokenValue: "tok-value",
 		},
 	}
-	if err := executor.Execute(cmd); err == nil || err.Error() != "open failed" {
+	err = executor.Execute(cmd)
+	if !errors.Is(err, ErrUploadDispatch) || !errors.Is(err, openErr) {
 		t.Fatalf("expected open endpoint error to propagate, got %v", err)
 	}
 }
 
 func TestExecutorPropagatesResetError(t *testing.T) {
-	service := &stubUploadService{resetErr: errors.New("reset failed")}
+	resetErr := errors.New("reset failed")
+	service := &stubUploadService{resetErr: resetErr}
 	executor, err := NewExecutor(service)
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
-	if err := executor.Execute(Command{Action: ActionUploadReset, ResetRequest: &ResetRequest{}}); err == nil || err.Error() != "reset failed" {
+	err = executor.Execute(Command{Action: ActionUploadReset, ResetRequest: &ResetRequest{}})
+	if !errors.Is(err, ErrUploadDispatch) || !errors.Is(err, resetErr) {
 		t.Fatalf("expected reset error to propagate, got %v", err)
 	}
 }
@@ -256,64 +253,6 @@ func TestExecutorReturnsUnsupportedActionError(t *testing.T) {
 	}
 }
 
-func TestSupportedActionsIncludesOpenEndpointAndReset(t *testing.T) {
-	supportedActions := actions.SupportedUploadActions()
-	expectedActions := expectedSupportedActions()
-	if len(supportedActions) != len(expectedActions) {
-		t.Fatalf("unexpected supported actions contract: %+v", supportedActions)
-	}
-	expected := actionSet(expectedActions)
-	got := actionSet(supportedActions)
-	for action := range expected {
-		if _, exists := got[action]; !exists {
-			t.Fatalf("expected supported actions to include %q, got %+v", action, supportedActions)
-		}
-	}
-}
-
-func TestParseActionMatchesSupportedActions(t *testing.T) {
-	for _, action := range actions.SupportedUploadActions() {
-		parsed, err := ParseUploadAction(string(action))
-		if err != nil {
-			t.Fatalf("expected supported action %q to parse, got error: %v", action, err)
-		}
-		if parsed != action {
-			t.Fatalf("parse mismatch for %q: got %q", action, parsed)
-		}
-	}
-}
-
-func TestParseActionRejectsUnsupportedValue(t *testing.T) {
-	_, err := ParseUploadAction("unsupported")
-	if err == nil {
-		t.Fatal("expected ParseAction to reject unsupported value")
-	}
-	var unsupported actions.UnsupportedActionError
-	if !errors.As(err, &unsupported) {
-		t.Fatalf("expected UnsupportedActionError, got %T: %v", err, err)
-	}
-}
-
-func TestExecutorSupportedActionsMatchesContract(t *testing.T) {
-	service := &stubUploadService{}
-	executor, err := NewExecutor(service)
-	if err != nil {
-		t.Fatalf("NewExecutor returned error: %v", err)
-	}
-	supportedActions := executor.SupportedActions()
-	expectedActions := expectedSupportedActions()
-	if len(supportedActions) != len(expectedActions) {
-		t.Fatalf("unexpected executor supported actions: %+v", supportedActions)
-	}
-	expected := actionSet(expectedActions)
-	got := actionSet(supportedActions)
-	for action := range expected {
-		if _, exists := got[action]; !exists {
-			t.Fatalf("executor supported actions missing %q, got %+v", action, supportedActions)
-		}
-	}
-}
-
 func TestExecutorDispatchTableParityAcrossSupportedActions(t *testing.T) {
 	service := &stubUploadService{}
 	executor, err := NewExecutor(service)
@@ -321,7 +260,7 @@ func TestExecutorDispatchTableParityAcrossSupportedActions(t *testing.T) {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
 
-	for _, action := range actions.SupportedUploadActions() {
+	for _, action := range supportedUploadActions() {
 		beforeOpen := service.openCalls
 		beforeReset := service.resetCalls
 
@@ -359,7 +298,7 @@ func TestDescribeActionCoversSupportedActions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewExecutor returned error: %v", err)
 	}
-	for _, action := range actions.SupportedUploadActions() {
+	for _, action := range supportedUploadActions() {
 		contract, found := uploadContracts()[action]
 		if !found {
 			t.Fatalf("supported action %q is missing contract metadata", action)

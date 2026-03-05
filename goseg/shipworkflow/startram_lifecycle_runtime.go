@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"groundseg/config"
+	dockerOrchestration "groundseg/docker/orchestration"
 	"groundseg/internal/workflow"
 	"groundseg/startram"
 	"groundseg/structs"
@@ -227,7 +228,7 @@ type startramToggleRuntimeBuilder struct {
 
 func (b startramToggleRuntimeBuilder) setWireguardConfig(enabled bool) func() error {
 	return func() error {
-		return b.runtime.UpdateConfTypedFn(config.WithWgOn(enabled))
+		return b.runtime.UpdateConfigTypedFn(config.WithWgOn(enabled))
 	}
 }
 
@@ -330,7 +331,7 @@ func (c startramEndpointTransitionCoordinator) cycleWireguardKey() error {
 }
 
 func (c startramEndpointTransitionCoordinator) persistNewEndpoint() error {
-	return c.runtime.UpdateConfTypedFn(
+	return c.runtime.UpdateConfigTypedFn(
 		config.WithEndpointURL(c.endpoint),
 		config.WithWgRegistered(false),
 	)
@@ -402,7 +403,7 @@ func runStartramReminderWithRuntime(runtime startramRuntime, remind bool) error 
 		steps = append(steps, workflow.Step{
 			Name: fmt.Sprintf("update startram reminder for %s", pier),
 			Run: func() error {
-				return runtime.UpdateUrbitFeatureConfigFn(pier, func(featureConf *structs.UrbitFeatureConfig) error {
+				return persistShipUrbitSectionConfig[structs.UrbitFeatureConfig](pier, dockerOrchestration.UrbitConfigSectionFeature, func(featureConf *structs.UrbitFeatureConfig) error {
 					featureConf.StartramReminder = remind
 					return nil
 				})

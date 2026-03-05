@@ -7,5 +7,5 @@ import (
 )
 
 func TestCoverageImportSmoke(t *testing.T) {
-	_ = pkg.C2cCheckWith
+	_ = pkg.C2CCheckWith
 }

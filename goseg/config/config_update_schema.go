@@ -4,20 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"groundseg/internal/configparse"
 	"groundseg/structs"
 )
 
 type ConfUpdateOption func(*ConfPatch)
+type ConfigUpdateOption = ConfUpdateOption
 
 type ConnectivityPatch struct {
 	Piers                *[]string
 	WgOn                 *bool
 	NetCheck             *string
 	UpdateMode           *string
-	UpdateUrl            *string
+	UpdateURL            *string
 	UpdateBranch         *string
 	RemoteBackupPassword *string
-	C2cInterval          *int
+	C2CInterval          *int
 	EndpointURL          *string
 	ApiVersion           *string
 	DiskWarning          *map[string]structs.DiskWarning
@@ -77,20 +79,21 @@ type ConfPatch struct {
 	PenpaiPatch
 	AuthSessionPatch
 }
+type ConfigPatch = ConfPatch
 
-type confPatchParser func(*ConfPatch, interface{}) error
-type confPatchHasUpdateFn func(*ConfPatch) bool
-type confPatchApplyTarget = *structs.SysConfig
+type configPatchParser func(*ConfPatch, interface{}) error
+type configPatchHasUpdateFn func(*ConfPatch) bool
+type configPatchApplyTarget = *structs.SysConfig
 
-type confPatchApplyFn func(confPatchApplyTarget, *ConfPatch) error
-type confPatchApplyValueFn[T any] func(confPatchApplyTarget, T) error
-type confPatchMergeFn func(defaultConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig)
+type configPatchApplyFn func(configPatchApplyTarget, *ConfPatch) error
+type configPatchApplyValueFn[T any] func(configPatchApplyTarget, T) error
+type configPatchMergeFn func(defaultConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig)
 
 func applyPatchValueToSection[T any, S any](
 	section func(*structs.SysConfig) *S,
 	setValue func(*S, T),
-) confPatchApplyValueFn[T] {
-	return func(target confPatchApplyTarget, value T) error {
+) configPatchApplyValueFn[T] {
+	return func(target configPatchApplyTarget, value T) error {
 		if target == nil {
 			return nil
 		}
@@ -99,18 +102,18 @@ func applyPatchValueToSection[T any, S any](
 	}
 }
 
-type confPatchField struct {
+type configPatchField struct {
 	key          string
 	patchField   string
-	parse        confPatchParser
+	parse        configPatchParser
 	initErr      error
-	hasUpdates   confPatchHasUpdateFn
-	applyUpdates confPatchApplyFn
-	mergeConfig  confPatchMergeFn
+	hasUpdates   configPatchHasUpdateFn
+	applyUpdates configPatchApplyFn
+	mergeConfig  configPatchMergeFn
 }
 
 func (patch *ConfPatch) hasUpdates() bool {
-	for _, field := range allConfPatchFields() {
+	for _, field := range allConfigPatchFields() {
 		if field.hasUpdates(patch) {
 			return true
 		}
@@ -118,7 +121,7 @@ func (patch *ConfPatch) hasUpdates() bool {
 	return false
 }
 
-func (field confPatchField) has(patch *ConfPatch) bool {
+func (field configPatchField) has(patch *ConfPatch) bool {
 	if field.initErr != nil {
 		return false
 	}
@@ -128,7 +131,7 @@ func (field confPatchField) has(patch *ConfPatch) bool {
 	return field.hasUpdates(patch)
 }
 
-func (field confPatchField) parsePatch(patch *ConfPatch, value interface{}) error {
+func (field configPatchField) parsePatch(patch *ConfPatch, value interface{}) error {
 	if field.initErr != nil {
 		return field.initErr
 	}
@@ -138,7 +141,7 @@ func (field confPatchField) parsePatch(patch *ConfPatch, value interface{}) erro
 	return field.parse(patch, value)
 }
 
-func (field confPatchField) apply(target confPatchApplyTarget, patch *ConfPatch) error {
+func (field configPatchField) apply(target configPatchApplyTarget, patch *ConfPatch) error {
 	if field.initErr != nil {
 		return field.initErr
 	}
@@ -148,7 +151,7 @@ func (field confPatchField) apply(target confPatchApplyTarget, patch *ConfPatch)
 	return field.applyUpdates(target, patch)
 }
 
-func (field confPatchField) merge(defaultConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
+func (field configPatchField) merge(defaultConfig, customConfig structs.SysConfig, mergedConfig *structs.SysConfig) {
 	if field.initErr != nil {
 		return
 	}
@@ -158,14 +161,14 @@ func (field confPatchField) merge(defaultConfig, customConfig structs.SysConfig,
 	field.mergeConfig(defaultConfig, customConfig, mergedConfig)
 }
 
-type confPatchValueParser[T any] func(interface{}) (T, error)
-type confPatchValueRef[T any] struct {
+type configPatchValueParser[T any] func(interface{}) (T, error)
+type configPatchValueRef[T any] struct {
 	getTarget func(*ConfPatch) **T
 	getValue  func(*ConfPatch) (T, bool)
 	setValue  func(*ConfPatch, T)
 }
 
-func (target confPatchValueRef[T]) get(patch *ConfPatch) (T, bool) {
+func (target configPatchValueRef[T]) get(patch *ConfPatch) (T, bool) {
 	var zero T
 	if target.getValue != nil {
 		return target.getValue(patch)
@@ -180,7 +183,7 @@ func (target confPatchValueRef[T]) get(patch *ConfPatch) (T, bool) {
 	return **holder, true
 }
 
-func (target confPatchValueRef[T]) set(patch *ConfPatch, value T) {
+func (target configPatchValueRef[T]) set(patch *ConfPatch, value T) {
 	if target.setValue != nil {
 		target.setValue(patch, value)
 		return
@@ -193,9 +196,9 @@ func (target confPatchValueRef[T]) set(patch *ConfPatch, value T) {
 	}
 }
 
-func confPatchPointerRef[T any](getTarget func(*ConfPatch) **T) confPatchValueRef[T] {
+func configPatchPointerRef[T any](getTarget func(*ConfPatch) **T) configPatchValueRef[T] {
 	var zero T
-	return confPatchValueRef[T]{
+	return configPatchValueRef[T]{
 		getValue: func(patch *ConfPatch) (T, bool) {
 			if getTarget == nil {
 				return zero, false
@@ -215,9 +218,9 @@ func confPatchPointerRef[T any](getTarget func(*ConfPatch) **T) confPatchValueRe
 	}
 }
 
-func confPatchValueAccessor[T any](getTarget func(*ConfPatch) *T) confPatchValueRef[T] {
+func configPatchValueAccessor[T any](getTarget func(*ConfPatch) *T) configPatchValueRef[T] {
 	var zero T
-	return confPatchValueRef[T]{
+	return configPatchValueRef[T]{
 		getValue: func(patch *ConfPatch) (T, bool) {
 			if getTarget == nil {
 				return zero, false
@@ -230,18 +233,18 @@ func confPatchValueAccessor[T any](getTarget func(*ConfPatch) *T) confPatchValue
 	}
 }
 
-func newConfPatchField[T any](
+func newConfigPatchField[T any](
 	key, patchField string,
-	parseValue confPatchValueParser[T],
-	target confPatchValueRef[T],
-	applyValue confPatchApplyValueFn[T],
+	parseValue configPatchValueParser[T],
+	target configPatchValueRef[T],
+	applyValue configPatchApplyValueFn[T],
 	hasUpdates func(T) bool,
-	mergeConfig confPatchMergeFn,
-) confPatchField {
+	mergeConfig configPatchMergeFn,
+) configPatchField {
 	if hasUpdates == nil {
 		hasUpdates = func(_ T) bool { return true }
 	}
-	return confPatchField{
+	return configPatchField{
 		key:        key,
 		patchField: patchField,
 		parse: func(patch *ConfPatch, value interface{}) error {
@@ -256,7 +259,7 @@ func newConfPatchField[T any](
 			parsed, ok := target.get(patch)
 			return ok && hasUpdates(parsed)
 		},
-		applyUpdates: func(patchTarget confPatchApplyTarget, patch *ConfPatch) error {
+		applyUpdates: func(patchTarget configPatchApplyTarget, patch *ConfPatch) error {
 			parsed, ok := target.get(patch)
 			if !ok || !hasUpdates(parsed) {
 				return nil
@@ -267,8 +270,8 @@ func newConfPatchField[T any](
 	}
 }
 
-func unsupportedConfPatchField(key string) confPatchField {
-	return confPatchField{
+func unsupportedConfigPatchField(key string) configPatchField {
+	return configPatchField{
 		key: key,
 		parse: func(_ *ConfPatch, _ interface{}) error {
 			return fmt.Errorf("unsupported config key: %s", key)
@@ -298,19 +301,19 @@ func copyDiskWarnings(warnings map[string]structs.DiskWarning) map[string]struct
 }
 
 var (
-	confPatchByKey    = map[string]confPatchField{}
-	confPatchByKeyErr error
+	configPatchByKey    = map[string]configPatchField{}
+	configPatchByKeyErr error
 )
 
 func init() {
-	allFields := allConfPatchFields()
-	confPatchByKey, confPatchByKeyErr = buildConfPatchByKey(allFields)
-	if confPatchByKeyErr == nil {
-		confPatchByKeyErr = validateConfPatchFields(allFields)
+	allFields := allConfigPatchFields()
+	configPatchByKey, configPatchByKeyErr = buildConfigPatchByKey(allFields)
+	if configPatchByKeyErr == nil {
+		configPatchByKeyErr = validateConfigPatchFields(allFields)
 	}
 }
 
-func validateConfPatchFields(fields []confPatchField) error {
+func validateConfigPatchFields(fields []configPatchField) error {
 	for _, field := range fields {
 		if field.initErr != nil {
 			return field.initErr
@@ -319,8 +322,8 @@ func validateConfPatchFields(fields []confPatchField) error {
 	return nil
 }
 
-func buildConfPatchByKey(fields []confPatchField) (map[string]confPatchField, error) {
-	registry := make(map[string]confPatchField, len(fields))
+func buildConfigPatchByKey(fields []configPatchField) (map[string]configPatchField, error) {
+	registry := make(map[string]configPatchField, len(fields))
 	for _, field := range fields {
 		if _, exists := registry[field.key]; exists {
 			return nil, fmt.Errorf("duplicate config patch key: %s", field.key)
@@ -331,30 +334,15 @@ func buildConfPatchByKey(fields []confPatchField) (map[string]confPatchField, er
 }
 
 func parseBoolValue(name string, value interface{}) (bool, error) {
-	parsed, ok := value.(bool)
-	if !ok {
-		return false, fmt.Errorf("invalid %s value: %T", name, value)
-	}
-	return parsed, nil
+	return configparse.Bool(name, value)
 }
 
 func parseIntValue(name string, value interface{}) (int, error) {
-	switch parsed := value.(type) {
-	case int:
-		return parsed, nil
-	case float64:
-		return int(parsed), nil
-	default:
-		return 0, fmt.Errorf("invalid %s value: %T", name, value)
-	}
+	return configparse.Int(name, value)
 }
 
 func parseStringValue(name string, value interface{}) (string, error) {
-	parsed, ok := value.(string)
-	if !ok {
-		return "", fmt.Errorf("invalid %s value: %T", name, value)
-	}
-	return parsed, nil
+	return configparse.String(name, value)
 }
 
 func parseStringSliceValue(name string, value interface{}) ([]string, error) {
@@ -367,7 +355,11 @@ func parseStringSliceValue(name string, value interface{}) ([]string, error) {
 	}
 	parsed := make([]string, 0, len(typedInterface))
 	for _, item := range typedInterface {
-		parsed = append(parsed, fmt.Sprint(item))
+		asString, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid %s item %d value: %T", name, len(parsed), item)
+		}
+		parsed = append(parsed, asString)
 	}
 	return parsed, nil
 }
@@ -423,12 +415,12 @@ func parsePenpaiModels(name string, value interface{}) ([]structs.Penpai, error)
 }
 
 func buildConfigPatch(values map[string]interface{}) (*ConfPatch, error) {
-	if confPatchByKeyErr != nil {
-		return nil, fmt.Errorf("invalid config patch registry: %w", confPatchByKeyErr)
+	if configPatchByKeyErr != nil {
+		return nil, fmt.Errorf("invalid config patch registry: %w", configPatchByKeyErr)
 	}
 	patch := &ConfPatch{}
 	for key, value := range values {
-		field, exists := confPatchByKey[key]
+		field, exists := configPatchByKey[key]
 		if !exists {
 			return nil, fmt.Errorf("unsupported config key: %s", key)
 		}

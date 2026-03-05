@@ -69,7 +69,10 @@ func openOrCreateConfigFile() (*os.File, bool, error) {
 }
 
 func seedDefaultConfigRuntimeState() error {
-	salt := RandString(32)
+	salt, err := RandStringWithError(32)
+	if err != nil {
+		return fmt.Errorf("generate default auth salt: %w", err)
+	}
 	wgPriv, wgPub, err := WgKeyGen()
 	if err != nil {
 		return fmt.Errorf("generate wireguard keypair: %w", err)
@@ -104,7 +107,10 @@ func ensureSessionKeyExists() error {
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("check session key file: %w", err)
 	}
-	keyContent := RandString(32)
+	keyContent, err := RandStringWithError(32)
+	if err != nil {
+		return fmt.Errorf("generate session key content: %w", err)
+	}
 	if err := ioutil.WriteFile(SessionKeyPath(), []byte(keyContent), 0644); err != nil {
 		return fmt.Errorf("couldn't write keyfile! %w", err)
 	}

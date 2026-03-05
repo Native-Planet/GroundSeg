@@ -1,0 +1,1091 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_191342/results/batch-2.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Cross-cutting Sweep
+Batch dimensions: api_surface_coherence, naming_quality
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/broadcast/state_lifecycle.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/state.go
+- goseg/broadcast/loop_test.go
+- goseg/broadcast/collectors/system_info_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/rectify/rectify_test.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/importer/importer.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/routines/version.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/routines/logstream/logs.go
+- goseg/config/config.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/config/config_events.go
+- goseg/system/wifi_runtime_api.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 2,
+  "assessments": {
+    "api_surface_coherence": 76.0,
+    "naming_quality": 71.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "The broadcast runtime entrypoints use mixed shapes for equivalent operations: `bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` and `LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime)` are variadic optional-runtime forms, while `ReloadUrbitsWithRuntime(runtime *broadcastStateRuntime)` requires a single pointer.",
+        "Version/docker startup APIs use the same `Start*` naming for different lifecycle contracts: `StartDockerHealthLoopsWithRuntime` launches goroutines and returns quickly, while `StartDockerSubsystemWithRuntime` and `StartVersionSubsystemWithContext` block until cancellation/error.",
+        "Transition/event APIs rely on positional string tuples instead of typed contracts, e.g. `RunTransitionedOperation(patp, transitionType, startEvent, successEvent string, ...)` and `emitWorkflowTransition(runtime, patp, transitionType, event string)`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "naming_quality": {
+      "evidence": [
+        "Initialism casing is inconsistent in exported and semi-public APIs: `GetStateJson` vs tests named `TestGetStateJSON...`; `DefaultWgConfig`/`WgOn`/`WgRegistered` coexists with `copyWGFileToVolume`; config fields use `EndpointUrl` and `ApiVersion`.",
+        "Wi-Fi naming conventions drift between `WiFi` and `Wifi` forms in the same subsystem (`WiFiRuntimeService`, `NewWiFiRuntime`, `NewWifiClient`, `WifiInfoTicker`).",
+        "Leak subsystem mixes two near-homophone vocabularies (`LickStatus`, `GetLickStatuses`, `lickStatuses`) inside the `leak` package and messages, making API intent harder to infer at call sites."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "runtime_injection_shape_drift",
+      "summary": "Equivalent runtime-injected APIs use conflicting call shapes (variadic optional pointer vs required pointer), making broadcast entrypoints non-uniform.",
+      "related_files": [
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "`bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` and `LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime)` accept variadic runtime and manually check first element.",
+        "`ReloadUrbitsWithRuntime(runtime *broadcastStateRuntime)` uses a non-variadic required pointer shape in the same file.",
+        "Other broadcast APIs choose different runtime passing conventions again (`StartBroadcastLoopWithRuntime(runtime *broadcastLoopRuntime)` and `ApplyBroadcastTransition(..., runtime *BroadcastStateRuntime)`), forcing callers to remember per-function conventions."
+      ],
+      "suggestion": "Standardize runtime-injection APIs in broadcast to one convention (prefer explicit `*Runtime` parameter or a consistent `ResolveRuntime` helper), then provide thin legacy wrappers for compatibility until call sites are migrated.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "start_api_lifecycle_ambiguity",
+      "summary": "`Start*` APIs encode different blocking/async/error semantics without naming distinction, reducing lifecycle predictability.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/routines/version.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`StartDockerHealthLoopsWithRuntime` starts a goroutine and returns immediately once loop launch succeeds.",
+        "`StartDockerSubsystemWithRuntime` starts workers and blocks until context cancellation or worker error.",
+        "`StartVersionSubsystemWithContext` also blocks and aggregates worker errors, while `CheckVersionLoop()` is a no-error fire-and-log wrapper."
+      ],
+      "suggestion": "Split lifecycle verbs to communicate contract (`StartAsync*`, `Run*`, `Serve*`) and standardize return/error behavior; document blocking semantics in package-level API comments and harmonize wrappers.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "initialism_casing_inconsistency",
+      "summary": "Initialism casing conventions (`JSON`, `URL`, `API`, `WiFi`, `WG`) are inconsistently applied across adjacent APIs.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/state_test.go",
+        "goseg/structs/configs.go",
+        "goseg/defaults/defaults.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "Implementation exports `GetStateJson`, while tests use `TestGetStateJSON...`, indicating unresolved naming convention drift.",
+        "Config/domain names mix forms such as `EndpointUrl`, `ApiVersion`, `WgOn`, `WgRegistered`, and `DefaultWgConfig` while other code uses `WG` and `WiFi` forms.",
+        "Wi-Fi runtime APIs combine `WiFiRuntimeService`/`NewWiFiRuntime` with fields `NewWifiClient`/`WifiInfoTicker` in the same subsystem."
+      ],
+      "suggestion": "Adopt one project-wide initialism policy (Go style: all-caps initialisms in identifiers), then batch-rename with compatibility shims/deprecation wrappers where exported identifiers are affected.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_convention_fragmentation"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "leak_lick_vocabulary_collision",
+      "summary": "The leak subsystem uses both `leak` and `lick` terminology for the same domain concept, obscuring intent.",
+      "related_files": [
+        "goseg/leak/broadcast.go",
+        "goseg/leak/broadcast_test.go",
+        "goseg/leak/leak_test.go"
+      ],
+      "evidence": [
+        "Core functions in package `leak` operate on `LickStatus`, `GetLickStatuses`, `lickStatuses`, and logs like \"Closing lick channel\".",
+        "Tests reinforce the divergent naming (`setLickStatusesForTest`, `TestGetLickStatusesReflectsCurrentState`) instead of clarifying a distinct concept boundary.",
+        "No parallel type family in these files indicates `lick` is a separate domain object; terms appear interchangeable with leak socket/session state."
+      ],
+      "suggestion": "Rename `Lick*` identifiers to a single domain term (`Leak*` or a clearer protocol-specific noun), and keep a short transitional alias layer only where external callers depend on old names.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_convention_fragmentation"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "stringly_typed_transition_contracts",
+      "summary": "Transition-publishing APIs expose multiple positional string parameters, making misuse easy and contracts hard to validate.",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/leak/broadcast.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "`RunTransitionedOperation` and `emitWorkflowTransition` pass transition identity and event semantics as raw strings.",
+        "Leak broadcast envelopes are assembled with literal string values for `Type`/`AuthLevel` in `updateBroadcast`, rather than shared typed enums.",
+        "Broadcast transition APIs are typed for mutation behavior but still depend on external string event naming conventions downstream."
+      ],
+      "suggestion": "Introduce typed transition/event identifiers (small enums or dedicated types) and replace multi-string positional APIs with request structs so compile-time checks enforce valid combinations.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single API contract standard for runtime injection and lifecycle methods across subsystems.",
+      "Naming policy for initialisms/domain vocabulary is not centrally enforced during refactors and wrapper introductions."
+    ],
+    "likely_symptoms": [
+      "runtime_injection_shape_drift",
+      "start_api_lifecycle_ambiguity",
+      "stringly_typed_transition_contracts",
+      "initialism_casing_inconsistency",
+      "leak_lick_vocabulary_collision"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cba45-3813-7672-b4cd-46b0032e5e2a
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Cross-cutting Sweep
+Batch dimensions: api_surface_coherence, naming_quality
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/broadcast/state_lifecycle.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/state.go
+- goseg/broadcast/loop_test.go
+- goseg/broadcast/collectors/system_info_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/rectify/rectify_test.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/importer/importer.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/routines/version.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/routines/logstream/logs.go
+- goseg/config/config.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/config/config_events.go
+- goseg/system/wifi_runtime_api.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll review the blind packet first to capture the exact `system_prompt` constraints, then inspect only the assigned files for `api_surface_coherence` and `naming_quality` and return a JSON-only assessment.
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg --files goseg/broadcast goseg/rectify goseg/defaults goseg/leak goseg/docker goseg/system goseg/structs goseg/config goseg/startuporchestrator goseg/importer goseg/routines goseg/shipworkflow goseg/main.go goseg/main_test.go | sed -n '1,200p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 5985
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "api_surface_coherence",
+    "abstraction_fitness",
+    "naming_quality"
+  ],
+  "dimension_prompts": {
+    "api_surface_coherence": {
+      "description": "Inconsistent API shapes, mixed sync/async, overloaded interfaces",
+      "look_for": [
+        "Inconsistent API shapes: similar functions with different parameter ordering or naming",
+        "Mixed sync/async in the same module's public API",
+        "Overloaded interfaces: one function doing too many things based on argument types",
+        "Missing error contracts: no documentation or types indicating what can fail",
+        "Public functions with >5 parameters (API boundary may be wrong)"
+ succeeded in 51ms:
+goseg/importer/extract.go
+goseg/routines/system_test.go
+goseg/startuporchestrator/startup_orchestrator.go
+goseg/startuporchestrator/startup_orchestrator_test.go
+goseg/system/wifi_c2c_service_test.go
+goseg/system/system_test.go
+goseg/system/wifi_runtime_api_test.go
+goseg/system/wifi_captive_api.go
+goseg/system/wifi_c2c_flow_test.go
+goseg/broadcast/state_lifecycle.go
+goseg/system/system_maintenance_test.go
+goseg/system/system_metrics_test.go
+goseg/broadcast/delivery_test.go
+goseg/system/swap_test.go
+goseg/system/system_command_test.go
+goseg/broadcast/broadcast.go
+goseg/system/wifi_c2c_policy.go
+goseg/broadcast/broadcast_test.go
+goseg/system/disk_vars.go
+goseg/broadcast/state.go
+codex
+I’ve loaded the packet constraints; next I’m scanning function signatures and naming patterns across just the assigned files to identify concrete API-shape and naming defects with cross-file evidence.
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg -n "''^func |type .*interface|''^var |''^const " goseg/broadcast/state_lifecycle.go goseg/broadcast/state_test.go goseg/broadcast/state.go goseg/broadcast/loop_test.go goseg/broadcast/collectors/system_info_test.go goseg/rectify/rectify_services.go goseg/defaults/defaults.go goseg/rectify/rectify_test.go goseg/broadcast/loop.go goseg/leak/broadcast_test.go goseg/docker/orchestration/subsystem/docker_test.go goseg/leak/broadcast.go goseg/docker/orchestration/wireguard.go goseg/docker/orchestration/wireguard_test.go goseg/system/wifi_runtime_methods.go goseg/leak/leak_test.go goseg/broadcast/transitions.go goseg/structs/configs.go goseg/config/config_test.go goseg/config/config_update_registry.go goseg/startuporchestrator/startup_orchestrator.go goseg/importer/importer.go goseg/main.go goseg/startuporchestrator/startup_orchestrator_test.go goseg/main_test.go goseg/handler/systemsvc/system_test.go goseg/routines/version.go goseg/docker/orchestration/subsystem/subsystem_events.go goseg/docker/orchestration/runtime_ops.go goseg/docker/events/events.go goseg/routines/logstream/logs.go goseg/config/config.go goseg/docker/orchestration/subsystem/subsystem_health.go goseg/shipworkflow/operations_runtime.go goseg/docker/lifecycle/planner.go goseg/routines/system/system.go goseg/docker/network/network.go goseg/config/config_events.go goseg/system/wifi_runtime_api.go' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 699
+
+goseg/broadcast/state_lifecycle.go:15:func bootstrapBroadcastState(runtime ...*broadcastStateRuntime) error {
+goseg/broadcast/state_lifecycle.go:22:func bootstrapBroadcastStateWithRuntime(resolved *broadcastStateRuntime) error {
+goseg/broadcast/state_lifecycle.go:50:func LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime) error {
+goseg/broadcast/state_lifecycle.go:57:func LoadStartramRegionsWithRuntimeState(resolved *broadcastStateRuntime) error {
+goseg/broadcast/state_lifecycle.go:72:func ReloadUrbits() error {
+goseg/broadcast/state_lifecycle.go:76:func ReloadUrbitsWithRuntime(runtime *broadcastStateRuntime) error {
+goseg/broadcast/state_lifecycle.go:91:func broadcastPierCollectorContract(runtime *broadcastStateRuntime) collectors.BroadcastPierCollectorContract {
+goseg/broadcast/state_lifecycle.go:98:func broadcastInfoCollectorContract(runtime *broadcastStateRuntime) collectors.BroadcastInfoCollectorContract {
+goseg/broadcast/state_lifecycle.go:105:func broadcastStartramCollectorContract(runtime *broadcastStateRuntime) collectors.BroadcastStartramCollectorContract {
+goseg/broadcast/state_lifecycle.go:112:func constructPierInfoWithRuntime(runtime *broadcastStateRuntime, urbits map[string]structs.Urbit, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
+goseg/broadcast/state_lifecycle.go:116:func constructAppsInfoWithRuntime(runtime *broadcastStateRuntime) structs.Apps {
+goseg/broadcast/state_lifecycle.go:120:func constructProfileInfoWithRuntime(runtime *broadcastStateRuntime, regions map[string]structs.StartramRegion) structs.Profile {
+goseg/broadcast/state_lifecycle.go:124:func constructSystemInfoWithRuntime(runtime *broadcastStateRuntime) structs.System {
+goseg/defaults/defaults.go:13:var (
+goseg/defaults/defaults.go:113:func DockerData(pathType string) string {
+goseg/defaults/defaults.go:132:func DefaultUrbitConfig() structs.UrbitDocker {
+goseg/defaults/defaults.go:137:func DefaultNetdataConfig() structs.NetdataConfig {
+goseg/defaults/defaults.go:152:func DefaultMcConfig() structs.McConfig {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/broadcast/state.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/broadcast/transitions.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/system/wifi_runtime_api.go | sed -n '1,340p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package broadcast
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/broadcast/collectors"
+     8		"groundseg/structs"
+     9		"groundseg/transition"
+    10		"maps"
+    11		"sync"
+    12		"time"
+    13	)
+    14	
+    15	var (
+    16		defaultBroadcastStateRuntime = NewBroadcastStateRuntime()
+    17		errBroadcastRuntimeRequired  = errors.New("broadcast state runtime is required")
+    18	)
+    19	
+    20	type broadcastStateRuntime struct {
+ succeeded in 51ms:
+     1	package broadcast
+     2	
+     3	import (
+     4		"errors"
+     5		"fmt"
+     6	
+     7		"groundseg/structs"
+     8		"groundseg/transition"
+     9	)
+    10	
+    11	type BroadcastStateRuntime = broadcastStateRuntime
+    12	
+    13	// BroadcastTransition describes a single, typed transition applied to broadcast state.
+    14	// Mutations must be scoped to the transition contract implemented by the transition type.
+    15	type BroadcastTransition interface {
+    16		Apply(*structs.AuthBroadcast) error
+    17	}
+    18	
+    19	// ApplyBroadcastTransition applies a typed transition to the current broadcast state.
+    20	// If `notify` is true, it refreshes connected websocket clients afterward.
+ succeeded in 51ms:
+     1	package system
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/internal/seams"
+     8		"os/exec"
+     9		"strings"
+    10	)
+    11	
+    12	var ErrWiFiInterfaceNotFound = errors.New("wifi interface not found")
+    13	
+    14	type WiFiRuntimeService struct {
+    15		runtime         wifiRuntime
+    16		state           *wifiRuntimeState
+    17		prepareErr      error
+    18		runtimePrepared bool
+    19	}
+    20	
+codex
+I’ve identified a few likely inconsistencies (especially around JSON/API naming and WiFi method contracts). I’m now verifying across config/startup/routine files to ensure each finding is structural and backed by at least two files.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/config/config.go | sed -n '1,320p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/config/config_events.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/config/config_update_registry.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package config
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7	
+     8		"groundseg/system"
+     9	
+    10		"go.uber.org/zap"
+    11	)
+    12	
+    13	type configEventRuntime struct {
+    14		channelFn func() <-chan string
+    15		processFn func(string)
+    16	}
+    17	
+    18	func defaultConfigEventRuntime() configEventRuntime {
+    19		return configEventRuntime{
+    20			channelFn: func() <-chan string {
+ succeeded in 52ms:
+     1	package config
+     2	
+     3	// code for managing groundseg and container configurations
+     4	
+     5	import (
+     6		"groundseg/defaults"
+     7		"sync"
+     8		"sync/atomic"
+     9		"time"
+    10	
+    11		"groundseg/structs"
+    12	)
+    13	
+    14	type StartramConfigSnapshot struct {
+    15		Value     structs.StartramRetrieve
+    16		UpdatedAt time.Time
+    17		Fresh     bool
+    18	}
+    19	
+    20	type StartramSettings struct {
+ succeeded in 52ms:
+     1	package config
+     2	
+     3	import (
+     4		"fmt"
+     5		"groundseg/structs"
+     6		"strings"
+     7	)
+     8	
+     9	type configPatchConfigFieldRef[T any] func(*structs.SysConfig) *T
+    10	
+    11	type configPatchFieldBinding[T any] struct {
+    12		key         string
+    13		patchField  string
+    14		parse       configPatchValueParser[T]
+    15		target      configPatchValueRef[T]
+    16		configField configPatchConfigFieldRef[T]
+    17		apply       configPatchApplyValueFn[T]
+    18		hasUpdates  func(T) bool
+    19		merge       configPatchMergeFn
+    20	}
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/structs/configs.go | sed -n '1,320p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/main.go | sed -n '520,760p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/startuporchestrator/startup_orchestrator.go | sed -n '900,1060p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package structs
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"time"
+     7	)
+     8	
+     9	type DiskWarning struct {
+    10		// true if warning has been sent
+    11		// resets to false when disk goes below 80% usage
+    12		// 95% will send a recurring warning
+    13		Eighty     bool      `json:"eighty"`
+    14		Ninety     bool      `json:"ninety"`
+    15		NinetyFive time.Time `json:"ninetyFive"`
+    16	}
+    17	
+    18	// system.json config struct grouped by domain
+    19	type SysConfig struct {
+    20		Connectivity ConnectivityConfig `json:"-"`
+ succeeded in 52ms:
+   520		if port <= 0 || port > 65535 {
+   521			return 0, fmt.Errorf("invalid %s port %q: must be between 1 and 65535", flagName, value)
+   522		}
+   523		return port, nil
+   524	}
+   525	
+   526	func parseStartupOptions(args []string) (appStartupOptions, error) {
+   527		opts := appStartupOptions{
+   528			httpPort:      80,
+   529			websocketPort: 3000,
+   530		}
+   531		for _, arg := range args {
+   532			switch {
+   533			case arg == "dev":
+   534				opts.devMode = true
+   535			case strings.HasPrefix(arg, "--http-port="):
+   536				portStr := strings.TrimPrefix(arg, "--http-port=")
+   537				port, err := parsePort("http", portStr)
+   538				if err != nil {
+   539					return appStartupOptions{}, err
+ succeeded in 52ms:
+   900				healthFn: func(ctx context.Context) error {
+   901					if backgroundServices == nil {
+   902						return nil
+   903					}
+   904					return backgroundServices.health(ctx)
+   905				},
+   906			},
+   907			{
+   908				id:           startupTaskServer,
+   909				name:         "service server",
+   910				dependencies: []startupTaskID{startupTaskRuntime},
+   911				required:     true,
+   912				startFn: func(ctx context.Context) error {
+   913					if opts.startServer == nil {
+   914						return fmt.Errorf("startup start server callback is required")
+   915					}
+   916					return opts.startServer(ctx, opts.httpPort, opts.websocketPort)
+   917				},
+   918			},
+   919		}
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/shipworkflow/operations_runtime.go | sed -n '150,280p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/routines/version.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/importer/importer.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package routines
+     2	
+     3	import (
+     4		"context"
+     5		"crypto/sha256"
+     6		"encoding/hex"
+     7		"errors"
+     8		"fmt"
+     9		"groundseg/config"
+    10		"groundseg/internal/resource"
+    11		"groundseg/routines/slsa"
+    12		"groundseg/structs"
+    13		"io"
+    14		"net/http"
+    15		"os"
+    16		"os/exec"
+    17		"path/filepath"
+    18		"reflect"
+    19		"strconv"
+    20		"strings"
+ succeeded in 52ms:
+     1	package importer
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/auth"
+     8		"groundseg/auth/tokens"
+     9		"groundseg/click/acme"
+    10		"groundseg/config"
+    11		"groundseg/docker/events"
+    12		dockerOrchestration "groundseg/docker/orchestration"
+    13		"groundseg/driveresolver"
+    14		"groundseg/internal/resource"
+    15		"groundseg/internal/seams"
+    16		"groundseg/lifecycle"
+    17		"groundseg/logger"
+    18		workflowOrchestration "groundseg/orchestration"
+    19		"groundseg/shipcleanup"
+    20		"groundseg/shipcreator"
+ succeeded in 52ms:
+   150	func dispatchUploadImport(runtime workflowRuntime, ctx context.Context, cmd UploadImportCommand) error {
+   151		resolvedRuntime, err := resolveWorkflowRuntime(runtime)
+   152		if err != nil {
+   153			return fmt.Errorf("prepare workflow runtime for upload import dispatch: %w", err)
+   154		}
+   155		runtime = resolvedRuntime
+   156		if err := runtime.UploadImportCoordinator(ctx, cmd); err != nil {
+   157			return fmt.Errorf("dispatch upload import for %s: %w", cmd.Patp, err)
+   158		}
+   159		return nil
+   160	}
+   161	
+   162	func emitWorkflowTransition(runtime workflowRuntime, patp, transitionType, event string) error {
+   163		resolvedRuntime, err := resolveWorkflowRuntime(runtime)
+   164		if err != nil {
+   165			return fmt.Errorf("prepare workflow runtime: %w", err)
+   166		}
+   167		return emitWorkflowTransitionResolved(resolvedRuntime, patp, transitionType, event)
+   168	}
+   169	
+codex
+I’m now validating naming consistency for initialisms and API method families (e.g., `WG`/`Wg`, `WiFi`/`Wifi`, `Json`/`JSON`) in Docker/network and broadcast files to avoid reporting shallow one-offs.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/docker/orchestration/wireguard.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/defaults/defaults.go | sed -n '120,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/docker/network/network.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+   120				if pathType == "volumes" {
+   121					return dir
+   122				} else {
+   123					splitPath := strings.Split(dir, "/")
+   124					basePath := "/" + strings.Join(splitPath[:len(splitPath)-1], "/")
+   125					return basePath
+   126				}
+   127			}
+   128		}
+   129		return ""
+   130	}
+   131	
+   132	func DefaultUrbitConfig() structs.UrbitDocker {
+   133		clone := defaultUrbitConfig
+   134		return clone
+   135	}
+   136	
+   137	func DefaultNetdataConfig() structs.NetdataConfig {
+   138		return structs.NetdataConfig{
+   139			NetdataName:    defaultNetdataConfig.NetdataName,
+ succeeded in 51ms:
+     1	package orchestration
+     2	
+     3	import (
+     4		"encoding/base64"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/docker/orchestration/container"
+     8		"groundseg/docker/orchestration/internal/artifactwriter"
+     9		"groundseg/internal/seams"
+    10		"os"
+    11		"path/filepath"
+    12		"strconv"
+    13		"strings"
+    14	
+    15		dockerc "github.com/docker/docker/api/types/container"
+    16		"github.com/docker/docker/api/types/mount"
+    17		"go.uber.org/zap"
+    18	)
+    19	
+    20	func (rt WireguardRuntime) LoadWireguard() error {
+ succeeded in 51ms:
+     1	package network
+     2	
+     3	import (
+     4		"context"
+     5		"fmt"
+     6		"os"
+     7		"path/filepath"
+     8		"time"
+     9	
+    10		"groundseg/docker/internal/closeutil"
+    11	
+    12		"github.com/docker/docker/api/types/container"
+    13		"github.com/docker/docker/api/types/filters"
+    14		dockernetwork "github.com/docker/docker/api/types/network"
+    15		volumetypes "github.com/docker/docker/api/types/volume"
+    16		"go.uber.org/zap"
+    17	
+    18		"groundseg/dockerclient"
+    19		"groundseg/internal/seams"
+    20	
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/system/wifi_runtime_methods.go | sed -n '1,320p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package system
+     2	
+     3	import (
+     4		"fmt"
+     5		"os/exec"
+     6		"strings"
+     7		"time"
+     8	
+     9		"groundseg/internal/resource"
+    10		"groundseg/internal/seams"
+    11	
+    12		"github.com/mdlayher/wifi"
+    13		"go.uber.org/zap"
+    14	)
+    15	
+    16	type wifiRuntime struct {
+    17		ExecCommand        func(string, ...string) *exec.Cmd
+    18		RunCommand         func(string, ...string) (string, error)
+    19		RunNmcliFn         func(args ...string) (string, error)
+    20		NewWifiClient      func() (*wifi.Client, error)
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/leak/broadcast.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/leak/broadcast_test.go | sed -n '1,140p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/leak/leak_test.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package leak
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"errors"
+     6		"io"
+     7		"net"
+     8		"reflect"
+     9		"testing"
+    10		"time"
+    11	
+    12		"groundseg/structs"
+    13	)
+    14	
+    15	func resetLeakStateForTest(t *testing.T) {
+    16		t.Helper()
+    17		originalBytes := BytesChan
+    18		lickMu.Lock()
+    19		originalStatuses := lickStatuses
+    20		lickMu.Unlock()
+ succeeded in 51ms:
+     1	package leak
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/internal/resource"
+     8		"groundseg/structs"
+     9		"io"
+    10		"net"
+    11		"reflect"
+    12	
+    13		"github.com/stevelacy/go-urbit/noun"
+    14		"go.uber.org/zap"
+    15	)
+    16	
+    17	func listener(patp string, conn net.Conn, info LickStatus) {
+    18		lickMu.Lock()
+    19		BytesChan[patp] = make(chan string)
+    20		readChan := make(chan []byte)
+ succeeded in 51ms:
+     1	package leak
+     2	
+     3	import (
+     4		"errors"
+     5		"net"
+     6		"path/filepath"
+     7		"reflect"
+     8		"testing"
+     9		"time"
+    10	
+    11		"groundseg/structs"
+    12	)
+    13	
+    14	func resetLeakSeamsForTest(t *testing.T) {
+    15		t.Helper()
+    16		originalNow := leakNow
+    17		originalSleep := leakSleep
+    18		originalConf := leakConf
+    19		originalUrbitConf := leakUrbitConf
+    20		originalLookupEnv := leakLookupEnv
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/broadcast/state_lifecycle.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package broadcast
+     2	
+     3	import (
+     4		"errors"
+     5		"fmt"
+     6		"time"
+     7	
+     8		"groundseg/broadcast/collectors"
+     9		"groundseg/structs"
+    10	
+    11		"go.uber.org/zap"
+    12	)
+    13	
+    14	// take in config file and addt'l info to initialize broadcast
+    15	func bootstrapBroadcastState(runtime ...*broadcastStateRuntime) error {
+    16		if len(runtime) == 0 || runtime[0] == nil {
+    17			return fmt.Errorf("bootstrap broadcast state: %w", errBroadcastRuntimeRequired)
+    18		}
+    19		return bootstrapBroadcastStateWithRuntime(runtime[0])
+    20	}
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/docker/orchestration/subsystem/subsystem_events.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package subsystem
+     2	
+     3	import (
+     4		"context"
+     5		"fmt"
+     6		"sync"
+     7		"time"
+     8	
+     9		"groundseg/docker/internal/closeutil"
+    10		"groundseg/dockerclient"
+    11		"groundseg/logger"
+    12		"groundseg/structs"
+    13		"groundseg/transition"
+    14	
+    15		eventtypes "github.com/docker/docker/api/types/events"
+    16	)
+    17	
+    18	type dockerSubsystemRuntime struct {
+    19		events dockerSubsystemEventBus
+    20		health dockerHealthLoopState
+codex
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 2,
+  "assessments": {
+    "api_surface_coherence": 76.0,
+    "naming_quality": 71.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "The broadcast runtime entrypoints use mixed shapes for equivalent operations: `bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` and `LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime)` are variadic optional-runtime forms, while `ReloadUrbitsWithRuntime(runtime *broadcastStateRuntime)` requires a single pointer.",
+        "Version/docker startup APIs use the same `Start*` naming for different lifecycle contracts: `StartDockerHealthLoopsWithRuntime` launches goroutines and returns quickly, while `StartDockerSubsystemWithRuntime` and `StartVersionSubsystemWithContext` block until cancellation/error.",
+        "Transition/event APIs rely on positional string tuples instead of typed contracts, e.g. `RunTransitionedOperation(patp, transitionType, startEvent, successEvent string, ...)` and `emitWorkflowTransition(runtime, patp, transitionType, event string)`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "naming_quality": {
+      "evidence": [
+        "Initialism casing is inconsistent in exported and semi-public APIs: `GetStateJson` vs tests named `TestGetStateJSON...`; `DefaultWgConfig`/`WgOn`/`WgRegistered` coexists with `copyWGFileToVolume`; config fields use `EndpointUrl` and `ApiVersion`.",
+        "Wi-Fi naming conventions drift between `WiFi` and `Wifi` forms in the same subsystem (`WiFiRuntimeService`, `NewWiFiRuntime`, `NewWifiClient`, `WifiInfoTicker`).",
+        "Leak subsystem mixes two near-homophone vocabularies (`LickStatus`, `GetLickStatuses`, `lickStatuses`) inside the `leak` package and messages, making API intent harder to infer at call sites."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "runtime_injection_shape_drift",
+      "summary": "Equivalent runtime-injected APIs use conflicting call shapes (variadic optional pointer vs required pointer), making broadcast entrypoints non-uniform.",
+      "related_files": [
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "`bootstrapBroadcastState(runtime ...*broadcastStateRuntime)` and `LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime)` accept variadic runtime and manually check first element.",
+        "`ReloadUrbitsWithRuntime(runtime *broadcastStateRuntime)` uses a non-variadic required pointer shape in the same file.",
+        "Other broadcast APIs choose different runtime passing conventions again (`StartBroadcastLoopWithRuntime(runtime *broadcastLoopRuntime)` and `ApplyBroadcastTransition(..., runtime *BroadcastStateRuntime)`), forcing callers to remember per-function conventions."
+      ],
+      "suggestion": "Standardize runtime-injection APIs in broadcast to one convention (prefer explicit `*Runtime` parameter or a consistent `ResolveRuntime` helper), then provide thin legacy wrappers for compatibility until call sites are migrated.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "start_api_lifecycle_ambiguity",
+      "summary": "`Start*` APIs encode different blocking/async/error semantics without naming distinction, reducing lifecycle predictability.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/routines/version.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`StartDockerHealthLoopsWithRuntime` starts a goroutine and returns immediately once loop launch succeeds.",
+        "`StartDockerSubsystemWithRuntime` starts workers and blocks until context cancellation or worker error.",
+        "`StartVersionSubsystemWithContext` also blocks and aggregates worker errors, while `CheckVersionLoop()` is a no-error fire-and-log wrapper."
+      ],
+      "suggestion": "Split lifecycle verbs to communicate contract (`StartAsync*`, `Run*`, `Serve*`) and standardize return/error behavior; document blocking semantics in package-level API comments and harmonize wrappers.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "initialism_casing_inconsistency",
+      "summary": "Initialism casing conventions (`JSON`, `URL`, `API`, `WiFi`, `WG`) are inconsistently applied across adjacent APIs.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/state_test.go",
+        "goseg/structs/configs.go",
+        "goseg/defaults/defaults.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "Implementation exports `GetStateJson`, while tests use `TestGetStateJSON...`, indicating unresolved naming convention drift.",
+        "Config/domain names mix forms such as `EndpointUrl`, `ApiVersion`, `WgOn`, `WgRegistered`, and `DefaultWgConfig` while other code uses `WG` and `WiFi` forms.",
+        "Wi-Fi runtime APIs combine `WiFiRuntimeService`/`NewWiFiRuntime` with fields `NewWifiClient`/`WifiInfoTicker` in the same subsystem."
+      ],
+      "suggestion": "Adopt one project-wide initialism policy (Go style: all-caps initialisms in identifiers), then batch-rename with compatibility shims/deprecation wrappers where exported identifiers are affected.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_convention_fragmentation"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "leak_lick_vocabulary_collision",
+      "summary": "The leak subsystem uses both `leak` and `lick` terminology for the same domain concept, obscuring intent.",
+      "related_files": [
+        "goseg/leak/broadcast.go",
+        "goseg/leak/broadcast_test.go",
+        "goseg/leak/leak_test.go"
+      ],
+      "evidence": [
+        "Core functions in package `leak` operate on `LickStatus`, `GetLickStatuses`, `lickStatuses`, and logs like \"Closing lick channel\".",
+        "Tests reinforce the divergent naming (`setLickStatusesForTest`, `TestGetLickStatusesReflectsCurrentState`) instead of clarifying a distinct concept boundary.",
+        "No parallel type family in these files indicates `lick` is a separate domain object; terms appear interchangeable with leak socket/session state."
+      ],
+      "suggestion": "Rename `Lick*` identifiers to a single domain term (`Leak*` or a clearer protocol-specific noun), and keep a short transitional alias layer only where external callers depend on old names.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_convention_fragmentation"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "stringly_typed_transition_contracts",
+      "summary": "Transition-publishing APIs expose multiple positional string parameters, making misuse easy and contracts hard to validate.",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/leak/broadcast.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "`RunTransitionedOperation` and `emitWorkflowTransition` pass transition identity and event semantics as raw strings.",
+        "Leak broadcast envelopes are assembled with literal string values for `Type`/`AuthLevel` in `updateBroadcast`, rather than shared typed enums.",
+        "Broadcast transition APIs are typed for mutation behavior but still depend on external string event naming conventions downstream."
+      ],
+      "suggestion": "Introduce typed transition/event identifiers (small enums or dedicated types) and replace multi-string positional APIs with request structs so compile-time checks enforce valid combinations.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_api_contract_inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single API contract standard for runtime injection and lifecycle methods across subsystems.",
+      "Naming policy for initialisms/domain vocabulary is not centrally enforced during refactors and wrapper introductions."
+    ],
+    "likely_symptoms": [
+      "runtime_injection_shape_drift",
+      "start_api_lifecycle_ambiguity",
+      "stringly_typed_transition_contracts",
+      "initialism_casing_inconsistency",
+      "leak_lick_vocabulary_collision"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+81,656
+

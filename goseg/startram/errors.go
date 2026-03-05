@@ -5,9 +5,9 @@ import (
 	"groundseg/protocol/contracts"
 )
 
-var APIConnectionErrorMessage = contracts.MustContractDescriptor(contracts.APIConnectionError).Message
-
 type APIConnectionErrorContractDescriptor = contracts.ContractDescriptor
+
+const APIConnectionErrorMessage = contracts.APIConnectionErrorMessage
 
 var apiConnectionErrorContract = APIConnectionErrorContractDescriptor(
 	contracts.MustContractDescriptor(contracts.APIConnectionError),
@@ -52,7 +52,7 @@ func IsAPIConnectionErrorContractDeprecated(version string) bool {
 }
 
 func wrapAPIConnectionError(err error) error {
-	masked := errpolicy.WrapMasked(APIConnectionErrorMessage, err)
+	masked := errpolicy.WrapMasked(contracts.APIConnectionErrorMessage, err)
 	return APIConnectionError{
 		masked: masked,
 		cause:  err,

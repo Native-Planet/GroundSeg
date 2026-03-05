@@ -1,0 +1,439 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 37.0,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 58.0,
+        "Indirection Cost": 52.0,
+        "Interface Honesty": 66.0
+      }
+    },
+    "design_coherence": 47.0,
+    "error_consistency": 59.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules rely on process-wide default runtimes/singletons (for example `defaultBroadcastStateRuntime`, `defaultDockerSubsystemRuntime`, and `defaultEventRuntime`) while also exposing optional override paths, creating two competing dependency models.",
+        "Runtime dependency carriers are very wide and embed other runtime bundles (`workflowRuntime`, `importerRuntime`, `StartupRuntime`, `startBackgroundServicesRuntime`), so features consume broad capability bags instead of narrow domain ports.",
+        "Several wrappers only forward calls without adding policy or translation (for example `startDockerHealthLoopWithRuntime`, `stopDockerHealthLoopWithRuntime`, `defaultWorkflowRuntime`, `NewWiFiRuntime`, `BroadcastLoopWithRuntime`), increasing call depth without leverage."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 52.0,
+        "interface_honesty": 66.0
+      }
+    },
+    "design_coherence": {
+      "evidence": [
+        "Configuration key-to-field translation is implemented in multiple manual layers: `UrbitDocker.UnmarshalJSON` in `goseg/structs/configs.go` contains a long string-key switch, while `goseg/config/config_update_schema.go` separately defines key-specific patch parsing and apply flows.",
+        "Runtime orchestration seams are split into many narrowly named op structs in `goseg/docker/orchestration/runtime_ops.go`, but assembled through one central registry and default builders, creating a broad composition hub that couples many subsystems in one file.",
+        "State-holder types combine unrelated concerns: `goseg/broadcast/state.go` includes state mutation, collector wiring, scheduling bus, and bootstrap/loop startup; `goseg/session/logstream_session_store.go` combines system sessions, docker sessions, and log message bus behavior in one store/interface."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "Background loops use inconsistent failure semantics: `check502Loop` logs errors and continues indefinitely, while `CheckVersionLoopWithContext` and `DockerLogStreamerWithRuntime` enforce consecutive-failure limits and return terminal errors.",
+        "Startup required/optional policy is inconsistently enforced: `runStartupSubsystem` fails required missing callbacks, but the required `configure swap` step can silently succeed when `ConfigureSwapFn` is nil.",
+        "Docker client lifecycle error handling is inconsistent: some modules aggregate close errors (`closeDockerClient`, `closeRuntimeDockerClient`), while `dockerListenerWithRuntime` creates a docker client and never closes it."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "ambient_singleton_runtime_model",
+      "summary": "Ambient singleton runtimes and optional override injection coexist, creating hidden dependency direction and inconsistent abstraction boundaries.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/state.go` exposes shared mutable state via `defaultBroadcastStateRuntime` and `DefaultBroadcastStateRuntime()`.",
+        "`goseg/docker/orchestration/subsystem/subsystem_events.go` runs subsystem entrypoints against `defaultDockerSubsystemRuntime` by default (`StartDockerHealthLoops`, `StartDockerSubsystem`, `StopDockerHealthLoops`).",
+        "`goseg/docker/events/events.go` uses `sync.OnceValue(newEventRuntime)` for a process-wide broker while callers can also pass delegate brokers.",
+        "`goseg/shipworkflow/operations_runtime.go` rebuilds defaults through `defaultWorkflowRuntime()` and then merges optional overrides in `resolveWorkflowRuntime`, mixing ambient and explicit dependency ownership."
+      ],
+      "suggestion": "Choose one dependency model per subsystem: prefer constructor-created runtime instances passed through orchestration boundaries, and remove package-level default runtime state from feature paths (retain only compatibility shims at entrypoints).",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "ambient_global_state"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_dependency_bag_overreach",
+      "summary": "Large embedded runtime structs act as capability bags, obscuring true domain interfaces and increasing coupling.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`importerRuntime` embeds `importerStorageRuntime`, `importerUploadRuntime`, `importerProvisionRuntime`, and transitively embeds `RuntimeContainerOps`/`RuntimeVolumeOps`.",
+        "`workflowRuntime` embeds `RuntimeContainerOps`, `RuntimeUrbitOps`, and `RuntimeSnapshotOps` plus unrelated callbacks (transition emit, CNAME, bar exit, upload coordinator).",
+        "`goseg/docker/orchestration/runtime_ops.go` defines many broad ops groups that aggregate unrelated responsibilities (context, file, snapshot, image, wireguard, minio, timer, command, startup).",
+        "`startBackgroundServicesRuntime` contains a long list of service start callbacks, making a single runtime abstraction cover many independent subsystems."
+      ],
+      "suggestion": "Refactor to narrower per-use-case ports (for example transition publishing, ship persistence, container lifecycle, config snapshots) and pass only required ports into each workflow/service function.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "capability_bag_abstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_wrapper_indirection",
+      "summary": "Multiple pass-through wrappers add indirection layers without policy, validation, or translation.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`startDockerHealthLoopWithRuntime` and `stopDockerHealthLoopWithRuntime` simply delegate to internal functions with no added behavior.",
+        "`NewWiFiRuntime()` only returns `newWiFiRuntime()` unchanged.",
+        "`defaultWorkflowRuntime()` only returns `newWorkflowRuntime()` unchanged.",
+        "`BroadcastLoopWithRuntime()` just forwards to `StartBroadcastLoopWithRuntime()`."
+      ],
+      "suggestion": "Collapse no-op forwarding layers and keep only API boundaries that enforce contract checks or policy; where compatibility APIs are needed, centralize and document them as legacy shims.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "indirection_without_policy"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_snapshot_reach_through",
+      "summary": "Orchestration abstractions repeatedly reach through to global config snapshots/functions, leaking infrastructure concerns across layers.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go"
+      ],
+      "evidence": [
+        "`defaultRuntimeSnapshot()` and `runtimeContextOps()` bind orchestration runtime directly to global config functions (`config.*Snapshot`, `config.BasePath`, `config.DockerDir`, etc.).",
+        "`main.go` constructs C2C logic from `config.RuntimeContextSnapshot`, `config.ConnectivitySettingsSnapshot`, and other package-level config calls instead of a dedicated connectivity port.",
+        "`startup_orchestrator.go` default runtimes wire directly to many global config entrypoints (initialize, settings snapshots, conf event loop) inside orchestration code.",
+        "`subsystem_health.go` consumes snapshot functions from runtime state, but these are still sourced from global config seams by default, preserving ambient coupling."
+      ],
+      "suggestion": "Introduce explicit domain services (runtime context provider, connectivity policy provider, ship/health settings provider) and keep config package usage at composition roots only.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "ambient_global_state"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_schema_parallel_mapping",
+      "summary": "Config mapping logic is duplicated across independent parser layers, increasing drift risk and weakening a single source of truth.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`UrbitDocker.UnmarshalJSON` in `goseg/structs/configs.go` manually maps many JSON keys via a long switch.",
+        "`goseg/config/config_update_schema.go` separately defines key-level parsing and patch application (`confPatchField`, parser helpers, registry build), duplicating key semantics in another mechanism.",
+        "Both files encode key names/types and update behavior independently, so adding/changing config fields requires synchronized edits across multiple mapping systems."
+      ],
+      "suggestion": "Introduce a shared declarative field registry (key, type parser, target accessor, merge/apply policy) reused by both full JSON decode and partial patch application, with generated or table-driven adapters to avoid hand-maintained parallel mappings.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "distributed_config_mapping"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "orchestration_seam_hub_overcentralized",
+      "summary": "Runtime seam composition is centralized into a broad hub that mixes infrastructure concerns and reduces boundary clarity.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_ops.go` defines many op groups (`RuntimeContainerOps`, `RuntimeStartupOps`, `RuntimeUrbitOps`, etc.) and assembles them in `runtimeSeamRegistry` + default builders in the same unit.",
+        "`subsystem_events.go` controls health-loop lifecycle, event ingestion, and transition execution, relying on orchestration runtime seams from the same subsystem boundary.",
+        "`urbit_operations_runtime.go` contains transition orchestration paths that depend on external runtime behavior, reinforcing cross-cutting orchestration coupling rather than tighter domain seams."
+      ],
+      "suggestion": "Split seam composition by bounded context (container lifecycle, startup/bootstrap, transition workflows, event handling) and expose smaller context-specific constructors so each module owns only its required dependency surface.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "orchestration_boundary_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "state_runtime_mixed_responsibilities",
+      "summary": "Mutable runtime stores combine multiple responsibilities (state, pub/sub, lifecycle orchestration), making behavior harder to reason about and evolve.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`broadcastStateRuntime` handles synchronized state mutation, scheduled-pack event bus, collector dependency resolution, bootstrap, and loop start/reload logic in one runtime type/file.",
+        "`logstreamSessionStore` manages system websocket lists, docker container-session maps, and a system log message channel under one interface (`LogstreamRuntime`).",
+        "These aggregates blend storage, coordination, and transport concerns, increasing implicit coupling and widening the blast radius of changes."
+      ],
+      "suggestion": "Separate pure state repositories from event buses and lifecycle coordinators (e.g., split broadcast snapshot store, schedule event publisher, and bootstrap coordinator; split log session registry from system log message broker).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_store_overload"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_harness_duplication_patterns",
+      "summary": "Test files repeatedly rebuild low-level stubs and request/response setup patterns instead of using shared fixtures.",
+      "related_files": [
+        "goseg/exporter/exporter_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/main_test.go",
+        "goseg/system/storage/storage_test.go",
+        "goseg/system/metrics/metrics_test.go",
+        "goseg/startram/backup_runtime_test.go",
+        "goseg/startram/state_sync_test.go",
+        "goseg/uploadsvc/service_test.go"
+      ],
+      "evidence": [
+        "HTTP handler tests repeatedly build ad-hoc `httptest.NewRequest`/`httptest.NewRecorder` flows with similar command/response scaffolding (`exporter_test.go`, `importer_test.go`, `main_test.go`).",
+        "Filesystem/info stubs are redefined in multiple places (`stubFileInfo` in `system/storage/storage_test.go`, `mockFileInfo` in `system/metrics/metrics_test.go`).",
+        "Service doubles for Startram and upload command execution are implemented per-file (`stubAPIClient`/`stubConfigService` in `backup_runtime_test.go`, `spyStartramConfigService` in `state_sync_test.go`, `stubUploadService` in `uploadsvc/service_test.go`)."
+      ],
+      "suggestion": "Create package-level test support modules (fixture builders, shared fake interfaces, reusable HTTP assertion helpers) and migrate repeated setup patterns to those helpers to reduce duplicated test design logic.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_shared_test_infra"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "background_loop_failure_policy_drift",
+      "summary": "Long-running subsystems apply incompatible error escalation rules, causing similar runtime failures to be either surfaced or silently tolerated depending on module.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/routines/version.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`check502Loop` logs `GetShipStatus`, `LoadUrbitConfig`, network, HTTP, and recovery errors then continues forever with no terminal condition.",
+        "`CheckVersionLoopWithContext` returns `version update failed after ... consecutive attempts` when failure threshold is crossed.",
+        "`DockerLogStreamerWithRuntime` returns `docker log stream failed after ... consecutive attempts` after repeated stream errors.",
+        "Startup health supervision (`startupBackgroundServices.health`) can observe service errors, but whether errors ever surface depends on each loop's internal policy."
+      ],
+      "suggestion": "Introduce a shared background-service error policy (retry budget + backoff + escalation contract) and apply it across all long-running loops so equivalent failure classes have predictable propagation behavior.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "background_error_policy_fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "required_callback_contract_bypassed",
+      "summary": "A required startup subsystem can silently pass without its callback, contradicting required-callback failure behavior elsewhere in startup.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "`runStartupSubsystem` returns an error when a required step has a nil callback (`initialization callback is not configured`).",
+        "In `initSubsystems`, the `configure swap` step is marked `startupSubsystemRequired` but returns `nil` when `runtime.ConfigureSwapFn == nil`, bypassing required callback enforcement.",
+        "Existing startup tests cover required failure behavior generally but do not cover this required-step bypass path."
+      ],
+      "suggestion": "Make required-step callback semantics uniform: either enforce non-nil callback for required steps (including `configure swap`) or downgrade that step policy and document it; add tests for nil `ConfigureSwapFn` with non-empty swap config.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "startup_contract_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "docker_client_close_handling_inconsistent",
+      "summary": "Docker client teardown errors are handled robustly in some modules but omitted in event listener code, creating inconsistent I/O-boundary failure handling.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/network/network.go",
+        "goseg/docker/lifecycle/client_close.go"
+      ],
+      "evidence": [
+        "`network` and `lifecycle` define close helpers that preserve close failures via joined/wrapped errors.",
+        "`dockerListenerWithRuntime` creates a Docker client via `dockerclient.New()` and uses it for `Events(...)` without any close/defer close path.",
+        "This diverges from the rest of the docker runtime code where client-close failures are explicitly accounted for."
+      ],
+      "suggestion": "Apply a consistent docker-client lifecycle pattern in subsystem listeners: defer close and fold close failures into returned errors (or explicit structured logs) using a shared helper.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "io_boundary_error_contract_drift"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 3,
+    "dimension_coverage": 0.333,
+    "evidence_density": 0.833,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 30.382,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 57,
+    "successful_batch_count": 3,
+    "full_sweep_included": false,
+    "total_files": 576,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/broadcast/loop.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/importer/importer.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/main.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/main_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/routines/version.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/docker/events/events.go",
+    "goseg/config/config.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/docker/network/network.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+    "goseg/docker/lifecycle/client_close.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_143812",
+    "created_at": "2026-03-04T14:40:05+00:00",
+    "batch_count": 3,
+    "batch_indexes": [
+      1,
+      2,
+      3
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "80c6a421ef04b9c790acb3c4f150c063fda48438eb0f82ca1caa4725c3542a6a"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "error_consistency",
+      "abstraction_fitness",
+      "design_coherence"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

@@ -145,10 +145,23 @@ func TestActionContractBindingsReturnedAsCopy(t *testing.T) {
 	}
 
 	original := snapshot[0]
-	snapshot[0].Action = ActionToken("mutation-test")
+	snapshot[0].Action = ActionVerb("mutation-test")
 	refreshed := ActionContractBindings()
 	if refreshed[0].Action != original.Action {
 		t.Fatalf("expected action contract bindings to be immutable from caller mutation")
+	}
+}
+
+func TestProtocolActionBindingIDsFollowNamespaceActionPolicy(t *testing.T) {
+	entries := ContractCatalogEntries()
+	for _, entry := range entries {
+		if entry.Namespace == "" && entry.Action == "" {
+			continue
+		}
+		expected := protocolActionContractID(entry.Namespace, entry.Action)
+		if entry.ID != expected {
+			t.Fatalf("protocol action contract id mismatch for %s:%s: got %s want %s", entry.Namespace, entry.Action, entry.ID, expected)
+		}
 	}
 }
 
@@ -172,13 +185,13 @@ func TestTypedActionContractLookupRejectsUnknownNamespaceActionPairs(t *testing.
 		t.Fatalf("failed to load contract catalog: %v", err)
 	}
 
-	if _, ok := catalog.ActionContractFor(ActionNamespace("invalid"), ActionToken("open-endpoint")); ok {
+	if _, ok := catalog.ActionContractFor(ActionNamespace("invalid"), ActionVerb("open-endpoint")); ok {
 		t.Fatal("expected invalid namespace lookup to fail")
 	}
-	if _, ok := catalog.ActionContractFor(ActionNamespaceUpload, ActionToken("does-not-exist")); ok {
+	if _, ok := catalog.ActionContractFor(ActionNamespaceUpload, ActionVerb("does-not-exist")); ok {
 		t.Fatal("expected invalid action lookup to fail")
 	}
-	if _, ok := catalog.ActionContractFor(ActionNamespace(""), ActionToken("")); ok {
+	if _, ok := catalog.ActionContractFor(ActionNamespace(""), ActionVerb("")); ok {
 		t.Fatal("expected empty namespace/action lookup to fail")
 	}
 }
@@ -225,5 +238,11 @@ func TestProtocolContractCatalogMatchesCanonicalConstants(t *testing.T) {
 		if contract.Compatibility != entry.Descriptor.Compatibility {
 			t.Fatalf("contract %s compatibility mismatch between canonical spec and catalog", entry.ID)
 		}
+	}
+}
+
+func TestContractCatalogInitErrorReturnsNilWhenInitialized(t *testing.T) {
+	if err := ContractCatalogInitError(); err != nil {
+		t.Fatalf("expected initialized catalog to have no error, got %v", err)
 	}
 }

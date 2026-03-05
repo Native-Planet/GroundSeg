@@ -1,0 +1,44 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 93.0,
+    "test_strategy": 92.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md explicitly documents contract governance expectations and enumerates the contract boundary files (`goseg/protocol/contracts/contracts.go`, `goseg/protocol/contracts/protocol_contracts.go`, `goseg/protocol/contracts/startram_contracts.go`) as a canonical surface for protocol/error compatibility.",
+        "`goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/contracts/startram_contracts.go` expose typed contract identities (`ContractID`/`ActionNamespace`/`ActionToken`) and descriptor composition in one place, which is consistent with the documented typed contract governance.",
+        "README.md references the same contract files in the upload/contract gate matrix, indicating intended cross-module boundary alignment between docs and runtime registry definitions."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "The architecture contract is split between code and prose; there is still residual drift risk because the authoritative rule set (compatibility policy and reviewer requirements) is partially externalized in README instead of a single, machine-validated contract governance source.",
+      "sub_axes": null
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md names a contract gate (`upload-contract-gate.yml`) and documents path-aware checks for contract surface changes, but the batch files themselves are declaration surfaces with no inline tests.",
+        "Contract contract metadata and bindings are validated through package tests outside the batch files, so confidence depends on consumers remembering to run those specific checks during contract edits.",
+        "The runtime docs list changed-files policy and deterministic-check expectations, but no explicit local enforcement appears embedded in these files themselves."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Increase confidence by making contract governance checks executable from these files (or nearby adjacent registry entry tests) so declaration edits cannot bypass the documented contract-test expectations.",
+      "sub_axes": null
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance is partly documented in prose, causing a recurring source-of-truth dispersion between README guidance and package registry implementation.",
+      "Declaration-only files rely on neighboring tests rather than embedding or co-locating their own critical contract assertions."
+    ],
+    "possible_false_positives": [
+      "Previous packet finding: \"security: Hardcoded secret in variable 'ActionToken'\" for `goseg/protocol/contracts/protocol_contracts.go` appears to be a stale/weak classification against non-sensitive action-token constants."
+    ]
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 64.0,
+    "error_consistency": 71.0,
+    "abstraction_fitness": 61.0,
+    "test_strategy": 46.0,
+    "design_coherence": 86.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Event publish path in `goseg/docker/events/events.go` uses a bounded transition channel and explicitly reports `ErrTransitionBusFull` when saturated, but callers in service orchestration (`goseg/chopsvc/service.go`) do not apply a compensating strategy (retry/backpressure/metrics), so core state-transition data can be dropped under load.",
+        "The same publish abstraction is used by multiple lifecycle consumers across Docker orchestration and runtime callers, so one module’s enqueue policy directly impacts state convergence in others without a shared, explicit reliability contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Introduce a shared transition-delivery contract (bounded queue policy, retry/backoff, and drop accounting) and enforce it across all publishers/consumers; without this, cross-module state propagation remains opportunistic."
+    },
+    "error_consistency": {
+      "evidence": [
+        "`goseg/accesspoint/parameters.go` accepts broadly parseable IP strings (`net.ParseIP`) and later `goseg/accesspoint/router.go` slices IP text by `strings.LastIndex(rt.IP, \".\")`, which can panic on non-IPv4 shapes.",
+        "Drop/error results from transition publish are often discarded by callers, causing silent failure modes instead of deterministic, diagnosable outcomes for callers that drive state transitions."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`goseg/config/config_update_schema.go` exposes many boolean patch fields through merge helpers that do not preserve explicit false values as intentional updates, so boolean config intents are not faithfully represented by the patch abstraction.",
+        "The same abstraction is consumed downstream by config update executors/transitions expecting declarative toggles, creating an implicit semantic mismatch between ‘request value’ and ‘effective value’ for flags."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 63.0,
+        "interface_honesty": 52.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "No test coverage is visible for critical boundary logic in the reviewed set (`goseg/accesspoint/router.go`, `goseg/config/config_update_schema.go`) where malformed/edge-case inputs and patch truthiness semantics directly control runtime behavior.",
+        "Likewise, event backpressure/drop behavior in `goseg/docker/events/events.go` and callers is unguarded by tests that simulate channel saturation and dropped transitions."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "design_coherence": {
+      "evidence": [
+        "The largest risk to coherence is not a single defect in one module, but accumulated boundary mismatches (input contract/merge semantics/event delivery assumptions) that force each caller to rely on implicit module-specific behavior.",
+        "Most modules still compose a recognisable lifecycle pattern, so structural integrity is mostly present."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Elevate module contracts into explicit interfaces (input schema validation contracts, transition delivery guarantees, patch semantics) and document/validate them in a shared layer; this would reduce implicit coupling between click/auth/config/docker surfaces."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ap_accesspoint_ipv6_string_slice_panic",
+      "summary": "Accesspoint router setup can panic on valid but non-IPv4 IP inputs due to brittle string slicing assumptions.",
+      "related_files": [
+        "goseg/accesspoint/parameters.go",
+        "goseg/accesspoint/router.go",
+        "goseg/accesspoint/accesspoint.go"
+      ],
+      "evidence": [
+        "`checkParameters` in accesspoint config allows generic `net.ParseIP` values, including formats outside dotted-quad.",
+        "`startRouterWithRuntime` path relies on `ipParts := rt.IP[:strings.LastIndex(rt.IP, \".\")]` for DNS range generation, which is unsafe when `rt.IP` is not IPv4 and `LastIndex` is -1.",
+        "This fault appears in the startup path before runtime recovery and can terminate startup on user-supplied/derived IP variants."
+      ],
+      "suggestion": "Normalize and validate `IP` as IPv4 early (`To4` + explicit CIDR/format checks), then safely handle invalid/non-IPv4 values with explicit error returns; keep validation in the same boundary as the code that later slices components.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "ip_validation_mismatch"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_bool_patch_false_noop",
+      "summary": "Boolean patch fields are treated as tri-state-like values in the schema but merge helpers can ignore intentional false updates.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_update_options.go",
+        "goseg/config/config_update_executor.go",
+        "goseg/config/config_update.go"
+      ],
+      "evidence": [
+        "`allConfPatchFields` registers many boolean config fields through helpers that do not preserve false as an explicit update in merge semantics.",
+        "Callers consuming `config patch` updates interpret those fields as authoritative, so false cannot be reliably persisted for several toggles."
+      ],
+      "suggestion": "Replace boolean merge behavior with explicit tri-state handling (e.g., pointer/optional bool in patch input) or schema tags that distinguish omission from false, then align all executors to apply the same rule.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_semantics_inconsistency"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "event_bus_drop_is_silent",
+      "summary": "Transition event bus drops are possible under load and are not surfaced to orchestration callers, creating hidden control-plane divergence.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/chopsvc/service.go",
+        "goseg/docker/lifecycle/planner.go"
+      ],
+      "evidence": [
+        "Event publishing uses bounded transport and returns `ErrTransitionBusFull` only when channel capacity is exceeded.",
+        "In orchestration paths, transition publication is invoked without mandatory handling of this error path, so saturation produces silent event loss.",
+        "This breaks eventual consistency assumptions between transition producers and lifecycle consumers."
+      ],
+      "suggestion": "Promote queue overflow from best-effort to policy-driven behavior: propagate errors, add metrics/tracing for overflow, and define per-bus retry/circuit policy so callers cannot proceed as if delivery were guaranteed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "event_delivery_reliability"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "critical_paths_without_tests",
+      "summary": "High-risk production paths lack focused tests for malformed inputs and saturation/fallback behavior.",
+      "related_files": [
+        "goseg/accesspoint/router.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "Validation logic in `accesspoint` and merge semantics in `config` directly encode safety/consistency behavior but are not covered by visible unit tests in the reviewed batch.",
+        "Transition bus overflow and dropped publication behavior is not guarded by tests simulating full-channel/backpressure scenarios."
+      ],
+      "suggestion": "Add table-driven unit tests for IP and patch-schema validation, plus event-bus concurrency tests that assert publish failures are surfaced and recovered/propagated according to contract.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Boundary contracts are encoded inconsistently across modules (input validation, patch semantics, and channel behavior are each assumed differently by consumers).",
+      "Error signaling is treated as optional in cross-module call chains, allowing failure modes to become silent.",
+      "Config and event-delivery abstractions are powerful but underspecified, so call sites depend on implicit behavior rather than enforced guarantees."
+    ],
+    "likely_symptoms": [
+      "ap_accesspoint_ipv6_string_slice_panic",
+      "config_bool_patch_false_noop",
+      "event_bus_drop_is_silent",
+      "critical_paths_without_tests"
+    ],
+    "possible_false_positives": [
+      "Some absent test references may be in packages not included in this batch and not observed in this pass."
+    ]
+  }
+}

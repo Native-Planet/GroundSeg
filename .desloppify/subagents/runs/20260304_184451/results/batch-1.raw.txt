@@ -1,0 +1,100 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 74.6
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple subsystems use layered runtime projection wrappers that mostly remap callbacks without adding domain policy (for example importer runtime scope projections and per-scope resolvers in goseg/importer/importer.go:307-407, and bootstrap/c2c runtime context wrappers in goseg/main.go:58-131 and :155-260).",
+        "Global singleton defaults are used as hidden dependency sources across event/broadcast/orchestration flows (goseg/broadcast/state.go:17-18, :98-114; goseg/broadcast/loop.go:44-45, :108-140; goseg/docker/events/events.go:17, :34-40), reducing interface honesty because call sites appear runtime-injectable but still depend on process-global state.",
+        "Config access is frequently carried via broad snapshot bags and then narrowed downstream (goseg/config/config.go:77-90, :181-200; goseg/startuporchestrator/startup_orchestrator.go:227-239; goseg/importer/importer.go:105, :280-289), which weakens abstraction leverage by coupling workflows to wider config domains than required."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 72.0,
+        "indirection_cost": 68.4,
+        "interface_honesty": 83.5
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_projection_churn",
+      "summary": "Scope-specific runtime projection layers add indirection cost without enough behavioral leverage.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "Importer defines composite runtime, then repeatedly projects it into init/workflow/publish variants with separate resolver paths (initRuntime/workflowRuntime/publishRuntime and resolveImporterRuntimeFor* chain in goseg/importer/importer.go:307-407).",
+        "main bootstrap and C2C paths add wrapper methods that mostly nil-check and forward to function fields (goseg/main.go:99-131 and :215-260).",
+        "Startup runtime repeats similar callback-carrying structures for init/background phases, with many fields passed through to spec tables (goseg/startuporchestrator/startup_orchestrator.go:88-117, :245-297)."
+      ],
+      "suggestion": "Consolidate runtime seams around smaller behavior-focused interfaces (for example `ImporterStorage`, `ImporterProvision`, `StartupInitDeps`) and remove projection methods that only copy fields. Keep one resolver per behavior boundary, and let call sites depend on narrow interfaces directly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overmodeling"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "singleton_backdoor_dependencies",
+      "summary": "Global singleton fallbacks undermine explicit dependency injection contracts.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go",
+        "goseg/docker/events/events.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "Broadcast state and loop maintain global defaults (`defaultBroadcastStateRuntime`, `defaultBroadcastLoopController`) and public entrypoints call them implicitly (goseg/broadcast/state.go:17-18, :108-114; goseg/broadcast/loop.go:44-45, :104-110, :137-155).",
+        "Event runtime uses a package-level singleton via `sync.OnceValue` and many call paths use `DefaultEventRuntime()` rather than explicit broker wiring (goseg/docker/events/events.go:17, :34-40).",
+        "Docker subsystem startup/stop wrappers normalize nil runtime to package default, introducing hidden shared state in code that appears parameterized (goseg/docker/orchestration/subsystem/subsystem_events.go:52-57, :94-106, :141-155)."
+      ],
+      "suggestion": "Make singleton usage explicit at composition roots only. Convert package entrypoints to require runtime/broker parameters (or a constructor-produced service object), and keep legacy globals only in compatibility shims.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overmodeling"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "broad_config_bag_coupling",
+      "summary": "Config snapshot bag abstractions are wider than consumer needs, increasing cross-domain coupling.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Snapshot DTOs group multiple domains (`ImportSettings`, `StartupSettings`, `C2CSettings`) and are passed through runtime seams even when only one subsection is required (goseg/config/config.go:77-90, :181-200).",
+        "Importer init workflow consumes `ImportSettings` then immediately narrows to swap path fields (goseg/importer/importer.go:105, :280-289), indicating bag width exceeds use-site needs.",
+        "Startup and main runtime contexts expose composite settings and then peel nested subfields (`settings.Update`, `settings.Startram`, `settings.Runtime`, `settings.Connectivity`) rather than requesting only necessary values (goseg/startuporchestrator/startup_orchestrator.go:227-239; goseg/main.go:155-170, :225-246)."
+      ],
+      "suggestion": "Replace bag snapshots in seams with minimal query functions (for example `SwapSettingsFn`, `ConnectivityIntervalFn`, `IsDebugModeFn`) or narrow typed views per subsystem. Keep wide snapshots only for serialization/reporting boundaries.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overmodeling"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Test-seam design expanded into production-facing runtime surface area without equivalent domain consolidation.",
+      "Compatibility layering (legacy aliases and global defaults) preserved old entrypoints but increased abstraction overlap."
+    ],
+    "likely_symptoms": [
+      "runtime_projection_churn",
+      "singleton_backdoor_dependencies",
+      "broad_config_bag_coupling"
+    ],
+    "possible_false_positives": []
+  }
+}

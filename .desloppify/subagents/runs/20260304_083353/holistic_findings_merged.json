@@ -1,0 +1,391 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 62.8,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 74.0,
+        "Indirection Cost": 70.0,
+        "Interface Honesty": 76.5
+      }
+    },
+    "cross_module_architecture": 65.3,
+    "design_coherence": 59.6,
+    "test_strategy": 82.3
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both target files expose contract surface through package-level symbols and helper-based derivation (`protocol_contracts.go` and `startram_contracts.go`) without an explicit schema/validation step at registration boundaries.",
+        "The helper in `protocol_contracts.go` hard-codes a dotted-string contract-token contract (`strings.Split(contractID, \".\")` and taking the final segment), so cross-module token parsing behavior is coupled to a string convention not enforced at compile-time.",
+        "The package-level action token bindings are mutable `var` values (`ActionUploadOpenEndpoint`, `ActionUploadReset`, `ActionC2CConnect`), which increases cross-module coupling risk if external code mutates them."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "A stronger contract-definition boundary (explicit action token fields/typed metadata + immutability) would better enforce cross-module compatibility and prevent subtle boundary drift."
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "In `goseg/defaults/defaults.go`, `SysConfig(basePath string)` ignores its input and always sets `DockerData: DockerData(\"basePath\")`, so callers cannot influence the configured docker data path through the API surface.",
+        "`goseg/rectify/rectify_services.go` and `goseg/shipworkflow/operations_runtime.go` independently define an `adaptUrbitSectionMutation` adapter with the same type-erasing wrapper pattern for section mutation calls, indicating repeated ad-hoc abstraction instead of a single shared seam.",
+        "Across `goseg/defaults/defaults.go`, `goseg/rectify/rectify_services.go`, `goseg/shipworkflow/operations_runtime.go`, and `goseg/startuporchestrator/startup_orchestrator.go`, dependency wiring remains mostly package-local and wrapper-heavy rather than a consistent reusable abstraction boundary, increasing indirection and drift risk."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 74.0,
+        "indirection_cost": 70.0,
+        "interface_honesty": 76.5
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "The batch docs list strict contract-gate expectations in `README.md`, but the contract surfaces here (`protocol_contracts.go`/`startram_contracts.go`) expose non-trivial mapping logic (`actionTokenFromContractID`) without in-scope regression assertions in this area.",
+        "Governance text references path-aware checks and test scripts, but mapping invariants for token extraction/metadata linkage are not represented as executable local assertions on these files themselves."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Add focused contract tests for catalog integrity (ID, namespace, action token, and metadata binding) adjacent to the contract definitions so governance is enforced by compile-time and unit-test signals, not only CI scripts."
+    },
+    "design_coherence": {
+      "evidence": [
+        "goseg/config/urbit.go and goseg/rectify/rectify_services.go both ship their own `adaptUrbitSectionMutation` implementations instead of sharing one utility.",
+        "Urbit config sections are modeled twice (`UrbitConfigSection`) in `goseg/config/urbit.go` (typed int enum) and `goseg/structs/configs.go` (typed string enum), requiring coordinated manual updates across packages.",
+        "The Startram reconcile path in `goseg/rectify/rectify_services.go` mixes discovery, service registration, and persistence decisions inside one function, making mutation policy hard to reason about and extend."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "implicit_contract_token_parsing",
+      "summary": "Contract token extraction is implicit and tied to dot-delimited IDs, creating fragile cross-module coupling.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` derives action tokens via `actionTokenFromContractID`, which parses `ContractID` by splitting on `.` and using the last segment, so token identity semantics are encoded as string-shape conventions rather than explicit API contracts.",
+        "`startram_contracts.go` uses a different declaration style (embedded constants and literal descriptor fields) and does not participate in explicit, typed token definitions, increasing asymmetry in contract registration assumptions."
+      ],
+      "suggestion": "Replace implicit parsing with explicit token constants per contract (for example `const ActionUploadOpenEndpoint ActionToken = \"open-endpoint\"`) and keep catalog construction using those explicit values; add a small validator to fail fast when contract IDs do not match the expected namespace/action shape.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_token_grammar_coupling"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_contract_exports",
+      "summary": "Exported mutable token variables expose the contract registry to accidental cross-package mutation.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Protocol contract tokens are declared as exported `var` values in `protocol_contracts.go`, which can be reassigned by external packages because they are not read-only contract constants.",
+        "The same contract package is intended as a boundary/API surface for protocol identifiers, so mutable public vars broaden the potential blast radius for coupling bugs."
+      ],
+      "suggestion": "Make contract tokens immutable at the public API boundary by using `const` or unexported storage with exported accessors, and avoid exposing mutable variables from contract modules.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_token_grammar_coupling"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "defaults-basepath-param-ignored",
+      "summary": "Config factory exposes `basePath` but silently hard-codes docker data to the literal \"basePath\", breaking the abstraction contract.",
+      "related_files": [
+        "goseg/defaults/defaults.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`goseg/defaults/defaults.go` `SysConfig(basePath string)` assigns `DockerData: DockerData(\"basePath\")`, while the `basePath` argument is never used.",
+        "Callers in higher-level setup (e.g. startup wiring in `goseg/main.go`) pass a caller-derived path expecting it to influence generated defaults."
+      ],
+      "suggestion": "Use the `basePath` argument directly when constructing defaults (or rename/remove parameter if unused): `DockerData: DockerData(basePath)`; add a unit test that asserts caller-supplied path is preserved.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "abstraction-contract-breaches"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate-urbit-mutation-adapter",
+      "summary": "Identical urbit section mutation adapter logic is duplicated in multiple packages, creating fragile copy-paste abstractions.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "Both files implement `adaptUrbitSectionMutation[T any](mutateFn func(*T) error) func(any) error` using equivalent type assertion and delegated mutation behavior.",
+        "The duplicated helper encodes the same abstraction seam in separate packages rather than centralizing in one shared utility."
+      ],
+      "suggestion": "Extract a single shared generic adapter utility in a small internal package used by both runtime construction paths, and update both callers; add a focused test table for the shared function to prevent divergence.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "abstraction-contract-breaches"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "implicit_contract_id_parsing",
+      "summary": "Action token is computed by parsing contract IDs, coupling runtime semantics to string format",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`actionTokenFromContractID` splits `ContractID` by \".\" and uses the last segment as the action token.",
+        "This makes token identity depend on string encoding convention rather than explicit contract API declarations."
+      ],
+      "suggestion": "Replace implicit parsing with explicit per-contract `ActionToken` constants and wire `contractCatalogSpec` entries to those constants directly. Keep string parsing only in migration/compatibility adapter code with hard failure when format assumptions change.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_format_coupling"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract_mapping_not_unit_guarded",
+      "summary": "Protocol/StarTram contract mappings lack local regression tests for catalog consistency",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines catalog specs and derived token extraction logic, but no inline assertions or test-adjacent coverage are visible in the reviewed contract surfaces.",
+        "`README.md` documents strict contract-gate expectations but that expectation is not mirrored as explicit tests tied to these mapping functions."
+      ],
+      "suggestion": "Add `protocol_contracts_test.go` and `startram_contracts_test.go` with table-driven tests for ID, namespace, action token, and descriptor/metadata wiring, plus a regression test that rejects malformed or unexpected contract ID shapes.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_mapping_test_gap"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_section_mutation_utility_duplication",
+      "summary": "Duplicate urbit section mutation adapters are duplicated across config and reconcile packages.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`config/urbit.go` defines `adaptUrbitSectionMutation[T any]` as a package-private generic section adapter.",
+        "`rectify/rectify_services.go` redefines the same generic adapter function with identical behavior and same error string pattern.",
+        "This helper is only kept in sync by convention, so behavior changes in one location are easy to miss in the other."
+      ],
+      "suggestion": "Extract a single shared typed helper (for example in an internal package) and use it from both call sites; keep section-specific wrappers in each package if needed but avoid duplicated casting/validation logic.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "urbit_config_mutation_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_config_section_model_split",
+      "summary": "Urbit section enums are defined in two separate type systems, creating drift-prone duplication.",
+      "related_files": [
+        "goseg/config/urbit.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`goseg/config/urbit.go` declares `type UrbitConfigSection int` with constants `{Runtime, Network, Schedule, ...}`.",
+        "`goseg/structs/configs.go` separately declares `type UrbitConfigSection string` with the same domain labels and string values.",
+        "Any new section or semantic rename requires two independent updates and tests currently do not enforce cross-type parity."
+      ],
+      "suggestion": "Define a canonical `UrbitConfigSection` representation once (or shared generated mapping) and consume it across config runtime + serialized models, with a compile-time or startup check that enforces the canonical section set.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "urbit_config_mutation_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "startram_reconcile_overloaded_single_loop",
+      "summary": "Startram retrieve reconciliation mixes discovery, service creation, and persistence orchestration in one oversized control path.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`StartramRetrieveReconciler.Reconcile` first scans the same `Subdomains` list to infer existing service presence, then rescans it for web/network reconciliation.",
+        "The function also performs config loading/persistence decisions (`updateWebConfig`, `updateNetworkConfig`) and publishes registration transitions in-line with low-level per-remote branching.",
+        "This broad responsibility boundary makes it difficult to add service-type-specific reconciliation without expanding a high-coupling function."
+      ],
+      "suggestion": "Split `Reconcile` into explicit phases: collect expected/existing subdomain index, compute a diff, then apply persistence and transition publication through dedicated coordinators so each concern (discovery, decision, mutation, side effects) is independently testable.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "phase_split_for_reconciliation"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 4,
+    "dimension_coverage": 0.312,
+    "evidence_density": 1.5,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 18.136,
+    "dimensions_with_findings": 4
+  },
+  "review_scope": {
+    "reviewed_files_count": 62,
+    "successful_batch_count": 4,
+    "full_sweep_included": false,
+    "total_files": 575,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "test_strategy"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/contracts/protocol_contracts.go",
+    "goseg/protocol/contracts/startram_contracts.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/broadcast/loop.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/importer/importer.go",
+    "goseg/defaults/version.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/main.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/main_test.go",
+    "goseg/routines/version.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/config/config.go",
+    "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+    "README.md",
+    "goseg/exporter/exporter_test.go",
+    "goseg/shipworkflow/urbit_operations_runtime_handlers.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/config/urbit.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_083353",
+    "created_at": "2026-03-04T08:34:40+00:00",
+    "batch_count": 4,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "9bb20af81ff15424136bc75edff74b62e7d43ef779fe9809d7172529137edaf7"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "test_strategy"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "test_strategy"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 2,
+  "assessments": {
+    "package_organization": 74.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows high flatness in reviewed ownership boundaries: goseg/config/ has 41 files (19 production), goseg/shipworkflow/ has 48 files (23 production), and goseg/system/ has 35 files (16 production), each above the >10 mixed-concern risk threshold.",
+        "goseg/shipworkflow/newship.go is placed in the top-level workflow package but directly coordinates infrastructure layers (docker orchestration, docker network, events, cleanup, creator, startram), indicating boundary overlap between domain workflow and provisioning/runtime adapters.",
+        "goseg/system/disk_shims.go exposes compatibility wrappers in parent package system while delegating to storagefacade and system/disk types; corresponding tests in goseg/system/disk_test.go and goseg/system/disk_storage_test.go keep disk-specific API surface anchored at system/ root instead of a disk-focused boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "shipworkflow_root_mixes_domain_and_infra",
+      "summary": "Top-level shipworkflow package mixes lifecycle domain logic with infrastructure provisioning flows.",
+      "related_files": [
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/doc.go"
+      ],
+      "evidence": [
+        "Directory profile for goseg/shipworkflow/ is 48 files, with broad mixed responsibilities in one folder.",
+        "newship.go imports and orchestrates config, docker/events, docker/network, docker/orchestration, shipcleanup, shipcreator, and startram directly.",
+        "lifecycle.go contains a narrower lifecycle wait primitive while provisioning/runtime choreography lives alongside it in the same root package."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/shipworkflow/provisioning/` and move provisioning-heavy flows (`newship.go`) there; (2) create `goseg/shipworkflow/lifecycle/` and move lifecycle wait/state helpers (`lifecycle.go`) there; (3) keep `goseg/shipworkflow` root as thin facade/orchestrator entrypoints. Move order: lifecycle helpers first, then provisioning flows, then update facade calls. After each move run `rg -n \"shipworkflow\\.|provisioning\\.|lifecycle\\.\" goseg -g '*.go'` to update references, `gofmt -w goseg/shipworkflow/**/*.go`, then validate with `go test ./goseg/shipworkflow/... ./goseg/api/...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_package_boundary_blur"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_root_flattening_hides_ownership",
+      "summary": "Config root directory is overloaded, obscuring clear ownership boundaries across runtime, bootstrap, and state.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "holistic directory profile lists goseg/config/ at 41 files and 5474 LOC, indicating a flat mixed-concern directory.",
+        "bootstrap.go handles startup/initialization sequencing and filesystem bootstrapping while config.go contains runtime context accessors and startram snapshot state APIs.",
+        "Tests mirror this mixed surface in the same package root rather than package-specific test boundaries."
+      ],
+      "suggestion": "Staged reorg plan: (1) introduce `goseg/config/bootstrap/` for initialization and path/debug boot logic; (2) introduce `goseg/config/runtime/` for runtime context getters/setters; (3) introduce `goseg/config/startramstate/` for startram snapshot/cache access. Move order: extract runtime context wrappers first (lowest risk), then startram state accessors, then bootstrap initialization entrypoints with a thin root-level compatibility facade if needed. Update imports with `rg -n \"groundseg/config\" goseg -g '*.go'`, apply `gofmt -w goseg/config/**/*.go`, then run `go test ./goseg/config/...` and `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_package_boundary_blur"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "system_disk_api_surface_in_wrong_layer",
+      "summary": "Disk compatibility shim API is exposed at system root instead of a disk-scoped boundary.",
+      "related_files": [
+        "goseg/system/disk_shims.go",
+        "goseg/system/disk_test.go",
+        "goseg/system/disk_storage_test.go"
+      ],
+      "evidence": [
+        "disk_shims.go is mostly pass-through wrappers to `storagefacade` and `system/disk` types, but remains in package `system`.",
+        "disk_test.go and disk_storage_test.go validate disk behaviors through top-level `system` symbols (`CreateGroundSegFilesystem`, `ListHardDisks`, `parseFstabLine`, etc.), reinforcing a broad root API.",
+        "holistic directory profile for goseg/system/ shows 35 files in one root directory, indicating broad concern mixing."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/system/diskcompat/` (or expand `goseg/system/disk/`) and move shim wrappers there; (2) keep temporary root-level forwarding functions in `system` with deprecation comments; (3) migrate tests and call sites to the disk-scoped package, then remove root forwards. Move order: add new package + duplicate wrappers, migrate imports and tests, finally delete root wrappers. Run `rg -n \"\\b(CreateGroundSegFilesystem|ListHardDisks|parseFstabLine|reconcileFstabLines)\\b\" goseg -g '*.go'` for import updates, then `gofmt -w goseg/system/**/*.go` and validate via `go test ./goseg/system/...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_package_boundary_blur"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Large flat top-level directories are being used as integration catch-alls rather than enforcing subpackage ownership by change boundary.",
+      "Compatibility and migration surfaces are retained in parent packages longer than necessary, keeping old boundaries alive."
+    ],
+    "likely_symptoms": [
+      "shipworkflow_root_mixes_domain_and_infra",
+      "config_root_flattening_hides_ownership",
+      "system_disk_api_surface_in_wrong_layer"
+    ],
+    "possible_false_positives": [
+      "holistic_context.structure did not provide usable per-file fan_in/fan_out and coupling_matrix values in this packet slice, so boundary conclusions rely mainly on directory profile thresholds plus direct file evidence."
+    ]
+  }
+}

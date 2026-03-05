@@ -1,0 +1,96 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 71.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Global mutable runtime seams are repeatedly reset per-test (`resetExporterState`, `resetUploadSessionsForTest`, `resetLeakStateForTest`, `resetLoggerInitForTest`), indicating behavior depends on package-level state rather than scoped test/runtime objects.",
+        "Core runtime files combine multiple concern layers in single units: `accesspoint.go` mixes config/default resolution, process probing/matching, shell execution, and lifecycle entrypoints; `urbit_operations_runtime.go` mixes transition registry, config mutation orchestration, external service calls, and post-transition broadcasting.",
+        "Configuration handling remains structurally broad and repetitive: `structs.SysConfig` and section update APIs are duplicated by section, while tests in `config_test.go` require very large hand-built config fixtures to exercise merge logic."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "global_test_state_coupling",
+      "summary": "Test design relies on shared package-global mutation across modules, creating systemic coupling and weak isolation boundaries.",
+      "related_files": [
+        "goseg/exporter/exporter_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/leak/broadcast_test.go",
+        "goseg/logger/logger_test.go"
+      ],
+      "evidence": [
+        "`resetExporterState` rewires package globals (`mkdirAllForExporter`, `getStoragePathForExporter`, `openForExporter`, `whitelist`) for each test.",
+        "`resetUploadSessionsForTest` mutates global `uploadSessions` under `uploadMu` and restores via cleanup.",
+        "`resetLeakStateForTest` swaps global `BytesChan` and `lickStatuses`, restoring later, and multiple tests depend on this side effect.",
+        "`resetLoggerInitForTest` mutates global logger init state (`setLoggerInitState`, `setLoggerInitErr`) for test behavior."
+      ],
+      "suggestion": "Introduce explicit runtime/store instances per subsystem (exporter, importer, leak, logger) and pass them through constructors/handlers; keep one compatibility default for production, but have tests instantiate isolated runtimes instead of mutating globals.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_files_mix_multiple_layers",
+      "summary": "Operational orchestration files mix unrelated responsibilities, reducing structural focus and increasing change blast radius.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "`accesspoint.go` contains runtime seam wiring, config/default normalization, password derivation, process matching/parsing, dependency checks, and shell execution in one file.",
+        "`urbit_operations_runtime.go` contains command registry mapping, transition step construction, config mutation orchestration (`runShipConfigTransition`), external side effects (docker/click/startram), and schedule publishing logic.",
+        "`subsystem_events.go` combines health-loop lifecycle control, event listener transport wiring, event-bus backpressure policy, and transition execution/retry-window policy."
+      ],
+      "suggestion": "Split each file into role-focused modules: runtime wiring/defaults, domain transition planning, and side-effect executors; define narrow coordinators that compose these parts so policy changes do not require touching transport/parsing/process code together.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_runtime_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_monolith_drives_fixture_duplication",
+      "summary": "Config modeling remains monolithic, which drives repetitive per-field setup and duplicated section-level update scaffolding.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_test.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`structs/configs.go` repeats near-identical section accessor/update methods (`ConnectivitySection`, `StartramSection`, etc. and corresponding `Update*Config`).",
+        "`config_test.go` builds very large default/custom config fixtures field-by-field in multiple tests (e.g., migration and override tests), indicating missing reusable builders/fixtures and high schema coupling in tests.",
+        "`config_update_schema.go` maintains key-to-parser/apply registries and specialized parse helpers, which amplifies maintenance when schema evolves."
+      ],
+      "suggestion": "Introduce canonical config fixture builders per section and table-driven patch cases; consolidate section update/access patterns via generic helpers or a section registry to reduce manual repetition when fields evolve.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_schema_surface_area"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit global runtime/seam pattern instead of explicit dependency ownership",
+      "Policy/orchestration logic co-located with low-level transport/process concerns",
+      "Large config surface without strong fixture/builder abstraction"
+    ],
+    "likely_symptoms": [
+      "global_test_state_coupling",
+      "runtime_files_mix_multiple_layers",
+      "config_monolith_drives_fixture_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

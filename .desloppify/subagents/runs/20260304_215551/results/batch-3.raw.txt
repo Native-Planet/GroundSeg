@@ -1,0 +1,98 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 72.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows very large flat packages: goseg/shipworkflow/ has 51 files, goseg/config/ has 41 files, and goseg/docker/orchestration/ has 34 files (all above the >10 mixed-concern risk threshold in the prompt).",
+        "goseg/config/bootstrap.go combines bootstrap orchestration (Initialize/initializeConfig), runtime-context wiring (initializePaths/initializeDebugMode), and path helpers (ConfigFilePath/SessionKeyPath) in one root package file, while goseg/config/config.go also exposes runtimecontext and startramstate wrappers from the same root package.",
+        "goseg/docker/orchestration/container_bridge.go is a large adapter-assembly file that builds container runtime templates across llama/netdata/minio; goseg/docker/orchestration/container_config.go separately maps container-type routing/builders in the same flat directory, indicating orchestration runtime assembly and config-routing concerns are co-located rather than subpackaged.",
+        "goseg/shipworkflow/newship_service.go mixes external action routing/JSON ingress handling (HandleNewShip) with validation helpers and async workflow dispatch, while goseg/shipworkflow/newship.go wires provisioning runtime dependencies; both are placed in a broad shipworkflow root package already containing many unrelated transition/runtime files."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "flat_package_overload_shipworkflow_config_orchestration",
+      "summary": "Core directories are overloaded flat packages, obscuring ownership boundaries and making navigation change-hostile.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go"
+      ],
+      "evidence": [
+        "directory_profiles report 51 files in goseg/shipworkflow/, 41 in goseg/config/, and 34 in goseg/docker/orchestration/ (all beyond the prompt’s >10 files mixed-concern threshold).",
+        "Assigned files demonstrate mixed responsibilities within each root package (workflow ingress + provisioning wiring; config bootstrap + runtime context facade; orchestration runtime assembly + container type routing).",
+        "The current package shapes force unrelated concerns to share one import namespace, increasing blast radius for refactors and making logical ownership non-obvious."
+      ],
+      "suggestion": "Staged reorg plan: (1) create focused subpackages `goseg/shipworkflow/newship/`, `goseg/config/bootstrap/`, and `goseg/docker/orchestration/runtimebridge/` plus `goseg/docker/orchestration/containerconfig/`; (2) move `newship.go` and `newship_service.go` first into `shipworkflow/newship` and export a narrow facade from `shipworkflow`; (3) move `bootstrap.go` path/debug/bootstrap routines into `config/bootstrap` while keeping stable getters in `config`; (4) move `container_bridge.go` runtime-template assembly into `runtimebridge` and `container_config.go` builder dispatch into `containerconfig`; (5) run import updates and validation with `goimports -w goseg/shipworkflow goseg/config goseg/docker/orchestration`, `go test ./goseg/shipworkflow/... ./goseg/config/... ./goseg/docker/orchestration/...`, then `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_domain_aggregation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_runtime_and_bootstrap_boundary_blur",
+      "summary": "The config root package conflates runtime context, bootstrap lifecycle, and state facades that should be separated by directory boundary.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "bootstrap.go handles initialization lifecycle (`Initialize`, `initializeConfig`), runtime env/path derivation (`initializePaths`, `initializeDebugMode`), and path utility functions (`ConfigFilePath`, `SessionKeyPath`).",
+        "config.go also acts as a broad facade for runtimecontext setters/getters and startramstate snapshots in the same root package, increasing conceptual coupling with bootstrap internals.",
+        "bootstrap_test.go must test runtime path/debug helpers directly from the root package, indicating boundary leakage from bootstrap/runtimecontext concerns into the config package surface."
+      ],
+      "suggestion": "Staged reorg plan: (1) introduce `goseg/config/bootstrap/` with `initialize.go` and `paths.go`, leaving `config` as stable API facade; (2) move runtime-context proxy methods from `config.go` into `goseg/config/runtimecontextfacade/` or call `runtimecontext` directly where possible; (3) update tests to target new package paths (`bootstrap` tests colocated under `goseg/config/bootstrap`); (4) update imports with `goimports -w goseg/config`, then validate with `go test ./goseg/config/...` and a full `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_domain_aggregation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "orchestration_bridge_and_builder_dispatch_cohabitation",
+      "summary": "Orchestration runtime-bridge assembly and container-type dispatch live side-by-side in one package, weakening layering clarity.",
+      "related_files": [
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go",
+        "goseg/docker/orchestration/container_bridge_test.go"
+      ],
+      "evidence": [
+        "container_bridge.go defines `dockerContainerRuntimeInputs` and multiple runtime-template/apply functions for llama/netdata/minio, which is adapter assembly logic.",
+        "container_config.go defines container-type builder registration and public config selection APIs (`ContainerConfigForType*`), which is routing/factory logic.",
+        "The smoke-only `container_bridge_test.go` indicates this boundary currently lacks dedicated package-level test seams, consistent with blurred organization in the same directory."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/docker/orchestration/runtimebridge/` for runtime input collection/template application and `goseg/docker/orchestration/containerconfig/` for type-dispatch builders; (2) move bridge file first and keep thin wrappers in old package for compatibility; (3) move config-dispatch file next and update callers to typed entrypoints; (4) replace smoke placeholder with targeted tests in new directories; (5) run `goimports -w goseg/docker/orchestration`, `go test ./goseg/docker/orchestration/...`, then `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_domain_aggregation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Long-lived growth in root-level domain packages without periodic subpackage extraction has accumulated mixed concerns in single directories.",
+      "Facade-first evolution keeps adding wrappers in top-level packages, masking ownership boundaries rather than enforcing them."
+    ],
+    "likely_symptoms": [
+      "flat_package_overload_shipworkflow_config_orchestration",
+      "config_runtime_and_bootstrap_boundary_blur",
+      "orchestration_bridge_and_builder_dispatch_cohabitation"
+    ],
+    "possible_false_positives": []
+  }
+}

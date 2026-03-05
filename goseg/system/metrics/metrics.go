@@ -12,10 +12,11 @@ import (
 	"strings"
 	"syscall"
 
+	"time"
+
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 	"go.uber.org/zap"
-	"time"
 )
 
 var (

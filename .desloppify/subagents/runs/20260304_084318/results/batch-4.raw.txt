@@ -1,0 +1,47 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 84.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "In `goseg/system/wifi_runtime_methods.go:75`, `parseNmcliWifiSSIDs` indexes `parts[7]` without a length guard, unlike `parseNmcliWifiDevices` which validates tokenized column count first.",
+        "That parser is used by `listSSIDs`/`ConstructWifiInfo` flow, so malformed or version-shifted `nmcli` output can crash the Wi‑Fi path at runtime via panic."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_ssid_parse_panic",
+      "summary": "Wi-Fi SSID parsing can panic on short `nmcli` lines before boundary validation.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`parseNmcliWifiSSIDs` directly reads `parts[7]` after `strings.Split(line, \":\")` at `goseg/system/wifi_runtime_methods.go:75-78` with no `len(parts)` check.",
+        "The same file’s `listSSIDs` returns this parser output directly, and the existing tests only verify malformed/empty SSID values, not under-length split lines."
+      ],
+      "suggestion": "Add a defensive guard in `parseNmcliWifiSSIDs` (e.g., `if len(parts) <= 7 || parts[7] == \"\" { continue }`) and add a test case in `goseg/system/wifi_test.go` for under-8-column lines to prevent panic while keeping malformed output tolerant.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "unsafe_shell_output_parsing"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Unsafe assumptions about external command output shape in parsing helpers"
+    ],
+    "likely_symptoms": [
+      "wifi_ssid_parse_panic"
+    ],
+    "possible_false_positives": []
+  }
+}

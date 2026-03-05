@@ -1,0 +1,438 @@
+{
+  "assessments": {
+    "design_coherence": 50.4,
+    "naming_quality": 63.3,
+    "package_organization": 50.1
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows `goseg/shipworkflow/` has 44 files and mixed concern clusters (newship, startram, urbit, workflow, lifecycle) in one flat folder, exceeding the >10 mixed-concern split signal.",
+        "`goseg/system/disk_fstab.go` and `goseg/system/disk_health.go` are parent-package wrappers that primarily delegate to subpackages (`groundseg/system/disk` and `groundseg/system/storage`), indicating placement outside their implementation affinity.",
+        "holistic_context.structure.directory_profiles shows `goseg/config/` has 41 files; `bootstrap.go` (process startup/env/path init) and `config.go` (runtime context/state snapshots/settings types) coexist with many unrelated config domains in one directory."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "design_coherence": {
+      "evidence": [
+        "Runtime seam/default wiring is repeated manually across modules: `normalizeAccessPointRuntime` in `goseg/accesspoint/accesspoint.go`, `NewWiFiRuntime` + `NewWiFiRuntimeWith` in `goseg/system/wifi_runtime_methods.go`, and many `runtime*Ops` constructor functions in `goseg/docker/orchestration/runtime_ops.go`.",
+        "`goseg/protocol/actions/actions.go` combines contract bootstrapping, namespace lookup APIs, compatibility checks, and payload marshaling in one file, while `goseg/protocol/actions/actions_test.go` has to validate all of these concerns together.",
+        "Several test files build bespoke seam/runtime DSLs instead of reusing one test runtime pattern (`goseg/importer/importer_test.go`, `goseg/startuporchestrator/startup_orchestrator_test.go`, `goseg/system/wifi_test.go`, `goseg/accesspoint/accesspoint_test.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "naming_quality": {
+      "evidence": [
+        "The same Wi-Fi subsystem mixes `WiFi` and `Wifi` in exported and internal names (`NewWiFiRuntime`, `isWiFiRadioEnabled`, `ErrWiFiInterfaceNotFound` vs `NewWifiClient`, `WifiInfoTicker`, `testWifiRuntime`).",
+        "Config naming mixes abbreviated and full forms in public and core patch types (`Conf()`, `ConfPatch`, `ConfUpdateOption`) alongside `Config()`, `ConfigPatch`, and `ConfigUpdateOption` aliases.",
+        "Session logstream naming drifts between `Sys*` and `System*` for the same concept (`SysLogSessions`, `SysSessionsToRemove` vs `SystemLogMessages`, `PublishSystemLog`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "shipworkflow_flat_mixed_concerns",
+      "summary": "The `shipworkflow` directory is a flat mixed-concern package, obscuring ownership boundaries between lifecycle/newship/startram/urbit flows.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go"
+      ],
+      "evidence": [
+        "directory_profiles reports 44 files under `goseg/shipworkflow/`, with filenames spanning multiple domains (`newship_*`, `startram_*`, `urbit_*`, `workflow_*`, `lifecycle.go`) in one folder.",
+        "`doc.go` describes broad coordination responsibilities while `lifecycle.go` is a narrow lifecycle utility, showing fine-grained and broad orchestration artifacts co-located without subpackage boundaries."
+      ],
+      "suggestion": "Staged reorg plan: (1) create target folders `goseg/shipworkflow/lifecycle`, `goseg/shipworkflow/newship`, `goseg/shipworkflow/startram`, `goseg/shipworkflow/urbit`; (2) move lowest-dependency files first (`lifecycle.go` + tests), then move `newship_*`, then `startram_*`, then `urbit_*`; (3) keep a temporary compatibility facade in `shipworkflow` that forwards to subpackages, then remove once callers migrate; (4) update imports with `rg 'groundseg/shipworkflow' goseg -n` and package refs via `gofmt -w goseg/shipworkflow/**/*.go`; (5) validate with `go test ./goseg/shipworkflow/...` and `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_package_without_domain_subpackages"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "system_disk_wrapper_misplacement",
+      "summary": "Disk/fstab APIs are placed in parent `system` as thin adapters even though implementation affinity is in `system/disk` and `system/storage`.",
+      "related_files": [
+        "goseg/system/disk_fstab.go",
+        "goseg/system/disk_health.go",
+        "goseg/system/disk_fstab_test.go"
+      ],
+      "evidence": [
+        "`disk_fstab.go` only aliases `systemdisk.FstabRecord` and forwards parse/reconcile/read/write calls directly to `groundseg/system/disk`.",
+        "`disk_health.go` forwards SMART and disk listing operations directly to `groundseg/system/storage` and seam resolution, adding no parent-level orchestration policy.",
+        "`disk_fstab_test.go` is a placeholder smoke test, so wrapper placement remains unvalidated as a deliberate API boundary."
+      ],
+      "suggestion": "Staged reorg plan: (1) move/define these entry points under `goseg/system/disk` as canonical API (`fstab.go`, `health.go`), keeping parent `system` wrappers only as deprecated shims; (2) migrate direct consumers to `groundseg/system/disk` imports in batches (read-only callers first, mutating callers second); (3) remove shims after one release window; (4) update imports via `rg 'groundseg/system\"|groundseg/system$' goseg -n` and `gofmt -w goseg/system/**/*.go`; (5) validate with `go test ./goseg/system/... ./goseg/system/disk/... ./goseg/system/storage/...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "affinity_mismatch_parent_wrappers"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_bootstrap_runtime_cohabitation",
+      "summary": "Process bootstrap concerns and runtime-context state modeling are co-located in `config`, increasing directory boundary blur in an already large package.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "`bootstrap.go` handles startup sequencing (`Initialize`), env/argv probing (`getBasePath`, `setDebugMode`), and persistence bootstrapping.",
+        "`config.go` defines broad settings snapshots plus mutable runtime context accessors (`RuntimeContextSnapshot`, `SetBasePath`, `SetDebugMode`) alongside config state models.",
+        "directory_profiles reports `goseg/config/` has 41 files, indicating a high-load folder where mixed startup/runtime/config-domain concerns reduce navigability."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/config/runtime` for runtime context/env/arch/debug path concerns and `goseg/config/bootstrap` for init orchestration; (2) move pure runtime-context functions/types first (`RuntimeContext*`, `Set*` runtime setters), then move init flow (`Initialize`, path/session/bootstrap helpers); (3) keep `config` package as stable facade exposing selected APIs during migration; (4) update imports with `rg 'groundseg/config' goseg -n` and run `gofmt -w goseg/config/**/*.go`; (5) validate with `go test ./goseg/config/...` and `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_package_without_domain_subpackages"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "contracts_flat_mixed_family_layout",
+      "summary": "The `protocol/contracts` directory is a flat mixed-concern package that combines domain-specific families and shared contract machinery.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines websocket action-family IDs and bindings, while `startram_contracts.go` defines StarTram API error contracts with different governance scope.",
+        "Packet structure profile reports 11 files in `goseg/protocol/contracts/`, crossing the flat-directory overload threshold with mixed responsibilities (family-specific catalogs + shared validators/tests).",
+        "`family_specs_test.go` validates shared family-builder behavior in the same folder as concrete family definitions, signaling missing subpackage boundaries."
+      ],
+      "suggestion": "Stage 1: create `goseg/protocol/contracts/shared/` for reusable catalog/family types and validators, `goseg/protocol/contracts/families/protocol/` for websocket action contracts, and `goseg/protocol/contracts/families/startram/` for StarTram contracts. Stage 2: move shared files first (`family_specs*`, shared builders/metadata), then move `protocol_contracts*`, then `startram_contracts*`. Stage 3: update imports with `rg \"groundseg/protocol/contracts\" goseg/protocol -n` and `goimports -w ./goseg/protocol/contracts/...`. Stage 4: validate with `go test ./goseg/protocol/contracts/... ./goseg/protocol/conformance/...` and then `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contracts_boundary_blur"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "split_contract_authority_across_actions_layers",
+      "summary": "Protocol action identity ownership is split across `actionids`, `actions`, and `contracts`, creating weak package ownership boundaries for compatibility-critical constants.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` declares canonical namespace/action strings.",
+        "`protocol_contracts.go` imports `actionids` and creates parallel typed aliases/constants for the same action tokens.",
+        "`fixtures_test.go` validates fixtures against `protocol/actions` constants instead of a single contracts-owned source, showing cross-package contract coupling."
+      ],
+      "suggestion": "Stage 1: establish a single ownership package, e.g. `goseg/protocol/contracts/bindings/` (or `goseg/protocol/actions/bindings/`) as the sole canonical namespace/action registry used by actions, contracts, and conformance. Stage 2: move `actionids.go` into that target package and migrate `protocol_contracts.go`/fixtures consumers to import only that API. Stage 3: remove duplicate constant re-exports after migration. Stage 4: run `rg \"NamespaceUpload|UploadOpenEndpoint|C2CConnect\" goseg/protocol -n` to update references, then `go test ./goseg/protocol/actions ./goseg/protocol/contracts ./goseg/protocol/conformance`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contracts_boundary_blur"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "docs_runtime_boundary_entrypoint_gap",
+      "summary": "Governance and quality-gate docs point to broad policy, but runtime contract ownership lacks a single package entrypoint aligned with those docs.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`README.md` references governance and backend quality-gate policy files but does not map those policies to a clear runtime contract package boundary.",
+        "Concrete contract families are split within a shared `contracts` package without an obvious top-level API surface for compatibility policy enforcement.",
+        "This docs-to-runtime mapping gap raises navigation and change-risk for contract governance updates."
+      ],
+      "suggestion": "Stage 1: introduce `goseg/protocol/contracts/catalog/` (or `api/`) as the documented entrypoint package exposing only stable discovery/validation interfaces. Stage 2: relocate family implementations under `families/*` and keep policy-facing APIs in `catalog`. Stage 3: update `README.md` governance section to reference the new package layout and ownership map. Stage 4: validate with `go test ./goseg/protocol/contracts/...` and a docs link check via `rg \"protocol/contracts\" README.md docs/architecture -n`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contracts_boundary_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_bootstrap_duplication",
+      "summary": "Runtime default/override wiring is duplicated across subsystems with inconsistent composition rules.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`accesspoint.go` duplicates baseline config assignment in both `defaultAccessPointContext` and `accessPointRuntime`, then repeats field-by-field fallback logic in `normalizeAccessPointRuntime`.",
+        "`wifi_runtime_methods.go` needs special repair logic in `NewWiFiRuntimeWith` (`if overrides.RunNmcliFn == nil { ... }`) because seam merge behavior is not uniform.",
+        "`runtime_ops.go` has many near-boilerplate `runtimeContextOps/runtimeFileOps/runtimeImageOps/...` constructors that manually wire package functions into seam structs."
+      ],
+      "suggestion": "Introduce one shared seam-construction pattern (e.g., `defaults + override merge + validate`) and apply it across accesspoint, wifi, and orchestration runtimes. Keep defaults in a single source per runtime and eliminate duplicate default constructors/normalizers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "protocol_actions_multi_role_module",
+      "summary": "The actions module mixes registry lifecycle, API querying, and transport payload concerns in one unit.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/actions/actions_test.go",
+        "goseg/protocol/contracts/contracts_test.go"
+      ],
+      "evidence": [
+        "`actions.go` contains init-time contract loading (`ensureActionContractsInitialized/initializeActionContracts`), namespace/action query APIs, lifecycle compatibility helpers, and C2C payload serialization (`NewC2CPayload/MarshalC2CPayload`).",
+        "`actions_test.go` correspondingly spans parsing, metadata, compatibility boundaries, and payload marshaling in one test surface, indicating one module is carrying multiple responsibilities.",
+        "Contract-policy tests in `contracts_test.go` and action-policy tests in `actions_test.go` overlap conceptually, increasing cross-module coupling around contract lifecycle behavior."
+      ],
+      "suggestion": "Split `actions.go` into focused units: contract registry/cache, namespace query API, and payload codec. Keep compatibility checks close to the registry layer and expose a smaller facade for callers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "protocol_surface_conflation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transitional_adapter_low_leverage_indirection",
+      "summary": "The disk adapter adds pass-through indirection without owning behavior or migration boundaries.",
+      "related_files": [
+        "goseg/system/disk/adapter.go",
+        "goseg/system/storage/storage_test.go"
+      ],
+      "evidence": [
+        "`adapter.go` is almost entirely thin wrappers to `storage` functions (`ParseFstabLine`, `ReconcileFstabLines`, `ReadFstabLines`, `CreateGroundSegFilesystem`, etc.), often injecting `storage.DefaultSeams()` inline.",
+        "`storage_test.go` validates the storage behavior directly, which implies the adapter layer contributes little behavioral boundary while still creating an extra API surface to maintain."
+      ],
+      "suggestion": "Either complete the migration by moving callers to `system/storage` and removing adapter wrappers, or define a real boundary (interface + explicit seams owned by `system/disk`) so the adapter adds stable domain behavior rather than simple forwarding.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_runtime_harness_fragmentation",
+      "summary": "Test seam setup is reimplemented per package, creating drift-prone and incomplete runtime builders.",
+      "related_files": [
+        "goseg/importer/importer_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/system/wifi_test.go",
+        "goseg/accesspoint/accesspoint_test.go"
+      ],
+      "evidence": [
+        "`importer_test.go` defines multiple near-identical runtime guard helpers (`initRuntime`, `uploadRuntime`, `provisionRuntime`) and custom runtime bootstrap helpers.",
+        "`startup_orchestrator_test.go` maintains a large manual callback-setter map (`startBackgroundServiceCallbackSetters`) to inject runtime seams.",
+        "`wifi_test.go` builds a partial copier in `testWifiRuntime` that copies only selected fields from `wifiRuntime` and omits others (e.g., `RunNmcliFn`, `WifiInfoTicker`), increasing risk that tests diverge from production runtime behavior.",
+        "`accesspoint_test.go` relies on global seam restoration utilities and package-level state mutation patterns distinct from other test suites."
+      ],
+      "suggestion": "Create one shared test seam builder utility for runtime structs (defaults + typed overrides + validation of missing callbacks) and migrate package tests to that pattern; remove duplicated guard helpers and manual setter maps.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "wifi_acronym_casing_drift",
+      "summary": "Wi-Fi symbols use inconsistent acronym casing (`WiFi` vs `Wifi`) within one subsystem.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi_runtime_methods.go` defines `NewWiFiRuntime`, `isWiFiRadioEnabled`, and `ErrWiFiInterfaceNotFound` usage, but the same runtime struct exposes `NewWifiClient` and `WifiInfoTicker`.",
+        "`goseg/system/wifi_test.go` mirrors the same drift with helpers like `resetWifiSeamsForTest`, `testWifiRuntime`, plus tests for `StartWiFiInfoLoop` and `RefreshWiFiInfo`."
+      ],
+      "suggestion": "Choose one canonical acronym style for this package (prefer Go initialism style, e.g. `WiFi`) and rename fields/helpers consistently (`NewWiFiClient`, `WiFiInfoTicker`, `resetWiFiSeamsForTest`, `testWiFiRuntime`) with compatibility shims only where required.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_and_abbreviation_policy_missing"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "config_conf_abbreviation_split",
+      "summary": "Config APIs split between `Conf` and `Config`, creating avoidable vocabulary drift.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`goseg/config/bootstrap.go` exports both `Config()` and `Conf()` (documented as backward-compatible alias), leaving two names for the same concept.",
+        "`goseg/config/config_update_schema.go` defines `ConfPatch`/`ConfUpdateOption` and then aliases `ConfigPatch`/`ConfigUpdateOption`, duplicating terminology in core schema types.",
+        "`goseg/config/config.go` uses full-form `Config` naming heavily (`SetStartramConfig`, `GetStartramConfigSnapshot`), increasing inconsistency with `Conf*` symbols."
+      ],
+      "suggestion": "Standardize on `Config` for public/core names and deprecate `Conf*` aliases behind transitional wrappers; update call sites and tests so one term is canonical in code search and API docs.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_and_abbreviation_policy_missing"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "sys_vs_system_term_mixing",
+      "summary": "Logstream session store mixes `Sys` and `System` prefixes for the same domain concept.",
+      "related_files": [
+        "goseg/session/logstream_session_store.go",
+        "goseg/logger/logger_test.go"
+      ],
+      "evidence": [
+        "`goseg/session/logstream_session_store.go` interface and methods use both `SysLogSessions`/`SysSessionsToRemove` and `SystemLogMessages`/`PublishSystemLog` for one system-log responsibility.",
+        "`goseg/logger/logger_test.go` uses explicit `SystemLog` terminology (`testSystemLogSink`, `drainSystemLogChannel`), reinforcing that session store abbreviations are a local outlier."
+      ],
+      "suggestion": "Normalize session-store method names to one vocabulary (prefer `System*` for clarity), e.g. `SystemLogSessions`, `SystemSessionsToRemove`, with temporary forwarding methods for backwards compatibility if needed.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_and_abbreviation_policy_missing"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 4,
+    "dimension_coverage": 0.333,
+    "evidence_density": 0.938,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 30.386,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 49,
+    "successful_batch_count": 4,
+    "full_sweep_included": false,
+    "total_files": 604,
+    "imported_dimensions": [
+      "design_coherence",
+      "naming_quality",
+      "package_organization"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/shipworkflow/doc.go",
+    "goseg/shipworkflow/lifecycle.go",
+    "goseg/shipworkflow/lifecycle_test.go",
+    "goseg/config/bootstrap.go",
+    "goseg/config/bootstrap_test.go",
+    "goseg/config/config.go",
+    "goseg/system/disk_fstab.go",
+    "goseg/system/disk_fstab_test.go",
+    "goseg/system/disk_health.go",
+    "README.md",
+    "goseg/protocol/actionids/actionids.go",
+    "goseg/protocol/conformance/fixtures_test.go",
+    "goseg/protocol/contracts/family_specs_test.go",
+    "goseg/protocol/contracts/protocol_contracts.go",
+    "goseg/protocol/contracts/startram_contracts.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/system/disk/adapter.go",
+    "goseg/accesspoint/accesspoint.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/main_test.go",
+    "goseg/protocol/actions/actions.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/structs/configs.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_c2c_flow_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_182027",
+    "created_at": "2026-03-04T18:22:32+00:00",
+    "batch_count": 4,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "8cfe637ba21aeeda920a4b22d7ec97df007c73b0d935b49165c807919c17984c"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "naming_quality",
+      "design_coherence",
+      "package_organization"
+    ],
+    "imported_dimensions": [
+      "design_coherence",
+      "naming_quality",
+      "package_organization"
+    ],
+    "missing_dimensions": [
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration"
+    ]
+  }
+}

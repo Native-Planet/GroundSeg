@@ -80,7 +80,7 @@ func (s C2CServiceExecutor) RestartGroundSeg() error {
 }
 
 func (s C2CServiceExecutor) Execute(action actions.Action, ssid, password string) error {
-	_, err := actions.ParseC2CAction(string(action))
+	_, err := actions.ParseAction(actions.NamespaceC2C, string(action))
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func ProcessC2CMessage(cmd C2CCommand, serviceFactory func() C2CService) error {
 	if serviceFactory == nil {
 		return fmt.Errorf("service factory is required")
 	}
-	action, err := actions.ParseC2CAction(string(cmd.Action))
+	action, err := actions.ParseAction(actions.NamespaceC2C, string(cmd.Action))
 	if err != nil {
 		return err
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"groundseg/shipworkflow"
+	"groundseg/shipworkflow/adapters/lifecyclebridge"
 	"groundseg/structs"
 )
 
@@ -30,7 +30,7 @@ func resetChopSvcSeams() {
 	}
 	waitCompleteFn = WaitComplete
 	sleepFn = time.Sleep
-	waitCompletePollerFn = shipworkflow.PollWithTimeout
+	waitCompletePollerFn = lifecyclebridge.PollWithTimeout
 }
 
 func TestChopPierReturnsErrorWhenStatusFetchFails(t *testing.T) {
@@ -100,6 +100,22 @@ func TestChopPierRunningShipTransitionsToChopAndBackToBoot(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(events, ","), "success") {
 		t.Fatalf("expected success event in transitions, got %v", events)
+	}
+}
+
+func TestChopPierSurfacesTransitionPublishFailure(t *testing.T) {
+	t.Cleanup(resetChopSvcSeams)
+	getShipStatusFn = func([]string) (map[string]string, error) {
+		return map[string]string{"~zod": "Up 2 minutes"}, nil
+	}
+	sleepFn = func(time.Duration) {}
+	publishUrbitTransitionFn = func(_ context.Context, _ structs.UrbitTransition) error {
+		return errors.New("event bus full")
+	}
+	if err := ChopPier("~zod"); err == nil {
+		t.Fatal("expected ChopPier to fail when publish transition fails")
+	} else if !strings.Contains(err.Error(), "event bus full") {
+		t.Fatalf("expected publish failure to be surfaced: %v", err)
 	}
 }
 

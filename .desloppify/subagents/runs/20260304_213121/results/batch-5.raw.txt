@@ -1,0 +1,117 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 71.0,
+    "package_organization": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/contracts/protocolfamily/specs.go` defines its own `ActionSpec` and hard-coded contract constants/owner strings, while `goseg/protocol/contracts/family_specs_test.go` exercises `contractFamilyEntrySpec`/catalog validation paths from a different contract model.",
+        "`goseg/protocol/contracts/startramfamily/specs.go` similarly defines a separate `ContractSpec` shape and IDs outside the validated family-entry pipeline covered in `family_specs_test.go`.",
+        "The listed tests (`fixtures_test.go`, `family_specs_test.go`, `actions_test.go`) verify local invariants but do not establish a single enforced boundary between runtime contract families and governance metadata."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`family_specs_test.go` builds synthetic `contractFamilyEntrySpec` values inline instead of validating real outputs from `protocolfamily.ActionSpecs()` and `startramfamily.ContractSpecs()`.",
+        "`fixtures_test.go` validates fixture/binding consistency but does not assert that family spec declarations remain synchronized with canonical bindings and governance metadata.",
+        "`uploadsvc/actions_test.go` validates parser behavior only; it does not test cross-module compatibility from parsed action -> contract binding -> family spec governance."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "From `holistic_context.structure.directory_profiles`, `goseg/protocol/contracts/` is a mixed directory with 11 files (5 production, 6 test), indicating broad concern concentration at one level.",
+        "The assigned family spec files live in `goseg/protocol/contracts/protocolfamily/` and `goseg/protocol/contracts/startramfamily/`, but these directories are not represented in `directory_profiles`, while neighboring `conformance/` is represented; this creates a discoverability mismatch between real code placement and structural metadata.",
+        "Family declarations are split across multiple small leaf packages plus root-level contract tests (`family_specs_test.go`), which increases navigation cost for governance-contract changes."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_family_model_split_brain",
+      "summary": "Contract family declarations use separate data models without a single enforced architecture contract.",
+      "related_files": [
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go"
+      ],
+      "evidence": [
+        "`family_specs_test.go` validates `contractFamilyEntrySpec`/catalog governance paths, but `protocolfamily/specs.go` and `startramfamily/specs.go` define separate `ActionSpec`/`ContractSpec` models.",
+        "Both family packages carry contract IDs and owner metadata as independent string constants, creating parallel authority for governance data."
+      ],
+      "suggestion": "Create one canonical family-spec schema in `goseg/protocol/contracts` (shared struct + validator), then make `protocolfamily` and `startramfamily` producers of that schema only. Remove duplicated model types and route all family declarations through one compile-time checked conversion path before catalog/binding registration.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "governance_contract_source_fragmentation"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "governance_tests_use_synthetic_inputs",
+      "summary": "Governance tests validate synthetic specs but miss regression coverage for real family declarations.",
+      "related_files": [
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`family_specs_test.go` constructs local sample specs instead of loading `ActionSpecs()`/`ContractSpecs()` from family packages.",
+        "`fixtures_test.go` and `actions_test.go` do not bridge parser/binding behavior to governance family declarations, leaving compatibility drift undetected."
+      ],
+      "suggestion": "Add contract-integration tests that: (1) load all real family declarations, (2) assert each declared action/error maps to canonical catalog/bindings, and (3) assert parser-accepted actions (`uploadsvc`) resolve to governed contract entries. Keep existing unit tests, but add this cross-module suite as a required quality gate.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_contract_source_fragmentation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "family_contract_layout_hides_ownership",
+      "summary": "Family contract files are split across root and micro-packages, obscuring ownership and change boundaries.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go"
+      ],
+      "evidence": [
+        "README sets backend quality-gate expectations, but contract-governance code is dispersed across `contracts/` root tests and separate family leaf packages with different local schemas.",
+        "`directory_profiles` shows `goseg/protocol/contracts/` already has 11 mixed files, and family package placement is not reflected consistently in structure metadata, reducing navigability."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1: create `goseg/protocol/contracts/families/protocol/` and `goseg/protocol/contracts/families/startram/` with a shared `families/spec.go` schema in `goseg/protocol/contracts/families/`. Stage 2: move `protocolfamily/specs.go` and `startramfamily/specs.go` into those targets and rename local types to the shared schema. Stage 3: move/adjust family-governance tests to `goseg/protocol/contracts/families/...` so tests are colocated with declarations. Stage 4: run import updates and validation commands: `cd goseg && gofmt -w ./protocol/contracts/... && go test ./protocol/contracts/... ./uploadsvc/... && go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_contract_source_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance contract authority is fragmented across multiple package-local spec types instead of one canonical contract model.",
+      "Tests emphasize local unit invariants, not cross-module governance compatibility paths."
+    ],
+    "likely_symptoms": [
+      "contract_family_model_split_brain",
+      "governance_tests_use_synthetic_inputs",
+      "family_contract_layout_hides_ownership"
+    ],
+    "possible_false_positives": [
+      "directory_profiles omission for some family subdirectories may partly reflect analyzer visibility limits rather than intentional package design"
+    ]
+  }
+}

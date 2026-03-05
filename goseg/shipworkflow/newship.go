@@ -3,11 +3,7 @@ package shipworkflow
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
-
-	"go.uber.org/zap"
 
 	"groundseg/config"
 	"groundseg/docker/events"
@@ -15,137 +11,58 @@ import (
 	"groundseg/docker/orchestration"
 	"groundseg/shipcleanup"
 	"groundseg/shipcreator"
+	"groundseg/shipworkflow/provisioning"
 	"groundseg/startram"
 	"groundseg/structs"
+
+	"go.uber.org/zap"
 )
 
-func ProvisionShip(patp string, shipPayload structs.WsNewShipPayload, customDrive string) error {
-	err := shipcreator.CreateUrbitConfig(patp, customDrive)
-	if err != nil {
-		errmsg := fmt.Sprintf("failed to create urbit config: %v", err)
-		zap.L().Error(errmsg)
-		return handleNewShipErrorCleanup(patp, errmsg, customDrive)
+func newShipProvisioningRuntime() provisioning.Runtime {
+	networkRuntime := network.NewNetworkRuntime()
+	return provisioning.Runtime{
+		CreateUrbitConfigFn:   shipcreator.CreateUrbitConfig,
+		AppendSysConfigPierFn: shipcreator.AppendSysConfigPier,
+		DeleteContainerFn:     orchestration.DeleteContainer,
+		DeleteVolumeFn:        networkRuntime.DeleteVolume,
+		CreateVolumeFn:        networkRuntime.CreateVolume,
+		WriteFileToVolumeFn:   networkRuntime.WriteFileToVolume,
+		PublishTransitionFn: func(ctx context.Context, transition structs.NewShipTransition) {
+			events.DefaultEventRuntime().PublishNewShipTransition(ctx, transition)
+		},
+		StartContainerFn:       orchestration.StartContainer,
+		UpdateContainerStateFn: config.UpdateContainerState,
+		ConfigFn:               config.Config,
+		RegisterShipServicesFn: RegisterNewShipServices,
+		StopContainerByNameFn:  orchestration.StopContainerByName,
+		StartLlamaFn: func() {
+			if _, err := orchestration.StartContainer("llama", "llama"); err != nil {
+				zap.L().Error(fmt.Sprintf("Couldn't restart Llama: %v", err))
+			}
+		},
+		StartLlamaAPIFn: func() {
+			if _, err := orchestration.StartContainer("llama-gpt-api", "llama-api"); err != nil {
+				zap.L().Error(fmt.Sprintf("Couldn't start Llama API: %v", err))
+			}
+		},
+		WaitForBootCodeFn:       WaitForBootCode,
+		WaitForRemoteReadyFn:    WaitForRemoteReady,
+		SwitchShipToWireguardFn: SwitchShipToWireguard,
+		SyncRetrieveFn: func() error {
+			_, err := startram.SyncRetrieve()
+			return err
+		},
+		RollbackProvisioningFn: shipcleanup.RollbackProvisioning,
+		SleepFn:                time.Sleep,
 	}
-
-	if err = shipcreator.AppendSysConfigPier(patp); err != nil {
-		errmsg := fmt.Sprintf("failed to add ship to system.json: %v", err)
-		zap.L().Error(errmsg)
-		return handleNewShipErrorCleanup(patp, errmsg, customDrive)
-	}
-
-	zap.L().Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
-	if err = orchestration.DeleteContainer(patp); err != nil {
-		zap.L().Error(fmt.Sprintf("delete container error: %v", err))
-	}
-	if err = network.NewNetworkRuntime().DeleteVolume(patp); err != nil {
-		zap.L().Error(fmt.Sprintf("delete volume error: %v", err))
-	}
-
-	if customDrive == "" {
-		if err = network.NewNetworkRuntime().CreateVolume(patp); err != nil {
-			errmsg := fmt.Sprintf("create volume error: %v", err)
-			zap.L().Error(errmsg)
-			return handleNewShipErrorCleanup(patp, errmsg, customDrive)
-		}
-		key := shipPayload.Payload.Key
-		if err = network.NewNetworkRuntime().WriteFileToVolume(patp, patp+".key", key); err != nil {
-			errmsg := fmt.Sprintf("write file to volume error: %v", err)
-			zap.L().Error(errmsg)
-			return handleNewShipErrorCleanup(patp, errmsg, customDrive)
-		}
-	} else {
-		path := filepath.Join(customDrive, patp)
-		filename := patp + ".key"
-		key := shipPayload.Payload.Key
-		if err = os.MkdirAll(path, os.ModePerm); err != nil {
-			errmsg := fmt.Sprintf("write file to volume error: %v", err)
-			zap.L().Error(errmsg)
-			return handleNewShipErrorCleanup(patp, errmsg, customDrive)
-		}
-		filePath := path + "/" + filename
-		if err = os.WriteFile(filePath, []byte(key), 0644); err != nil {
-			errmsg := fmt.Sprintf("Error writing to file: %v", err)
-			zap.L().Error(errmsg)
-			return handleNewShipErrorCleanup(patp, errmsg, customDrive)
-		}
-	}
-
-	zap.L().Info(fmt.Sprintf("Creating Pier: %v", patp))
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "creating"})
-	info, err := orchestration.StartContainer(patp, "vere")
-	if err != nil {
-		errmsg := fmt.Sprintf("start container error: %v", err)
-		zap.L().Error(errmsg)
-		return handleNewShipErrorCleanup(patp, errmsg, customDrive)
-	}
-	config.UpdateContainerState(patp, info)
-
-	conf := config.Conf()
-	if conf.Connectivity.WgRegistered {
-		go RegisterNewShipServices(patp)
-	}
-	if conf.Penpai.PenpaiAllow {
-		if err := orchestration.StopContainerByName("llama"); err != nil {
-			zap.L().Error(fmt.Sprintf("Couldn't stop Llama: %v", err))
-		}
-		_, err := orchestration.StartContainer("llama", "llama")
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("Couldn't restart Llama: %v", err))
-		}
-	}
-
-	go waitForNewShipReady(shipPayload, customDrive)
-	return nil
 }
 
-func waitForNewShipReady(shipPayload structs.WsNewShipPayload, customDrive string) {
-	patp := shipPayload.Payload.Patp
-	remote := shipPayload.Payload.Remote
-
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "booting"})
-	zap.L().Info(fmt.Sprintf("Booting ship: %v", patp))
-	WaitForBootCode(patp, 1*time.Second)
-
-	conf := config.Conf()
-	if conf.Connectivity.WgRegistered && conf.Connectivity.WgOn && remote {
-		events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "remote"})
-		WaitForRemoteReady(patp, 1*time.Second)
-		if err := SwitchShipToWireguard(patp, false); err != nil {
-			errmsg := fmt.Sprintf("%v", err)
-			zap.L().Error(errmsg)
-			handleNewShipErrorCleanup(patp, errmsg, customDrive)
-			return
-		}
-	}
-
-	startram.SyncRetrieve()
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "completed"})
-	if conf.Penpai.PenpaiAllow {
-		orchestration.StartContainer("llama-gpt-api", "llama-api")
-	}
+func ProvisionShip(patp string, shipPayload structs.WsNewShipPayload, customDrive string) error {
+	return provisioning.ProvisionShip(newShipProvisioningRuntime(), patp, shipPayload, customDrive)
 }
 
 func RegisterNewShipServices(patp string) {
 	if err := RegisterShipServices(patp); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to register StarTram service for %s: %v", patp, err))
 	}
-}
-
-func handleNewShipErrorCleanup(patp, errmsg, customDrive string) error {
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: "aborted"})
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "error", Event: fmt.Sprintf("%v", errmsg)})
-	zap.L().Info(fmt.Sprintf("New ship creation failed: %s: %s", patp, errmsg))
-	zap.L().Info(fmt.Sprintf("Running cleanup routine"))
-	customPierPath := ""
-	if customDrive != "" {
-		customPierPath = filepath.Join(customDrive, patp)
-	}
-	if err := shipcleanup.RollbackProvisioning(patp, shipcleanup.RollbackOptions{
-		CustomPierPath:       customPierPath,
-		RemoveContainer:      true,
-		RemoveContainerState: true,
-	}); err != nil {
-		zap.L().Error(fmt.Sprintf("New ship rollback encountered errors: %v", err))
-	}
-	return fmt.Errorf("%s", errmsg)
 }

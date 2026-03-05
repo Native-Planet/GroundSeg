@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker/orchestration/internal/artifactwriter"
+	"groundseg/docker/registry"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
@@ -29,7 +30,7 @@ type MinioRuntime struct {
 	StartContainerFn            func(string, string) (structs.ContainerState, error)
 	UpdateContainerStateFn      func(string, structs.ContainerState)
 	GetContainerRunningStatusFn func(string) (string, error)
-	GetLatestContainerInfoFn    func(string) (map[string]string, error)
+	GetLatestContainerInfoFn    func(string) (registry.ImageDescriptor, error)
 	GetLatestContainerImageFn   func(string) (string, error)
 	LoadUrbitConfigFn           func(string) error
 	UrbitConfFn                 func(string) structs.UrbitDocker
@@ -116,7 +117,7 @@ func MinioContainerConfWithRuntime(rt MinioRuntime, containerName string) (conta
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
+	desiredImage := containerInfo.Reference()
 
 	randomBytes := make([]byte, 16)
 	if _, err := rt.RandReadFn(randomBytes); err != nil {
@@ -173,7 +174,7 @@ func MCContainerConfWithRuntime(rt MinioRuntime) (container.Config, container.Ho
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
+	desiredImage := containerInfo.Reference()
 	containerConfig = container.Config{
 		Image:      desiredImage,
 		Entrypoint: []string{"/bin/bash"},

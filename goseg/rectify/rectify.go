@@ -20,29 +20,40 @@ import (
 
 type RectifyRuntime struct {
 	EventRuntime events.EventBroker
-	StateRuntime broadcast.BroadcastStore
+	StateRuntime *broadcast.BroadcastStateRuntime
 	dockerOrchestration.RuntimeContainerOps
 	dockerOrchestration.RuntimeUrbitOps
 	dockerOrchestration.RuntimeSnapshotOps
 	dockerOrchestration.RuntimeStartupOps
 }
 
-func newRectifyRuntime() RectifyRuntime {
+var rectifyStateRuntimeFactory = func() *broadcast.BroadcastStateRuntime {
+	return broadcast.DefaultBroadcastStateRuntime()
+}
+
+func newRectifyRuntime(stateRuntime *broadcast.BroadcastStateRuntime) RectifyRuntime {
+	if stateRuntime == nil {
+		stateRuntime = rectifyStateRuntimeFactory()
+	}
 	orchestrationRuntime := dockerOrchestration.NewRuntime()
 	return RectifyRuntime{
 		EventRuntime:        events.DefaultEventRuntime(),
-		StateRuntime:        broadcast.DefaultBroadcastStateRuntime(),
+		StateRuntime:        stateRuntime,
 		RuntimeContainerOps: orchestrationRuntime.RuntimeContainerOps,
 		RuntimeUrbitOps:     orchestrationRuntime.RuntimeUrbitOps,
 		RuntimeSnapshotOps:  orchestrationRuntime.RuntimeSnapshotOps,
 		RuntimeStartupOps: dockerOrchestration.RuntimeStartupOps{
-			UpdateConfTypedFn: orchestrationRuntime.RuntimeStartupOps.UpdateConfTypedFn,
+			UpdateConfigTypedFn: orchestrationRuntime.RuntimeStartupOps.UpdateConfigTypedFn,
 		},
 	}
 }
 
 func NewRectifyRuntime(overrides ...RectifyRuntime) RectifyRuntime {
-	runtime := newRectifyRuntime()
+	return NewRectifyRuntimeWithStateRuntime(nil, overrides...)
+}
+
+func NewRectifyRuntimeWithStateRuntime(stateRuntime *broadcast.BroadcastStateRuntime, overrides ...RectifyRuntime) RectifyRuntime {
+	runtime := newRectifyRuntime(stateRuntime)
 	if len(overrides) == 0 {
 		return runtime
 	}
@@ -57,11 +68,11 @@ func resolveRectifyRuntime(overrides ...RectifyRuntime) (RectifyRuntime, error) 
 	return runtime, nil
 }
 
-func (runtime RectifyRuntime) UpdateConfig(opts ...config.ConfUpdateOption) error {
-	if runtime.UpdateConfTypedFn == nil {
+func (runtime RectifyRuntime) UpdateConfig(opts ...config.ConfigUpdateOption) error {
+	if runtime.UpdateConfigTypedFn == nil {
 		return fmt.Errorf("rectify runtime missing update config callback")
 	}
-	return runtime.UpdateConfTypedFn(opts...)
+	return runtime.UpdateConfigTypedFn(opts...)
 }
 
 func (runtime RectifyRuntime) validate() error {
@@ -137,7 +148,7 @@ func RectifyUrbitWithContext(ctx context.Context) error {
 	)
 }
 
-func publishUrbitServiceRegistrationTransitionWithRuntime(patp string, serviceCreated bool, runtime broadcast.BroadcastStore) error {
+func publishUrbitServiceRegistrationTransitionWithRuntime(patp string, serviceCreated bool, runtime *broadcast.BroadcastStateRuntime) error {
 	return applyTransitionUpdate("urbit", urbitServiceRegistrationTransitionCommand{
 		patp:          patp,
 		serviceStatus: serviceCreated,

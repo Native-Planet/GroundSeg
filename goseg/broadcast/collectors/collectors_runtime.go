@@ -10,6 +10,9 @@ import (
 	"groundseg/internal/seams"
 	"groundseg/startram"
 	"groundseg/structs"
+	"groundseg/system"
+	systemdisk "groundseg/system/disk"
+	maintenanceapt "groundseg/system/maintenance/apt"
 	"time"
 )
 
@@ -18,6 +21,7 @@ var defaultCollectorRuntimeValue = NewCollectorRuntime()
 type collectorRuntime struct {
 	collectorUrbitRuntime
 	collectorConfigRuntime
+	collectorSystemRuntime
 }
 
 type collectorUrbitRuntime struct {
@@ -41,6 +45,18 @@ type collectorConfigRuntime struct {
 	SwapSettingsFn              func() config.SwapSettings
 	BackupRootFn                func() string
 	BackupTimeFn                func() time.Time
+}
+
+type collectorSystemRuntime struct {
+	SystemUpdatesFn        func() structs.SystemUpdates
+	WiFiInfoSnapshotFn     func() structs.SystemWifi
+	GetMemoryFn            func() (uint64, uint64, error)
+	GetCPUFn               func() (int, error)
+	GetTempFn              func() (float64, error)
+	GetDiskFn              func() (map[string][2]uint64, error)
+	ListHardDisksFn        func() (structs.LSBLKDevice, error)
+	IsDevMountedFn         func(structs.BlockDev) bool
+	SmartResultsSnapshotFn func() map[string]bool
 }
 
 func NewCollectorRuntime() collectorRuntime {
@@ -67,6 +83,17 @@ func NewCollectorRuntime() collectorRuntime {
 			BackupRootFn:                func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) },
 			BackupTimeFn:                func() time.Time { return config.BackupTime },
 		},
+		collectorSystemRuntime: collectorSystemRuntime{
+			SystemUpdatesFn:        maintenanceapt.SystemUpdatesSnapshot,
+			WiFiInfoSnapshotFn:     func() structs.SystemWifi { return system.WifiInfoSnapshot() },
+			GetMemoryFn:            system.GetMemory,
+			GetCPUFn:               system.GetCPU,
+			GetTempFn:              system.GetTemp,
+			GetDiskFn:              system.GetDisk,
+			ListHardDisksFn:        systemdisk.ListHardDisks,
+			IsDevMountedFn:         systemdisk.IsDevMounted,
+			SmartResultsSnapshotFn: systemdisk.SmartResultsSnapshot,
+		},
 	}
 }
 
@@ -82,6 +109,7 @@ func collectorRuntimeWithDefaults(runtime collectorRuntime) collectorRuntime {
 	defaultRuntime := NewCollectorRuntime()
 	defaultRuntime.collectorUrbitRuntime = seams.Merge(defaultRuntime.collectorUrbitRuntime, runtime.collectorUrbitRuntime)
 	defaultRuntime.collectorConfigRuntime = seams.Merge(defaultRuntime.collectorConfigRuntime, runtime.collectorConfigRuntime)
+	defaultRuntime.collectorSystemRuntime = seams.Merge(defaultRuntime.collectorSystemRuntime, runtime.collectorSystemRuntime)
 	return defaultRuntime
 }
 

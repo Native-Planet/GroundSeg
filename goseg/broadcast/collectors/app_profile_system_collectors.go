@@ -2,11 +2,11 @@ package collectors
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"groundseg/structs"
-	"groundseg/system"
 	"runtime"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
 func ConstructAppsInfo() structs.Apps {
@@ -106,5 +106,5 @@ type systemInfoCollector struct{}
 
 func (systemInfoCollector) collect(runtimeRt collectorRuntime) (structs.System, error) {
 	swapSettings := runtimeRt.SwapSettingsFn()
-	return system.CollectBroadcastSystemInfo(swapSettings.SwapVal)
+	return collectSystemInfo(runtimeRt.collectorSystemRuntime, swapSettings.SwapVal)
 }

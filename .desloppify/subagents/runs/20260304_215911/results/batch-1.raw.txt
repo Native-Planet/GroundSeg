@@ -1,0 +1,73 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 76.8
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/contracts/protocolfamily/specs.go` and `goseg/uploadsvc/contractspec/specs.go` both re-export `actionids` constants into local aliases and each maintain their own `[]familyspec.ActionSpec` declarations, creating multiple authoring points for the same contract namespace/action boundary.",
+        "`goseg/protocol/contracts/family_specs_test.go` imports both family packages and validates they stay aligned with governance, indicating contract-family ownership is spread across modules rather than centralized behind one authoritative boundary.",
+        "`goseg/uploadsvc/contractspec/contractspec_test.go` and `goseg/uploadsvc/actions_test.go` enforce cross-package agreement (supported actions, contract bindings, canonical catalog) via repeated integration assertions and hard-coded expectations, which increases change blast radius for adding/removing an action."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_action_contract_authority",
+      "summary": "Action contract declarations are fragmented across protocol and feature packages, creating a multi-owner boundary with drift risk.",
+      "related_files": [
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/uploadsvc/contractspec/specs.go",
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`protocolfamily/specs.go` and `uploadsvc/contractspec/specs.go` both define local alias constants that mirror `actionids` and both construct `familyspec.ActionSpec` entries for governed contracts.",
+        "Cross-family validation tests in `family_specs_test.go` are needed to keep these separate declarations in sync, which signals there is no single authoritative registration path.",
+        "Both modules depend on shared stringly contract IDs/namespaces from `actionids`, but declaration ownership remains split."
+      ],
+      "suggestion": "Introduce a single contract registration boundary (for example, one central registry package with typed registration helpers) and make feature packages contribute via explicit registration inputs instead of duplicating alias constants and spec-shaping logic. Keep `actionids` as immutable identifiers only, and generate/read normalized family specs from one source of truth.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fragmented_contract_registry"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "cross_package_invariant_duplication_in_tests",
+      "summary": "Cross-module coupling is enforced through duplicated test invariants, increasing blast radius for routine contract evolution.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/contractspec/contractspec_test.go"
+      ],
+      "evidence": [
+        "`fixtures_test.go` and `contractspec_test.go` both recompute binding agreement across packages (`contracts.ActionContractBindings`, fixture maps, supported actions) instead of depending on a single verification API.",
+        "`contractspec_test.go` hard-codes cardinality (`expected exactly two supported upload actions`), forcing unrelated test updates when new upload actions are added.",
+        "`actions_test.go` and protocol contract tests both assert the same mapping consistency from different package vantage points, indicating repeated invariant encoding."
+      ],
+      "suggestion": "Move cross-module conformance checks behind one shared contract-conformance harness (single package-level validator) and keep package-local tests focused on local behavior only. Remove hard-coded action counts and derive expectations from authoritative registry metadata to reduce coupling-driven churn.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_contract_registry"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract metadata ownership is distributed across multiple packages without one canonical registration surface.",
+      "Conformance responsibilities are duplicated across test suites instead of centralized in a reusable boundary validator."
+    ],
+    "likely_symptoms": [
+      "cross_package_invariant_duplication_in_tests"
+    ],
+    "possible_false_positives": []
+  }
+}

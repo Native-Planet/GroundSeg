@@ -1,0 +1,78 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 79.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "goseg/config/config.go uses a per-field read-modify-write pattern (`setRuntimeContextBasePath`, `setRuntimeContextDebugMode`, etc.) over an atomic pointer, so independent mutators can overwrite each other instead of composing a single coherent runtime snapshot",
+        "goseg/main.go and goseg/startuporchestrator/startup_orchestrator.go read process context (`config.RuntimeContextSnapshot`) and directly consume package-level state instead of requiring an explicit context abstraction in constructor inputs",
+        "goseg/shipworkflow/recovery.go accepts a raw function-pointer runtime (`wireguardRecoveryRuntime`) and invokes callbacks directly without any validation, unlike other runtimes in this batch that validate callback groups through seam checks"
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 61.0,
+        "indirection_cost": 54.0,
+        "interface_honesty": 67.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_runtime_context_rmw_update_loss",
+      "summary": "Config runtime context setters are separate read-modify-write operations on a shared atomic pointer, which can drop updates under concurrent or interleaved calls.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`setRuntimeContextBasePath`, `setRuntimeContextDebugMode`, and peers all load `RuntimeContextSnapshot()`, mutate one field, then store the updated struct.",
+        "Because each setter writes the full struct independently, concurrent callers can overwrite unrelated fields (for example, basePath and architecture) with stale snapshots.",
+        "Multiple tests and call sites mutate runtime context via these setters (for example `SetBasePath`, `SetDebugMode`) indicating this path is part of runtime dependency control, not a single-threaded one-off initialization."
+      ],
+      "suggestion": "Refactor runtime-context updates to serialize through a single `updateRuntimeContext` helper (mutex-protected or CAS loop) that applies a full mutate function to the current snapshot, then stores once; keep public setters as thin wrappers over that shared updater.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "function_seam_mutability_race"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wireguard_recovery_seam_lacks_contract_guards",
+      "summary": "Wireguard recovery uses a function-field seam without validation, creating an abstraction that can be instantiated in an invalid state and panic at runtime.",
+      "related_files": [
+        "goseg/shipworkflow/recovery.go",
+        "goseg/shipworkflow/recovery_test.go"
+      ],
+      "evidence": [
+        "`RecoverWireguardFleet` accepts `wireguardRecoveryRuntime` directly and immediately calls `runtime.GetShipStatusFn`, `RestartContainerFn`, `WaitForShipExitFn`, etc. without nil checks.",
+        "The function type is exported via `NewWireguardRecoveryRuntime`, but callers can bypass it with a zero-value or partially filled struct because the public entry point does not enforce required seams.",
+        "Other runtime compositions in this batch (for example workflow/runtime constructors) validate callback groups before use, while this seam has no comparable guard."
+      ],
+      "suggestion": "Introduce a runtime validator for wireguard recovery (required callback set) and change `RecoverWireguardFleet` to obtain runtime via a constructor that returns an error on missing callbacks, or perform explicit nil checks at entry.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "function_seam_mutability_race"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime abstractions are defined as mutable shared state or raw function buckets without a single, enforced contract boundary.",
+      "Context mutation APIs expose split-field writes instead of transactional updates."
+    ],
+    "likely_symptoms": [
+      "Intermittent loss of runtime context values when multiple set operations run in close sequence",
+      "Potential nil-function panics in recovery paths if a seam runtime is misconstructed outside the default constructor"
+    ],
+    "possible_false_positives": [
+      "If runtime context is guaranteed single-threaded in production and setters are never interleaved, first finding impact is lower than scored.",
+      "If all callers always build recovery runtimes via constructor and never pass zero-value runtimes, second finding remains a defensive hardening concern more than a demonstrated production bug."
+    ]
+  }
+}

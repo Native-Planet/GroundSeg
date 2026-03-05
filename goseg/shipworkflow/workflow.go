@@ -55,7 +55,11 @@ func RegisterShipServices(patp string) error {
 }
 
 func SwitchShipToWireguard(patp string, gracefulStop bool) error {
-	if err := config.UpdateUrbitNetworkConfig(patp, func(shipConf *structs.UrbitNetworkConfig) error {
+	if err := config.UpdateUrbitSection(patp, config.UrbitConfigSectionNetwork, func(section any) error {
+		shipConf, ok := section.(*structs.UrbitNetworkConfig)
+		if !ok {
+			return fmt.Errorf("unexpected config section type: %T", section)
+		}
 		shipConf.Network = "wireguard"
 		return nil
 	}); err != nil {

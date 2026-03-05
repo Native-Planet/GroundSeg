@@ -3,6 +3,7 @@ package orchestration
 import (
 	"errors"
 	"groundseg/config"
+	"groundseg/docker/registry"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
@@ -32,8 +33,8 @@ func testMinIORuntime() dockerRuntime {
 		GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil },
 	}
 	rt.imageOps = RuntimeImageOps{
-		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
-			return map[string]string{"repo": "repo/image", "tag": "latest", "hash": "hash"}, nil
+		GetLatestContainerInfoFn: func(string) (registry.ImageDescriptor, error) {
+			return registry.ImageDescriptor{Repo: "repo/image", Tag: "latest", Hash: "hash"}, nil
 		},
 	}
 	rt.configOps = RuntimeSnapshotOps{
@@ -199,8 +200,8 @@ func TestMinioContainerConfBuildsExpectedConfig(t *testing.T) {
 		},
 	}
 	rt.imageOps = RuntimeImageOps{
-		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
-			return map[string]string{"repo": "repo/minio", "tag": "latest", "hash": "abcd"}, nil
+		GetLatestContainerInfoFn: func(string) (registry.ImageDescriptor, error) {
+			return registry.ImageDescriptor{Repo: "repo/minio", Tag: "latest", Hash: "abcd"}, nil
 		},
 	}
 	var storedName, storedPwd string
@@ -241,8 +242,8 @@ func TestMinioContainerConfInvalidName(t *testing.T) {
 func TestMCContainerConfPollsUntilWireguardUp(t *testing.T) {
 	rt := testMinIORuntime()
 	rt.imageOps = RuntimeImageOps{
-		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
-			return map[string]string{"repo": "repo/mc", "tag": "latest", "hash": "hash"}, nil
+		GetLatestContainerInfoFn: func(string) (registry.ImageDescriptor, error) {
+			return registry.ImageDescriptor{Repo: "repo/mc", Tag: "latest", Hash: "hash"}, nil
 		},
 	}
 	calls := 0

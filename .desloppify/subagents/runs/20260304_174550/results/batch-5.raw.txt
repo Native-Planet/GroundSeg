@@ -1,0 +1,122 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "naming_quality": 72.0
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "Config package mixes two competing vocabularies for the same concept: `StartConfigEventLoop`/`StartConfigEventLoopWithRuntime` alongside alias and internals `StartConfEventLoop`, `runConfEventLoop`, `processConfEvent`, and `Conf()` in goseg/config/config_events.go.",
+        "WiFi API/methods use three names for the same interface identity (`dev`, `device`, `ifaceName`) and include opaque names like `ifCheck`, making call sites less self-explanatory across goseg/system/wifi_runtime_api.go and goseg/system/wifi_runtime_methods.go.",
+        "Multiple orchestration modules overload `runtime` to mean different things (dependency bundle, lifecycle state, service group, context object), e.g. `StartupRuntime`, `startupInitRuntime`, `startBackgroundServicesRuntime`, `workflowRuntime`, `RuntimeContainerOps`, reducing semantic precision across goseg/startuporchestrator/startup_orchestrator.go, goseg/shipworkflow/operations_runtime.go, and goseg/docker/orchestration/runtime_ops.go."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "naming_quality",
+      "identifier": "config_conf_vocab_split",
+      "summary": "Config module uses conflicting `config` vs `conf` naming for the same API surface, obscuring intent and discoverability.",
+      "related_files": [
+        "goseg/config/config_events.go",
+        "goseg/config/config.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "`StartConfigEventLoop` is paired with aliases/internal names `StartConfEventLoop`, `StartConfEventLoopWithRuntime`, `runConfEventLoop`, `processConfEvent` in the same file.",
+        "`processConfEvent` calls `Conf()` while neighboring APIs are `*SettingsSnapshot` and `RuntimeContextSnapshot`, creating mixed terminology for reading config state.",
+        "Patch schema/registry types are centered on `confPatch*` prefixes while the package/file naming is `config*`, continuing the split vocabulary."
+      ],
+      "suggestion": "Standardize on a single public and internal term (`config`) and deprecate/remove `conf` identifiers in one migration pass (aliases retained temporarily with clear deprecation comments), including patch-type prefixes.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "terminology_drift"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "runtime_term_overload",
+      "summary": "The label `runtime` is overloaded for unrelated concepts, making orchestration APIs harder to reason about.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`startup_orchestrator.go` defines `StartupRuntime`, `startupInitRuntime`, and `startBackgroundServicesRuntime` where each represents a different concern (bootstrap callbacks vs background service wiring).",
+        "`operations_runtime.go` uses `workflowRuntime` as both dependency carrier and operation context, while `runtime_ops.go` uses many `Runtime*Ops` types for function bundles.",
+        "`wifi_runtime_api.go` and `logs.go` also expose service-level runtime structs (`WiFiRuntimeService.runtime`, `LogstreamRuntime`) that are semantically different from orchestration runtime bundles."
+      ],
+      "suggestion": "Rename by role rather than umbrella term (for example `Deps`, `ServiceSet`, `BootstrapHooks`, `WorkflowDeps`) and reserve `runtime` for one narrowly defined concept per subsystem.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "role_name_overload"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "wifi_device_name_inconsistency",
+      "summary": "WiFi interface identifiers are named inconsistently (`dev`, `device`, `ifaceName`) and include shorthand names that hide behavior.",
+      "related_files": [
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "API methods mix `RefreshWiFiInfo(dev string)`, `ListWiFiSSIDs(dev string)`, `DisconnectWiFi(ifaceName string)`, and internal `resolveDevice(dev, ...)` for the same conceptual value.",
+        "Runtime method `ifCheck()` is non-descriptive compared with surrounding method names (`primaryWifiDevice`, `listSSIDs`, `toggleDevice`).",
+        "Mixed call-site wording increases ambiguity around whether parameters represent device name, interface name, or selected state."
+      ],
+      "suggestion": "Adopt one canonical term (`interfaceName` or `deviceName`) across API/runtime/test surfaces and rename opaque helpers like `ifCheck` to behavior-explicit forms (`isWiFiRadioEnabled`/`readWiFiRadioState`).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "terminology_drift"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "generic_run_prefix_overuse",
+      "summary": "High reuse of `run*` prefixes across unrelated behaviors reduces semantic signal in execution flows.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/routines/system/system.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "Core entrypoints and helpers use broad verbs (`run`, `runServer`, `runBootstrapSubsystems`, `runStartupSubsystems`, `runRoutine`, `runTransitionLifecycle`, `runImportPhases`) despite different side effects and lifecycles.",
+        "In startup and workflow orchestration, several adjacent `run*` functions differ primarily by suffix (`runTransitionLifecycle`, `runTransitionLifecycleResolved`, `runUrbitTransition`), making intent distinctions easy to miss.",
+        "This pattern appears in multiple subsystems, indicating naming convention drift rather than isolated local style."
+      ],
+      "suggestion": "Use intent-specific verbs by responsibility (`start`, `execute`, `dispatch`, `publish`, `bootstrap`, `orchestrate`) and keep `run*` for thin loop/executor primitives only.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "generic_verb_bias"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Terminology drift across long-lived modules (`conf` vs `config`, `dev/device/ifaceName`).",
+      "Overuse of umbrella nouns (`runtime`) and generic verbs (`run`) as codebase-scale naming defaults."
+    ],
+    "likely_symptoms": [
+      "config_conf_vocab_split",
+      "wifi_device_name_inconsistency",
+      "generic_run_prefix_overuse"
+    ],
+    "possible_false_positives": [
+      "Some `run*` names may intentionally match established Go service-loop conventions."
+    ]
+  }
+}

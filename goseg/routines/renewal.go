@@ -16,7 +16,7 @@ var (
 	withStartramReminderOneForRenewal   = config.WithStartramReminderOne
 	withStartramReminderThreeForRenewal = config.WithStartramReminderThree
 	withStartramReminderSevenForRenewal = config.WithStartramReminderSeven
-	updateConfTypedForRenewal           = config.UpdateConfTyped
+	updateConfTypedForRenewal           = config.UpdateConfigTyped
 	urbitConfForRenewal                 = config.UrbitConf
 	sendNotificationForRenewal          = click.SendNotification
 )
@@ -41,7 +41,7 @@ func StartramRenewalReminderWithContext(ctx context.Context) error {
 }
 
 func startramRenewalDelay() time.Duration {
-	conf := config.Conf()
+	conf := config.Config()
 	zap.L().Debug(fmt.Sprintf("Checking StarTram renewal status.."))
 
 	if !conf.Connectivity.WgRegistered {
@@ -107,7 +107,7 @@ func waitForContext(ctx context.Context, delay time.Duration) error {
 }
 
 func setReminder(daysType string, reminded bool) {
-	var option config.ConfUpdateOption
+	var option config.ConfigUpdateOption
 	switch daysType {
 	case "one":
 		option = withStartramReminderOneForRenewal(reminded)

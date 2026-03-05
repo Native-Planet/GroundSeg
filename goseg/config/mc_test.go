@@ -11,7 +11,7 @@ import (
 )
 
 func resetMcSeams() {
-	confForMc = Conf
+	confForMc = Config
 	getVersionChannelForMc = GetVersionChannel
 }
 
@@ -34,8 +34,8 @@ func TestCreateDefaultMcConfWritesDefaults(t *testing.T) {
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("unmarshal mc.json failed: %v", err)
 	}
-	if got != defaults.McConfig {
-		t.Fatalf("unexpected mc defaults: got %+v want %+v", got, defaults.McConfig)
+	if got != defaults.DefaultMcConfig() {
+		t.Fatalf("unexpected mc defaults: got %+v want %+v", got, defaults.DefaultMcConfig())
 	}
 }
 

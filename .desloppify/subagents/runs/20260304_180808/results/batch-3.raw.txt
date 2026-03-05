@@ -1,0 +1,72 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 79.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "`goseg/protocol/actionids/actionids.go` defines canonical namespace/action tokens, while `goseg/protocol/contracts/protocol_contracts.go` redefines typed aliases and derives IDs from those tokens, splitting protocol identity across packages.",
+        "`goseg/protocol/conformance/fixtures_test.go` validates canonical bindings using `groundseg/protocol/actions` symbols instead of the `actionids`/contracts source-of-truth path, indicating package-boundary ambiguity for contract governance ownership.",
+        "`README.md` backend quality-gate fast path explicitly targets `./protocol/contracts` but not `./protocol/conformance`, even though `fixtures_test.go` is a dedicated contract-fixture conformance check."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "protocol_contract_identity_fragmentation",
+      "summary": "Protocol action/contract identity is split across multiple sibling packages with no single ownership boundary.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` stores raw canonical tokens (`NamespaceUpload`, `UploadOpenEndpoint`, `C2CConnect`).",
+        "`protocol_contracts.go` re-exports those tokens as `ActionNamespace*`/`Action*` and constructs governance IDs in a separate package.",
+        "`fixtures_test.go` anchors conformance checks to `protocol/actions` constants, creating a third dependency surface for the same contract identity space."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/protocol/spec/` as the single protocol identity package (namespaces, verbs, binding map, contract-ID helpers); (2) move constants from `goseg/protocol/actionids/actionids.go` into `goseg/protocol/spec/actions.go`; (3) update `goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/conformance/fixtures_test.go` imports to use `protocol/spec` only; (4) remove redundant alias constants after call sites are migrated; (5) validate with `cd goseg && go test ./protocol/spec ./protocol/contracts ./protocol/conformance ./protocol/actions` and then `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "protocol_governance_boundary_split"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "contract_conformance_gate_outside_declared_fast_path",
+      "summary": "Contract conformance tests are organized outside the README’s declared backend governance gate, weakening navigable policy-to-package alignment.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`README.md` fast backend gate command includes `./protocol/contracts` but omits `./protocol/conformance`.",
+        "`fixtures_test.go` enforces canonical fixture coverage and unknown-action rejection, which are governance-level compatibility checks.",
+        "`family_specs_test.go` validates contract-family metadata and ID expectations, showing conformance and contracts are one policy domain but split in gate and package focus."
+      ],
+      "suggestion": "Staged reorg plan: (1) move `goseg/protocol/conformance/` under `goseg/protocol/contracts/conformance/` to co-locate governance checks with contract specs; (2) update package imports and test package declarations to new path; (3) update README backend fast-gate command to `go test ./protocol/contracts/...` so both contract and conformance checks are included by default; (4) validate with `cd goseg && go test ./protocol/contracts/...` and `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "protocol_governance_boundary_split"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol governance artifacts evolved in parallel (`actionids`, `actions`, `contracts`, `conformance`) without consolidation into a single package contract.",
+      "Quality-gate documentation tracks major runtime modules but not all policy-enforcement packages in the same governance surface."
+    ],
+    "likely_symptoms": [
+      "protocol_contract_identity_fragmentation",
+      "contract_conformance_gate_outside_declared_fast_path"
+    ],
+    "possible_false_positives": []
+  }
+}

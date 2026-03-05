@@ -1,0 +1,213 @@
+{
+  "assessments": {
+    "cross_module_architecture": 52.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract identity primitives are defined in `goseg/protocol/actionids/actionids.go`, then re-exported in `goseg/protocol/contracts/protocolfamily/specs.go` (`ProtocolActionContractRoot`, namespace/action constants, and derived ID constants), creating more than one authoritative boundary surface.",
+        "`goseg/protocol/contracts/conformance/fixtures_test.go` validates contract fixtures against `groundseg/protocol/actions` runtime constants, while contract-family declarations in `goseg/protocol/contracts/protocolfamily/specs.go` are built from `actionids` + `familyspec`; this mixes runtime action API and contract-governance API in the conformance boundary.",
+        "`README.md` defines backend quality gate as `go test ./...` and references external docs for contract-gate mapping, while contract-governance enforcement is implemented in dedicated tests (`goseg/protocol/contracts/family_specs_test.go`, `goseg/protocol/contracts/conformance/fixtures_test.go`) that are not explicitly surfaced as a named architecture contract gate."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "bidirectional_contract_test_coupling",
+      "summary": "Protocol and uploadsvc tests are mutually coupled, creating boundary-crossing change blast radius.",
+      "related_files": [
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/uploadsvc/contractspec/contractspec_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`family_specs_test.go` validates protocol catalog behavior using `uploadsvc/contractspec.UploadActionSpecs()`, so protocol tests depend on uploadsvc package details.",
+        "`contractspec_test.go` validates uploadsvc behavior by enumerating `contracts.ActionContractBindings()` from protocol contracts, so uploadsvc tests depend on protocol catalog internals.",
+        "This two-way assertion pattern means a local contract change in either package requires synchronized edits in both test suites."
+      ],
+      "suggestion": "Introduce a single contract-governance test seam (for example, a shared conformance fixture package under `protocol/contracts/conformance`) that owns cross-package assertions. Keep feature-package tests focused on local parsing/behavior and remove direct protocol<->feature mutual assertions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_contract_ownership"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_contract_ownership_across_packages",
+      "summary": "Contract IDs and action specs are distributed across multiple packages with no single authoritative module.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/uploadsvc/contractspec/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines canonical namespace/action/contract-id constants, while `protocolfamily/specs.go` and `uploadsvc/contractspec/specs.go` each rebuild family-specific catalogs by re-exporting and recombining those constants.",
+        "Conformance tests (`fixtures_test.go` and related tests) are required to keep these parallel declarations aligned, indicating coordination through duplicated declarations rather than a single owning boundary.",
+        "Adding or changing an action currently requires touching multiple modules and tests to preserve consistency, increasing architectural drift risk."
+      ],
+      "suggestion": "Create one authoritative contract catalog package that owns namespace/action/ID/spec metadata, and have protocolfamily/uploadsvc expose thin views generated from that catalog. Keep conformance tests as verification, not as the primary mechanism stitching duplicate declarations together.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fragmented_contract_ownership"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_contract_identity_authority",
+      "summary": "Contract IDs and action vocabulary are maintained through duplicated boundary surfaces instead of a single authoritative module.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines root, namespaces, actions, and composed contract IDs.",
+        "`protocolfamily/specs.go` re-exports these constants under new names and uses them as family declarations.",
+        "`family_specs_test.go` also constructs validation expectations through separate contract constants/metadata paths, reinforcing multiple parallel representations for the same contract vocabulary."
+      ],
+      "suggestion": "Establish one canonical contract identity source (for root/namespace/action/contract ID), make family specs consume it directly without re-export aliases, and enforce a no-duplicate-constant rule in contract packages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_identity_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "conformance_depends_on_runtime_actions_boundary",
+      "summary": "Conformance fixtures are coupled to runtime action package constants, blurring contract-governance boundaries.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/actionids/actionids.go"
+      ],
+      "evidence": [
+        "`fixtures_test.go` imports `groundseg/protocol/actions` and checks fixture keys against `actions.NamespaceC2C` and `actions.ActionC2CConnect`.",
+        "Contract family declarations in `protocolfamily/specs.go` are expressed through contract-focused types (`familyspec.ActionSpec`) and `actionids`, indicating a separate governance boundary.",
+        "This creates dependency direction where contract conformance is validated against runtime action API rather than solely against canonical contract declarations."
+      ],
+      "suggestion": "Drive conformance validation from canonical contract declarations (`actionids`/family specs) and keep runtime `actions` compatibility checks in a dedicated adapter test layer to preserve boundary direction.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_identity_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "quality_gate_contract_scope_not_explicit_in_root_policy",
+      "summary": "Repository-level quality gate policy does not explicitly name the contract conformance gate it relies on for compatibility governance.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`README.md` backend gate requires only `go test ./...` and links to external documentation for detailed contract-gate mapping.",
+        "Contract governance is enforced by specific test suites (`TestActionContractFixturesMatchCanonicalBindings`, `TestProtocolFamilyDeclarationsValidateAgainstGovernance`, `TestStartramFamilyDeclarationsValidateAgainstGovernance`) but this gate is not explicitly named in root policy text.",
+        "Without explicit top-level policy naming, architecture compatibility contracts are discoverable only by reading test internals or secondary docs."
+      ],
+      "suggestion": "Add an explicit contract-conformance gate section in `README.md` (with required command/target and ownership), and align it with the existing contract test suite naming to make boundary policy auditable at repo root.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 2,
+    "dimension_coverage": 1.0,
+    "evidence_density": 1.0,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 12.752,
+    "dimensions_with_findings": 1
+  },
+  "review_scope": {
+    "reviewed_files_count": 9,
+    "successful_batch_count": 2,
+    "full_sweep_included": false,
+    "total_files": 632,
+    "imported_dimensions": [
+      "cross_module_architecture"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/actionids/actionids.go",
+    "goseg/protocol/contracts/conformance/fixtures_test.go",
+    "goseg/protocol/contracts/family_specs_test.go",
+    "goseg/protocol/contracts/protocolfamily/specs.go",
+    "goseg/protocol/contracts/startramfamily/specs.go",
+    "goseg/uploadsvc/actions_test.go",
+    "goseg/uploadsvc/contractspec/contractspec_test.go",
+    "goseg/uploadsvc/contractspec/specs.go",
+    "README.md"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_220104",
+    "created_at": "2026-03-04T22:02:20+00:00",
+    "batch_count": 2,
+    "batch_indexes": [
+      1,
+      2
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "f62541d1ba787444595b04f21d020ff9e603ef42c8dd7fc7ac94fbfc1b18c03b"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "cross_module_architecture"
+    ],
+    "imported_dimensions": [
+      "cross_module_architecture"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

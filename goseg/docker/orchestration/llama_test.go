@@ -122,7 +122,7 @@ func TestLoadLlamaStartError(t *testing.T) {
 	}
 
 	err := loadLlamaWithRuntime(llamaRuntimeFromDocker(rt))
-	if err == nil || !strings.Contains(err.Error(), "Error starting Llama API") {
+	if err == nil || !strings.Contains(err.Error(), "start llama API container") {
 		t.Fatalf("expected wrapped start error, got %v", err)
 	}
 }

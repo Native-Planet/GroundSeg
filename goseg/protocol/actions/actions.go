@@ -1,8 +1,8 @@
 package actions
 
 import (
+	"encoding/json"
 	"fmt"
-	"sync"
 
 	"groundseg/protocol/contracts"
 )
@@ -11,8 +11,8 @@ import (
 type Namespace = contracts.ActionNamespace
 
 const (
-	NamespaceUpload Namespace = contracts.ActionNamespaceUpload
-	NamespaceC2C    Namespace = contracts.ActionNamespaceC2C
+	NamespaceUpload Namespace = Namespace(contracts.ActionNamespaceUpload)
+	NamespaceC2C    Namespace = Namespace(contracts.ActionNamespaceC2C)
 )
 
 // Action is a transport action contract token.
@@ -25,52 +25,48 @@ const (
 )
 
 // UploadPayload indicates which upload payload fragment an action expects.
-type UploadPayload uint8
+type UploadPayload = contracts.UploadPayloadRule
 
 const (
-	UploadPayloadOpenEndpoint UploadPayload = 1 << iota
-	UploadPayloadReset
+	UploadPayloadOpenEndpoint UploadPayload = contracts.UploadPayloadOpenEndpoint
+	UploadPayloadReset        UploadPayload = contracts.UploadPayloadReset
 )
 
-var (
-	actionContractsByNamespace map[Namespace][]ActionContract
-	uploadActionContracts      []UploadActionContract
-	c2cActionContracts         []ActionContract
-	actionsInitOnce            sync.Once
-	actionContractsInitErr     error
-)
-
-func ensureActionContractsInitialized() {
-	actionsInitOnce.Do(func() {
-		actionContractsInitErr = initializeActionContracts()
-	})
-	if actionContractsInitErr != nil {
-		panic(actionContractsInitErr)
-	}
+type actionCatalog struct {
+	contractsByNamespace map[Namespace][]ActionContract
+	contractByNamespace  map[Namespace]map[Action]ActionContract
+	uploadContracts      []UploadActionContract
 }
 
-func initializeActionContracts() error {
+func buildActionCatalog() (actionCatalog, error) {
 	if err := contracts.ValidateActionContractBindings(); err != nil {
-		return fmt.Errorf("validate action contract bindings: %w", err)
+		return actionCatalog{}, fmt.Errorf("validate action contract bindings: %w", err)
 	}
-	uploadActions, err := buildActionContractSlice(contracts.ActionNamespaceUpload)
+	uploadActions, err := buildActionContractSlice(contracts.ActionNamespace(NamespaceUpload))
 	if err != nil {
-		return fmt.Errorf("initialize upload action contracts: %w", err)
+		return actionCatalog{}, fmt.Errorf("initialize upload action contracts: %w", err)
 	}
-	c2cActions, err := buildActionContractSlice(contracts.ActionNamespaceC2C)
+	c2cActions, err := buildActionContractSlice(contracts.ActionNamespace(NamespaceC2C))
 	if err != nil {
-		return fmt.Errorf("initialize c2c action contracts: %w", err)
+		return actionCatalog{}, fmt.Errorf("initialize c2c action contracts: %w", err)
 	}
-	uploadActionContracts, err = buildUploadActionContracts(uploadActions)
+	uploadActionByAction := actionContractByActionIndex(uploadActions)
+	c2cActionByAction := actionContractByActionIndex(c2cActions)
+	uploadActionContracts, err := buildUploadActionContracts(uploadActions)
 	if err != nil {
-		return fmt.Errorf("initialize upload action payload matrix: %w", err)
+		return actionCatalog{}, fmt.Errorf("initialize upload action payload matrix: %w", err)
 	}
-	c2cActionContracts = c2cActions
-	actionContractsByNamespace = map[Namespace][]ActionContract{
-		NamespaceUpload: actionContractsFromUpload(uploadActionContracts),
-		NamespaceC2C:    c2cActionContracts,
-	}
-	return nil
+	return actionCatalog{
+		contractsByNamespace: map[Namespace][]ActionContract{
+			NamespaceUpload: actionContractsFromUpload(uploadActionContracts),
+			NamespaceC2C:    c2cActions,
+		},
+		contractByNamespace: map[Namespace]map[Action]ActionContract{
+			NamespaceUpload: uploadActionByAction,
+			NamespaceC2C:    c2cActionByAction,
+		},
+		uploadContracts: uploadActionContracts,
+	}, nil
 }
 
 // ActionMeta captures protocol action metadata used by protocol-aware dispatchers.
@@ -79,8 +75,22 @@ type ActionMeta struct {
 	Description string
 }
 
+const C2CPayloadType = "c2c"
+
+type C2CPayload struct {
+	Type    string         `json:"type"`
+	Payload C2CPayloadBody `json:"payload"`
+}
+
+type C2CPayloadBody struct {
+	Action   string `json:"action"`
+	SSID     string `json:"ssid"`
+	Password string `json:"password"`
+}
+
 type ActionContract struct {
 	Action      Action
+	ID          contracts.ContractID
 	Description string
 	Contract    contracts.ContractDescriptor
 }
@@ -95,6 +105,7 @@ func buildActionContractSlice(namespace contracts.ActionNamespace) ([]ActionCont
 		}
 		contractInfos = append(contractInfos, ActionContract{
 			Action:      Action(binding.Action),
+			ID:          binding.Contract,
 			Description: descriptor.Description,
 			Contract:    descriptor,
 		})
@@ -107,26 +118,25 @@ func buildUploadActionContracts(uploadActions []ActionContract) ([]UploadActionC
 	for _, contract := range uploadActions {
 		byAction[contract.Action] = contract
 	}
-	openEndpointContract, hasOpenEndpoint := byAction[ActionUploadOpenEndpoint]
-	if !hasOpenEndpoint {
-		return nil, fmt.Errorf("missing action contract binding for %q", ActionUploadOpenEndpoint)
+	bindingSpecs := contracts.UploadActionBindingSpecs()
+	uploadContracts := make([]UploadActionContract, 0, len(bindingSpecs))
+	for _, spec := range bindingSpecs {
+		action := Action(spec.Action)
+		contract, ok := byAction[action]
+		if !ok {
+			return nil, fmt.Errorf("missing action contract binding for %q", action)
+		}
+		uploadContracts = append(uploadContracts, UploadActionContract{
+			ActionContract:    contract,
+			RequiredPayloads:  UploadPayload(spec.RequiredPayloads),
+			ForbiddenPayloads: UploadPayload(spec.ForbiddenPayloads),
+		})
+		delete(byAction, action)
 	}
-	resetContract, hasReset := byAction[ActionUploadReset]
-	if !hasReset {
-		return nil, fmt.Errorf("missing action contract binding for %q", ActionUploadReset)
+	if len(byAction) > 0 {
+		return nil, fmt.Errorf("unexpected upload action contract bindings: %d", len(byAction))
 	}
-	return []UploadActionContract{
-		{
-			ActionContract:    openEndpointContract,
-			RequiredPayloads:  UploadPayloadOpenEndpoint,
-			ForbiddenPayloads: UploadPayloadReset,
-		},
-		{
-			ActionContract:    resetContract,
-			RequiredPayloads:  UploadPayloadReset,
-			ForbiddenPayloads: UploadPayloadOpenEndpoint,
-		},
-	}, nil
+	return uploadContracts, nil
 }
 
 // UploadActionContract defines protocol-level upload action metadata and payload requirements.
@@ -138,15 +148,6 @@ type UploadActionContract struct {
 
 // currentContractVersion is used by compatibility helpers for explicit policy checks.
 const CurrentContractVersion = contracts.CurrentContractVersion
-
-func (p UploadPayload) Has(flag UploadPayload) bool {
-	return p&flag != 0
-}
-
-// IsEmpty reports whether no payload behavior is required or forbidden.
-func (p UploadPayload) IsEmpty() bool {
-	return p == 0
-}
 
 func actionContractsFromUpload(contracts []UploadActionContract) []ActionContract {
 	out := make([]ActionContract, len(contracts))
@@ -166,10 +167,32 @@ func (e UnsupportedActionError) Error() string {
 	return fmt.Sprintf("unsupported %s action: %s", e.Namespace, e.Action)
 }
 
+// UnsupportedNamespaceError is raised for unknown action namespaces.
+type UnsupportedNamespaceError struct {
+	Namespace Namespace
+}
+
+func (e UnsupportedNamespaceError) Error() string {
+	return fmt.Sprintf("unsupported action namespace: %s", e.Namespace)
+}
+
+func validateNamespace(namespace Namespace) error {
+	switch namespace {
+	case NamespaceUpload, NamespaceC2C:
+		return nil
+	default:
+		return UnsupportedNamespaceError{Namespace: namespace}
+	}
+}
+
 // ParseAction validates an action for a given namespace and returns a typed Action.
 func ParseAction(namespace Namespace, raw string) (Action, error) {
 	action := Action(raw)
-	for _, meta := range actionMetasForNamespace(namespace) {
+	metas, err := ActionMetas(namespace)
+	if err != nil {
+		return action, err
+	}
+	for _, meta := range metas {
 		if action == meta.Action {
 			return action, nil
 		}
@@ -178,175 +201,168 @@ func ParseAction(namespace Namespace, raw string) (Action, error) {
 }
 
 // SupportedActions returns supported action tokens for a namespace.
-func SupportedActions(namespace Namespace) []Action {
-	metas := actionMetasForNamespace(namespace)
-	if len(metas) == 0 {
-		return nil
+func SupportedActions(namespace Namespace) ([]Action, error) {
+	metas, err := ActionMetas(namespace)
+	if err != nil {
+		return nil, err
 	}
 	out := make([]Action, len(metas))
 	for i, meta := range metas {
 		out[i] = meta.Action
 	}
-	return out
+	return out, nil
 }
 
 // ActionMetas returns action metadata for a namespace.
-func ActionMetas(namespace Namespace) []ActionMeta {
-	metas := actionMetasForNamespace(namespace)
-	if len(metas) == 0 {
-		return nil
+func ActionMetas(namespace Namespace) ([]ActionMeta, error) {
+	metas, err := actionMetasForNamespace(namespace)
+	if err != nil {
+		return nil, err
 	}
 	out := make([]ActionMeta, len(metas))
 	copy(out, metas)
-	return out
+	return out, nil
 }
 
-func UploadActionContracts() []UploadActionContract {
-	ensureActionContractsInitialized()
-	out := make([]UploadActionContract, len(uploadActionContracts))
-	copy(out, uploadActionContracts)
-	return out
+func UploadActionContracts() ([]UploadActionContract, error) {
+	catalog, err := buildActionCatalog()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]UploadActionContract, len(catalog.uploadContracts))
+	copy(out, catalog.uploadContracts)
+	return out, nil
 }
 
 // UploadActionContractByAction returns upload action contracts keyed by action token.
 //
 // The result is a defensive copy to preserve the initialization order in this package.
-func UploadActionContractByAction() map[Action]UploadActionContract {
-	ensureActionContractsInitialized()
-	contractsByAction := make(map[Action]UploadActionContract, len(uploadActionContracts))
-	for _, contract := range uploadActionContracts {
+func UploadActionContractByAction() (map[Action]UploadActionContract, error) {
+	contractsForUpload, err := UploadActionContracts()
+	if err != nil {
+		return nil, err
+	}
+	contractsByAction := make(map[Action]UploadActionContract, len(contractsForUpload))
+	for _, contract := range contractsForUpload {
 		contractsByAction[contract.Action] = contract
 	}
-	return contractsByAction
+	return contractsByAction, nil
 }
 
-func actionContractForAction(namespace Namespace, action Action) (ActionContract, bool) {
-	ensureActionContractsInitialized()
-	for _, contract := range actionContractsForNamespace(namespace) {
+func actionContractForAction(namespace Namespace, action Action) (ActionContract, error) {
+	if err := validateNamespace(namespace); err != nil {
+		return ActionContract{}, err
+	}
+	catalog, err := buildActionCatalog()
+	if err != nil {
+		return ActionContract{}, err
+	}
+	contract, ok := catalog.contractByNamespace[namespace][action]
+	if !ok {
+		return ActionContract{}, UnsupportedActionError{Namespace: namespace, Action: action}
+	}
+	return contract, nil
+}
+
+// ContractForAction returns a contract descriptor for a namespace/action pair.
+func ContractForAction(namespace Namespace, action Action) (ActionContract, error) {
+	return actionContractForAction(namespace, action)
+}
+
+func ContractMetadataForAction(namespace Namespace, action Action) (contracts.ContractMetadata, error) {
+	contract, err := actionContractForAction(namespace, action)
+	if err != nil {
+		return contracts.ContractMetadata{}, err
+	}
+	return contract.Contract.ContractMetadata, nil
+}
+
+func IsActionContractDeprecated(namespace Namespace, version string, action Action) (bool, error) {
+	contract, err := actionContractForAction(namespace, action)
+	if err != nil {
+		return false, err
+	}
+	return contract.Contract.IsDeprecated(version), nil
+}
+
+func IsActionContractActive(namespace Namespace, version string, action Action) (bool, error) {
+	contract, err := actionContractForAction(namespace, action)
+	if err != nil {
+		return false, err
+	}
+	return contract.Contract.IsActive(version), nil
+}
+
+func UploadActionContractForAction(action Action) (UploadActionContract, error) {
+	catalog, err := buildActionCatalog()
+	if err != nil {
+		return UploadActionContract{}, err
+	}
+	for _, contract := range catalog.uploadContracts {
 		if contract.Action == action {
-			return contract, true
+			return contract, nil
 		}
 	}
-	return ActionContract{}, false
+	return UploadActionContract{}, UnsupportedActionError{Namespace: NamespaceUpload, Action: action}
 }
 
-func actionContractMetadataForAction(namespace Namespace, action Action) (contracts.ContractMetadata, bool) {
-	contract, ok := actionContractForAction(namespace, action)
-	if !ok {
-		return contracts.ContractMetadata{}, false
+func actionMetasForNamespace(namespace Namespace) ([]ActionMeta, error) {
+	contractsForNamespace, err := actionContractsForNamespace(namespace)
+	if err != nil {
+		return nil, err
 	}
-	return contract.Contract.ContractMetadata, true
-}
-
-func isActionContractDeprecated(namespace Namespace, version string, action Action) bool {
-	contract, ok := actionContractForAction(namespace, action)
-	if !ok {
-		return false
-	}
-	return contract.Contract.IsDeprecated(version)
-}
-
-func isActionContractActive(namespace Namespace, version string, action Action) bool {
-	contract, ok := actionContractForAction(namespace, action)
-	if !ok {
-		return false
-	}
-	return contract.Contract.IsActive(version)
-}
-
-func UploadActionContractForAction(action Action) (UploadActionContract, bool) {
-	ensureActionContractsInitialized()
-	for _, contract := range uploadActionContracts {
-		if contract.Action == action {
-			return contract, true
-		}
-	}
-	return UploadActionContract{}, false
-}
-
-// UploadActionContractMetadataForAction returns metadata for action compatibility checks.
-func UploadActionContractMetadataForAction(action Action) (contracts.ContractMetadata, bool) {
-	return actionContractMetadataForAction(NamespaceUpload, action)
-}
-
-// IsUploadActionContractDeprecated reports whether an action contract is deprecated as of version.
-func IsUploadActionContractDeprecated(version string, action Action) bool {
-	return isActionContractDeprecated(NamespaceUpload, version, action)
-}
-
-// IsUploadActionContractActive reports whether an action contract is active at the provided version.
-func IsUploadActionContractActive(version string, action Action) bool {
-	return isActionContractActive(NamespaceUpload, version, action)
-}
-
-func actionMetasForNamespace(namespace Namespace) []ActionMeta {
-	contracts := actionContractsForNamespace(namespace)
-	if len(contracts) == 0 {
-		return nil
-	}
-	out := make([]ActionMeta, len(contracts))
-	for i, contract := range contracts {
+	out := make([]ActionMeta, len(contractsForNamespace))
+	for i, contract := range contractsForNamespace {
 		out[i] = ActionMeta{
 			Action:      contract.Action,
 			Description: contract.Description,
 		}
 	}
-	return out
+	return out, nil
 }
 
-func actionContractsForNamespace(namespace Namespace) []ActionContract {
-	ensureActionContractsInitialized()
-	contractsForNamespace, ok := actionContractsByNamespace[namespace]
-	if !ok {
-		return nil
+func actionContractsForNamespace(namespace Namespace) ([]ActionContract, error) {
+	if err := validateNamespace(namespace); err != nil {
+		return nil, err
 	}
+	catalog, err := buildActionCatalog()
+	if err != nil {
+		return nil, err
+	}
+	contractsForNamespace := catalog.contractsByNamespace[namespace]
 	out := make([]ActionContract, len(contractsForNamespace))
 	copy(out, contractsForNamespace)
-	return out
+	return out, nil
 }
 
-func C2CActionContracts() []ActionContract {
-	ensureActionContractsInitialized()
-	out := make([]ActionContract, len(c2cActionContracts))
-	copy(out, c2cActionContracts)
-	return out
+func actionContractByActionIndex(contractList []ActionContract) map[Action]ActionContract {
+	index := make(map[Action]ActionContract, len(contractList))
+	for _, contract := range contractList {
+		index[contract.Action] = contract
+	}
+	return index
 }
 
-func C2CActionContractForAction(action Action) (ActionContract, bool) {
-	return actionContractForAction(NamespaceC2C, action)
+func ActionContracts(namespace Namespace) ([]ActionContract, error) {
+	return actionContractsForNamespace(namespace)
 }
 
-// C2CActionContractMetadataForAction returns metadata for C2C action compatibility checks.
-func C2CActionContractMetadataForAction(action Action) (contracts.ContractMetadata, bool) {
-	return actionContractMetadataForAction(NamespaceC2C, action)
+func NewC2CPayload(action Action, ssid, password string) C2CPayload {
+	return C2CPayload{
+		Type: C2CPayloadType,
+		Payload: C2CPayloadBody{
+			Action:   string(action),
+			SSID:     ssid,
+			Password: password,
+		},
+	}
 }
 
-// IsC2CActionContractDeprecated reports whether a C2C action contract is deprecated as of version.
-func IsC2CActionContractDeprecated(version string, action Action) bool {
-	return isActionContractDeprecated(NamespaceC2C, version, action)
-}
-
-// IsC2CActionContractActive reports whether a C2C action contract is active at the provided version.
-func IsC2CActionContractActive(version string, action Action) bool {
-	return isActionContractActive(NamespaceC2C, version, action)
-}
-
-// ParseUploadAction validates actions for the upload transport namespace.
-func ParseUploadAction(raw string) (Action, error) {
-	return ParseAction(NamespaceUpload, raw)
-}
-
-// ParseC2CAction validates actions for the c2c transport namespace.
-func ParseC2CAction(raw string) (Action, error) {
-	return ParseAction(NamespaceC2C, raw)
-}
-
-// SupportedUploadActions returns upload-supported actions.
-func SupportedUploadActions() []Action {
-	return SupportedActions(NamespaceUpload)
-}
-
-// SupportedC2CActions returns c2c-supported actions.
-func SupportedC2CActions() []Action {
-	return SupportedActions(NamespaceC2C)
+func MarshalC2CPayload(action Action, ssid, password string) ([]byte, error) {
+	payload := NewC2CPayload(action, ssid, password)
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal c2c payload for action %s: %w", action, err)
+	}
+	return encoded, nil
 }

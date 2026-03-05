@@ -1,0 +1,138 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Runtime wiring is implemented as large hand-written seam bundles with many near-identical constructor/default functions in goseg/docker/orchestration/runtime_ops.go (e.g., Runtime*Ops structs at lines 17-137 and default builders at 175-350), increasing structural noise and change surface.",
+        "Compatibility and indirection layers are partly pass-through mirrors (goseg/system/disk/adapter.go lines 11-61), while other files keep separate mirrored view structs for same data (goseg/accesspoint/accesspoint.go lines 17-63 and 65-89), indicating repeated manual synchronization patterns.",
+        "Single files carry multiple operational concerns: goseg/shipworkflow/urbit_operations_runtime.go combines alias policy, minio link orchestration, runtime config mutation, container restart logic, and schedule publishing (lines 38-541).",
+        "Several tests bundle many behaviors in one body instead of focused scenario units (e.g., goseg/handler/systemsvc/system_test.go lines 141-229 and goseg/config/config_test.go lines 72-185), which mirrors and reinforces mixed-responsibility production design."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_bundle_bloat",
+      "summary": "Runtime seam construction is fragmented into large hand-wired bundles that mix wiring policy with domain behavior boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/accesspoint/accesspoint.go"
+      ],
+      "evidence": [
+        "goseg/docker/orchestration/runtime_ops.go defines many Runtime*Ops structs and default builders (lines 17-137, 175-350) with repetitive callback assignment logic.",
+        "goseg/shipworkflow/urbit_operations_runtime.go consumes broad cross-domain runtime behavior in one command map and handler set (lines 38-63, 393-541), making seam definitions and command orchestration tightly coupled.",
+        "goseg/accesspoint/accesspoint.go duplicates runtime/config/strategy views and normalization assignment chains (lines 17-63, 148-200), extending the same manual-wiring pattern into another subsystem."
+      ],
+      "suggestion": "Introduce per-domain runtime modules with explicit constructor contracts (e.g., `networkRuntime`, `urbitRuntime`, `configRuntime`) and compose them via a small top-level coordinator. Replace repeated field-by-field assignment with generated or table-driven wiring descriptors.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_runtime_wiring_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "pass_through_adapter_pattern",
+      "summary": "Thin compatibility wrappers are preserved as full files/functions, creating parallel APIs that add little behavior and increase synchronization burden.",
+      "related_files": [
+        "goseg/system/disk/adapter.go",
+        "goseg/system/storage/storage_test.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "goseg/system/disk/adapter.go is almost entirely pass-through wrappers to `storage` (ParseFstabLine through RemoveMultipartFiles at lines 11-61).",
+        "goseg/system/storage/storage_test.go validates behavior directly in `storage`, while adapter-level behavior is not distinct (lines 50-262), indicating duplicated boundary without separate policy.",
+        "goseg/docker/orchestration/runtime_ops.go also uses type aliases and forwarding-style wrappers (e.g., `type RuntimeFileOps = container.RuntimeFileOps` at line 94 plus default builders), reinforcing cross-package forwarding instead of clear ownership."
+      ],
+      "suggestion": "Collapse compatibility wrappers behind a single migration boundary: either fully re-export via package-level aliases with deprecation markers, or move callers directly to `storage` and remove forwarder functions in one staged migration.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_runtime_wiring_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_transition_file_mixed_concerns",
+      "summary": "Urbit transition runtime file mixes multiple independent concerns in one flow layer, making command evolution and failure handling hard to reason about.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "goseg/shipworkflow/urbit_operations_runtime.go includes command routing, alias checks, startram alias operations, minio link orchestration, config persistence, container lifecycle actions, and schedule publication in the same unit (lines 38-541).",
+        "The file relies on broad shared config/embedded models (`structs.UrbitDocker` and multiple section writes) which encourages cross-concern mutation paths (lines 65-126, 429-475).",
+        "Runtime dependencies are broad and loosely grouped in orchestration runtime ops (goseg/docker/orchestration/runtime_ops.go lines 65-74), matching the same concern mixing in execution code."
+      ],
+      "suggestion": "Split transition handling by concern (`alias`, `runtime-config`, `container-lifecycle`, `schedule`) behind a small command dispatcher. Keep each handler with a narrow dependency interface and dedicated error policy strategy.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transition_handler_concern_mixing"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "contract_behavior_tests_duplicated",
+      "summary": "Protocol/command behavior is asserted through repeated bespoke tests across packages instead of a shared contract harness.",
+      "related_files": [
+        "goseg/protocol/actions/actions_test.go",
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/uploadsvc/service_test.go",
+        "goseg/protocol/contracts/contracts_test.go"
+      ],
+      "evidence": [
+        "goseg/protocol/actions/actions_test.go contains overlapping unknown-action checks (`TestParseActionRejectsUnknownAction` lines 102-114 and `TestParseUploadActionRejectsUnknown` lines 195-207).",
+        "goseg/system/wifi_c2c_flow_test.go re-validates canonical C2C action token and envelope parsing behavior (`TestProcessMessageRoutesSupportedAction` lines 13-45 and `TestC2CPayloadUsesCanonicalActionToken` lines 182-195).",
+        "goseg/uploadsvc/service_test.go repeats action/payload matrix checks with many near-duplicate executor scenarios (lines 90-190, 222-260), overlapping responsibilities already tested in action/contracts packages."
+      ],
+      "suggestion": "Create a shared protocol contract test harness that owns action-token, payload-shape, and dispatch-matrix assertions once; let package tests focus on package-specific behavior (integration wiring/error mapping) only.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_contract_assertions"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "monolithic_test_scenarios",
+      "summary": "Large multi-purpose tests encode many behavioral branches in one function, reducing readability and masking responsibility boundaries.",
+      "related_files": [
+        "goseg/handler/systemsvc/system_test.go",
+        "goseg/config/config_test.go",
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "goseg/handler/systemsvc/system_test.go `TestHandleSystemSwapWifiAndUpdate` validates swap, update, wifi toggle, wifi connect success/failure in one test body (lines 141-229).",
+        "goseg/config/config_test.go `TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing` sets and verifies a very broad field matrix (lines 72-185), bundling many merge responsibilities together.",
+        "goseg/accesspoint/accesspoint_test.go `TestCheckParametersValidationPaths` mutates one runtime through many invalid states sequentially (lines 142-195), making failures harder to localize."
+      ],
+      "suggestion": "Split mega-tests into focused, table-driven subtests with one behavior axis per case. Introduce reusable fixture builders so state setup is declarative and each assertion maps to a single responsibility.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_structure_coupling"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Manual runtime wiring and compatibility layering are used as a recurring pattern instead of narrower composable modules.",
+      "Protocol contracts are validated in multiple packages without a single shared assertion surface.",
+      "Large scenario tests mirror production concern mixing, making design boundaries harder to maintain."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_bundle_bloat",
+      "pass_through_adapter_pattern",
+      "contract_behavior_tests_duplicated",
+      "monolithic_test_scenarios"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -22,6 +22,10 @@ var (
 	newShipTransitionOnce      sync.Once
 	systemTransitionOnce       sync.Once
 	rectifyUrbitOnce           sync.Once
+	urbitTransitionErrCh       = make(chan error, 1)
+	newShipTransitionErrCh     = make(chan error, 1)
+	systemTransitionErrCh      = make(chan error, 1)
+	rectifyUrbitErrCh          = make(chan error, 1)
 	rectifyTestRuntime         = RectifyRuntime{
 		EventRuntime: events.NewEventRuntime(),
 	}
@@ -34,13 +38,22 @@ func initializeRectifyTestEnv() {
 	})
 }
 
+func assertNoAsyncRectifyError(t *testing.T, name string, errCh <-chan error) {
+	t.Helper()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("%s returned error: %v", name, err)
+		}
+	default:
+	}
+}
+
 func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	initializeRectifyTestEnv()
 	urbitTransitionHandlerOnce.Do(func() {
 		go func() {
-			if err := UrbitTransitionHandlerWithContextAndRuntime(context.Background(), rectifyTestRuntime); err != nil {
-				t.Fatalf("UrbitTransitionHandlerWithContext failed: %v", err)
-			}
+			urbitTransitionErrCh <- UrbitTransitionHandlerWithContextAndRuntime(context.Background(), rectifyTestRuntime)
 		}()
 	})
 
@@ -62,15 +75,18 @@ func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 		state := broadcast.DefaultBroadcastStateRuntime().GetState()
 		return state.Urbits["zod"].Transition.Pack == eventValue
 	}, "urbit pack transition was not applied")
+	state := broadcast.DefaultBroadcastStateRuntime().GetState()
+	if got := state.Urbits["zod"].Transition.Pack; got != eventValue {
+		t.Fatalf("unexpected urbit pack transition value: got %q want %q", got, eventValue)
+	}
+	assertNoAsyncRectifyError(t, "UrbitTransitionHandlerWithContextAndRuntime", urbitTransitionErrCh)
 }
 
 func TestNewShipTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	initializeRectifyTestEnv()
 	newShipTransitionOnce.Do(func() {
 		go func() {
-			if err := NewShipTransitionHandlerWithContextAndRuntime(context.Background(), rectifyTestRuntime); err != nil {
-				t.Fatalf("NewShipTransitionHandlerWithContext failed: %v", err)
-			}
+			newShipTransitionErrCh <- NewShipTransitionHandlerWithContextAndRuntime(context.Background(), rectifyTestRuntime)
 		}()
 	})
 
@@ -84,15 +100,21 @@ func TestNewShipTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 		state := broadcast.DefaultBroadcastStateRuntime().GetState()
 		return state.NewShip.Transition.BootStage == bootStage && state.NewShip.Transition.Patp == patp
 	}, "new ship transitions were not applied")
+	state := broadcast.DefaultBroadcastStateRuntime().GetState()
+	if got := state.NewShip.Transition.BootStage; got != bootStage {
+		t.Fatalf("unexpected new-ship boot stage: got %q want %q", got, bootStage)
+	}
+	if got := state.NewShip.Transition.Patp; got != patp {
+		t.Fatalf("unexpected new-ship patp: got %q want %q", got, patp)
+	}
+	assertNoAsyncRectifyError(t, "NewShipTransitionHandlerWithContextAndRuntime", newShipTransitionErrCh)
 }
 
 func TestSystemTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	initializeRectifyTestEnv()
 	systemTransitionOnce.Do(func() {
 		go func() {
-			if err := SystemTransitionHandlerWithContextAndRuntime(context.Background(), rectifyTestRuntime); err != nil {
-				t.Fatalf("SystemTransitionHandlerWithContext failed: %v", err)
-			}
+			systemTransitionErrCh <- SystemTransitionHandlerWithContextAndRuntime(context.Background(), rectifyTestRuntime)
 		}()
 	})
 
@@ -104,15 +126,18 @@ func TestSystemTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 		state := broadcast.DefaultBroadcastStateRuntime().GetState()
 		return state.System.Transition.BugReportError == event
 	}, "system transition bugReportError was not applied")
+	state := broadcast.DefaultBroadcastStateRuntime().GetState()
+	if got := state.System.Transition.BugReportError; got != event {
+		t.Fatalf("unexpected system transition bug report error: got %q want %q", got, event)
+	}
+	assertNoAsyncRectifyError(t, "SystemTransitionHandlerWithContextAndRuntime", systemTransitionErrCh)
 }
 
 func TestRectifyUrbitAppliesStartramEvents(t *testing.T) {
 	initializeRectifyTestEnv()
 	rectifyUrbitOnce.Do(func() {
 		go func() {
-			if err := RectifyUrbitWithContext(context.Background()); err != nil {
-				t.Fatalf("RectifyUrbitWithContext failed: %v", err)
-			}
+			rectifyUrbitErrCh <- RectifyUrbitWithContext(context.Background())
 		}()
 	})
 
@@ -128,6 +153,17 @@ func TestRectifyUrbitAppliesStartramEvents(t *testing.T) {
 			state.Profile.Startram.Transition.Toggle == "loading" &&
 			state.Profile.Startram.Transition.Endpoint == ""
 	}, "rectify startram transitions were not applied")
+	state := broadcast.DefaultBroadcastStateRuntime().GetState()
+	if got := state.Profile.Startram.Transition.Restart; got != restartValue {
+		t.Fatalf("unexpected startram restart transition: got %q want %q", got, restartValue)
+	}
+	if got := state.Profile.Startram.Transition.Toggle; got != "loading" {
+		t.Fatalf("unexpected startram toggle transition: got %q want %q", got, "loading")
+	}
+	if got := state.Profile.Startram.Transition.Endpoint; got != "" {
+		t.Fatalf("unexpected startram endpoint transition: got %q want empty string", got)
+	}
+	assertNoAsyncRectifyError(t, "RectifyUrbitWithContext", rectifyUrbitErrCh)
 }
 
 func TestSetUrbitTransitionSupportsWorkflowRegistryAndTelemetry(t *testing.T) {

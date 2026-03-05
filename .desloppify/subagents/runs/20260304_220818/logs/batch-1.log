@@ -1,0 +1,501 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_220818/results/batch-1.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/familycatalog/catalog.go
+- goseg/uploadsvc/actions_test.go
+- goseg/uploadsvc/contractspec/contractspec_test.go
+- goseg/uploadsvc/doc.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{"batch":"Architecture & Coupling","batch_index":1,"assessments":{"cross_module_architecture":82.0},"dimension_notes":{"cross_module_architecture":{"evidence":["Contract identity and semantics are authored in multiple places: canonical IDs in goseg/protocol/actionids/actionids.go, catalog specs in goseg/protocol/contracts/familycatalog/catalog.go, and behavior assertions in goseg/uploadsvc/actions_test.go and goseg/uploadsvc/contractspec/contractspec_test.go.","goseg/protocol/contracts/family_specs_test.go builds family entries with duplicated literal Name/Description/Message values rather than consuming familycatalog declarations, which creates parallel sources for contract metadata.","goseg/protocol/contracts/conformance/fixtures_test.go imports groundseg/uploadsvc to validate parser/actions from within protocol contract conformance tests, creating reverse test-time coupling from protocol contracts to a service module."],"impact_scope":"subsystem","fix_scope":"multi_file_refactor","confidence":"high"}},"findings":[{"dimension":"cross_module_architecture","identifier":"fragmented_action_contract_authority","summary":"Action-contract ownership is fragmented across protocol catalog, action ID constants, and upload service tests, creating boundary drift risk.","related_files":["goseg/protocol/actionids/actionids.go","goseg/protocol/contracts/familycatalog/catalog.go","goseg/protocol/contracts/family_specs_test.go","goseg/uploadsvc/contractspec/contractspec_test.go"],"evidence":["`actionids.go` defines namespace/action/contract-id primitives while `familycatalog/catalog.go` separately defines action names/descriptions/owners for the same actions.","`family_specs_test.go` uses inline literals (e.g., \"upload open endpoint\", \"open upload endpoint contract\", \"upload open endpoint message\") instead of deriving from catalog specs, so metadata can diverge without a compile-time boundary.","`contractspec_test.go` validates count and membership alignment between uploadsvc and contractspec, but does not centralize the authority; consistency relies on cross-package tests rather than a single dependency direction."],"suggestion":"Create a single canonical contract declaration module (IDs + metadata + ownership) consumed by both protocol contracts and uploadsvc, and replace duplicated literals in tests with generated/derived expectations from that source to enforce one-way dependency and reduce drift.","confidence":"high","impact_scope":"subsystem","fix_scope":"architectural_change","root_cause_cluster":"missing_single_contract_authority"},{"dimension":"cross_module_architecture","identifier":"protocol_tests_depend_on_service_impl","summary":"Protocol conformance tests depend directly on upload service APIs, introducing reverse layer coupling and larger blast radius for service changes.","related_files":["goseg/protocol/contracts/conformance/fixtures_test.go","goseg/uploadsvc/actions_test.go","goseg/uploadsvc/contractspec/contractspec_test.go"],"evidence":["`fixtures_test.go` imports `groundseg/uploadsvc` and calls `SupportedUploadActions`, `UploadActionContractByAction`, and `ParseUploadAction` from a protocol contracts test package.","This makes protocol contract conformance test outcomes contingent on uploadsvc parser implementation details, not only contract declarations.","Adjacent uploadsvc tests already validate parser and contract map behavior, so protocol-layer tests are crossing boundaries to revalidate service behavior."],"suggestion":"Move uploadsvc parser conformance checks into uploadsvc-owned contract tests (or a dedicated integration layer) and keep protocol conformance tests limited to protocol declaration artifacts/interfaces. If cross-layer checks are needed, define a narrow adapter interface in protocol tests and satisfy it from integration tests.","confidence":"high","impact_scope":"module","fix_scope":"multi_file_refactor","root_cause_cluster":"missing_single_contract_authority"}],"retrospective":{"root_causes":["Contract metadata lacks a single authoritative boundary, so consistency is enforced by distributed tests instead of dependency structure.","Conformance responsibilities are split across protocol and upload service tests, causing layer ownership blur."],"likely_symptoms":["fragmented_action_contract_authority","protocol_tests_depend_on_service_impl"],"possible_false_positives":[]}}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cbae5-1127-7530-9057-298dd1e677a3
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/familycatalog/catalog.go
+- goseg/uploadsvc/actions_test.go
+- goseg/uploadsvc/contractspec/contractspec_test.go
+- goseg/uploadsvc/doc.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I will read the blind packet first, then inspect only the seven assigned files for cross-module architecture issues, and return a JSON-only batch assessment without modifying any files.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/conformance/fixtures_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/protocol/actionids/actionids.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package conformance
+
+import (
+	"testing"
+
+	"groundseg/protocol/actionids"
+	"groundseg/protocol/contracts"
+	"groundseg/uploadsvc"
+)
+
+func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+	fixtures := ActionContractFixtures()
+	if len(fixtures) == 0 {
+		t.Fatal("expected at least one action contract fixture")
+	}
+
+	foundC2C := false
+	for _, fixture := range fixtures {
+		if err := ValidateActionContractFixture(fixture); err != nil {
+			t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+ succeeded in 51ms:
+package actionids
+
+const ProtocolActionContractRoot = "protocol.actions"
+
+const (
+	NamespaceUpload = "upload"
+	NamespaceC2C    = "c2c"
+)
+
+const (
+	UploadOpenEndpoint = "open-endpoint"
+	UploadReset        = "reset"
+	C2CConnect         = "connect"
+)
+
+const (
+	UploadOpenEndpointContractID = ProtocolActionContractRoot + "." + NamespaceUpload + "." + UploadOpenEndpoint
+	UploadResetContractID        = ProtocolActionContractRoot + "." + NamespaceUpload + "." + UploadReset
+	C2CConnectContractID         = ProtocolActionContractRoot + "." + NamespaceC2C + "." + C2CConnect
+)
+ succeeded in 51ms:
+Total output lines: 6178
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+        "Cross-module coordination through shared mutable state or import-time side effects",
+        "Compatibility shim paths that persist without active external need and blur boundaries",
+        "Cross-package duplication that indicates a missing shared boundary"
+      ],
+codex
+I have the packet constraints and first two files; next I’m reading the remaining assigned files to verify boundary drift and any side-effect coupling patterns before scoring.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/uploadsvc/actions_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/familycatalog/catalog.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/family_specs_test.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package contracts
+
+import (
+	"strings"
+	"testing"
+
+	"groundseg/protocol/contracts/familycatalog"
+)
+
+func TestBuildContractFamilyEntriesFromSpecs(t *testing.T) {
+	specs := []contractFamilyEntrySpec{
+		{
+			ID:          UploadOpenEndpointAction,
+			Namespace:   ActionNamespaceUpload,
+			Action:      ActionUploadOpenEndpoint,
+			Name:        "upload open endpoint",
+			Description: "open upload endpoint contract",
+			Message:     "upload open endpoint message",
+			Governance: contractGovernanceMetadata{
+				OwnerModule:  "uploadsvc",
+ succeeded in 52ms:
+package familycatalog
+
+import (
+	"groundseg/protocol/actionids"
+	"groundseg/protocol/contracts/familyspec"
+)
+
+const (
+	C2CConnectActionName        = "C2CConnectAction"
+	C2CConnectActionDescription = "connect c2c client"
+
+	UploadOpenEndpointActionName        = "UploadOpenEndpointAction"
+	UploadOpenEndpointActionDescription = "open upload endpoint"
+	UploadResetActionName               = "UploadResetAction"
+	UploadResetActionDescription        = "reset upload session"
+
+	StartramContractFamily = "startram"
+	StartramContractScope  = "errors"
+	StartramAPIConnSlug    = "api-connection"
+
+ succeeded in 52ms:
+package uploadsvc
+
+import "testing"
+
+func TestParseUploadActionAcceptsKnownActions(t *testing.T) {
+	t.Parallel()
+
+	gotOpen, err := ParseUploadAction(string(ActionUploadOpenEndpoint))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(open-endpoint) returned error: %v", err)
+	}
+	if gotOpen != ActionUploadOpenEndpoint {
+		t.Fatalf("unexpected parsed open-endpoint action: %q", gotOpen)
+	}
+
+	gotReset, err := ParseUploadAction(string(ActionUploadReset))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(reset) returned error: %v", err)
+	}
+	if gotReset != ActionUploadReset {
+codex
+I’m now checking the last two assigned upload files and then I’ll synthesize structural findings tied to the requested architecture dimension only.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,200p' goseg/uploadsvc/doc.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/conformance/fixtures_test.go | nl -ba" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/uploadsvc/contractspec/contractspec_test.go | nl -ba" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,280p' goseg/uploadsvc/contractspec/contractspec_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/familycatalog/catalog.go | nl -ba" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/family_specs_test.go | nl -ba" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/uploadsvc/actions_test.go | nl -ba" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/protocol/actionids/actionids.go | nl -ba" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,200p' goseg/uploadsvc/doc.go | nl -ba" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+// Package uploadsvc parses websocket upload actions and dispatches validated
+// commands to upload backends.
+//
+// Validation is strict by action contract: reset must never carry open-endpoint
+// payload fields, and open-endpoint requires a complete endpoint/token payload.
+package uploadsvc
+ succeeded in 51ms:
+     1	package conformance
+     2	
+     3	import (
+     4		"testing"
+     5	
+     6		"groundseg/protocol/actionids"
+     7		"groundseg/protocol/contracts"
+     8		"groundseg/uploadsvc"
+     9	)
+    10	
+    11	func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+    12		fixtures := ActionContractFixtures()
+    13		if len(fixtures) == 0 {
+    14			t.Fatal("expected at least one action contract fixture")
+    15		}
+    16	
+    17		foundC2C := false
+    18		for _, fixture := range fixtures {
+    19			if err := ValidateActionContractFixture(fixture); err != nil {
+    20				t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+ succeeded in 51ms:
+     1	package contractspec_test
+     2	
+     3	import (
+     4		"testing"
+     5	
+     6		"groundseg/uploadsvc"
+     7		"groundseg/uploadsvc/contractspec"
+     8	)
+     9	
+    10	func TestSupportedUploadActionsAndContractsStayAligned(t *testing.T) {
+    11		availableActions, err := uploadsvc.SupportedUploadActions()
+    12		if err != nil {
+    13			t.Fatalf("supported upload actions: %v", err)
+    14		}
+    15		if len(availableActions) != 2 {
+    16			t.Fatalf("expected exactly two supported upload actions, got %d", len(availableActions))
+    17		}
+    18		specs := contractspec.UploadActionSpecs()
+    19		if len(specs) != len(availableActions) {
+    20			t.Fatalf("upload contract specs count mismatch: got %d want %d", len(specs), len(availableActions))
+ succeeded in 51ms:
+package contractspec_test
+
+import (
+	"testing"
+
+	"groundseg/uploadsvc"
+	"groundseg/uploadsvc/contractspec"
+)
+
+func TestSupportedUploadActionsAndContractsStayAligned(t *testing.T) {
+	availableActions, err := uploadsvc.SupportedUploadActions()
+	if err != nil {
+		t.Fatalf("supported upload actions: %v", err)
+	}
+	if len(availableActions) != 2 {
+		t.Fatalf("expected exactly two supported upload actions, got %d", len(availableActions))
+	}
+	specs := contractspec.UploadActionSpecs()
+	if len(specs) != len(availableActions) {
+		t.Fatalf("upload contract specs count mismatch: got %d want %d", len(specs), len(availableActions))
+ succeeded in 51ms:
+     1	package familycatalog
+     2	
+     3	import (
+     4		"groundseg/protocol/actionids"
+     5		"groundseg/protocol/contracts/familyspec"
+     6	)
+     7	
+     8	const (
+     9		C2CConnectActionName        = "C2CConnectAction"
+    10		C2CConnectActionDescription = "connect c2c client"
+    11	
+    12		UploadOpenEndpointActionName        = "UploadOpenEndpointAction"
+    13		UploadOpenEndpointActionDescription = "open upload endpoint"
+    14		UploadResetActionName               = "UploadResetAction"
+    15		UploadResetActionDescription        = "reset upload session"
+    16	
+    17		StartramContractFamily = "startram"
+    18		StartramContractScope  = "errors"
+    19		StartramAPIConnSlug    = "api-connection"
+    20	
+ succeeded in 51ms:
+     1	package contracts
+     2	
+     3	import (
+     4		"strings"
+     5		"testing"
+     6	
+     7		"groundseg/protocol/contracts/familycatalog"
+     8	)
+     9	
+    10	func TestBuildContractFamilyEntriesFromSpecs(t *testing.T) {
+    11		specs := []contractFamilyEntrySpec{
+    12			{
+    13				ID:          UploadOpenEndpointAction,
+    14				Namespace:   ActionNamespaceUpload,
+    15				Action:      ActionUploadOpenEndpoint,
+    16				Name:        "upload open endpoint",
+    17				Description: "open upload endpoint contract",
+    18				Message:     "upload open endpoint message",
+    19				Governance: contractGovernanceMetadata{
+    20					OwnerModule:  "uploadsvc",
+ succeeded in 50ms:
+     1	package uploadsvc
+     2	
+     3	import "testing"
+     4	
+     5	func TestParseUploadActionAcceptsKnownActions(t *testing.T) {
+     6		t.Parallel()
+     7	
+     8		gotOpen, err := ParseUploadAction(string(ActionUploadOpenEndpoint))
+     9		if err != nil {
+    10			t.Fatalf("ParseUploadAction(open-endpoint) returned error: %v", err)
+    11		}
+    12		if gotOpen != ActionUploadOpenEndpoint {
+    13			t.Fatalf("unexpected parsed open-endpoint action: %q", gotOpen)
+    14		}
+    15	
+    16		gotReset, err := ParseUploadAction(string(ActionUploadReset))
+    17		if err != nil {
+    18			t.Fatalf("ParseUploadAction(reset) returned error: %v", err)
+    19		}
+    20		if gotReset != ActionUploadReset {
+ succeeded in 51ms:
+     1	package actionids
+     2	
+     3	const ProtocolActionContractRoot = "protocol.actions"
+     4	
+     5	const (
+     6		NamespaceUpload = "upload"
+     7		NamespaceC2C    = "c2c"
+     8	)
+     9	
+    10	const (
+    11		UploadOpenEndpoint = "open-endpoint"
+    12		UploadReset        = "reset"
+    13		C2CConnect         = "connect"
+    14	)
+    15	
+    16	const (
+    17		UploadOpenEndpointContractID = ProtocolActionContractRoot + "." + NamespaceUpload + "." + UploadOpenEndpoint
+    18		UploadResetContractID        = ProtocolActionContractRoot + "." + NamespaceUpload + "." + UploadReset
+    19		C2CConnectContractID         = ProtocolActionContractRoot + "." + NamespaceC2C + "." + C2CConnect
+    20	)
+ succeeded in 51ms:
+     1	// Package uploadsvc parses websocket upload actions and dispatches validated
+     2	// commands to upload backends.
+     3	//
+     4	// Validation is strict by action contract: reset must never carry open-endpoint
+     5	// payload fields, and open-endpoint requires a complete endpoint/token payload.
+     6	package uploadsvc
+codex
+{"batch":"Architecture & Coupling","batch_index":1,"assessments":{"cross_module_architecture":82.0},"dimension_notes":{"cross_module_architecture":{"evidence":["Contract identity and semantics are authored in multiple places: canonical IDs in goseg/protocol/actionids/actionids.go, catalog specs in goseg/protocol/contracts/familycatalog/catalog.go, and behavior assertions in goseg/uploadsvc/actions_test.go and goseg/uploadsvc/contractspec/contractspec_test.go.","goseg/protocol/contracts/family_specs_test.go builds family entries with duplicated literal Name/Description/Message values rather than consuming familycatalog declarations, which creates parallel sources for contract metadata.","goseg/protocol/contracts/conformance/fixtures_test.go imports groundseg/uploadsvc to validate parser/actions from within protocol contract conformance tests, creating reverse test-time coupling from protocol contracts to a service module."],"impact_scope":"subsystem","fix_scope":"multi_file_refactor","confidence":"high"}},"findings":[{"dimension":"cross_module_architecture","identifier":"fragmented_action_contract_authority","summary":"Action-contract ownership is fragmented across protocol catalog, action ID constants, and upload service tests, creating boundary drift risk.","related_files":["goseg/protocol/actionids/actionids.go","goseg/protocol/contracts/familycatalog/catalog.go","goseg/protocol/contracts/family_specs_test.go","goseg/uploadsvc/contractspec/contractspec_test.go"],"evidence":["`actionids.go` defines namespace/action/contract-id primitives while `familycatalog/catalog.go` separately defines action names/descriptions/owners for the same actions.","`family_specs_test.go` uses inline literals (e.g., \"upload open endpoint\", \"open upload endpoint contract\", \"upload open endpoint message\") instead of deriving from catalog specs, so metadata can diverge without a compile-time boundary.","`contractspec_test.go` validates count and membership alignment between uploadsvc and contractspec, but does not centralize the authority; consistency relies on cross-package tests rather than a single dependency direction."],"suggestion":"Create a single canonical contract declaration module (IDs + metadata + ownership) consumed by both protocol contracts and uploadsvc, and replace duplicated literals in tests with generated/derived expectations from that source to enforce one-way dependency and reduce drift.","confidence":"high","impact_scope":"subsystem","fix_scope":"architectural_change","root_cause_cluster":"missing_single_contract_authority"},{"dimension":"cross_module_architecture","identifier":"protocol_tests_depend_on_service_impl","summary":"Protocol conformance tests depend directly on upload service APIs, introducing reverse layer coupling and larger blast radius for service changes.","related_files":["goseg/protocol/contracts/conformance/fixtures_test.go","goseg/uploadsvc/actions_test.go","goseg/uploadsvc/contractspec/contractspec_test.go"],"evidence":["`fixtures_test.go` imports `groundseg/uploadsvc` and calls `SupportedUploadActions`, `UploadActionContractByAction`, and `ParseUploadAction` from a protocol contracts test package.","This makes protocol contract conformance test outcomes contingent on uploadsvc parser implementation details, not only contract declarations.","Adjacent uploadsvc tests already validate parser and contract map behavior, so protocol-layer tests are crossing boundaries to revalidate service behavior."],"suggestion":"Move uploadsvc parser conformance checks into uploadsvc-owned contract tests (or a dedicated integration layer) and keep protocol conformance tests limited to protocol declaration artifacts/interfaces. If cross-layer checks are needed, define a narrow adapter interface in protocol tests and satisfy it from integration tests.","confidence":"high","impact_scope":"module","fix_scope":"multi_file_refactor","root_cause_cluster":"missing_single_contract_authority"}],"retrospective":{"root_causes":["Contract metadata lacks a single authoritative boundary, so consistency is enforced by distributed tests instead of dependency structure.","Conformance responsibilities are split across protocol and upload service tests, causing layer ownership blur."],"likely_symptoms":["fragmented_action_contract_authority","protocol_tests_depend_on_service_impl"],"possible_false_positives":[]}}
+tokens used
+25,424
+

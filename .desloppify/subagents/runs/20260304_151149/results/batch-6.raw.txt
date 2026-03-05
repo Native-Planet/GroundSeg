@@ -1,0 +1,184 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 72.0,
+    "error_consistency": 76.0,
+    "abstraction_fitness": 68.0,
+    "test_strategy": 83.0,
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Multiple subsystems expose mutable process-wide defaults (`defaultRuntime`, `defaultBroadcastStateRuntime`, `runtimeRuntime`, lifecycle globals) and provide package-level setters/resolvers rather than explicit dependency flow.",
+        "Entry points in different modules construct real runtimes internally (`LoadLlama`, `ContainerConfigForType`, `StartBroadcastLoop`, auth lifecycle `Start`) which couples orchestration logic to global state and hidden side effects.",
+        "Broadcast and auth lifecycle rely on background goroutines driven by package globals, increasing cross-module coordination through implicit shared state."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "Error propagation style is mixed: some paths preserve wrapping with `%w` (e.g., accesspoint/config/backups), while others flatten with `%v` and lose unwrap ability (`click/internal/runtime`: create/parse/execute error messages).",
+        "Error vocabulary and conventions drift across packages (capitalized vs lowercased messages like `Session not in client manager`, `Unrecognized container type`, mixed sentinel vs ad-hoc formatted errors).",
+        "Some execution helpers return raw upstream errors while peers return contextual wrapped errors, producing inconsistent failure contracts for callers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Large callback-bag runtimes (`dockerContainerRuntimeInputs`, `clickRuntime`, `AccessPointRuntime`) add substantial indirection and wiring cost before business logic executes.",
+        "Several files are thin pass-through facades (`docker/orchestration/llama.go`, many methods in `click/click.go`) that mostly forward calls with little policy/translation, increasing surface area without proportional leverage.",
+        "Runtime template/merge layering in orchestration (`collectDockerContainerRuntimeInputs` -> template builders -> `seams.Merge`) creates deep indirection chains that are hard to reason about."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 66.0,
+        "indirection_cost": 41.0,
+        "interface_honesty": 72.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "Production entry points frequently instantiate concrete runtimes directly (`ContainerConfigForType`, `LoadLlama`, `accesspoint.Start`), so unit seams do not exercise the default wiring path.",
+        "Background loop behavior depends on package-level globals/tickers/controllers (`broadcast/loop.go`, `auth/lifecycle/lifecycle.go`), which increases need for integration-level verification around startup/stop ordering and race behavior.",
+        "Many components are test-seam friendly, but critical orchestration paths still rely on implicit global runtime construction."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "design_coherence": {
+      "evidence": [
+        "`accesspoint/router.go` combines command validation, shell command construction, network orchestration, firewall mutation, and process lifecycle in one unit.",
+        "`accesspoint/lifecycle_coordinator.go` coordinates dependency checks, state probing, config writing, and start/stop policy in one flow with runtime-flag branching (`UseDefaultStartFn`/`UseDefaultStopFn`).",
+        "Click domain wrappers spread repeated validation/forwarding patterns across many methods, indicating a shared command-template abstraction is missing."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_singleton_runtime_mesh",
+      "summary": "Cross-module behavior is coordinated through mutable package-level default runtimes, creating hidden coupling and broad blast radius.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/click/click.go",
+        "goseg/auth/lifecycle/lifecycle.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "`defaultBroadcastStateRuntime`, `runtimeRuntime`, `defaultRuntime`, and auth lifecycle globals hold process-wide mutable runtime state.",
+        "Public entry points rely on these defaults instead of requiring explicit runtime injection, so state changes in one area can affect unrelated callers."
+      ],
+      "suggestion": "Introduce explicit composition roots per subsystem and pass immutable runtime dependencies through constructors; keep package-level defaults only as thin compatibility adapters and freeze them after startup.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_runtime_coupling"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_indirection_overhead",
+      "summary": "Large callback-bag runtime structs create high indirection cost with limited behavioral leverage.",
+      "related_files": [
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/click/click.go",
+        "goseg/accesspoint/accesspoint.go"
+      ],
+      "evidence": [
+        "`dockerContainerRuntimeInputs` aggregates dozens of function fields then remaps them into multiple templates and merges.",
+        "`clickRuntime` exposes many one-line forwarding methods and duplicates adapter surface.",
+        "`AccessPointRuntime` mixes config data and function seams, increasing API width and branchy defaulting."
+      ],
+      "suggestion": "Split runtime bags into cohesive capability interfaces (file IO, container control, config snapshot, command exec), and replace method-per-command wrappers with small domain services that enforce policy once.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "error_wrapping_contract_drift",
+      "summary": "Error handling contracts are inconsistent across modules, with partial context loss and uneven message conventions.",
+      "related_files": [
+        "goseg/click/internal/runtime/runtime.go",
+        "goseg/accesspoint/router.go",
+        "goseg/docker/orchestration/container_config.go",
+        "goseg/auth/client_session.go"
+      ],
+      "evidence": [
+        "`click/internal/runtime` uses `%v` in contextual errors (e.g., parse/create/execute paths), which breaks `errors.Is/As` chaining.",
+        "Other modules use `%w` wrapping and sentinel errors, so caller behavior differs depending on path.",
+        "Message casing/style is inconsistent (`Session not in client manager`, `Unrecognized container type`, lowercase forms elsewhere)."
+      ],
+      "suggestion": "Adopt a subsystem-wide error contract: always wrap external-call failures with `%w`, normalize message style to lowercase sentence fragments, and define sentinel/typed errors for expected control-flow outcomes.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "accesspoint_multi_responsibility_stack",
+      "summary": "Accesspoint lifecycle and router modules mix too many responsibilities, reducing clarity and maintainability.",
+      "related_files": [
+        "goseg/accesspoint/router.go",
+        "goseg/accesspoint/lifecycle_coordinator.go",
+        "goseg/accesspoint/accesspoint.go"
+      ],
+      "evidence": [
+        "Router file includes shell safety validation, command formatting, interface bring-up/down, iptables mutation, process management, and preflight behavior.",
+        "Lifecycle coordinator handles dependency validation, state policy, config emission, and start/stop control with runtime flag branching."
+      ],
+      "suggestion": "Extract command-builder/sanitizer, network policy applier, and lifecycle policy into separate collaborators; keep coordinator limited to orchestration decisions and a narrow runtime interface.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "orchestrator_concern_mixing"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "default_wiring_path_underverified",
+      "summary": "Default production wiring paths are hard to validate because entry points instantiate concrete runtimes internally.",
+      "related_files": [
+        "goseg/docker/orchestration/llama.go",
+        "goseg/docker/orchestration/container_config.go",
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`LoadLlama` and `ContainerConfigForType` call `newDockerRuntime()` directly, bypassing explicit dependency injection at the entry boundary.",
+        "`accesspoint.Start` and broadcast loop defaults similarly rely on internal runtime construction and package globals.",
+        "This pattern makes unit tests exercise injected seams while leaving default integration wiring vulnerable to regressions."
+      ],
+      "suggestion": "Add black-box integration tests for default entry points and expose constructor-based entry APIs that accept full runtime dependencies, so default wiring is testable without global mutation.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "global_runtime_coupling"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Heavy reliance on mutable package-level runtime state rather than explicit composition boundaries.",
+      "Incremental seam injection produced very wide callback bags and pass-through facades instead of cohesive service interfaces.",
+      "No single enforced cross-package error contract (wrapping, sentinel usage, and message conventions)."
+    ],
+    "likely_symptoms": [
+      "error_wrapping_contract_drift",
+      "accesspoint_multi_responsibility_stack",
+      "default_wiring_path_underverified"
+    ],
+    "possible_false_positives": []
+  }
+}

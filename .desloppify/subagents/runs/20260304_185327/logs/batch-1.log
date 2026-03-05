@@ -1,0 +1,671 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_185327/results/batch-1.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture, high_level_elegance
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+- goseg/uploadsvc/actions_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "high_level_elegance": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action vocabulary is defined in `goseg/protocol/actionids/actionids.go` but conformance checks in `goseg/protocol/conformance/fixtures_test.go` use `groundseg/protocol/actions` symbols, creating multiple package-level authorities for the same namespace/action bindings.",
+        "`goseg/protocol/contracts/protocol_contracts.go` re-wraps `actionids` constants into contract-local types and IDs, while `goseg/uploadsvc/actions_test.go` validates upload action support via uploadsvc-local action APIs; this spreads canonical binding ownership across protocol, contracts, and service layers.",
+        "Cross-module alignment is enforced via test assertions in multiple packages (conformance/contracts/uploadsvc), indicating boundary integrity depends on distributed checks rather than a single authoritative manifest boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "Contract governance ownership and lifecycle metadata are string literals in multiple families (`OwnerModule`, `SinceVersion` in both `protocol_contracts.go` and `startram_contracts.go`), increasing drift risk and weakening explicit ownership boundaries.",
+        "Public contract-ID naming policy is inconsistent: upload has explicit backward-compatible aliases in `protocol_contracts.go`, while other families/actions use different naming exposure patterns, forcing mixed usage conventions in tests (`family_specs_test.go`).",
+        "Descriptor/governance declaration patterns are repeated per contract entry with no shared higher-level declaration model, so adding a new action likely requires edits in several files and conventions."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "distributed_action_authority",
+      "summary": "Canonical protocol action identity is split across multiple modules, creating a high-coupling change surface.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines raw namespace/action tokens.",
+        "`protocol_contracts.go` redefines those tokens as contract-layer typed constants and derives contract IDs from them.",
+        "`fixtures_test.go` validates bindings against `protocol/actions` package symbols instead of `actionids` or contract IDs.",
+        "`actions_test.go` checks upload action coverage via uploadsvc action APIs, adding another representation boundary."
+      ],
+      "suggestion": "Introduce a single protocol action manifest package that owns namespace/action/contract-ID tuples and have contracts, conformance fixtures, and uploadsvc mapping consume that manifest directly; keep thin typed adapters only where required.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_single_source_protocol_manifest"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "stringly_governance_metadata",
+      "summary": "Governance ownership/version metadata is duplicated as free-form strings across contract families.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` repeats `OwnerModule` and `SinceVersion` literals per entry (e.g., `uploadsvc`, `system/wifi`, `2026.03.02`).",
+        "`startram_contracts.go` duplicates the same pattern with separate literals (`startram`, `2026.01.20`).",
+        "`family_specs_test.go` hardcodes matching ownership semantics in test fixture specs, increasing synchronization burden."
+      ],
+      "suggestion": "Define typed governance owners and version constants in one shared governance declaration layer, then reference those constants from all family specs and tests to prevent drift.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_contract_governance"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "inconsistent_contract_alias_policy",
+      "summary": "Backward-compatibility alias strategy is applied unevenly, producing an inconsistent top-level contract surface.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines upload backward-compatible aliases (`UploadActionOpenEndpoint`, `UploadActionReset`) but no equivalent alias policy for C2C IDs.",
+        "`family_specs_test.go` mixes alias-era naming (`UploadActionOpenEndpoint`) with canonical naming (`C2CConnectAction`), reflecting inconsistent public naming conventions."
+      ],
+      "suggestion": "Codify one alias/deprecation policy for all contract families (either canonical-only or uniform alias coverage) and enforce it with a dedicated naming-policy test.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_single_source_protocol_manifest"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol action semantics lack one authoritative declaration consumed uniformly across contracts, conformance, and service APIs.",
+      "Governance metadata is modeled as duplicated literals rather than shared typed declarations.",
+      "Compatibility naming policy is not centrally defined, so surfaces evolve inconsistently by family."
+    ],
+    "likely_symptoms": [
+      "distributed_action_authority",
+      "inconsistent_contract_alias_policy"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cba32-ac13-7ef3-a08e-89c462f1d23e
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture, high_level_elegance
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+- goseg/uploadsvc/actions_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’m reviewing only the six assigned files against the blind packet constraints, then I’ll produce a strict JSON assessment for `cross_module_architecture` and `high_level_elegance` with evidence-backed findings. I’ll start by reading the packet and those files without modifying anything.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/conformance/fixtures_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/contracts/family_specs_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,220p' goseg/protocol/actionids/actionids.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/contracts/startram_contracts.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,300p' goseg/protocol/contracts/protocol_contracts.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,280p' goseg/uploadsvc/actions_test.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package conformance
+
+import (
+	"testing"
+
+	"groundseg/protocol/actions"
+)
+
+func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+	fixtures := ActionContractFixtures()
+	if len(fixtures) == 0 {
+		t.Fatal("expected at least one action contract fixture")
+	}
+
+	foundC2C := false
+	for _, fixture := range fixtures {
+		if err := ValidateActionContractFixture(fixture); err != nil {
+			t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+		}
+		if fixture.Namespace == actions.NamespaceC2C && fixture.Action == actions.ActionC2CConnect {
+ succeeded in 50ms:
+package contracts
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestBuildContractFamilyEntriesFromSpecs(t *testing.T) {
+	specs := []contractFamilyEntrySpec{
+		{
+			ID:          UploadActionOpenEndpoint,
+			Namespace:   ActionNamespaceUpload,
+			Action:      ActionUploadOpenEndpoint,
+			Name:        "upload open endpoint",
+			Description: "open upload endpoint contract",
+			Message:     "upload open endpoint message",
+			Governance: contractGovernanceMetadata{
+				OwnerModule:  "uploadsvc",
+				Stability:    CompatibilityBackwardSafe,
+				SinceVersion: contractMetadataFor(UploadActionOpenEndpoint).IntroducedIn,
+ succeeded in 51ms:
+package actionids
+
+const (
+	NamespaceUpload = "upload"
+	NamespaceC2C    = "c2c"
+)
+
+const (
+	UploadOpenEndpoint = "open-endpoint"
+	UploadReset        = "reset"
+	C2CConnect         = "connect"
+)
+ succeeded in 50ms:
+Total output lines: 6276
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "logic_clarity",
+    "type_safety",
+    "contract_coherence",
+    "error_consistency",
+    "ai_generated_debt",
+    "high_level_elegance",
+    "mid_level_elegance",
+    "low_level_elegance",
+    "cross_module_architecture",
+    "initialization_coupling",
+    "convention_outlier",
+    "dependency_health",
+    "test_strategy",
+ succeeded in 51ms:
+package contracts
+
+import "fmt"
+
+const (
+	// StarTram contract namespace segments.
+	startramContractFamily = "startram"
+	startramContractScope  = "errors"
+	startramAPIConnSlug    = "api-connection"
+
+	// APIConnectionErrorMessage is the canonical StarTram API connectivity contract message.
+	APIConnectionErrorMessage             = "Unable to connect to API server"
+	startramAPIConnectionErrorName        = "APIConnectionError"
+	startramAPIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+)
+
+// APIConnectionError is the canonical StarTram API connectivity contract id.
+const APIConnectionError ContractID = ContractID(startramContractFamily + "." + startramContractScope + "." + startramAPIConnSlug)
+
+func startramContractSpecs() []contractFamilyEntrySpec {
+ succeeded in 51ms:
+package contracts
+
+import (
+	"fmt"
+
+	"groundseg/protocol/actionids"
+)
+
+const (
+	// Protocol namespaces for websocket action contracts.
+	ActionNamespaceUpload ActionNamespace = ActionNamespace(actionids.NamespaceUpload)
+	ActionNamespaceC2C    ActionNamespace = ActionNamespace(actionids.NamespaceC2C)
+
+	// Protocol action tokens.
+	ActionUploadOpenEndpoint ActionVerb = ActionVerb(actionids.UploadOpenEndpoint)
+	ActionUploadReset        ActionVerb = ActionVerb(actionids.UploadReset)
+	ActionC2CConnect         ActionVerb = ActionVerb(actionids.C2CConnect)
+)
+
+const (
+ succeeded in 51ms:
+package uploadsvc
+
+import "testing"
+
+func TestParseUploadActionAcceptsKnownActions(t *testing.T) {
+	t.Parallel()
+
+	gotOpen, err := ParseUploadAction(string(ActionUploadOpenEndpoint))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(open-endpoint) returned error: %v", err)
+	}
+	if gotOpen != ActionUploadOpenEndpoint {
+		t.Fatalf("unexpected parsed open-endpoint action: %q", gotOpen)
+	}
+
+	gotReset, err := ParseUploadAction(string(ActionUploadReset))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(reset) returned error: %v", err)
+	}
+	if gotReset != ActionUploadReset {
+codex
+I’ve gathered the target files and packet constraints; next I’m validating architectural patterns and cross-file ownership boundaries to ensure findings are structural, not just test-level nits. I’ll pull line-numbered snippets now so the evidence is concrete and consistent with scoring.
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && nl -ba goseg/protocol/contracts/protocol_contracts.go' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && nl -ba goseg/protocol/actionids/actionids.go' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && nl -ba goseg/protocol/contracts/family_specs_test.go' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && nl -ba goseg/protocol/conformance/fixtures_test.go' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && nl -ba goseg/protocol/contracts/startram_contracts.go' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && nl -ba goseg/uploadsvc/actions_test.go' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package contracts
+     2	
+     3	import (
+     4		"fmt"
+     5	
+     6		"groundseg/protocol/actionids"
+     7	)
+     8	
+     9	const (
+    10		// Protocol namespaces for websocket action contracts.
+    11		ActionNamespaceUpload ActionNamespace = ActionNamespace(actionids.NamespaceUpload)
+    12		ActionNamespaceC2C    ActionNamespace = ActionNamespace(actionids.NamespaceC2C)
+    13	
+    14		// Protocol action tokens.
+    15		ActionUploadOpenEndpoint ActionVerb = ActionVerb(actionids.UploadOpenEndpoint)
+    16		ActionUploadReset        ActionVerb = ActionVerb(actionids.UploadReset)
+    17		ActionC2CConnect         ActionVerb = ActionVerb(actionids.C2CConnect)
+    18	)
+    19	
+    20	const (
+ succeeded in 50ms:
+     1	package actionids
+     2	
+     3	const (
+     4		NamespaceUpload = "upload"
+     5		NamespaceC2C    = "c2c"
+     6	)
+     7	
+     8	const (
+     9		UploadOpenEndpoint = "open-endpoint"
+    10		UploadReset        = "reset"
+    11		C2CConnect         = "connect"
+    12	)
+ succeeded in 51ms:
+     1	package conformance
+     2	
+     3	import (
+     4		"testing"
+     5	
+     6		"groundseg/protocol/actions"
+     7	)
+     8	
+     9	func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+    10		fixtures := ActionContractFixtures()
+    11		if len(fixtures) == 0 {
+    12			t.Fatal("expected at least one action contract fixture")
+    13		}
+    14	
+    15		foundC2C := false
+    16		for _, fixture := range fixtures {
+    17			if err := ValidateActionContractFixture(fixture); err != nil {
+    18				t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+    19			}
+    20			if fixture.Namespace == actions.NamespaceC2C && fixture.Action == actions.ActionC2CConnect {
+ succeeded in 51ms:
+     1	package contracts
+     2	
+     3	import (
+     4		"strings"
+     5		"testing"
+     6	)
+     7	
+     8	func TestBuildContractFamilyEntriesFromSpecs(t *testing.T) {
+     9		specs := []contractFamilyEntrySpec{
+    10			{
+    11				ID:          UploadActionOpenEndpoint,
+    12				Namespace:   ActionNamespaceUpload,
+    13				Action:      ActionUploadOpenEndpoint,
+    14				Name:        "upload open endpoint",
+    15				Description: "open upload endpoint contract",
+    16				Message:     "upload open endpoint message",
+    17				Governance: contractGovernanceMetadata{
+    18					OwnerModule:  "uploadsvc",
+    19					Stability:    CompatibilityBackwardSafe,
+    20					SinceVersion: contractMetadataFor(UploadActionOpenEndpoint).IntroducedIn,
+ succeeded in 50ms:
+     1	package contracts
+     2	
+     3	import "fmt"
+     4	
+     5	const (
+     6		// StarTram contract namespace segments.
+     7		startramContractFamily = "startram"
+     8		startramContractScope  = "errors"
+     9		startramAPIConnSlug    = "api-connection"
+    10	
+    11		// APIConnectionErrorMessage is the canonical StarTram API connectivity contract message.
+    12		APIConnectionErrorMessage             = "Unable to connect to API server"
+    13		startramAPIConnectionErrorName        = "APIConnectionError"
+    14		startramAPIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+    15	)
+    16	
+    17	// APIConnectionError is the canonical StarTram API connectivity contract id.
+    18	const APIConnectionError ContractID = ContractID(startramContractFamily + "." + startramContractScope + "." + startramAPIConnSlug)
+    19	
+    20	func startramContractSpecs() []contractFamilyEntrySpec {
+ succeeded in 50ms:
+     1	package uploadsvc
+     2	
+     3	import "testing"
+     4	
+     5	func TestParseUploadActionAcceptsKnownActions(t *testing.T) {
+     6		t.Parallel()
+     7	
+     8		gotOpen, err := ParseUploadAction(string(ActionUploadOpenEndpoint))
+     9		if err != nil {
+    10			t.Fatalf("ParseUploadAction(open-endpoint) returned error: %v", err)
+    11		}
+    12		if gotOpen != ActionUploadOpenEndpoint {
+    13			t.Fatalf("unexpected parsed open-endpoint action: %q", gotOpen)
+    14		}
+    15	
+    16		gotReset, err := ParseUploadAction(string(ActionUploadReset))
+    17		if err != nil {
+    18			t.Fatalf("ParseUploadAction(reset) returned error: %v", err)
+    19		}
+    20		if gotReset != ActionUploadReset {
+codex
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "high_level_elegance": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action vocabulary is defined in `goseg/protocol/actionids/actionids.go` but conformance checks in `goseg/protocol/conformance/fixtures_test.go` use `groundseg/protocol/actions` symbols, creating multiple package-level authorities for the same namespace/action bindings.",
+        "`goseg/protocol/contracts/protocol_contracts.go` re-wraps `actionids` constants into contract-local types and IDs, while `goseg/uploadsvc/actions_test.go` validates upload action support via uploadsvc-local action APIs; this spreads canonical binding ownership across protocol, contracts, and service layers.",
+        "Cross-module alignment is enforced via test assertions in multiple packages (conformance/contracts/uploadsvc), indicating boundary integrity depends on distributed checks rather than a single authoritative manifest boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "Contract governance ownership and lifecycle metadata are string literals in multiple families (`OwnerModule`, `SinceVersion` in both `protocol_contracts.go` and `startram_contracts.go`), increasing drift risk and weakening explicit ownership boundaries.",
+        "Public contract-ID naming policy is inconsistent: upload has explicit backward-compatible aliases in `protocol_contracts.go`, while other families/actions use different naming exposure patterns, forcing mixed usage conventions in tests (`family_specs_test.go`).",
+        "Descriptor/governance declaration patterns are repeated per contract entry with no shared higher-level declaration model, so adding a new action likely requires edits in several files and conventions."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "distributed_action_authority",
+      "summary": "Canonical protocol action identity is split across multiple modules, creating a high-coupling change surface.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines raw namespace/action tokens.",
+        "`protocol_contracts.go` redefines those tokens as contract-layer typed constants and derives contract IDs from them.",
+        "`fixtures_test.go` validates bindings against `protocol/actions` package symbols instead of `actionids` or contract IDs.",
+        "`actions_test.go` checks upload action coverage via uploadsvc action APIs, adding another representation boundary."
+      ],
+      "suggestion": "Introduce a single protocol action manifest package that owns namespace/action/contract-ID tuples and have contracts, conformance fixtures, and uploadsvc mapping consume that manifest directly; keep thin typed adapters only where required.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_single_source_protocol_manifest"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "stringly_governance_metadata",
+      "summary": "Governance ownership/version metadata is duplicated as free-form strings across contract families.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` repeats `OwnerModule` and `SinceVersion` literals per entry (e.g., `uploadsvc`, `system/wifi`, `2026.03.02`).",
+        "`startram_contracts.go` duplicates the same pattern with separate literals (`startram`, `2026.01.20`).",
+        "`family_specs_test.go` hardcodes matching ownership semantics in test fixture specs, increasing synchronization burden."
+      ],
+      "suggestion": "Define typed governance owners and version constants in one shared governance declaration layer, then reference those constants from all family specs and tests to prevent drift.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_contract_governance"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "inconsistent_contract_alias_policy",
+      "summary": "Backward-compatibility alias strategy is applied unevenly, producing an inconsistent top-level contract surface.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines upload backward-compatible aliases (`UploadActionOpenEndpoint`, `UploadActionReset`) but no equivalent alias policy for C2C IDs.",
+        "`family_specs_test.go` mixes alias-era naming (`UploadActionOpenEndpoint`) with canonical naming (`C2CConnectAction`), reflecting inconsistent public naming conventions."
+      ],
+      "suggestion": "Codify one alias/deprecation policy for all contract families (either canonical-only or uniform alias coverage) and enforce it with a dedicated naming-policy test.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_single_source_protocol_manifest"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol action semantics lack one authoritative declaration consumed uniformly across contracts, conformance, and service APIs.",
+      "Governance metadata is modeled as duplicated literals rather than shared typed declarations.",
+      "Compatibility naming policy is not centrally defined, so surfaces evolve inconsistently by family."
+    ],
+    "likely_symptoms": [
+      "distributed_action_authority",
+      "inconsistent_contract_alias_policy"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+28,548
+

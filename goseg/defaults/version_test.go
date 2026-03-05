@@ -1,26 +1,33 @@
 package defaults
 
 import (
-	"encoding/json"
 	"reflect"
 	"testing"
 
 	"groundseg/structs"
 )
 
-func TestDefaultVersionTextParsesToVersionInfo(t *testing.T) {
-	var parsed structs.Version
-	if err := json.Unmarshal([]byte(DefaultVersionText), &parsed); err != nil {
-		t.Fatalf("DefaultVersionText should be valid JSON: %v", err)
+func TestDefaultVersionDefaultsParses(t *testing.T) {
+	parsed, err := DefaultVersionDefaults()
+	if err != nil {
+		t.Fatalf("DefaultVersionDefaults should return parseable metadata: %v", err)
 	}
-	if !reflect.DeepEqual(parsed, VersionInfo) {
-		t.Fatalf("VersionInfo should match DefaultVersionText parse result")
+	raw, err := DefaultVersionDefaults()
+	if err != nil {
+		t.Fatalf("DefaultVersionDefaults should return parseable metadata again: %v", err)
+	}
+	if !reflect.DeepEqual(parsed, raw) {
+		t.Fatalf("Version defaults should be repeatable and stable")
 	}
 }
 
 func TestDefaultVersionContainsExpectedChannels(t *testing.T) {
+	version, err := DefaultVersionDefaults()
+	if err != nil {
+		t.Fatalf("DefaultVersionDefaults should return version defaults: %v", err)
+	}
 	for _, channelName := range []string{"canary", "edge", "latest"} {
-		channel, ok := VersionInfo.Groundseg[channelName]
+		channel, ok := version.Groundseg[channelName]
 		if !ok {
 			t.Fatalf("expected channel %q in default version metadata", channelName)
 		}

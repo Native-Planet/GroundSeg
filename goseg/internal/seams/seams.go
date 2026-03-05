@@ -34,6 +34,11 @@ func mergeValue(base, overrides reflect.Value) {
 		return
 	}
 	for i := 0; i < overrides.NumField(); i++ {
+		// Avoid writing to unexported fields from this package; callers should
+		// manage those through explicit struct construction.
+		if overrides.Type().Field(i).PkgPath != "" {
+			continue
+		}
 		baseField := base.Field(i)
 		if !baseField.IsValid() {
 			continue

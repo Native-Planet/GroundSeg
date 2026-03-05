@@ -61,14 +61,22 @@ func getMemoryUsage(containerID string) uint64 {
 		zap.L().Error(fmt.Sprintf("Failed to create Docker client: %v", err))
 		return 0
 	}
-	defer cli.Close()
+	defer func() {
+		if closeErr := cli.Close(); closeErr != nil {
+			zap.L().Warn(fmt.Sprintf("Failed to close Docker client after memory usage lookup: %v", closeErr))
+		}
+	}()
 
 	resp, err := cli.ContainerStats(context.Background(), containerID, false)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to get container stats: %v", err))
 		return 0
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			zap.L().Warn(fmt.Sprintf("Failed to close container stats response: %v", closeErr))
+		}
+	}()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -93,7 +101,11 @@ func getDiskUsage(containerID string) int64 {
 		zap.L().Error(fmt.Sprintf("Failed to create Docker client: %v", err))
 		return 0
 	}
-	defer cli.Close()
+	defer func() {
+		if closeErr := cli.Close(); closeErr != nil {
+			zap.L().Warn(fmt.Sprintf("Failed to close Docker client after disk usage lookup: %v", closeErr))
+		}
+	}()
 
 	inspect, err := cli.ContainerInspect(context.Background(), containerID)
 	if err != nil {

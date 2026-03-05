@@ -1,0 +1,75 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {
+    "design_coherence": 84.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "goseg/rectify/rectify_services.go: Reconcile performs service discovery, policy resolution, state mutation, persistence calls, and transition publication in one large control block (lines ~88-166), including closure-managed publish bookkeeping.",
+        "goseg/accesspoint/accesspoint_test.go, goseg/leak/handler_test.go, goseg/leak/broadcast_test.go, goseg/importer/importer_test.go are each reported with multi-cluster responsibility_cohesion in scan metadata (disconnected function clusters), indicating mixed concerns inside single test files.",
+        "goseg/importer/importer_test.go also retains high decomposition burden (large LOC/complexity) and multiple unrelated test clusters, which increases upkeep cost when test scenarios evolve.",
+        "This is a repeated pattern where a single file becomes the home for orchestration-like flow plus detailed behavior assertions, weakening local readability and test intent signaling."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "rectify-reconcile-mixed-responsibility",
+      "summary": "Startram reconcile path interleaves orchestration, policy checks, mutation, and persistence in one monolithic routine.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/startram/state_sync_test.go"
+      ],
+      "evidence": [
+        "goseg/rectify/rectify_services.go:88-166 loops over all urbits, refreshes config, computes desired remote/service state, mutates local config and persist flags, and emits transitions from the same function.",
+        "The routine also manages local side-effect flags (`modified`, `persistNetwork`, `persistWeb`, etc.) and publishes a completion transition in the same block, making behavior ordering hard to reason about and easier to regress."
+      ],
+      "suggestion": "Split `Reconcile` into explicit stages: load/deduplicate targets, build reconciled desired state per urbit, apply policy updates, and then execute persistence/notification as a separate phase with small command objects; keep each function focused and unit-testable.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mixed-responsibility-orchestration"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test-hub-cohesion-fragmentation",
+      "summary": "Large test files aggregate multiple unrelated behavior groups, creating mixed responsibilities and fragile maintenance paths.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/leak/handler_test.go",
+        "goseg/leak/broadcast_test.go",
+        "goseg/importer/extract_test.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "Scan metadata lists `responsibility_cohesion` warnings for multiple of these files (for example, accesspoint/accesspoint_test: 12 clusters; leak/handler_test: 9 clusters; leak/broadcast_test: 8 clusters).",
+        "importer/importer_test is flagged as both large (898 LOC, complexity 59) and multi-cluster, with tests spanning diverse flows in one file.",
+        "Repeated broad-scope helpers and setup seams in these test files increase cross-test coupling and make it difficult to isolate intention of each behavioral group."
+      ],
+      "suggestion": "Refactor these suites into multiple focused files by domain concern (handler contracts, state reconciliation, runtime interactions, protocol parsing), extract shared builders into `*_test.go` helpers, and keep each test file near one behavioral contract.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test-module-sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Mixed-responsibility control blocks are concentrating orchestration, mutation, and persistence in single functions.",
+      "Cross-cutting test file sprawl: high-volume suites accumulate unrelated scenarios instead of splitting by behavior contract."
+    ],
+    "likely_symptoms": [
+      "rectify_reconcile_monolith",
+      "test_suite_sprawl"
+    ],
+    "possible_false_positives": [
+      "Some consolidation in test files might be intentional for rapid protocol coverage expansion, which can reduce immediate refactor urgency but still hurts long-term coherence."
+    ]
+  }
+}

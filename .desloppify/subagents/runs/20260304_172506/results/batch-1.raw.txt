@@ -1,0 +1,67 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 81.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both contract files keep catalog definitions in package-level mutable vars (`var protocolContractSpecs = []...`, `var startramContractSpecs = []...`), so runtime/test mutation can alter shared contract behavior across modules.",
+        "The C2C flow test asserts envelope type with a raw literal (`payload.Type != \"c2c\"`) while the protocol contract layer defines canonical namespace/action tokens, indicating contract identity is sourced from multiple places instead of one boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_contract_catalog_globals",
+      "summary": "Contract catalogs rely on mutable package globals, creating cross-module state coupling risk",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocolContractSpecs` and `startramContractSpecs` are package-level `var` slices initialized at import time.",
+        "Validation/catalog functions consume these shared vars directly, so any in-package mutation changes contract resolution behavior globally."
+      ],
+      "suggestion": "Make catalog specs immutable by construction: replace mutable package vars with function-local literals or expose read-only copies (defensive clone before use). Keep canonical contract descriptors in unmodifiable data structures so runtime and tests cannot mutate boundary-defining metadata.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_metadata_mutability"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_contract_source_in_c2c_tests",
+      "summary": "C2C tests mix raw literals and canonical action contracts, weakening boundary integrity",
+      "related_files": [
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "Test code checks `payload.Type` against raw string `\"c2c\"` instead of a canonical constant.",
+        "The same test file separately validates action fixtures/contracts via `conformance.ActionContractFixtures()` and `actions.ParseC2CAction`, showing duplicated contract authority paths in one flow."
+      ],
+      "suggestion": "Standardize all protocol identity checks in the test flow on canonical constants/contracts (namespace and action) from the protocol/actions contract boundary. Remove raw protocol literals from assertions/builders to prevent drift when contract tokens evolve.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_metadata_mutability"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Boundary-defining protocol metadata is not fully immutable, allowing shared mutable state at package scope.",
+      "Protocol identity is asserted from multiple sources (literals plus contract constants), indicating incomplete single-source contract governance."
+    ],
+    "likely_symptoms": [
+      "mutable_contract_catalog_globals",
+      "fragmented_contract_source_in_c2c_tests"
+    ],
+    "possible_false_positives": []
+  }
+}

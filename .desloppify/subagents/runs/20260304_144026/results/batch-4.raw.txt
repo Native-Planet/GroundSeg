@@ -1,0 +1,107 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 4,
+  "assessments": {
+    "package_organization": 66.0,
+    "high_level_elegance": 69.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows very large flat directories for the reviewed areas: goseg/shipworkflow/ has 45 files, goseg/system/ has 43 files, goseg/config/ has 41 files.",
+        "goseg/system/ already has purpose-specific subdirectories (maintenance/, metrics/, storage/, wifi/service/, wifi/transport/) but reviewed files goseg/system/apt.go and goseg/system/broadcast_info.go remain in the root package, indicating inconsistent placement boundaries.",
+        "goseg/shipworkflow/lifecycle.go contains generic lifecycle/polling helpers while the same directory also contains multiple domains (newship, startram, urbit_operations, workflow), making ownership and discovery dependent on filename scanning.",
+        "goseg/config/bootstrap.go and goseg/config/config.go combine bootstrap, runtime context, global mutable config state, and startram cache state in one package-level namespace."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "Subsystem decomposition is inconsistent: system package has both old flat files and new nested packages, so architectural pattern is not applied uniformly.",
+        "goseg/shipworkflow/lifecycle.go + goseg/shipworkflow/operations_runtime.go expose utility-level lifecycle logic through a broad package that also owns higher-level workflows, which blurs top-level ownership boundaries.",
+        "config bootstrap/runtime state placement (goseg/config/bootstrap.go, goseg/config/config.go) makes process-context concerns and persisted-configuration concerns co-resident, increasing cross-cutting change surface."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "shipworkflow_flat_domain_mix",
+      "summary": "shipworkflow is an overloaded flat package that mixes multiple domain slices without folder-level boundaries.",
+      "related_files": [
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go",
+        "goseg/shipworkflow/coverage_smoke_test.go"
+      ],
+      "evidence": [
+        "directory_profiles reports goseg/shipworkflow/ with 45 files (23 production, 22 test), exceeding the mixed-concern threshold.",
+        "The same directory contains unrelated concern groups (newship*, startram*, urbit_operations*, workflow*), while lifecycle.go adds generic polling/config-persist helpers rather than a clear domain aggregate.",
+        "lifecycle_test.go is a placeholder smoke test, which reinforces that placement/import wiring is being tested more than cohesive behavior ownership."
+      ],
+      "suggestion": "Stage 1: create `goseg/shipworkflow/lifecycle/` and move `lifecycle.go` + `lifecycle_test.go` there, keeping exported surface minimal. Stage 2: create domain folders `goseg/shipworkflow/newship/`, `goseg/shipworkflow/startram/`, `goseg/shipworkflow/urbitops/` and move files by prefix group in that order (newship -> startram -> urbit_operations). Stage 3: add a thin `goseg/shipworkflow/api.go` facade for stable callers. Stage 4: update imports with `rg -n \"groundseg/shipworkflow\" goseg` then `goimports -w goseg/shipworkflow/**/*.go goseg/**/*.go`, and validate with `go test ./goseg/shipworkflow/... ./goseg/handler/...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_package_overload"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "system_split_boundary_migration",
+      "summary": "system package shows partial reorganization with key files still stranded at root, creating ambiguous module boundaries.",
+      "related_files": [
+        "goseg/system/apt.go",
+        "goseg/system/broadcast_info.go",
+        "goseg/system/apt_test.go"
+      ],
+      "evidence": [
+        "directory_profiles shows goseg/system/ has 43 files while dedicated subdirectories already exist (maintenance/, metrics/, storage/, wifi/service/, wifi/transport/).",
+        "apt.go provides maintenance/update orchestration but remains in root instead of maintenance-aligned placement.",
+        "broadcast_info.go aggregates runtime metrics and disk/wifi/system snapshots for broadcast use but remains in root even with a metrics subpackage present."
+      ],
+      "suggestion": "Stage 1: move `apt.go`/`apt_test.go` to `goseg/system/maintenance/apt.go` and keep compatibility via temporary forwarding wrappers in `goseg/system/`. Stage 2: move `broadcast_info.go` to `goseg/system/metrics/broadcast_info.go` (or `goseg/broadcast/collectors/system_info.go` if ownership is broadcast-facing). Stage 3: replace root exports with explicit package-level facades and deprecate them in one release cycle. Stage 4: update imports using `rg -n \"groundseg/system\" goseg` and `goimports -w goseg/system/**/*.go goseg/broadcast/**/*.go goseg/handler/**/*.go`, then validate with `go test ./goseg/system/... ./goseg/broadcast/... ./goseg/handler/...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "partial_package_migration"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "config_owns_too_many_layers",
+      "summary": "config package combines bootstrap orchestration, runtime process context, and mutable service state in one top-level ownership boundary.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "directory_profiles reports goseg/config/ with 41 files and mixed responsibilities (bootstrap, update schema/registry, storage/minio/wireguard/version, runtime context).",
+        "bootstrap.go performs initialization orchestration, filesystem seeding, persistence, and auth/session setup in one package-level flow.",
+        "config.go holds runtime context defaults + mutable startram/global config state, increasing coupling between process context and persistent config concerns."
+      ],
+      "suggestion": "Stage 1: introduce `goseg/config/runtimectx/` and move `RuntimeContext`, setters/getters, and default resolvers from `config.go`. Stage 2: introduce `goseg/config/bootstrap/` for initialization workflow from `bootstrap.go`; keep `config.Initialize` as facade. Stage 3: isolate mutable startram/global state into `goseg/config/state/` and keep persistence/update logic in existing config core. Stage 4: run import updates via `rg -n \"groundseg/config\" goseg` and `goimports -w goseg/config/**/*.go goseg/**/*.go`; validate with `go test ./goseg/config/... ./goseg/startuporchestrator/... ./goseg/main...`.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_package_overload"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Large flat packages accumulated multiple domains before subpackage extraction policy was applied consistently.",
+      "Migration toward layered folders exists but is incomplete, leaving root-level compatibility and ownership ambiguity.",
+      "Package-level globals encourage keeping unrelated concerns co-located instead of splitting by stable change boundaries."
+    ],
+    "likely_symptoms": [
+      "shipworkflow_flat_domain_mix",
+      "system_split_boundary_migration"
+    ],
+    "possible_false_positives": [
+      "If maintainers intentionally preserve root-level APIs for long-term backward compatibility, some placement findings may be partially intentional."
+    ]
+  }
+}

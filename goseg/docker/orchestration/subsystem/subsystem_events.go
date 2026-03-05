@@ -6,7 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"groundseg/docker/internal/closeutil"
 	"groundseg/dockerclient"
+	"groundseg/internal/workflow"
 	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/transition"
@@ -14,95 +16,203 @@ import (
 	eventtypes "github.com/docker/docker/api/types/events"
 )
 
+type dockerSubsystemRuntime struct {
+	events dockerSubsystemEventBus
+	health dockerHealthLoopState
+}
+
+type dockerEventStreamClient interface {
+	Events(context.Context, eventtypes.ListOptions) (<-chan eventtypes.Message, <-chan error)
+	Close() error
+}
+
+type dockerSubsystemEventBus struct {
+	channel chan structs.Event
+}
+
+type dockerHealthLoopState struct {
+	mu      sync.Mutex
+	running bool
+	stopFn  context.CancelFunc
+	loopID  int
+}
+
+func newDockerSubsystemRuntime() *dockerSubsystemRuntime {
+	return &dockerSubsystemRuntime{
+		events: dockerSubsystemEventBus{
+			channel: make(chan structs.Event, 100),
+		},
+	}
+}
+
 var (
-	eventBus           = make(chan structs.Event, 100)
 	DisableShipRestart = false
 	errEventBusFull    = fmt.Errorf("docker event bus is full")
-	dockerHealthLoopMu sync.Mutex
-	healthLoopRunning  bool
-	healthLoopStopFn   context.CancelFunc
 
 	dockerTransitionFailureLimit  = 5
 	dockerTransitionFailureWindow = 3 * time.Minute
+
+	defaultDockerSubsystemRuntime = newDockerSubsystemRuntime()
+	newDockerEventStreamClient    = func() (dockerEventStreamClient, error) { return dockerclient.New() }
 )
 
+func normalizeDockerSubsystemRuntime(runtime *dockerSubsystemRuntime) *dockerSubsystemRuntime {
+	if runtime == nil {
+		return defaultDockerSubsystemRuntime
+	}
+	return runtime
+}
+
 func StartDockerHealthLoops(ctx context.Context) error {
+	return StartDockerHealthLoopsWithRuntime(ctx, defaultDockerSubsystemRuntime)
+}
+
+func StartDockerHealthLoopsWithRuntime(ctx context.Context, runtime *dockerSubsystemRuntime) error {
+	runtime = normalizeDockerSubsystemRuntime(runtime)
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if ctx.Err() != nil {
 		return nil
 	}
-	return startDockerHealthLoop(ctx)
+	runtime.health.mu.Lock()
+	defer runtime.health.mu.Unlock()
+	if runtime.health.running {
+		return nil
+	}
+	loopCtx, cancel := context.WithCancel(ctx)
+	runtime.health.loopID++
+	loopID := runtime.health.loopID
+	runtime.health.running = true
+	runtime.health.stopFn = cancel
+
+	go func() {
+		Check502Loop(loopCtx)
+		runtime.health.mu.Lock()
+		if runtime.health.running && runtime.health.loopID == loopID {
+			runtime.health.running = false
+			runtime.health.stopFn = nil
+		}
+		runtime.health.mu.Unlock()
+	}()
+	return nil
 }
 
 func StartDockerSubsystem(ctx context.Context) error {
+	return StartDockerSubsystemWithRuntime(ctx, defaultDockerSubsystemRuntime)
+}
+
+// RunDockerSubsystem blocks until context cancellation or worker failure.
+func RunDockerSubsystem(ctx context.Context) error {
+	return RunDockerSubsystemWithRuntime(ctx, defaultDockerSubsystemRuntime)
+}
+
+func StartDockerSubsystemWithRuntime(ctx context.Context, runtime *dockerSubsystemRuntime) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if err := startDockerHealthLoop(ctx); err != nil {
+	if ctx.Err() != nil {
+		return nil
+	}
+	runtime = normalizeDockerSubsystemRuntime(runtime)
+	go func() {
+		if err := RunDockerSubsystemWithRuntime(ctx, runtime); err != nil && ctx.Err() == nil {
+			logger.Error(fmt.Sprintf("Docker subsystem exited with error: %v", err))
+		}
+	}()
+	return nil
+}
+
+// RunDockerSubsystemWithRuntime blocks until context cancellation or worker failure.
+func RunDockerSubsystemWithRuntime(ctx context.Context, runtime *dockerSubsystemRuntime) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	runtime = normalizeDockerSubsystemRuntime(runtime)
+	if err := StartDockerHealthLoopsWithRuntime(ctx, runtime); err != nil {
 		return err
 	}
-	defer StopDockerHealthLoops()
-	errs := make(chan error, 2)
-	go func() {
-		errs <- dockerListenerWithContext(ctx)
-	}()
-	go func() {
-		errs <- dockerSubscriptionHandler(ctx)
-	}()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case err := <-errs:
-			return err
-		}
-	}
+	defer StopDockerHealthLoopsWithRuntime(runtime)
+	return workflow.RunUntilDoneOrWorkerResult(
+		ctx,
+		func(workerCtx context.Context) error {
+			return dockerListenerWithRuntime(runtime, workerCtx)
+		},
+		func(workerCtx context.Context) error {
+			return dockerSubscriptionHandlerWithRuntime(runtime, workerCtx)
+		},
+	)
 }
 
 func StopDockerHealthLoops() {
-	dockerHealthLoopMu.Lock()
-	defer dockerHealthLoopMu.Unlock()
+	StopDockerHealthLoopsWithRuntime(defaultDockerSubsystemRuntime)
+}
 
-	if !healthLoopRunning || healthLoopStopFn == nil {
+func StopDockerHealthLoopsWithRuntime(runtime *dockerSubsystemRuntime) {
+	runtime = normalizeDockerSubsystemRuntime(runtime)
+	runtime.health.mu.Lock()
+	defer runtime.health.mu.Unlock()
+	if !runtime.health.running || runtime.health.stopFn == nil {
 		return
 	}
-	healthLoopStopFn()
-	healthLoopRunning = false
-	healthLoopStopFn = nil
+	runtime.health.stopFn()
+	runtime.health.running = false
+	runtime.health.stopFn = nil
+}
+
+func (runtime *dockerSubsystemRuntime) isHealthLoopRunning() bool {
+	if runtime == nil {
+		return false
+	}
+	runtime.health.mu.Lock()
+	defer runtime.health.mu.Unlock()
+	return runtime.health.running
 }
 
 // dockerListenerWithContext runs until ctx is canceled.
-func dockerListenerWithContext(ctx context.Context) error {
+func dockerListenerWithRuntime(runtime *dockerSubsystemRuntime, ctx context.Context) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	cli, err := dockerclient.New()
+	runtime = normalizeDockerSubsystemRuntime(runtime)
+	cli, err := newDockerEventStreamClient()
 	if err != nil {
 		return fmt.Errorf("initialize Docker client: %w", err)
 	}
+	defer closeutil.MergeCloseError(cli, "docker event listener", &err)
 	messages, errs := cli.Events(ctx, eventtypes.ListOptions{})
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Stopping Docker event listener")
 			return nil
-		case event := <-messages:
+		case event, ok := <-messages:
+			if !ok {
+				if ctx.Err() != nil {
+					return nil
+				}
+				return fmt.Errorf("docker event stream closed")
+			}
 			if ctx.Err() != nil {
 				return nil
 			}
 			// Convert the Docker event to our custom event and send it to the EventBus.
 			select {
-			case eventBus <- structs.Event{Type: string(event.Action), Data: event}:
+			case runtime.events.channel <- structs.Event{Type: string(event.Action), Data: event}:
 				continue
 			case <-ctx.Done():
 				return nil
 			default:
 				return fmt.Errorf("docker event bus saturated: %w", errEventBusFull)
 			}
-		case err := <-errs:
-			if err == nil {
+		case eventErr, ok := <-errs:
+			if !ok {
+				if ctx.Err() != nil {
+					return nil
+				}
+				return fmt.Errorf("docker event error stream closed")
+			}
+			if eventErr == nil {
 				if ctx.Err() != nil {
 					return nil
 				}
@@ -111,15 +221,16 @@ func dockerListenerWithContext(ctx context.Context) error {
 			if ctx.Err() != nil {
 				return nil
 			}
-			return fmt.Errorf("docker event error: %w", err)
+			return fmt.Errorf("docker event error: %w", eventErr)
 		}
 	}
 }
 
-func dockerSubscriptionHandler(ctx context.Context) error {
+func dockerSubscriptionHandlerWithRuntime(runtime *dockerSubsystemRuntime, ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	runtime = normalizeDockerSubsystemRuntime(runtime)
 	rt := newDockerRoutineRuntime()
 	failureCount := 0
 	var lastFailure time.Time
@@ -128,7 +239,7 @@ func dockerSubscriptionHandler(ctx context.Context) error {
 		case <-ctx.Done():
 			logger.Info("Stopping Docker subscription handler")
 			return nil
-		case event := <-eventBus:
+		case event := <-runtime.events.channel:
 			dockerEvent, ok := event.Data.(eventtypes.Message)
 			if !ok {
 				logger.Error("Failed to assert Docker event data type")
@@ -162,29 +273,4 @@ func handleSubscriptionFailure(count int, lastFailure time.Time, err error) (int
 	}
 	logger.Warn(fmt.Sprintf("Recent docker transition failures in window: %d", count+1))
 	return count + 1, nextFailure
-}
-
-func startDockerHealthLoop(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	dockerHealthLoopMu.Lock()
-	defer dockerHealthLoopMu.Unlock()
-	if healthLoopRunning {
-		return nil
-	}
-	loopCtx, cancel := context.WithCancel(ctx)
-	healthLoopRunning = true
-	healthLoopStopFn = cancel
-
-	go func() {
-		Check502Loop(loopCtx)
-		dockerHealthLoopMu.Lock()
-		if healthLoopRunning {
-			healthLoopRunning = false
-			healthLoopStopFn = nil
-		}
-		dockerHealthLoopMu.Unlock()
-	}()
-	return nil
 }

@@ -1,0 +1,61 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 90.0,
+    "high_level_elegance": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files stay within the `contracts` package and encode protocol identifiers/metadata without importing runtime subsystems, keeping boundary direction stable.",
+        "`protocol_contracts.go` and `startram_contracts.go` each expose package-level contract IDs (`UploadActionOpenEndpoint`, `APIConnectionError`) created at init time via pure string composition helpers, with no I/O or mutable shared state.",
+        "Contract catalog assembly is split across file-local `...CatalogSpecs()` functions, reducing direct coupling to callers but leaving aggregation behavior implicit outside these files."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Contract registration/aggregation ownership is implicit rather than enforced by a single explicit module boundary, which can allow future drift in how contracts are introduced."
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "`protocol_contracts.go` defines a reusable constructor path (`protocolActionContract`) for contract entries, while `startram_contracts.go` constructs entries inline, creating two parallel declaration styles in the same package.",
+        "Both files encode the same conceptual artifact (contract ID + descriptor + metadata) but with different construction conventions, which weakens ownership clarity for how new contract families should be added.",
+        "Package-level exported contract IDs are declared as mutable `var` values in both files even though they appear semantically constant, blurring contract identity intent."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "contract_declaration_style_drift",
+      "summary": "The contracts package uses inconsistent construction patterns for equivalent catalog entries, which weakens architectural coherence.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` routes entries through `protocolActionContract(...)` and namespace/action helpers.",
+        "`startram_contracts.go` builds `contractCatalogEntry` inline with hard-coded structure and does not reuse the same entry-construction path.",
+        "Both files publish package-level contract IDs as `var`, mixing mutable-looking identifiers with immutable contract semantics."
+      ],
+      "suggestion": "Standardize one declaration pipeline for all contract families (e.g., a shared builder/registry helper), and make contract IDs immutable by construction where possible; this should be applied across both files so new contract families follow one architectural convention.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_unified_contract_definition_abstraction"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single enforced abstraction for declaring contract IDs and catalog entries across contract families."
+    ],
+    "likely_symptoms": [
+      "contract_declaration_style_drift"
+    ],
+    "possible_false_positives": []
+  }
+}

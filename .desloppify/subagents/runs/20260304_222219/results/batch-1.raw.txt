@@ -1,0 +1,121 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 78.4
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime dependency injection is implemented as very large callback bags (for example `importerRuntime` and `startupInitRuntime`/`startBackgroundServicesRuntime`) with many grouped validators and default mergers, which increases indirection cost before core logic executes.",
+        "Cross-module code repeatedly depends on broad global config/runtime snapshots (`config.*Snapshot`, `config.BasePath`, `config.RuntimeContextSnapshot`) instead of narrower domain inputs, so boundaries are hidden behind shared state access.",
+        "Broadcast lifecycle exposes multiple near-pass-through `*WithRuntime` layers that mostly add nil checks and forwarding (`StartBroadcastLoop`, `StartBroadcastLoopWithRuntime`, `runBroadcastTick`, `runBroadcastTickWithRuntime`, `LoadStartramRegionsWithRuntime`, `LoadStartramRegionsWithRuntimeState`)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 74.0,
+        "indirection_cost": 71.5,
+        "interface_honesty": 83.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_bag_overcomposition",
+      "summary": "Monolithic runtime callback bags create high indirection and weakly bounded dependencies.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`importerRuntime` composes multiple embedded runtime structs with a large callback surface and separate validation phases (`validateImporterConfigRuntime`, `validateImporterProvisionRuntime`, `validateImporterPublishRuntime`).",
+        "`startuporchestrator` splits startup into several embedded runtime bags with many function fields and merges defaults via seam helpers, so initialization behavior is distributed across indirection layers.",
+        "`workflowRuntime` embeds `RuntimeContainerOps`, `RuntimeUrbitOps`, and `RuntimeSnapshotOps`, making operation functions depend on a broad capability bundle even for narrower workflows."
+      ],
+      "suggestion": "Replace broad runtime bags with smaller phase-specific interfaces (for example per use-case: init, publish, provisioning), pass only required capabilities into each function, and remove cross-phase embedding so dependency contracts are explicit and minimal.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "oversized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_config_context_bag_leakage",
+      "summary": "Global config/context snapshot access acts as a wide parameter bag across subsystems.",
+      "related_files": [
+        "goseg/config/runtimecontext/context.go",
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "`runtimecontext` exposes process-wide mutable snapshot getters/setters (`BasePath`, `Architecture`, `DebugMode`, `DockerDir`) backed by global atomic state.",
+        "`main` and startup code pull settings from `config.*Snapshot` and runtime context globally inside default runtime constructors instead of receiving explicit config values from callers.",
+        "`SysConfig`/`UrbitDocker` remain broad aggregate structures that are read and mutated by distant modules, encouraging broad coupling to configuration shape rather than domain-specific inputs."
+      ],
+      "suggestion": "Introduce explicit, immutable configuration structs per subsystem (startup, networking, import, workflow) and pass them through constructors; restrict global snapshot access to a thin bootstrap layer and keep downstream packages on narrow typed inputs.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "oversized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "broadcast_runtime_wrapper_chain",
+      "summary": "Broadcast runtime APIs contain low-leverage forwarding layers that deepen call chains.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/transitions.go"
+      ],
+      "evidence": [
+        "Several entrypoints immediately forward to `*WithRuntime` variants after only nil/default checks (`StartBroadcastLoop`, `ReloadUrbits`, `LoadStartramRegionsWithRuntime`).",
+        "Tick execution similarly has wrapper layers (`runBroadcastTick` -> `runBroadcastTickWithRuntime` -> `buildBroadcastTickState`) while runtime resolution is split across helper functions (`newBroadcastLoopRuntimeWithDefault`, `resolveBroadcastLoopRuntime`).",
+        "This pattern adds abstraction depth without introducing distinct policy boundaries, making lifecycle behavior harder to follow."
+      ],
+      "suggestion": "Collapse wrapper pairs where behavior is identical, keep one explicit injected-path API plus a single package-level convenience entrypoint, and centralize default runtime resolution in one place to reduce forwarding layers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "oversized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "delegate_fallback_event_broker_duality",
+      "summary": "Event broker abstraction mixes delegate and in-memory fallback semantics in one type.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`EventRuntime` can either delegate to an external `EventBroker` or publish to local channels, decided per call in generic helpers (`publishTransition`, `runtimeTransitionSource`).",
+        "Callers use `DefaultEventRuntime()` directly in workflow/importer defaults, so runtime behavior depends on hidden delegate/fallback mode rather than a single explicit broker contract.",
+        "This dual behavior increases interface ambiguity because the same runtime type can represent materially different transport guarantees."
+      ],
+      "suggestion": "Split broker roles into explicit implementations (for example `InMemoryEventBroker` and `DelegatingEventBroker`) and inject one concrete broker per runtime so publish/subscribe behavior is fixed and transparent.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "oversized_runtime_seams"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams evolved into broad callback registries instead of narrow capability interfaces.",
+      "Global config/runtime snapshot access became a convenience abstraction that now hides true dependency boundaries."
+    ],
+    "likely_symptoms": [
+      "broadcast_runtime_wrapper_chain",
+      "delegate_fallback_event_broker_duality"
+    ],
+    "possible_false_positives": []
+  }
+}

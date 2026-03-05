@@ -1,0 +1,112 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 78.0,
+    "high_level_elegance": 76.0,
+    "test_strategy": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/actionids/actionids.go` defines canonical namespace/action string tokens, while `goseg/protocol/contracts/protocol_contracts.go` re-wraps them into a second constant layer (`ActionNamespace*`, `Action*`) plus formula-built IDs and legacy aliases.",
+        "Contract governance ownership is encoded as free-form strings in multiple files (`OwnerModule: \"uploadsvc\"`, `\"system/wifi\"`, `\"startram\"`) across `protocol_contracts.go` and `startram_contracts.go`, creating distributed boundary definitions rather than one typed contract boundary source."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "README claims architecture/runtime-boundary policy is documented and trustworthy, but runtime governance-critical fields remain unconstrained literals in code (`OwnerModule`, `SinceVersion`, contract names/messages) across multiple contract spec files.",
+        "`protocol_contracts.go` keeps both current IDs and backward-compatible alias IDs in the same surface, mixing compatibility shim concerns with canonical contract declarations and making ownership/purpose less crisp."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/protocol/conformance/fixtures_test.go` validates fixture shape/presence and one unknown-action negative case, but does not assert governance metadata policy (owner vocabulary, version format/progression, compatibility semantics).",
+        "`goseg/protocol/contracts/family_specs_test.go` heavily tests helper behavior with handcrafted specs, but does not provide end-to-end assertions that README-declared governance/quality-gate intent stays aligned with live contract catalogs in `protocol_contracts.go` and `startram_contracts.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_contract_identity_sources",
+      "summary": "Contract identity is defined through layered constants across modules, blurring the canonical boundary.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines raw namespace/action tokens; `protocol_contracts.go` redefines typed wrappers and recomposes IDs from those wrappers plus also exports legacy aliases.",
+        "Governance-defining metadata is separately embedded per contract family file, so boundary contracts are not represented through one strongly-typed central registry."
+      ],
+      "suggestion": "Introduce a single canonical contract registry package (typed owner enum, namespace/action binding, compatibility metadata) and make `actionids` and family-specific files consume generated/derived views from that registry; keep legacy aliases in a dedicated compatibility layer.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "decentralized_contract_governance_model"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "governance_policy_not_enforced_by_design",
+      "summary": "Declared governance/compatibility policy relies on conventions instead of structural enforcement.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README positions governance and quality gates as architecture contracts, but code-level policy fields (`OwnerModule`, `SinceVersion`, descriptive strings) are plain literals with no shared typed policy object.",
+        "Compatibility aliases are co-located with canonical contracts in `protocol_contracts.go`, coupling long-term migration concerns to day-to-day domain declarations."
+      ],
+      "suggestion": "Promote governance policy to first-class typed constructs (owner/module enum, version type/validator, compatibility declaration type) and split canonical declarations from compatibility aliases into separate files/modules with explicit lifecycle rules.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "decentralized_contract_governance_model"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "missing_policy_level_contract_tests",
+      "summary": "Tests validate local mechanics but miss policy-level guarantees for governance contracts.",
+      "related_files": [
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "Current tests focus on fixture validity and helper validation branches; they do not assert that every declared contract complies with governance policy constraints across families.",
+        "No test in this batch enforces that compatibility aliases remain intentionally mapped and non-divergent as canonical IDs evolve.",
+        "README’s quality-gate narrative implies contract-governance confidence, but there is no direct policy test proving docs-vs-runtime alignment for these governance-critical fields."
+      ],
+      "suggestion": "Add policy-level tests that iterate all contract catalogs and assert owner whitelist, version format/ordering, alias->canonical mapping invariants, and family-level governance rules; keep these tests as explicit quality-gate targets.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "decentralized_contract_governance_model"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance contract data is decentralized across constants and family files without one typed policy model.",
+      "Test suite is stronger on helper correctness than on architecture/policy invariants."
+    ],
+    "likely_symptoms": [
+      "split_contract_identity_sources",
+      "governance_policy_not_enforced_by_design",
+      "missing_policy_level_contract_tests"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	UrbitConfig = structs.UrbitDocker{
+	defaultUrbitConfig = structs.UrbitDocker{
 		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
 			PierName:         "",
 			HTTPPort:         0,
@@ -64,7 +64,7 @@ var (
 			BackupTime:       "0000",
 		},
 	}
-	NetdataConfig = structs.NetdataConfig{
+	defaultNetdataConfig = structs.NetdataConfig{
 		NetdataName:    "netdata",
 		Repo:           "registry.hub.docker.com/netdata/netdata",
 		NetdataVersion: "latest",
@@ -86,7 +86,7 @@ var (
 		},
 	}
 
-	McConfig = structs.McConfig{
+	defaultMcConfig = structs.McConfig{
 		McName:      "minio_client",
 		McVersion:   "latest",
 		Repo:        "registry.hub.docker.com/minio/mc",
@@ -94,7 +94,7 @@ var (
 		Arm64Sha256: "6825aecd2f123c9d4408e660aba8a72f9e547a3774350b8f4d2d9b674e99e424",
 	}
 
-	WgConfig = structs.WgConfig{
+	defaultWgConfig = structs.WgConfig{
 		WireguardName:    "wireguard",
 		WireguardVersion: "latest",
 		Repo:             "registry.hub.docker.com/linuxserver/wireguard",
@@ -129,6 +129,49 @@ func DockerData(pathType string) string {
 	return ""
 }
 
+func DefaultUrbitConfig() structs.UrbitDocker {
+	clone := defaultUrbitConfig
+	return clone
+}
+
+func DefaultNetdataConfig() structs.NetdataConfig {
+	return structs.NetdataConfig{
+		NetdataName:    defaultNetdataConfig.NetdataName,
+		Repo:           defaultNetdataConfig.Repo,
+		NetdataVersion: defaultNetdataConfig.NetdataVersion,
+		Amd64Sha256:    defaultNetdataConfig.Amd64Sha256,
+		Arm64Sha256:    defaultNetdataConfig.Arm64Sha256,
+		CapAdd:         append([]string(nil), defaultNetdataConfig.CapAdd...),
+		Port:           defaultNetdataConfig.Port,
+		Restart:        defaultNetdataConfig.Restart,
+		SecurityOpt:    defaultNetdataConfig.SecurityOpt,
+		Volumes:        append([]string(nil), defaultNetdataConfig.Volumes...),
+	}
+}
+
+func DefaultMcConfig() structs.McConfig {
+	return structs.McConfig{
+		McName:      defaultMcConfig.McName,
+		McVersion:   defaultMcConfig.McVersion,
+		Repo:        defaultMcConfig.Repo,
+		Amd64Sha256: defaultMcConfig.Amd64Sha256,
+		Arm64Sha256: defaultMcConfig.Arm64Sha256,
+	}
+}
+
+func DefaultWgConfig() structs.WgConfig {
+	return structs.WgConfig{
+		WireguardName:    defaultWgConfig.WireguardName,
+		WireguardVersion: defaultWgConfig.WireguardVersion,
+		Repo:             defaultWgConfig.Repo,
+		Amd64Sha256:      defaultWgConfig.Amd64Sha256,
+		Arm64Sha256:      defaultWgConfig.Arm64Sha256,
+		CapAdd:           append([]string(nil), defaultWgConfig.CapAdd...),
+		Volumes:          append([]string(nil), defaultWgConfig.Volumes...),
+		Sysctls:          defaultWgConfig.Sysctls,
+	}
+}
+
 // this one needs params from config so we use a func
 func SysConfig(basePath string) structs.SysConfig {
 	sysConfig := structs.SysConfig{
@@ -137,12 +180,12 @@ func SysConfig(basePath string) structs.SysConfig {
 			WgOn:                 false,
 			NetCheck:             "1.1.1.1:53",
 			UpdateMode:           "auto",
-			UpdateUrl:            "https://version.groundseg.app",
+			UpdateURL:            "https://version.groundseg.app",
 			UpdateBranch:         "latest",
 			RemoteBackupPassword: "",
-			C2cInterval:          0,
+			C2CInterval:          0,
 			WgRegistered:         false,
-			EndpointUrl:          "api.startram.io",
+			EndpointURL:          "api.startram.io",
 			ApiVersion:           "v1",
 		},
 		Runtime: structs.RuntimeConfig{

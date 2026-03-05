@@ -1,0 +1,303 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 86.0,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 88.0,
+        "Indirection Cost": 74.0,
+        "Interface Honesty": 90.0
+      }
+    },
+    "design_coherence": 63.7,
+    "error_consistency": 74.3
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Startup orchestration composes multiple runtime seam structs with many callback fields and tag metadata (for example `startuporchestrator/startupInitRuntime`, `startBackgroundServicesRuntime`, `startBackgroundServiceSpecs`, and runtime validation groups), creating a high-cost abstraction layer for dependency wiring.",
+        "Importer/runtime wiring mirrors the same callback-heavy pattern (`importerStorageRuntime`, `importerUploadRuntime`, `importerProvisionRuntime`) with separate validation paths and grouped requirements for each call site phase.",
+        "Tests repeatedly rely on helper adapters and setter maps to bind behavior into these seam-heavy structs (for example callback maps and `withStartBackgroundServiceCallback` style setup), increasing indirection and potential drift across similar abstractions.",
+        "Configuration and transition handling frequently passes large config/runtime structs through numerous generic helper wrappers (`runtime`-style seam structs and default/resolve/validate layers), which increases call depth without adding domain policy."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "The main abstraction debt is structural and non-blocking: callback-heavy seam layers improve testability but add constant boilerplate and indirection. Further gains require refactoring toward fewer lifecycle-specific runtime registries and shared composition helpers, which is a deliberate architectural cleanup beyond defect patching.",
+      "sub_axes": {
+        "abstraction_leverage": 88.0,
+        "indirection_cost": 74.0,
+        "interface_honesty": 90.0
+      }
+    },
+    "design_coherence": {
+      "evidence": [
+        "shipworkflow transition handlers repeatedly re-implement the same config-update-and-reconcile flow (persist section config + cleanup + restart/start decisions) across multiple transition paths, with duplicated branching branches and side effects spread across files.",
+        "broadcast loop/state management is implemented as package-level mutable singletons (default runtime factory/runtime and loop-running globals) instead of explicit lifecycle-owned state, which increases coupling between independent callers and test setups."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "goseg/broadcast/loop.go returns a freshly formatted string with fmt.Errorf(\"%s\", msg) after a pier-info failure, which strips original error type/chain before surfacing to callers.",
+        "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go drops the first file-write error when directory creation fails; the returned error becomes only the mkdir failure, not a chained cause.",
+        "Multiple production pathways across these files format upstream failures as context-only strings in places, which reduces recoverability and consistency of failure handling at higher layers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "shipworkflow_transition_orchestration_duplication",
+      "summary": "Transition handlers duplicate config persistence and cleanup logic, increasing drift risk when adding or changing transitions.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime_handlers.go"
+      ],
+      "evidence": [
+        "runTogglePowerTransition and runToggleNetworkTransition implement repeated patterns of config fetch, validation/persistence, ship cleanup, and restart logic inline.",
+        "runToggleNetworkTransition repeats the same persist+urbitCleanDelete block across multiple switch branches for different initial network states.",
+        "Other transitions in urbit_operations_runtime.go use similar bespoke orchestration patterns instead of shared transition helpers."
+      ],
+      "suggestion": "Create a dedicated transition orchestration helper (or policy-driven state machine) that accepts transition pre/post actions and error paths, then have all urbit transitions call a single sequencer function to apply config updates, optional cleanup, and restart behavior consistently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shipworkflow_transition_sequence_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_global_runtime_loop_state",
+      "summary": "Broadcast runtime and loop control use package-level mutable singletons that couple unrelated call paths and complicate composition.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`DefaultBroadcastStateRuntime` resolves through `defaultBroadcastStateRuntimeFactory`, and tests call `SetBroadcastStateRuntimeFactory` to override it globally without synchronization.",
+        "`loopRunning` and `loopStopChannel` in `loop.go` are global process state, so only one broadcast loop can be managed safely through this global channel without coordination.",
+        "Production and tests share the same mutable broadcast state pathways, which makes independent runtime instances hard to host."
+      ],
+      "suggestion": "Introduce an explicit `BroadcastCoordinator`/runtime owner that holds state runtime and loop control as instance fields, and avoid global mutable factory/runtime overrides except at process bootstrap points.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "shipbroadcast_singleton_coordination"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_responsibility_cohesion_sprawl",
+      "summary": "Large mixed-purpose test files combine multiple unrelated fixture setups and behavior clusters, slowing understanding and maintenance.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/handler/ship/urbit_test.go"
+      ],
+      "evidence": [
+        "accesspoint_test.go mixes command/argument helpers, config/password validation tests, process matching tests, router lifecycle behavior, and error path checks in one large file.",
+        "importer_test.go combines HTTP transport, runtime setup, session lifecycle management, transition counting, and archive-path behavior in a single suite.",
+        "ship/urbit handler tests contain protocol parsing, lifecycle seam reset helpers, and action-transition behavior in a broad single module."
+      ],
+      "suggestion": "Split these suites by behavioral concern (runtime construction, protocol parsing, lifecycle/error handling, transition dispatch) into smaller test modules with narrowly scoped fixtures and common shared helpers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "module",
+      "root_cause_cluster": "test_responsibility_cohesion_sprawl"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast_tick_loses_pier_error_cause",
+      "summary": "Broadcast loop converts pier-info failure to message-only error, discarding chain and classification.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/loop_test.go"
+      ],
+      "evidence": [
+        "runBroadcastTickWithRuntime constructs msg := fmt.Sprintf(\"unable to build pier info: %v\", err), records it, then returns fmt.Errorf(\"%s\", msg), which cannot be errors.Is/As matched by callers.",
+        "loop tests assert the exact string in TestRunBroadcastTickRecordsPierInfoError, encouraging string-coupled handling instead of typed/wrapped handling."
+      ],
+      "suggestion": "Return fmt.Errorf(\"unable to build pier info: %w\", err) and keep the stateTransition message logging separate; this preserves structured error handling for callers while retaining operator-readable context.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_chain_dropped"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "artifactwriter_masks_write_failure",
+      "summary": "Artifact write path drops the initial file-write error when mkdir recovery fails.",
+      "related_files": [
+        "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "artifactwriter.Write() attempts a direct file write, stores err; on mkdirAll failure it returns mkdirErr without preserving/wrapping the original write error.",
+        "wireguard.write path relies on this helper for fallback persistence and error surfacing, so this suppression affects production config/write diagnostics.",
+        "Dropped root failure can make triage misleading when write permission and directory-creation issues race; operators lose the primary failure reason."
+      ],
+      "suggestion": "When both write and fallback steps fail, combine errors (e.g., errors.Join(writeErr, mkdirErr) or wrap the mkdirErr with initial writeErr) so the first write failure remains observable while still surfacing fallback-path context.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_chain_dropped"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 3,
+    "dimension_coverage": 0.333,
+    "evidence_density": 2.056,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 10.18,
+    "dimensions_with_findings": 2
+  },
+  "review_scope": {
+    "reviewed_files_count": 58,
+    "successful_batch_count": 3,
+    "full_sweep_included": false,
+    "total_files": 576,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/broadcast/loop.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/importer/importer.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/main.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/main_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/routines/version.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/docker/network/network.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/config/config.go",
+    "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+    "goseg/docker/lifecycle/client_close.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/shipworkflow/urbit_operations_runtime_handlers.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_112703",
+    "created_at": "2026-03-04T11:27:43+00:00",
+    "batch_count": 3,
+    "batch_indexes": [
+      1,
+      2,
+      3
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "9d30632b6a68f77829a976058665d663a832dca45029fbce7fca1cb05f5c49ed"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

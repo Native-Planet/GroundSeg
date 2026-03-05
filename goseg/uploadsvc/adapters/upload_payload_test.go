@@ -22,6 +22,15 @@ func sortedUploadActions(contracts map[actions.Action]uploadsvc.UploadActionCont
 	return actionsSlice
 }
 
+func mustUploadContracts(t *testing.T) map[actions.Action]uploadsvc.UploadActionContract {
+	t.Helper()
+	contractsByAction, err := uploadsvc.UploadActionContractByAction()
+	if err != nil {
+		t.Fatalf("upload action contracts: %v", err)
+	}
+	return contractsByAction
+}
+
 func sampleToken() structs.WsTokenStruct {
 	return structs.WsTokenStruct{
 		ID:    "tok-id",
@@ -51,7 +60,7 @@ func forbiddenPayload(contract uploadsvc.UploadActionContract) *structs.WsUpload
 }
 
 func TestCommandFromWsPayloadMapsProtocolContracts(t *testing.T) {
-	contracts := uploadsvc.UploadActionContractByAction()
+	contracts := mustUploadContracts(t)
 	for _, action := range sortedUploadActions(contracts) {
 		contract := contracts[action]
 		t.Run(string(contract.Action), func(t *testing.T) {
@@ -85,7 +94,7 @@ func TestCommandFromWsPayloadMapsProtocolContracts(t *testing.T) {
 }
 
 func TestCommandFromWsPayloadRejectsForbiddenPayloads(t *testing.T) {
-	contracts := uploadsvc.UploadActionContractByAction()
+	contracts := mustUploadContracts(t)
 	for _, action := range sortedUploadActions(contracts) {
 		contract := contracts[action]
 		forbidden := forbiddenPayload(contract)
@@ -120,7 +129,7 @@ func TestCommandFromWsPayloadRejectsOtherNamespaceActions(t *testing.T) {
 }
 
 func TestCommandFromWsPayloadUsesParsedActionOutput(t *testing.T) {
-	contractMap := uploadsvc.UploadActionContractByAction()
+	contractMap := mustUploadContracts(t)
 	contract, ok := contractMap[uploadsvc.ActionUploadOpenEndpoint]
 	if !ok {
 		t.Fatal("expected upload open-endpoint contract")
@@ -162,7 +171,7 @@ func TestCommandFromWsPayloadRejectsUnsupportedAction(t *testing.T) {
 }
 
 func TestCommandFromWsPayloadSupportsAllProtocolUploadActions(t *testing.T) {
-	contracts := uploadsvc.UploadActionContractByAction()
+	contracts := mustUploadContracts(t)
 	actionsSlice := sortedUploadActions(contracts)
 	if len(actionsSlice) == 0 {
 		t.Fatal("expected upload action contracts")

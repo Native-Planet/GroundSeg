@@ -3,37 +3,21 @@ package click
 import (
 	"errors"
 	"fmt"
-	"groundseg/click/acme"
-	"groundseg/click/backup"
-	"groundseg/click/desk"
-	"groundseg/click/lifecycle"
-	"groundseg/click/luscode"
-	"groundseg/click/notify"
-	"groundseg/click/pack"
-	"groundseg/click/restore"
-	"groundseg/click/storage"
 	"groundseg/structs"
 	"strings"
 	"testing"
 )
 
 func resetClickSeams() {
-	fixAcmeFn = acme.Fix
-	clearLusCodeFn = luscode.ClearLusCode
-	getLusCodeFn = luscode.GetLusCode
-	reviveDeskFn = desk.ReviveDesk
-	uninstallDeskFn = desk.UninstallDesk
-	installDeskFn = desk.InstallDesk
-	getDeskFn = desk.GetDesk
-	mountDeskFn = desk.MountDesk
-	commitDeskFn = desk.CommitDesk
-	barExitFn = lifecycle.BarExit
-	sendNotificationFn = notify.SendNotification
-	sendPackFn = pack.SendPack
-	unlinkStorageFn = storage.UnlinkStorage
-	linkStorageFn = storage.LinkStorage
-	restoreTlonFn = restore.RestoreTlon
-	backupTlonFn = backup.BackupTlon
+	SetRuntime(nil)
+}
+
+func withClickRuntime(mutator func(*clickRuntime)) {
+	runtime := defaultClickRuntime()
+	if mutator != nil {
+		mutator(&runtime)
+	}
+	SetRuntime(runtime)
 }
 
 func TestValidatePatpAndArg(t *testing.T) {
@@ -54,9 +38,11 @@ func TestClearLusCodeValidations(t *testing.T) {
 	t.Cleanup(resetClickSeams)
 
 	called := false
-	clearLusCodeFn = func(patp string) {
-		called = true
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.clearLusCodeFn = func(patp string) {
+			called = true
+		}
+	})
 	ClearLusCode("")
 	if called {
 		t.Fatalf("expected clearLusCode to skip invalid patp")
@@ -72,10 +58,12 @@ func TestFixAcmePaths(t *testing.T) {
 	t.Cleanup(resetClickSeams)
 
 	called := ""
-	fixAcmeFn = func(patp string) error {
-		called = patp
-		return nil
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.fixAcmeFn = func(patp string) error {
+			called = patp
+			return nil
+		}
+	})
 	if err := FixAcme("~zod"); err != nil {
 		t.Fatalf("expected success, got error: %v", err)
 	}
@@ -84,7 +72,9 @@ func TestFixAcmePaths(t *testing.T) {
 	}
 
 	expected := "fixing failed"
-	fixAcmeFn = func(string) error { return errors.New(expected) }
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.fixAcmeFn = func(string) error { return errors.New(expected) }
+	})
 	err := FixAcme("~zod")
 	if err == nil || !strings.Contains(err.Error(), "fix acme for ~zod") || !strings.Contains(err.Error(), expected) {
 		t.Fatalf("expected wrapped error, got %v", err)
@@ -94,17 +84,21 @@ func TestFixAcmePaths(t *testing.T) {
 func TestGetLusCodePaths(t *testing.T) {
 	t.Cleanup(resetClickSeams)
 
-	getLusCodeFn = func(patp string) (string, error) {
-		return "code-" + patp, nil
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.getLusCodeFn = func(patp string) (string, error) {
+			return "code-" + patp, nil
+		}
+	})
 	got, err := GetLusCode("~zod")
 	if err != nil || got != "code-~zod" {
 		t.Fatalf("unexpected lus code response: got=%q err=%v", got, err)
 	}
 
-	getLusCodeFn = func(string) (string, error) {
-		return "", errors.New("lookup failed")
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.getLusCodeFn = func(string) (string, error) {
+			return "", errors.New("lookup failed")
+		}
+	})
 	_, err = GetLusCode("~zod")
 	if err == nil || !strings.Contains(err.Error(), "get +code for ~zod") {
 		t.Fatalf("expected wrapped lookup error, got %v", err)
@@ -116,30 +110,32 @@ func TestDeskFacadeValidationAndDelegation(t *testing.T) {
 
 	var gotPatp, gotDesk, gotShip string
 	var gotBypass bool
-	reviveDeskFn = func(patp, desk string) error {
-		gotPatp, gotDesk = patp, desk
-		return nil
-	}
-	uninstallDeskFn = func(patp, desk string) error {
-		gotPatp, gotDesk = patp, desk
-		return nil
-	}
-	installDeskFn = func(patp, ship, desk string) error {
-		gotPatp, gotShip, gotDesk = patp, ship, desk
-		return nil
-	}
-	getDeskFn = func(patp, desk string, bypass bool) (string, error) {
-		gotPatp, gotDesk, gotBypass = patp, desk, bypass
-		return "ok", nil
-	}
-	mountDeskFn = func(patp, desk string) error {
-		gotPatp, gotDesk = patp, desk
-		return nil
-	}
-	commitDeskFn = func(patp, desk string) error {
-		gotPatp, gotDesk = patp, desk
-		return nil
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.reviveDeskFn = func(patp, desk string) error {
+			gotPatp, gotDesk = patp, desk
+			return nil
+		}
+		runtime.uninstallDeskFn = func(patp, desk string) error {
+			gotPatp, gotDesk = patp, desk
+			return nil
+		}
+		runtime.installDeskFn = func(patp, ship, desk string) error {
+			gotPatp, gotShip, gotDesk = patp, ship, desk
+			return nil
+		}
+		runtime.getDeskFn = func(patp, desk string, bypass bool) (string, error) {
+			gotPatp, gotDesk, gotBypass = patp, desk, bypass
+			return "ok", nil
+		}
+		runtime.mountDeskFn = func(patp, desk string) error {
+			gotPatp, gotDesk = patp, desk
+			return nil
+		}
+		runtime.commitDeskFn = func(patp, desk string) error {
+			gotPatp, gotDesk = patp, desk
+			return nil
+		}
+	})
 
 	if err := ReviveDesk("", "base"); err == nil {
 		t.Fatalf("expected validation error for empty patp")
@@ -175,7 +171,9 @@ func TestDeskFacadeValidationAndDelegation(t *testing.T) {
 		t.Fatalf("unexpected commit result: %v", err)
 	}
 
-	getDeskFn = func(string, string, bool) (string, error) { return "", errors.New("desk failed") }
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.getDeskFn = func(string, string, bool) (string, error) { return "", errors.New("desk failed") }
+	})
 	err := func() error {
 		_, got := GetDesk("~zod", "base", false)
 		return got
@@ -189,10 +187,12 @@ func TestLifecycleAndNotificationFacade(t *testing.T) {
 	t.Cleanup(resetClickSeams)
 
 	var gotPatp string
-	barExitFn = func(patp string) error {
-		gotPatp = patp
-		return nil
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.barExitFn = func(patp string) error {
+			gotPatp = patp
+			return nil
+		}
+	})
 	if err := BarExit("~zod"); err != nil {
 		t.Fatalf("expected bar exit success, got %v", err)
 	}
@@ -200,15 +200,19 @@ func TestLifecycleAndNotificationFacade(t *testing.T) {
 		t.Fatalf("unexpected bar exit patp: %s", gotPatp)
 	}
 
-	sendNotificationFn = func(patp string, _ structs.HarkNotification) error { return nil }
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.sendNotificationFn = func(patp string, _ structs.HarkNotification) error { return nil }
+	})
 	if err := SendNotification("~bus", structs.HarkNotification{Type: "test"}); err != nil {
 		t.Fatalf("expected sendNotification wrapper success, got %v", err)
 	}
 
-	sendPackFn = func(patp string) error {
-		gotPatp = patp
-		return errors.New("pack failed")
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.sendPackFn = func(patp string) error {
+			gotPatp = patp
+			return errors.New("pack failed")
+		}
+	})
 	err := SendPack("~nec")
 	if err == nil || !strings.Contains(err.Error(), "send pack for ~nec") {
 		t.Fatalf("expected wrapped send pack error, got %v", err)
@@ -221,10 +225,12 @@ func TestStorageAndRuntimeFacade(t *testing.T) {
 	var storagePatp string
 	var unlinkPatp string
 	var gotEndpoint string
-	unlinkStorageFn = func(patp string) error {
-		unlinkPatp = patp
-		return nil
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.unlinkStorageFn = func(patp string) error {
+			unlinkPatp = patp
+			return nil
+		}
+	})
 	if err := UnlinkStorage("~zod"); err != nil {
 		t.Fatalf("expected unlink success, got %v", err)
 	}
@@ -232,11 +238,13 @@ func TestStorageAndRuntimeFacade(t *testing.T) {
 		t.Fatalf("unexpected unlink patp: %s", unlinkPatp)
 	}
 
-	linkStorageFn = func(patp, endpoint string, _ structs.MinIOServiceAccount) error {
-		storagePatp = patp
-		gotEndpoint = endpoint
-		return nil
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.linkStorageFn = func(patp, endpoint string, _ structs.MinIOServiceAccount) error {
+			storagePatp = patp
+			gotEndpoint = endpoint
+			return nil
+		}
+	})
 	account := structs.MinIOServiceAccount{AccessKey: "ak", SecretKey: "sk", Alias: "alias", User: "user"}
 	if err := LinkStorage("~bus", "https://storage", account); err != nil {
 		t.Fatalf("expected link success, got %v", err)
@@ -248,31 +256,38 @@ func TestStorageAndRuntimeFacade(t *testing.T) {
 		t.Fatalf("expected endpoint validation error, got %v", err)
 	}
 
-	restoreTlonFn = func(patp string) error {
-		if !strings.HasPrefix(patp, "~") {
-			return errors.New("bad patp")
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.restoreTlonFn = func(patp string) error {
+			if !strings.HasPrefix(patp, "~") {
+				return errors.New("bad patp")
+			}
+			return nil
 		}
-		return nil
-	}
+	})
 	if err := RestoreTlon("~bus"); err != nil {
 		t.Fatalf("expected restore success, got %v", err)
 	}
 
-	backupTlonFn = func(patp string) error {
-		if patp == "~zod" {
-			return errors.New("backup failed")
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.backupTlonFn = func(patp string) error {
+			if patp == "~zod" {
+				return errors.New("backup failed")
+			}
+			return nil
 		}
-		return nil
-	}
+	})
 	err := BackupTlon("~zod")
 	if err == nil || !strings.Contains(err.Error(), "backup tlon for ~zod") {
 		t.Fatalf("expected wrapped backup error, got %v", err)
 	}
 }
+
 func TestClearLusCodeUsesPatpValidation(t *testing.T) {
 	t.Cleanup(resetClickSeams)
 	called := false
-	clearLusCodeFn = func(string) { called = true }
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.clearLusCodeFn = func(string) { called = true }
+	})
 
 	ClearLusCode("  ")
 	if called {
@@ -288,11 +303,13 @@ func TestSendNotificationForwardsPayload(t *testing.T) {
 	t.Cleanup(resetClickSeams)
 	var gotPatp string
 	var gotNotification structs.HarkNotification
-	sendNotificationFn = func(patp string, n structs.HarkNotification) error {
-		gotPatp = patp
-		gotNotification = n
-		return nil
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.sendNotificationFn = func(patp string, n structs.HarkNotification) error {
+			gotPatp = patp
+			gotNotification = n
+			return nil
+		}
+	})
 
 	notification := structs.HarkNotification{
 		Type:             "startram-reminder",
@@ -313,10 +330,12 @@ func TestPackAndRuntimeWrappers(t *testing.T) {
 	}
 
 	var gotPatp string
-	sendPackFn = func(patp string) error {
-		gotPatp = patp
-		return nil
-	}
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.sendPackFn = func(patp string) error {
+			gotPatp = patp
+			return nil
+		}
+	})
 	if err := SendPack("~nov"); err != nil {
 		t.Fatalf("expected SendPack success: %v", err)
 	}
@@ -324,17 +343,23 @@ func TestPackAndRuntimeWrappers(t *testing.T) {
 		t.Fatalf("unexpected SendPack patp: %s", gotPatp)
 	}
 
-	sendPackFn = func(string) error { return errors.New("pack failed") }
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.sendPackFn = func(string) error { return errors.New("pack failed") }
+	})
 	err := SendPack("~zod")
 	if err == nil || !strings.Contains(err.Error(), "send pack for ~zod") {
 		t.Fatalf("expected wrapped SendPack error, got %v", err)
 	}
 
-	restoreTlonFn = func(string) error { return fmt.Errorf("restore failed") }
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.restoreTlonFn = func(string) error { return fmt.Errorf("restore failed") }
+	})
 	if err := RestoreTlon("~zod"); err == nil || !strings.Contains(err.Error(), "restore tlon for ~zod") {
 		t.Fatalf("expected wrapped restore error, got %v", err)
 	}
-	backupTlonFn = func(string) error { return errors.New("backup failed") }
+	withClickRuntime(func(runtime *clickRuntime) {
+		runtime.backupTlonFn = func(string) error { return errors.New("backup failed") }
+	})
 	if err := BackupTlon("~zod"); err == nil || !strings.Contains(err.Error(), "backup tlon for ~zod") {
 		t.Fatalf("expected wrapped backup error, got %v", err)
 	}

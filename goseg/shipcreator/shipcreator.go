@@ -43,7 +43,7 @@ func (configShipPort) SaveShipConfig(patp string, conf structs.UrbitDocker) erro
 }
 
 func (configShipPort) SavePiers(piers []string) error {
-	return config.UpdateConfTyped(config.WithPiers(piers))
+	return config.UpdateConfigTyped(config.WithPiers(piers))
 }
 
 type Service struct {
@@ -67,7 +67,7 @@ func (s *Service) CreateUrbitConfig(patp, customDrive string) error {
 	// get unused http and ames ports
 	httpPort, amesPort := s.getOpenUrbitPorts()
 	// get default urbit config
-	conf := defaults.UrbitConfig
+	conf := defaults.DefaultUrbitConfig()
 	// replace values
 	conf.PierName = patp
 	conf.HTTPPort = httpPort

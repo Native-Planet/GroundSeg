@@ -1,0 +1,53 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/contracts/startram_contracts.go` defines the canonical StarTram error message as `startramAPIConnectionErrorMessage = \"Unable to connect to API server\"` inside contract metadata.",
+        "`goseg/startram/errors.go` redefines the same literal as exported `APIConnectionErrorMessage = \"Unable to connect to API server\"` and separately uses it when wrapping errors.",
+        "`APIConnectionErrorContract()` already exposes the contract descriptor, but `startram` consumers can still depend on `APIConnectionErrorMessage` instead of that descriptor-derived contract message.",
+        "The two values are in different packages (`protocol/contracts` and `startram`) with no shared source-of-truth linkage, creating implicit duplication drift risk."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "dup_cross_module_error_message_source",
+      "summary": "StarTram API-connection error message text is duplicated across contract and module packages, creating a brittle coupling point.",
+      "related_files": [
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "`startram_contracts.go` declares `startramAPIConnectionErrorMessage = \"Unable to connect to API server\"` for the contract descriptor.",
+        "`errors.go` separately exports `APIConnectionErrorMessage = \"Unable to connect to API server\"` in `startram`.",
+        "`wrapAPIConnectionError` builds masked error text from the local constant while contract metadata is sourced independently."
+      ],
+      "suggestion": "Define a single source of truth for this message in the contract layer and have `startram` consume it directly (e.g., via the exported descriptor/message accessor), then remove the duplicate literal in `startram/errors.go` to prevent contract-message drift.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_error_message_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Single-source-of-truth mismatch between contract definitions and transport/consumer error wrapping."
+    ],
+    "likely_symptoms": [
+      "dup_cross_module_error_source",
+      "error message drift between wrapped errors and contract metadata"
+    ],
+    "possible_false_positives": [
+      "If `APIConnectionErrorMessage` is an intentional public API for consumers that must be independent from contract metadata, duplicate definition may be intentional."
+    ]
+  }
+}

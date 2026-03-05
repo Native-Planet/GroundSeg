@@ -53,7 +53,7 @@ func TestSetupBeginUpdatesProfileStage(t *testing.T) {
 	resetSetupSeamsForTest(t)
 
 	var patch config.ConfPatch
-	updateConfTypedForSetup = func(opts ...config.ConfUpdateOption) error {
+	updateConfTypedForSetup = func(opts ...config.ConfigUpdateOption) error {
 		if len(opts) != 1 {
 			t.Fatalf("expected 1 update option, got %d", len(opts))
 		}
@@ -80,7 +80,7 @@ func TestSetupPasswordHashesAndPersistsPassword(t *testing.T) {
 	}
 
 	var patch config.ConfPatch
-	updateConfTypedForSetup = func(opts ...config.ConfUpdateOption) error {
+	updateConfTypedForSetup = func(opts ...config.ConfigUpdateOption) error {
 		for _, opt := range opts {
 			opt(&patch)
 		}
@@ -117,7 +117,7 @@ func TestSetupStartramRunsRegistrationAndAuthFlow(t *testing.T) {
 		}
 		return nil
 	}
-	updateConfTypedForSetup = func(opts ...config.ConfUpdateOption) error {
+	updateConfTypedForSetup = func(opts ...config.ConfigUpdateOption) error {
 		steps = append(steps, "update")
 		patch := &config.ConfPatch{}
 		for _, opt := range opts {
@@ -154,7 +154,7 @@ func TestSetupSkipCompletesAndAddsAuth(t *testing.T) {
 	resetSetupSeamsForTest(t)
 
 	updated := false
-	updateConfTypedForSetup = func(opts ...config.ConfUpdateOption) error {
+	updateConfTypedForSetup = func(opts ...config.ConfigUpdateOption) error {
 		patch := &config.ConfPatch{}
 		for _, opt := range opts {
 			opt(patch)

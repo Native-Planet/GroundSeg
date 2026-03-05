@@ -96,7 +96,7 @@ func ExecuteCommandWithResponse(
 	}
 	parsed, success, err := FilterResponse(responseToken, response)
 	if err != nil {
-		return response, "", false, fmt.Errorf("%s failed to parse response: %v", operation, err)
+		return response, "", false, fmt.Errorf("%s failed to parse response: %w", operation, err)
 	}
 	return response, parsed, success, nil
 }
@@ -134,7 +134,7 @@ func executeClickCommand(
 	clearLusCode func(string),
 ) (string, error) {
 	if err := CreateHoon(patp, file, hoon); err != nil {
-		return "", fmt.Errorf("%s failed to create hoon: %v", operation, err)
+		return "", fmt.Errorf("%s failed to create hoon: %w", operation, err)
 	}
 	if clearLusCode != nil {
 		clearLusCode(patp)
@@ -143,7 +143,7 @@ func executeClickCommand(
 
 	response, err := ClickExec(patp, file, sourcePath)
 	if err != nil {
-		return "", fmt.Errorf("%s failed to execute hoon: %v", operation, err)
+		return "", fmt.Errorf("%s failed to execute hoon: %w", operation, err)
 	}
 	return response, nil
 }

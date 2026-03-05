@@ -37,7 +37,7 @@ func TestResolveAPPasswordFallbackShape(t *testing.T) {
 func TestMakeConfigContainsNetworkAndCredentials(t *testing.T) {
 	cfg, err := buildHostapdConfig("wlan0", "GroundSegTest", "strong-passphrase")
 	if err != nil {
-		t.Fatalf("makeConfig returned error: %v", err)
+		t.Fatalf("buildHostapdConfig returned error: %v", err)
 	}
 	if !strings.Contains(cfg, "interface=wlan0") {
 		t.Fatalf("expected interface stanza in config: %q", cfg)
@@ -81,7 +81,7 @@ func TestMakeConfigRejectsInvalidInputs(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := buildHostapdConfig(tc.wlan, tc.ssid, tc.password); err == nil {
-				t.Fatal("expected makeConfig validation error")
+				t.Fatal("expected buildHostapdConfig validation error")
 			}
 		})
 	}
@@ -125,6 +125,9 @@ func TestValidateIP(t *testing.T) {
 	if validateIP("bad-ip") {
 		t.Fatal("expected invalid IP to fail validation")
 	}
+	if validateIP("2001:db8::1") {
+		t.Fatal("expected IPv6 to fail IPv4-only validation")
+	}
 }
 
 func TestHasInterface(t *testing.T) {
@@ -139,7 +142,7 @@ func TestHasInterface(t *testing.T) {
 func TestCheckParametersValidationPaths(t *testing.T) {
 	resetParameterGlobalsForTest(t)
 
-	makeRuntime := func() AccessPointRuntime {
+	makeValidRuntime := func() AccessPointRuntime {
 		rt := accessPointRuntime()
 		rt.NetInterfacesFn = func() ([]net.Interface, error) {
 			return []net.Interface{
@@ -147,47 +150,64 @@ func TestCheckParametersValidationPaths(t *testing.T) {
 				{Name: "eth0"},
 			}, nil
 		}
+		rt.Wlan = "wlan0"
+		rt.Inet = "eth0"
+		rt.IP = "192.168.45.1"
+		rt.SSID = "GroundSeg"
+		rt.Password = "supersecret"
 		return rt
 	}
 
-	rt := makeRuntime()
-	rt.Wlan = "wlan0"
-	rt.Inet = "eth0"
-	rt.IP = "192.168.45.1"
-	rt.SSID = "GroundSeg"
-	rt.Password = "supersecret"
+	t.Run("valid runtime", func(t *testing.T) {
+		if err := checkParametersWithContext(makeValidRuntime()); err != nil {
+			t.Fatalf("expected valid parameters, got error: %v", err)
+		}
+	})
 
-	if err := checkParametersWithContext(rt); err != nil {
-		t.Fatalf("expected valid parameters, got error: %v", err)
+	testCases := []struct {
+		name   string
+		mutate func(*AccessPointRuntime)
+	}{
+		{
+			name: "missing wlan",
+			mutate: func(runtime *AccessPointRuntime) {
+				runtime.Wlan = "missing"
+			},
+		},
+		{
+			name: "missing inet",
+			mutate: func(runtime *AccessPointRuntime) {
+				runtime.Inet = "missing"
+			},
+		},
+		{
+			name: "invalid ip",
+			mutate: func(runtime *AccessPointRuntime) {
+				runtime.IP = "not-an-ip"
+			},
+		},
+		{
+			name: "empty ssid",
+			mutate: func(runtime *AccessPointRuntime) {
+				runtime.SSID = ""
+			},
+		},
+		{
+			name: "empty password",
+			mutate: func(runtime *AccessPointRuntime) {
+				runtime.Password = ""
+			},
+		},
 	}
-
-	rt.Wlan = "missing"
-	if err := checkParametersWithContext(rt); err == nil {
-		t.Fatal("expected missing wlan validation error")
-	}
-	rt.Wlan = "wlan0"
-
-	rt.Inet = "missing"
-	if err := checkParametersWithContext(rt); err == nil {
-		t.Fatal("expected missing inet validation error")
-	}
-	rt.Inet = "eth0"
-
-	rt.IP = "not-an-ip"
-	if err := checkParametersWithContext(rt); err == nil {
-		t.Fatal("expected invalid ip validation error")
-	}
-	rt.IP = "192.168.45.1"
-
-	rt.SSID = ""
-	if err := checkParametersWithContext(rt); err == nil {
-		t.Fatal("expected empty ssid validation error")
-	}
-	rt.SSID = "GroundSeg"
-
-	rt.Password = ""
-	if err := checkParametersWithContext(rt); err == nil {
-		t.Fatal("expected empty password validation error")
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			rt := makeValidRuntime()
+			tc.mutate(&rt)
+			if err := checkParametersWithContext(rt); err == nil {
+				t.Fatalf("expected validation error for %s", tc.name)
+			}
+		})
 	}
 }
 

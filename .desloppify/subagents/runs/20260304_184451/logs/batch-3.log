@@ -1,0 +1,484 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_184451/results/batch-3.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Governance & Contracts
+Batch dimensions: package_organization
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+9a. For package_organization, ground scoring in objective structure signals from `holistic_context.structure` (root_files fan_in/fan_out roles, directory_profiles, coupling_matrix). Prefer thresholded evidence (for example: fan_in < 5 for root stragglers, import-affinity > 60%, directories > 10 files with mixed concerns).
+9b. Suggestions must include a staged reorg plan (target folders, move order, and import-update/validation commands).
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 78.6
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "The packet structure data shows `goseg/protocol/contracts/` at 11 files, crossing the >10-file flat-directory threshold; in this batch those files mix protocol action contracts (`protocol_contracts.go`) and StarTram-specific contracts (`startram_contracts.go`) under one folder.",
+        "`README.md` routes governance to both `goseg/protocol/contracts/GOVERNANCE.md` and `goseg/startram/GOVERNANCE.md`, while StarTram contract identifiers/messages are physically defined in `goseg/protocol/contracts/startram_contracts.go`, splitting a single ownership concept across two package locations.",
+        "Action vocabulary is split across `goseg/protocol/actionids/actionids.go` (raw tokens), `goseg/protocol/contracts/protocol_contracts.go` (typed re-exposure + contract IDs), and `goseg/protocol/conformance/fixtures_test.go` (validates via `protocol/actions` symbols), increasing navigation hops for one change boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "contracts_family_mixed_domain_placement",
+      "summary": "Protocol and StarTram contract families are colocated in one flat contracts package, obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`goseg/protocol/contracts/protocol_contracts.go` defines websocket protocol action contracts and governance owners like `uploadsvc`/`system/wifi`.",
+        "`goseg/protocol/contracts/startram_contracts.go` defines StarTram error contracts (`APIConnectionError`) in the same package despite StarTram having its own top-level domain package and governance doc reference in `README.md`.",
+        "Packet directory profile marks `goseg/protocol/contracts/` as 11 files, indicating flat-folder overload where mixed contract families now share one location."
+      ],
+      "suggestion": "Staged reorg plan: (1) create target folders `goseg/protocol/contracts/protocol/` and `goseg/protocol/contracts/startram/` plus a small root `registry.go` facade in `goseg/protocol/contracts`; (2) move `protocol_contracts.go` first into `.../protocol/`, update internal references, then move `startram_contracts.go` into `.../startram/`; (3) keep exported access through root facade functions to avoid immediate downstream churn; (4) run import/validation commands: `cd goseg && gofmt -w protocol/contracts && go test ./protocol/contracts/... ./protocol/conformance/... ./startram/...` and finally `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_boundary_fragmentation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "action_token_source_fragmentation",
+      "summary": "Canonical action tokens are split across micro-packages, creating a fragmented change boundary for protocol contract updates.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/actionids/actionids.go` contains only string constants (namespace/actions), but `goseg/protocol/contracts/protocol_contracts.go` immediately re-wraps those constants into contract-facing types and IDs.",
+        "`goseg/protocol/conformance/fixtures_test.go` verifies fixture coverage via `protocol/actions` constants, meaning one protocol action change spans at least three locations/packages to confirm full consistency.",
+        "This distribution makes ownership/navigation unclear for contributors trying to modify action naming or compatibility metadata in one pass."
+      ],
+      "suggestion": "Staged reorg plan: (1) establish a single target vocabulary package, e.g. `goseg/protocol/actionspec/`, that owns namespace/action tokens plus typed aliases currently split between `actionids` and contracts; (2) move constants from `actionids` first and add temporary type aliases/shims in old package to keep callers compiling; (3) update `protocol_contracts.go` and conformance fixtures to consume `actionspec` directly, then remove shim usage; (4) run import/validation commands: `cd goseg && gofmt -w protocol/actionids protocol/contracts protocol/conformance && go test ./protocol/actions/... ./protocol/contracts/... ./protocol/conformance/... ./uploadsvc/...` followed by `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_boundary_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance artifacts are organized by implementation history rather than by stable domain ownership boundaries.",
+      "Canonical protocol vocabulary lacks a single authoritative package boundary."
+    ],
+    "likely_symptoms": [
+      "contracts_family_mixed_domain_placement",
+      "action_token_source_fragmentation"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cba2a-cd68-71a3-9c49-136275991198
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Governance & Contracts
+Batch dimensions: package_organization
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+9a. For package_organization, ground scoring in objective structure signals from `holistic_context.structure` (root_files fan_in/fan_out roles, directory_profiles, coupling_matrix). Prefer thresholded evidence (for example: fan_in < 5 for root stragglers, import-affinity > 60%, directories > 10 files with mixed concerns).
+9b. Suggestions must include a staged reorg plan (target folders, move order, and import-update/validation commands).
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+Reviewing the blind packet and the six assigned files now, then I’ll produce a JSON-only batch assessment scoped strictly to `package_organization`.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' README.md && echo '---' && sed -n '1,260p' goseg/protocol/actionids/actionids.go && echo '---' && sed -n '1,260p' goseg/protocol/conformance/fixtures_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/contracts/family_specs_test.go && echo '---' && sed -n '1,320p' goseg/protocol/contracts/protocol_contracts.go && echo '---' && sed -n '1,320p' goseg/protocol/contracts/startram_contracts.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg --files .desloppify/review_packet_blind.json README.md goseg/protocol/actionids/actionids.go goseg/protocol/conformance/fixtures_test.go goseg/protocol/contracts/family_specs_test.go goseg/protocol/contracts/protocol_contracts.go goseg/protocol/contracts/startram_contracts.go && echo '---PACKET---' && cat .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+ succeeded in 52ms:
+package contracts
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestBuildContractFamilyEntriesFromSpecs(t *testing.T) {
+	specs := []contractFamilyEntrySpec{
+		{
+			ID:          UploadActionOpenEndpoint,
+			Namespace:   ActionNamespaceUpload,
+			Action:      ActionUploadOpenEndpoint,
+			Name:        "upload open endpoint",
+			Description: "open upload endpoint contract",
+			Message:     "upload open endpoint message",
+			Governance: contractGovernanceMetadata{
+				OwnerModule:  "uploadsvc",
+				Stability:    CompatibilityBackwardSafe,
+				SinceVersion: contractMetadataFor(UploadActionOpenEndpoint).IntroducedIn,
+ succeeded in 52ms:
+Total output lines: 6141
+
+goseg/protocol/contracts/startram_contracts.go
+goseg/protocol/contracts/protocol_contracts.go
+goseg/protocol/contracts/family_specs_test.go
+goseg/protocol/conformance/fixtures_test.go
+goseg/protocol/actionids/actionids.go
+README.md
+.desloppify/review_packet_blind.json
+---PACKET---
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "abstraction_fitness",
+    "design_coherence",
+    "package_organization",
+    "naming_quality"
+  ],
+codex
+I have the core file contents; next I’m extracting the packet’s `holistic_context.structure` signals (fan-in/out, directory profiles, coupling) so the score is grounded in the required objective thresholds.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && jq '.holistic_context.structure' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+{
+  "directory_profiles": {
+    "goseg/accesspoint/": {
+      "file_count": 11,
+      "files": [
+        "accesspoint.go",
+        "accesspoint_entrypoint_test.go",
+        "accesspoint_test.go",
+        "config.go",
+        "config_test.go",
+        "lifecycle_coordinator.go",
+        "lifecycle_coordinator_test.go",
+        "parameters.go",
+        "parameters_test.go",
+        "router.go",
+        "router_test.go"
+      ],
+      "total_loc": 2762,
+      "avg_fan_in": 0.0,
+      "avg_fan_out": 0.0,
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && jq '.holistic_context.structure | keys' .desloppify/review_packet_blind.json && echo '---' && jq '.holistic_context.structure.root_files // {} | to_entries[:20]' .desloppify/review_packet_blind.json && echo '---' && jq '.holistic_context.structure.coupling_matrix // {} | to_entries[:40]' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+[
+  "directory_profiles"
+]
+---
+[]
+---
+[]
+codex
+I found that the packet only exposes `directory_profiles` (no root fan-in/out or coupling matrix), so I’m grounding this batch on objective folder-shape signals and cross-file placement mismatches visible in the assigned files. I’ll pull exact line evidence next.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/protocol/actionids/actionids.go && echo '---' && nl -ba goseg/protocol/contracts/protocol_contracts.go && echo '---' && nl -ba goseg/protocol/contracts/startram_contracts.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/protocol/conformance/fixtures_test.go && echo '---' && nl -ba goseg/protocol/contracts/family_specs_test.go && echo '---' && nl -ba README.md | sed -n '1,220p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package actionids
+     2	
+     3	const (
+     4		NamespaceUpload = "upload"
+     5		NamespaceC2C    = "c2c"
+     6	)
+     7	
+     8	const (
+     9		UploadOpenEndpoint = "open-endpoint"
+    10		UploadReset        = "reset"
+    11		C2CConnect         = "connect"
+    12	)
+---
+     1	package contracts
+     2	
+     3	import (
+     4		"fmt"
+     5	
+     6		"groundseg/protocol/actionids"
+     7	)
+ succeeded in 51ms:
+     1	package conformance
+     2	
+     3	import (
+     4		"testing"
+     5	
+     6		"groundseg/protocol/actions"
+     7	)
+     8	
+     9	func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+    10		fixtures := ActionContractFixtures()
+    11		if len(fixtures) == 0 {
+    12			t.Fatal("expected at least one action contract fixture")
+    13		}
+    14	
+    15		foundC2C := false
+    16		for _, fixture := range fixtures {
+    17			if err := ValidateActionContractFixture(fixture); err != nil {
+    18				t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+    19			}
+    20			if fixture.Namespace == actions.NamespaceC2C && fixture.Action == actions.ActionC2CConnect {
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 78.6
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "The packet structure data shows `goseg/protocol/contracts/` at 11 files, crossing the >10-file flat-directory threshold; in this batch those files mix protocol action contracts (`protocol_contracts.go`) and StarTram-specific contracts (`startram_contracts.go`) under one folder.",
+        "`README.md` routes governance to both `goseg/protocol/contracts/GOVERNANCE.md` and `goseg/startram/GOVERNANCE.md`, while StarTram contract identifiers/messages are physically defined in `goseg/protocol/contracts/startram_contracts.go`, splitting a single ownership concept across two package locations.",
+        "Action vocabulary is split across `goseg/protocol/actionids/actionids.go` (raw tokens), `goseg/protocol/contracts/protocol_contracts.go` (typed re-exposure + contract IDs), and `goseg/protocol/conformance/fixtures_test.go` (validates via `protocol/actions` symbols), increasing navigation hops for one change boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "contracts_family_mixed_domain_placement",
+      "summary": "Protocol and StarTram contract families are colocated in one flat contracts package, obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`goseg/protocol/contracts/protocol_contracts.go` defines websocket protocol action contracts and governance owners like `uploadsvc`/`system/wifi`.",
+        "`goseg/protocol/contracts/startram_contracts.go` defines StarTram error contracts (`APIConnectionError`) in the same package despite StarTram having its own top-level domain package and governance doc reference in `README.md`.",
+        "Packet directory profile marks `goseg/protocol/contracts/` as 11 files, indicating flat-folder overload where mixed contract families now share one location."
+      ],
+      "suggestion": "Staged reorg plan: (1) create target folders `goseg/protocol/contracts/protocol/` and `goseg/protocol/contracts/startram/` plus a small root `registry.go` facade in `goseg/protocol/contracts`; (2) move `protocol_contracts.go` first into `.../protocol/`, update internal references, then move `startram_contracts.go` into `.../startram/`; (3) keep exported access through root facade functions to avoid immediate downstream churn; (4) run import/validation commands: `cd goseg && gofmt -w protocol/contracts && go test ./protocol/contracts/... ./protocol/conformance/... ./startram/...` and finally `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_boundary_fragmentation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "action_token_source_fragmentation",
+      "summary": "Canonical action tokens are split across micro-packages, creating a fragmented change boundary for protocol contract updates.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/actionids/actionids.go` contains only string constants (namespace/actions), but `goseg/protocol/contracts/protocol_contracts.go` immediately re-wraps those constants into contract-facing types and IDs.",
+        "`goseg/protocol/conformance/fixtures_test.go` verifies fixture coverage via `protocol/actions` constants, meaning one protocol action change spans at least three locations/packages to confirm full consistency.",
+        "This distribution makes ownership/navigation unclear for contributors trying to modify action naming or compatibility metadata in one pass."
+      ],
+      "suggestion": "Staged reorg plan: (1) establish a single target vocabulary package, e.g. `goseg/protocol/actionspec/`, that owns namespace/action tokens plus typed aliases currently split between `actionids` and contracts; (2) move constants from `actionids` first and add temporary type aliases/shims in old package to keep callers compiling; (3) update `protocol_contracts.go` and conformance fixtures to consume `actionspec` directly, then remove shim usage; (4) run import/validation commands: `cd goseg && gofmt -w protocol/actionids protocol/contracts protocol/conformance && go test ./protocol/actions/... ./protocol/contracts/... ./protocol/conformance/... ./uploadsvc/...` followed by `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_boundary_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance artifacts are organized by implementation history rather than by stable domain ownership boundaries.",
+      "Canonical protocol vocabulary lacks a single authoritative package boundary."
+    ],
+    "likely_symptoms": [
+      "contracts_family_mixed_domain_placement",
+      "action_token_source_fragmentation"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+44,608
+

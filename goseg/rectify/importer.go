@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func ImportShipTransitionHandlerWithContextAndRuntime(ctx context.Context, runtime broadcast.BroadcastStore, eventRuntime ...events.EventRuntime) error {
+func ImportShipTransitionHandlerWithContextAndRuntime(ctx context.Context, runtime *broadcast.BroadcastStateRuntime, eventRuntime ...events.EventRuntime) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}

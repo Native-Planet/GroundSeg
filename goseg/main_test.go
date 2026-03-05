@@ -21,22 +21,25 @@ import (
 type c2cRuntimeOption func(*c2cRuntime)
 
 func c2cTestRuntime(overrides ...c2cRuntimeOption) c2cRuntime {
-	runtime := defaultC2cRuntime()
+	runtime := defaultC2CRuntime()
 	for _, apply := range overrides {
+		if apply == nil {
+			continue
+		}
 		apply(&runtime)
 	}
 	return runtime
 }
 
-func withC2cState(
+func withC2CState(
 	connCheck func() bool,
 	settings func() config.ConnectivitySettings,
 	isNPBoxFn func() bool,
 	hasDeviceFn func() bool,
 	wifiInfoFn func() (bool, error),
-	isC2cModeFn func() error,
-	setC2cModeFn func(bool) error,
-	startKillSwitchFn func(context.Context, func() config.ConnectivitySettings),
+	isC2CModeFn func() error,
+	setC2CModeFn func(bool) error,
+	startKillSwitchFn func(context.Context, func() config.ConnectivitySettings, func() error),
 ) c2cRuntimeOption {
 	return func(runtime *c2cRuntime) {
 		runtime.connectivity = c2cConnectivityRuntime{
@@ -49,9 +52,10 @@ func withC2cState(
 			wifiInfo:  wifiInfoFn,
 		}
 		runtime.mode = c2cModeRuntime{
-			isC2cMode:       isC2cModeFn,
-			setC2cMode:      setC2cModeFn,
+			isC2CMode:       isC2CModeFn,
+			setC2CMode:      setC2CModeFn,
 			startKillSwitch: startKillSwitchFn,
+			restartFn:       func() error { return nil },
 		}
 	}
 }
@@ -114,6 +118,26 @@ func TestFallbackToIndexServesIndexForMissingPath(t *testing.T) {
 	}
 }
 
+func TestParseStartupOptionsReturnsErrorOnInvalidPort(t *testing.T) {
+	if _, err := parseStartupOptions([]string{"--http-port=not-a-number"}); err == nil {
+		t.Fatal("expected invalid http port to error")
+	}
+
+	if _, err := parseStartupOptions([]string{"--ws-port=90000"}); err == nil {
+		t.Fatal("expected out-of-range websocket port to error")
+	}
+}
+
+func TestParseStartupOptionsParsesValidPortsAndDevMode(t *testing.T) {
+	opts, err := parseStartupOptions([]string{"dev", "--http-port=8080", "--ws-port=3001"})
+	if err != nil {
+		t.Fatalf("parseStartupOptions returned unexpected error: %v", err)
+	}
+	if !opts.devMode || opts.httpPort != 8080 || opts.websocketPort != 3001 {
+		t.Fatalf("unexpected parsed options: %#v", opts)
+	}
+}
+
 func TestConnCheckImmediateSuccess(t *testing.T) {
 	callCount := 0
 	if !connCheckWith(connectivityCheckRuntime{
@@ -160,16 +184,16 @@ func TestConnCheckTimeout(t *testing.T) {
 	}
 }
 
-func TestC2cCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
+func TestC2CCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
 	activated := false
 	setModeCalled := false
 	setModeValue := false
 	killStarted := make(chan struct{}, 1)
 
 	runtime := c2cTestRuntime(
-		withC2cState(
+		withC2CState(
 			func() bool { return false },
-			func() config.ConnectivitySettings { return config.ConnectivitySettings{C2cInterval: 42} },
+			func() config.ConnectivitySettings { return config.ConnectivitySettings{C2CInterval: 42} },
 			func() bool { return true },
 			func() bool { return true },
 			nil,
@@ -182,13 +206,13 @@ func TestC2cCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
 				setModeValue = enabled
 				return nil
 			},
-			func(_ context.Context, _ func() config.ConnectivitySettings) {
+			func(_ context.Context, _ func() config.ConnectivitySettings, _ func() error) {
 				killStarted <- struct{}{}
 			},
 		),
 	)
 
-	if err := C2cCheckWith(context.Background(), runtime); err != nil {
+	if err := C2CCheckWith(context.Background(), runtime); err != nil {
 		t.Fatalf("expected no error when enabling C2C mode, got %v", err)
 	}
 
@@ -205,10 +229,10 @@ func TestC2cCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
 	}
 }
 
-func TestC2cCheckSkipsWhenOnline(t *testing.T) {
+func TestC2CCheckSkipsWhenOnline(t *testing.T) {
 	activated := false
 	runtime := c2cTestRuntime(
-		withC2cState(
+		withC2CState(
 			func() bool { return true },
 			func() config.ConnectivitySettings { return config.ConnectivitySettings{} },
 			func() bool { return true },
@@ -219,17 +243,17 @@ func TestC2cCheckSkipsWhenOnline(t *testing.T) {
 				return nil
 			},
 			func(enabled bool) error { return nil },
-			func(_ context.Context, _ func() config.ConnectivitySettings) {
+			func(_ context.Context, _ func() config.ConnectivitySettings, _ func() error) {
 				t.Fatal("killSwitch should not be started when internet is available")
 			},
 		),
 	)
 
-	if err := C2cCheckWith(context.Background(), runtime); err != nil {
+	if err := C2CCheckWith(context.Background(), runtime); err != nil {
 		t.Fatalf("expected online checks to skip C2C mode with no error, got %v", err)
 	}
 	if activated {
-		t.Fatal("C2cCheck should not activate C2C mode when internet is available")
+		t.Fatal("C2CCheck should not activate C2C mode when internet is available")
 	}
 }
 
@@ -260,7 +284,7 @@ func TestBootstrapSubsystemsForwardsCallbacks(t *testing.T) {
 	const expectedPort = 61234
 	var gotPort int
 	gotServer := false
-	gotC2c := false
+	gotC2C := false
 	runtime := bootstrapRuntimeWith(
 		func(_ context.Context, opts startuporchestrator.StartupOptions) error {
 			if opts.HTTPPort != expectedPort {
@@ -269,24 +293,27 @@ func TestBootstrapSubsystemsForwardsCallbacks(t *testing.T) {
 			if opts.StartServer == nil {
 				t.Fatal("expected StartServer callback")
 			}
-			if opts.StartC2cCheck == nil {
-				t.Fatal("expected StartC2cCheck callback")
+			if opts.StartC2CCheck == nil {
+				t.Fatal("expected StartC2CCheck callback")
 			}
-			if err := opts.StartServer(context.Background(), opts.HTTPPort); err != nil {
+			if err := opts.StartServer(context.Background(), opts.HTTPPort, 3000); err != nil {
 				return err
 			}
-			if err := opts.StartC2cCheck(context.Background()); err != nil {
+			if err := opts.StartC2CCheck(context.Background()); err != nil {
 				return err
 			}
 			return nil
 		},
-		func(_ context.Context, httpPort int) error {
+		func(_ context.Context, httpPort int, websocketPort int) error {
 			gotPort = httpPort
+			if websocketPort != 3000 {
+				t.Fatalf("expected websocket port %d, got %d", 3000, websocketPort)
+			}
 			gotServer = true
 			return nil
 		},
 		func(context.Context) error {
-			gotC2c = true
+			gotC2C = true
 			return nil
 		},
 	)
@@ -300,8 +327,34 @@ func TestBootstrapSubsystemsForwardsCallbacks(t *testing.T) {
 	if gotPort != expectedPort {
 		t.Fatalf("expected server callback port %d, got %d", expectedPort, gotPort)
 	}
-	if !gotC2c {
+	if !gotC2C {
 		t.Fatal("expected c2c callback to be exercised")
+	}
+}
+
+func TestBootstrapSubsystemsForwardsStartupRuntime(t *testing.T) {
+	startupRuntime := startuporchestrator.StartupRuntime{}
+	startupRuntime.StartConfigEventLoopFn = func(context.Context) error { return nil }
+	gotStartupRuntime := false
+
+	runtime := bootstrapRuntimeWith(
+		func(_ context.Context, opts startuporchestrator.StartupOptions) error {
+			if opts.StartupRuntime.StartConfigEventLoopFn == nil {
+				t.Fatal("expected startup runtime to be forwarded into startup options")
+			}
+			gotStartupRuntime = true
+			return opts.StartupRuntime.StartConfigEventLoopFn(context.Background())
+		},
+		func(_ context.Context, _ int, _ int) error { return nil },
+		func(context.Context) error { return nil },
+		startupRuntime,
+	)
+
+	if err := runBootstrapSubsystems(context.Background(), appStartupOptions{}, runtime); err != nil {
+		t.Fatalf("bootstrapSubsystems returned error: %v", err)
+	}
+	if !gotStartupRuntime {
+		t.Fatal("expected startup runtime callback to be invoked")
 	}
 }
 
@@ -309,7 +362,7 @@ func TestBootstrapSubsystemsPropagatesBootstrapError(t *testing.T) {
 	expectedErr := errors.New("bootstrap failed")
 	runtime := bootstrapRuntimeWith(
 		func(context.Context, startuporchestrator.StartupOptions) error { return expectedErr },
-		func(context.Context, int) error { return nil },
+		func(context.Context, int, int) error { return nil },
 		func(context.Context) error { return nil },
 	)
 
@@ -337,7 +390,7 @@ func TestStartServerReturnsNilWhenServersExitNormally(t *testing.T) {
 		return nil
 	}
 
-	if err := runServer(context.Background(), 8123, runtime); err != nil {
+	if err := runServer(context.Background(), 8123, 3000, runtime); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 	if atomic.LoadInt64(&httpCalls) == 0 || atomic.LoadInt64(&wsCalls) == 0 {
@@ -363,7 +416,7 @@ func TestStartServerReturnsErrorWhenListenerFails(t *testing.T) {
 		return nil
 	}
 
-	err := runServer(context.Background(), 8124, runtime)
+	err := runServer(context.Background(), 8124, 3000, runtime)
 	if err == nil {
 		t.Fatal("expected startServer to return listener failure")
 	}
@@ -385,12 +438,35 @@ func TestStartServerReturnsUnexpectedErrorWhenOtherListenerShutsDownGracefully(t
 		return nil
 	}
 
-	err := runServer(context.Background(), 8126, runtime)
+	err := runServer(context.Background(), 8126, 3000, runtime)
 	if err == nil {
 		t.Fatal("expected listener failure to be surfaced")
 	}
 	if !strings.Contains(err.Error(), "unexpected listener failure") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestStartServerReturnsAllUnexpectedListenerErrors(t *testing.T) {
+	runtime := defaultServerRuntime()
+
+	runtime.listenAndServe = func(server *http.Server) error {
+		if server.Addr == ":3000" {
+			return errors.New("websocket listener failed")
+		}
+		return errors.New("http listener failed")
+	}
+	runtime.shutdown = func(_ context.Context, _ *http.Server) error {
+		return nil
+	}
+
+	err := runServer(context.Background(), 8127, 3000, runtime)
+	if err == nil {
+		t.Fatal("expected listener failures to be surfaced")
+	}
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "http listener failed") || !strings.Contains(errMsg, "websocket listener failed") {
+		t.Fatalf("expected both listener errors in joined result, got: %v", err)
 	}
 }
 
@@ -413,7 +489,7 @@ func TestStartServerStopsWhenContextIsDone(t *testing.T) {
 	done := make(chan error, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		done <- runServer(ctx, 8125, runtime)
+		done <- runServer(ctx, 8125, 3000, runtime)
 	}()
 
 	for i := 0; i < 2; i++ {

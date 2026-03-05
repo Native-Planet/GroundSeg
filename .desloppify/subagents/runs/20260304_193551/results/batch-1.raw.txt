@@ -1,0 +1,74 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 1,
+  "assessments": {
+    "package_organization": 78.4
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows `goseg/system/` has 36 files while disk behavior is already split into focused subpackages (`goseg/system/disk/` and `goseg/system/storage/`), yet assigned disk shim tests remain in root-level `system` package (`disk_health_test.go`, `disk_shims_test.go`, `disk_storage_test.go`).",
+        "Assigned `goseg/system/disk_shims_test.go` validates wrappers that delegate to `goseg/system/storage` and `goseg/system/disk` adapters, indicating cross-folder seam behavior is owned by root package tests instead of colocated package tests.",
+        "holistic_context.structure.directory_profiles shows `goseg/shipworkflow/` has 49 files; assigned `lifecycle.go` holds generic stop/poll/persist helpers while `doc.go` describes a broad multi-domain workflow package, signaling continued flattening inside an already overloaded directory."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "system_disk_tests_not_colocated_with_disk_packages",
+      "summary": "Disk seam tests are anchored in root `system` package instead of the disk/storage package boundaries they verify.",
+      "related_files": [
+        "goseg/system/disk_health_test.go",
+        "goseg/system/disk_shims_test.go",
+        "goseg/system/disk_storage_test.go",
+        "goseg/system/disk/adapter.go",
+        "goseg/system/storage/storage.go"
+      ],
+      "evidence": [
+        "`disk_shims_test.go` asserts behavior of root-level shim functions that immediately delegate to `system/storage` and `system/disk` concerns.",
+        "The directory profile for `goseg/system/` is large (36 files), while dedicated subdirectories already exist for disk adapters and storage implementations, so keeping seam tests in root increases boundary blur and navigation cost."
+      ],
+      "suggestion": "Staged reorg plan: 1) create `goseg/system/diskshim/` (or `goseg/system/diskbridge/`) for root-wrapper ownership and move `disk_shims_test.go` plus wrapper functions there; 2) move storage-focused tests (`disk_storage_test.go`) under `goseg/system/storage/` and adapter-focused tests (`disk_health_test.go` cases that are adapter-specific) under `goseg/system/disk/`; 3) keep only orchestration-level integration tests in `goseg/system/`; 4) run import updates with `go test ./goseg/system/... ./goseg/system/disk/... ./goseg/system/storage/...` and `go test ./...` to validate no package-cycle or API breakage.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "disk_boundary_flattening"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "shipworkflow_lifecycle_helpers_embedded_in_overloaded_package",
+      "summary": "Generic lifecycle helpers remain in a 49-file workflow package instead of a narrower lifecycle boundary.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go",
+        "goseg/shipworkflow/workflow.go",
+        "goseg/shipworkflow/newship.go"
+      ],
+      "evidence": [
+        "`lifecycle.go` contains reusable timeout/poll/persist primitives (`PollWithTimeout`, `PersistUrbitConfig`, `WaitForUrbitStop*`) that are not specific to one workflow branch.",
+        "The directory profile reports `goseg/shipworkflow/` at 49 files (23 production/26 test), which exceeds the mixed-concern threshold and increases discoverability friction when generic lifecycle code is kept in the same flat directory."
+      ],
+      "suggestion": "Staged reorg plan: 1) add `goseg/shipworkflow/lifecycle/` (or `goseg/shiplifecycle/`) and move `lifecycle.go` + `lifecycle_test.go` there; 2) expose a small API from that package and update callers in `shipworkflow` runtime files to import it explicitly; 3) leave `doc.go` in root `shipworkflow` focused on orchestration ownership only; 4) run `go test ./goseg/shipworkflow/...` then `go test ./...` to validate imports and ensure move does not create cycles.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "workflow_directory_overflattening"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Large root packages (`system`, `shipworkflow`) continue to accumulate seam-level and helper-level code after specialized subpackages already exist.",
+      "Boundary ownership is defined in code delegation but not reflected in test/code placement, so directory layout lags behind architecture intent."
+    ],
+    "likely_symptoms": [
+      "system_disk_tests_not_colocated_with_disk_packages",
+      "shipworkflow_lifecycle_helpers_embedded_in_overloaded_package"
+    ],
+    "possible_false_positives": []
+  }
+}

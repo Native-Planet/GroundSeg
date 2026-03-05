@@ -1,0 +1,126 @@
+{
+  "assessments": {
+    "ai_generated_debt": 81.3
+  },
+  "dimension_notes": {
+    "ai_generated_debt": {
+      "evidence": [
+        "All four package docs use a near-identical two-paragraph template: sentence 1 lists responsibilities, sentence 2 states what other package(s) own and then repeats 'this package owns ...'.",
+        "The wording pattern is formulaic across modules (e.g., '... owns ... only', '... owns ... orchestration and policy decisions', '... owns action validation and dispatch'), which lowers information density and suggests generated-style boilerplate."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Package docs are consistently structured but overly templated; they should add module-specific rationale/constraints instead of repeating the same ownership formula."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "ai_generated_debt",
+      "identifier": "templated_package_docs_boilerplate",
+      "summary": "Package doc comments follow a repeated generated-style template that restates ownership without module-specific operational context.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/startram/doc.go",
+        "goseg/system/doc.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "Each file has the same doc shape: broad capability list in paragraph 1, then dependency boundary statement in paragraph 2 ending with 'this package owns ...'.",
+        "The comments describe package boundaries at a generic level but omit concrete constraints/tradeoffs (for example, lifecycle invariants, failure modes, or migration status), making the text read as boilerplate rather than high-signal documentation."
+      ],
+      "suggestion": "Refactor package docs to a shared style guide that requires one non-boilerplate, module-specific section (e.g., key invariants, operational caveats, or migration boundary notes) and remove repeated ownership phrasing unless it captures a concrete boundary decision.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "doc_template_over_standardization"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 1,
+    "dimension_coverage": 1.0,
+    "evidence_density": 2.0,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 2.496,
+    "dimensions_with_findings": 1
+  },
+  "review_scope": {
+    "reviewed_files_count": 4,
+    "successful_batch_count": 1,
+    "full_sweep_included": false,
+    "total_files": 632,
+    "imported_dimensions": [
+      "ai_generated_debt"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/shipworkflow/doc.go",
+    "goseg/startram/doc.go",
+    "goseg/system/doc.go",
+    "goseg/uploadsvc/doc.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_215822",
+    "created_at": "2026-03-04T21:58:48+00:00",
+    "batch_count": 1,
+    "batch_indexes": [
+      1
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "7f9db2d58b170fc2940c059ea8486c6fc5473cb25584417a437ef928dff6314d"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "ai_generated_debt"
+    ],
+    "imported_dimensions": [
+      "ai_generated_debt"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

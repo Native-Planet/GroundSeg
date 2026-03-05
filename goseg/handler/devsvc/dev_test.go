@@ -59,7 +59,7 @@ func TestDevHandlerPrintMountsAndBackupTlon(t *testing.T) {
 
 	backupRoot := t.TempDir()
 	backupDirFn = func() string { return backupRoot }
-	confForDev = func() structs.SysConfig {
+	configForDev = func() structs.SysConfig {
 		return structs.SysConfig{Connectivity: structs.ConnectivityConfig{Piers: []string{"~zod"}}}
 	}
 	called := false
@@ -92,7 +92,7 @@ func TestDevHandlerRemoteBackupAndRestore(t *testing.T) {
 	patp := "~zod"
 	backupDirFn = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
 
-	confForDev = func() structs.SysConfig {
+	configForDev = func() structs.SysConfig {
 		return structs.SysConfig{Connectivity: structs.ConnectivityConfig{Piers: []string{patp}, RemoteBackupPassword: "pw"}}
 	}
 	uploadedPath := ""
@@ -127,7 +127,7 @@ func TestDevHandlerStartramReminderAndToggle(t *testing.T) {
 	t.Cleanup(resetDevSeams)
 	isDevFn = func() bool { return true }
 
-	confForDev = func() structs.SysConfig {
+	configForDev = func() structs.SysConfig {
 		conf := structs.SysConfig{
 			Connectivity: structs.ConnectivityConfig{
 				WgRegistered: true,
@@ -173,7 +173,7 @@ func TestDevHandlerStartramReminderAndToggle(t *testing.T) {
 		t.Fatalf("expected only opted-in ship to be notified, got %s", notified)
 	}
 
-	confForDev = func() structs.SysConfig {
+	configForDev = func() structs.SysConfig {
 		return structs.SysConfig{Connectivity: structs.ConnectivityConfig{WgRegistered: false}}
 	}
 	if err := DevHandler(devMessage(t, "startram-reminder")); err == nil {
@@ -181,7 +181,7 @@ func TestDevHandlerStartramReminderAndToggle(t *testing.T) {
 	}
 
 	updateCalled := false
-	updateConfTypedForDev = func(...config.ConfUpdateOption) error {
+	updateConfTypedForDev = func(...config.ConfigUpdateOption) error {
 		updateCalled = true
 		return nil
 	}

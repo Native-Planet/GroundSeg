@@ -1,0 +1,50 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 82.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Multiple Urbit transition handlers duplicate inline orchestration policy and operational side effects (status fetch, config persistence, cleanup/start sequencing) instead of expressing transitions through shared transition metadata.",
+        "The same transition flow shape appears across handlers while handling errors and restart/cleanup paths in separate copies, increasing regression risk when sequencing rules change."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_transition_side_effect_duplication",
+      "summary": "Extract and centralize repeated Urbit transition orchestration to avoid divergent policy/action implementations.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime_handlers.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "runTogglePowerTransition and runToggleNetworkTransition both combine business conditionals (boot/network state handling), config persistence, cleanup, and container restart decisions in monolithic functions.",
+        "Each transition path creates bespoke ad-hoc side-effect chains (e.g., persist → optional urbitCleanDelete → conditional StartContainer), which are then wrapped again by small builder functions, causing repeated branching patterns that are hard to keep consistent."
+      ],
+      "suggestion": "Introduce a transition executor abstraction (descriptor-driven) in urbit_operations_runtime.go and move each transition to a compact descriptor (precondition, config-update function, optional cleanup action, optional startup action). Have buildToggle* functions return descriptors, and a single executor apply validation, config mutation, cleanup/start behavior, and error wrapping consistently.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transition_policy_mixing"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Shared orchestration concerns are embedded directly into multiple transition handlers, creating repeated imperative side-effect logic"
+    ],
+    "likely_symptoms": [
+      "Inconsistent transition behavior as new actions are added",
+      "Harder to reason about error ordering and restart/cleanup consistency"
+    ],
+    "possible_false_positives": [
+      "Some duplication may be intentional to preserve nuanced per-transition behavior"
+    ]
+  }
+}

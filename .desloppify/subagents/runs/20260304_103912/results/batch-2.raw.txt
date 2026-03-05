@@ -1,0 +1,96 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 82.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple subsystems consume a shared mutable `DefaultBroadcastStateRuntime()` singleton instead of injecting explicit runtime state (`goseg/broadcast/state.go`, `goseg/rectify/rectify.go`, `goseg/routines/pack.go`, `goseg/shipworkflow/urbit_operations_runtime.go`).",
+        "`k`ill-switch flow in `main.go` calls `exec.Command(\"reboot\")` directly, bypassing a runtime seam used elsewhere and forcing a concrete side-effect through command execution.",
+        "CLI parsing in `parseStartupOptions` mutates package globals (`HttpPort`, `WebsocketPort`, `DevMode`) instead of returning a pure config value (`goseg/main.go`, `goseg/main_test.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 74.0,
+        "interface_honesty": 68.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "broadcast_singleton_state_abstraction",
+      "summary": "Ambient broadcast state singleton is shared across unrelated modules, reducing modularity and test isolation",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/routines/pack.go"
+      ],
+      "evidence": [
+        "`state.go` defines a package-level `defaultBroadcastStateRuntime` and `DefaultBroadcastStateRuntime()` returns that global pointer.",
+        "Production and runtime code in multiple packages repeatedly call `DefaultBroadcastStateRuntime()` directly (rectify, shipworkflow, routines), creating implicit coupling to process-wide mutable state.",
+        "Tests also read/write this default runtime, indicating shared state can leak across test boundaries."
+      ],
+      "suggestion": "Stop using the global singleton as the primary runtime contract: introduce explicit runtime injection through constructor params for all broadcast consumers, keep `DefaultBroadcastStateRuntime` as a narrow test/bootstrap helper only, and provide a resettable factory for test isolation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_state_singleton_leak"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "c2c_reboot_command_hardcoded",
+      "summary": "C2C kill-switch reboot path hardcodes process execution and cannot be abstracted/replaced",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`killSwitchWithMode` executes `exec.Command(\"reboot\")` directly instead of using an injected system-control seam.",
+        "Neighboring control flows in this batch consistently pass dependencies via runtime structs (`c2cRuntime`, wifi service wrappers), so this call is an outlier that escapes seam-based design."
+      ],
+      "suggestion": "Add a restart command/policy callback into the C2C runtime struct and call it from `killSwitchWithMode`; default it to reboot in production and inject a no-op/recording implementation in tests/CI to avoid side effects.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "hardcoded_side_effects"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "startup_cli_globals_mutated",
+      "summary": "Startup option parsing mutates package globals, creating hidden mutable dependencies",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`parseStartupOptions` writes parsed values into globals (`DevMode`, `HttpPort`, `WebsocketPort`) rather than returning immutable config.",
+        "Those globals are then observed later by startup/bootstrap behavior, so callers cannot safely reuse parsing in alternative contexts without side effects."
+      ],
+      "suggestion": "Make startup option parsing pure: parse into a dedicated options struct only, keep globals read-only defaults, and pass parsed values explicitly through bootstrap/runtime constructors.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "module",
+      "root_cause_cluster": "global_state_singleton_leak"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Global mutable singletons used as implicit cross-module state holders",
+      "Hardcoded operational side effects without seam injection",
+      "Configuration parsing with side effects instead of explicit dependency propagation"
+    ],
+    "likely_symptoms": [
+      "broadcast_singleton_state_abstraction",
+      "c2c_reboot_command_hardcoded",
+      "startup_cli_globals_mutated"
+    ],
+    "possible_false_positives": []
+  }
+}

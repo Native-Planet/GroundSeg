@@ -1,0 +1,533 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_220818/results/batch-2.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/familycatalog/catalog.go
+- goseg/uploadsvc/actions_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/contracts/conformance/fixtures_test.go` imports `groundseg/uploadsvc` and validates upload parser behavior from inside the contracts package test suite, creating a reverse dependency from contract-governance tests to one concrete consumer module.",
+        "`README.md` defines one combined backend gate (`go test ./protocol/contracts/... ./uploadsvc/...`) with protocol/contracts maintainers as owner, while enforcement logic is split across contract tests and uploadsvc tests, indicating blurred ownership boundaries rather than a single governance boundary.",
+        "`goseg/protocol/actionids/actionids.go`, `goseg/protocol/contracts/familycatalog/catalog.go`, and `goseg/protocol/contracts/family_specs_test.go` each carry overlapping action-contract declarations/strings, with test literals duplicated instead of deriving from one manifest."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_tests_reverse_dependency_on_uploadsvc",
+      "summary": "Contract-governance tests depend directly on `uploadsvc`, inverting the intended boundary where contracts should be consumer-agnostic.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`TestUploadParserActionsMatchConformanceBindings` in `fixtures_test.go` imports and calls `uploadsvc.SupportedUploadActions`, `uploadsvc.UploadActionContractByAction`, and `uploadsvc.ParseUploadAction`.",
+        "This places consumer behavior assertions inside the contracts package test layer rather than in consumer-owned conformance tests.",
+        "README backend gate ownership is assigned to protocol/contracts maintainers while also requiring `./uploadsvc/...`, reinforcing cross-module ownership coupling."
+      ],
+      "suggestion": "Move consumer conformance assertions into `uploadsvc` (or a dedicated integration-conformance package) and expose a small neutral contract fixture/assertion API from `protocol/contracts` so dependency direction remains contracts -> consumers (not consumers pulled into contract package tests).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_boundary_blur"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_source_of_truth_fragmented",
+      "summary": "Action contract governance is fragmented across multiple files with duplicated literals, increasing drift risk between docs, catalog, and tests.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/familycatalog/catalog.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`actionids.go` defines namespace/action/contract IDs; `catalog.go` defines names/descriptions/owners; `family_specs_test.go` redefines descriptor strings in test specs (`\"upload open endpoint\"`, `\"open upload endpoint contract\"`, `\"upload open endpoint message\"`).",
+        "The README quality-gate language references family-governance tests but there is no single declared manifest in these files that all tests and docs consume.",
+        "Manual duplication across IDs, descriptors, and test fixtures creates multi-point updates for one contract change."
+      ],
+      "suggestion": "Create one canonical contract manifest (ID, namespace/action, descriptor, governance metadata) and generate/derive action IDs, family catalog specs, and conformance fixtures from it; update tests to assert against generated/canonical data rather than inline literals.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_boundary_blur"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "owner_boundary_is_stringly_typed",
+      "summary": "Governance ownership uses unconstrained string values, so module-boundary contracts are not structurally enforced.",
+      "related_files": [
+        "goseg/protocol/contracts/familycatalog/catalog.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`catalog.go` sets `Owner` as raw strings (`\"system/wifi\"`, `\"uploadsvc\"`, `\"startram\"`) with no typed domain or compile-time registry in these reviewed files.",
+        "`family_specs_test.go` similarly uses free-form `OwnerModule: \"uploadsvc\"` in governance metadata fixtures.",
+        "README assigns owner responsibility for the contract gate, but the owner identity model in code is not normalized or validated against a maintained module registry."
+      ],
+      "suggestion": "Introduce a typed owner/module identifier registry (constants or enum-like type) and validate all governance specs against it during contract-family validation so ownership and boundary declarations cannot silently drift.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_boundary_blur"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance is distributed across docs, tests, and catalogs without one authoritative machine-checked manifest.",
+      "Conformance responsibilities are split across package boundaries, causing ownership and dependency-direction ambiguity."
+    ],
+    "likely_symptoms": [
+      "contract_tests_reverse_dependency_on_uploadsvc",
+      "contract_source_of_truth_fragmented",
+      "owner_boundary_is_stringly_typed"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cbae5-a5f0-7d30-892a-5d7959187e83
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/familycatalog/catalog.go
+- goseg/uploadsvc/actions_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+Reviewing the blind packet and the six assigned files now, then I’ll produce a strict JSON-only assessment for `cross_module_architecture` with evidence-backed findings.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' README.md" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/conformance/fixtures_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/family_specs_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/uploadsvc/actions_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/protocol/actionids/actionids.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/familycatalog/catalog.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package conformance
+
+import (
+	"testing"
+
+	"groundseg/protocol/actionids"
+	"groundseg/protocol/contracts"
+	"groundseg/uploadsvc"
+)
+
+func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+	fixtures := ActionContractFixtures()
+	if len(fixtures) == 0 {
+		t.Fatal("expected at least one action contract fixture")
+	}
+
+	foundC2C := false
+	for _, fixture := range fixtures {
+		if err := ValidateActionContractFixture(fixture); err != nil {
+			t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+ succeeded in 51ms:
+package contracts
+
+import (
+	"strings"
+	"testing"
+
+	"groundseg/protocol/contracts/familycatalog"
+)
+
+func TestBuildContractFamilyEntriesFromSpecs(t *testing.T) {
+	specs := []contractFamilyEntrySpec{
+		{
+			ID:          UploadOpenEndpointAction,
+			Namespace:   ActionNamespaceUpload,
+			Action:      ActionUploadOpenEndpoint,
+			Name:        "upload open endpoint",
+			Description: "open upload endpoint contract",
+			Message:     "upload open endpoint message",
+			Governance: contractGovernanceMetadata{
+				OwnerModule:  "uploadsvc",
+ succeeded in 52ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+ succeeded in 52ms:
+Total output lines: 6178
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+        "Cross-module coordination through shared mutable state or import-time side effects",
+        "Compatibility shim paths that persist without active external need and blur boundaries",
+        "Cross-package duplication that indicates a missing shared boundary"
+      ],
+ succeeded in 50ms:
+package actionids
+
+const ProtocolActionContractRoot = "protocol.actions"
+
+const (
+	NamespaceUpload = "upload"
+	NamespaceC2C    = "c2c"
+)
+
+const (
+	UploadOpenEndpoint = "open-endpoint"
+	UploadReset        = "reset"
+	C2CConnect         = "connect"
+)
+
+const (
+	UploadOpenEndpointContractID = ProtocolActionContractRoot + "." + NamespaceUpload + "." + UploadOpenEndpoint
+	UploadResetContractID        = ProtocolActionContractRoot + "." + NamespaceUpload + "." + UploadReset
+	C2CConnectContractID         = ProtocolActionContractRoot + "." + NamespaceC2C + "." + C2CConnect
+)
+ succeeded in 50ms:
+package uploadsvc
+
+import "testing"
+
+func TestParseUploadActionAcceptsKnownActions(t *testing.T) {
+	t.Parallel()
+
+	gotOpen, err := ParseUploadAction(string(ActionUploadOpenEndpoint))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(open-endpoint) returned error: %v", err)
+	}
+	if gotOpen != ActionUploadOpenEndpoint {
+		t.Fatalf("unexpected parsed open-endpoint action: %q", gotOpen)
+	}
+
+	gotReset, err := ParseUploadAction(string(ActionUploadReset))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(reset) returned error: %v", err)
+	}
+	if gotReset != ActionUploadReset {
+ succeeded in 50ms:
+package familycatalog
+
+import (
+	"groundseg/protocol/actionids"
+	"groundseg/protocol/contracts/familyspec"
+)
+
+const (
+	C2CConnectActionName        = "C2CConnectAction"
+	C2CConnectActionDescription = "connect c2c client"
+
+	UploadOpenEndpointActionName        = "UploadOpenEndpointAction"
+	UploadOpenEndpointActionDescription = "open upload endpoint"
+	UploadResetActionName               = "UploadResetAction"
+	UploadResetActionDescription        = "reset upload session"
+
+	StartramContractFamily = "startram"
+	StartramContractScope  = "errors"
+	StartramAPIConnSlug    = "api-connection"
+
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/contracts/conformance/fixtures_test.go` imports `groundseg/uploadsvc` and validates upload parser behavior from inside the contracts package test suite, creating a reverse dependency from contract-governance tests to one concrete consumer module.",
+        "`README.md` defines one combined backend gate (`go test ./protocol/contracts/... ./uploadsvc/...`) with protocol/contracts maintainers as owner, while enforcement logic is split across contract tests and uploadsvc tests, indicating blurred ownership boundaries rather than a single governance boundary.",
+        "`goseg/protocol/actionids/actionids.go`, `goseg/protocol/contracts/familycatalog/catalog.go`, and `goseg/protocol/contracts/family_specs_test.go` each carry overlapping action-contract declarations/strings, with test literals duplicated instead of deriving from one manifest."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_tests_reverse_dependency_on_uploadsvc",
+      "summary": "Contract-governance tests depend directly on `uploadsvc`, inverting the intended boundary where contracts should be consumer-agnostic.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`TestUploadParserActionsMatchConformanceBindings` in `fixtures_test.go` imports and calls `uploadsvc.SupportedUploadActions`, `uploadsvc.UploadActionContractByAction`, and `uploadsvc.ParseUploadAction`.",
+        "This places consumer behavior assertions inside the contracts package test layer rather than in consumer-owned conformance tests.",
+        "README backend gate ownership is assigned to protocol/contracts maintainers while also requiring `./uploadsvc/...`, reinforcing cross-module ownership coupling."
+      ],
+      "suggestion": "Move consumer conformance assertions into `uploadsvc` (or a dedicated integration-conformance package) and expose a small neutral contract fixture/assertion API from `protocol/contracts` so dependency direction remains contracts -> consumers (not consumers pulled into contract package tests).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_boundary_blur"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_source_of_truth_fragmented",
+      "summary": "Action contract governance is fragmented across multiple files with duplicated literals, increasing drift risk between docs, catalog, and tests.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/familycatalog/catalog.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`actionids.go` defines namespace/action/contract IDs; `catalog.go` defines names/descriptions/owners; `family_specs_test.go` redefines descriptor strings in test specs (`\"upload open endpoint\"`, `\"open upload endpoint contract\"`, `\"upload open endpoint message\"`).",
+        "The README quality-gate language references family-governance tests but there is no single declared manifest in these files that all tests and docs consume.",
+        "Manual duplication across IDs, descriptors, and test fixtures creates multi-point updates for one contract change."
+      ],
+      "suggestion": "Create one canonical contract manifest (ID, namespace/action, descriptor, governance metadata) and generate/derive action IDs, family catalog specs, and conformance fixtures from it; update tests to assert against generated/canonical data rather than inline literals.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_boundary_blur"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "owner_boundary_is_stringly_typed",
+      "summary": "Governance ownership uses unconstrained string values, so module-boundary contracts are not structurally enforced.",
+      "related_files": [
+        "goseg/protocol/contracts/familycatalog/catalog.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`catalog.go` sets `Owner` as raw strings (`\"system/wifi\"`, `\"uploadsvc\"`, `\"startram\"`) with no typed domain or compile-time registry in these reviewed files.",
+        "`family_specs_test.go` similarly uses free-form `OwnerModule: \"uploadsvc\"` in governance metadata fixtures.",
+        "README assigns owner responsibility for the contract gate, but the owner identity model in code is not normalized or validated against a maintained module registry."
+      ],
+      "suggestion": "Introduce a typed owner/module identifier registry (constants or enum-like type) and validate all governance specs against it during contract-family validation so ownership and boundary declarations cannot silently drift.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_boundary_blur"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance is distributed across docs, tests, and catalogs without one authoritative machine-checked manifest.",
+      "Conformance responsibilities are split across package boundaries, causing ownership and dependency-direction ambiguity."
+    ],
+    "likely_symptoms": [
+      "contract_tests_reverse_dependency_on_uploadsvc",
+      "contract_source_of_truth_fragmented",
+      "owner_boundary_is_stringly_typed"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+19,313
+

@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"strings"
 
+	"groundseg/docker/registry"
+	"groundseg/structs"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"go.uber.org/zap"
-	"groundseg/structs"
 )
 
 type containerPlan struct {
@@ -17,7 +19,7 @@ type containerPlan struct {
 	Type         string
 	Config       container.Config
 	HostConfig   container.HostConfig
-	ImageInfo    map[string]string
+	ImageInfo    registry.ImageDescriptor
 	DesiredImage string
 }
 
@@ -35,7 +37,7 @@ func (runtime *Runtime) containerPlanFor(containerName string, containerType str
 		return plan, fmt.Errorf("lookup latest image for container type %s: %w", containerType, err)
 	}
 	plan.ImageInfo = imageInfo
-	plan.DesiredImage = fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+	plan.DesiredImage = imageInfo.Reference()
 	if _, err := runtime.pullImageIfNotExistFn(plan.DesiredImage, imageInfo); err != nil {
 		return plan, fmt.Errorf("ensure image exists %s: %w", plan.DesiredImage, err)
 	}
@@ -58,7 +60,7 @@ func recreateContainerIfImageChanged(ctx context.Context, cli *client.Client, pl
 	if len(digestParts) > 1 {
 		currentDigest = digestParts[1]
 	}
-	if currentDigest == plan.ImageInfo["hash"] {
+	if currentDigest == plan.ImageInfo.Hash {
 		return nil
 	}
 
@@ -68,12 +70,12 @@ func recreateContainerIfImageChanged(ctx context.Context, cli *client.Client, pl
 		stopOpts := container.StopOptions{Timeout: &gracefulTimeout}
 		zap.L().Info(fmt.Sprintf("Gracefully stopping %s (60s timeout) before update", plan.Name))
 		if err := cli.ContainerStop(ctx, plan.Name, stopOpts); err != nil {
-			zap.L().Warn(fmt.Sprintf("Graceful stop failed for %s: %v, forcing removal", plan.Name, err))
+			zap.L().Warn(fmt.Sprintf("graceful stop failed for %s: %v, forcing removal", plan.Name, err))
 			recreateErrs = append(recreateErrs, fmt.Errorf("graceful stop container %s: %w", plan.Name, err))
 		}
 	}
 	if err := cli.ContainerRemove(ctx, plan.Name, container.RemoveOptions{Force: true}); err != nil {
-		zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet): %v", plan.Name, err))
+		zap.L().Warn(fmt.Sprintf("couldn't remove container %v (may not exist yet): %v", plan.Name, err))
 		recreateErrs = append(recreateErrs, fmt.Errorf("remove container %s: %w", plan.Name, err))
 	}
 	if err := createAndStartContainer(ctx, cli, plan); err != nil {

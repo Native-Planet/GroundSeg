@@ -30,8 +30,8 @@ type ContractMetadata struct {
 // ContractID identifies a contract in the shared governance catalog.
 type ContractID string
 
-// ActionToken identifies the wire-level action string for each action binding.
-type ActionToken string
+// ActionVerb identifies the wire-level action token string for each action binding.
+type ActionVerb string
 
 // ActionNamespace identifies the protocol namespace for action contracts.
 type ActionNamespace string
@@ -40,7 +40,7 @@ type ActionNamespace string
 // and namespace, allowing runtime validation and single-source discovery.
 type ActionContractBinding struct {
 	Namespace ActionNamespace
-	Action    ActionToken
+	Action    ActionVerb
 	Contract  ContractID
 }
 
@@ -63,7 +63,8 @@ func (contract ContractDescriptor) IsActive(version string) bool {
 type contractCatalogEntry struct {
 	ID         ContractID
 	Namespace  ActionNamespace
-	Action     ActionToken
+	Action     ActionVerb
+	Governance contractGovernanceMetadata
 	Descriptor ContractDescriptor
 }
 
@@ -71,12 +72,29 @@ type ContractCatalogEntry = contractCatalogEntry
 
 type actionContractBindingKey struct {
 	Namespace ActionNamespace
-	Action    ActionToken
+	Action    ActionVerb
 }
 
 type contractCatalogFamily struct {
-	name  string
-	specs func() []contractCatalogEntry
+	name     string
+	specs    func() []contractCatalogEntry
+	validate func([]contractCatalogEntry) error
+}
+
+func protocolActionContractID(namespace ActionNamespace, action ActionVerb) ContractID {
+	base := contractID("protocol", "actions", string(namespace), string(action))
+	return ContractID(base)
+}
+
+func contractID(parts ...string) ContractID {
+	segments := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			segments = append(segments, trimmed)
+		}
+	}
+	return ContractID(strings.Join(segments, "."))
 }
 
 // ContractCatalog owns all contract descriptors and action-to-contract bindings.
@@ -87,8 +105,8 @@ type ContractCatalog struct {
 }
 
 var contractCatalogFamilySpecs = []contractCatalogFamily{
-	{name: "protocol", specs: protocolContractCatalogSpecs},
-	{name: "startram", specs: startramContractCatalogSpecs},
+	{name: "protocol", specs: protocolContractCatalogSpecs, validate: validateProtocolContractSpecs},
+	{name: "startram", specs: startramContractCatalogSpecs, validate: validateStartramContractSpecs},
 }
 
 const (
@@ -130,9 +148,22 @@ func catalogEntriesSnapshot(specs []contractCatalogEntry) []contractCatalogEntry
 func ContractCatalogEntries() []ContractCatalogEntry {
 	entries := make([]ContractCatalogEntry, 0, 16)
 	for _, family := range contractCatalogFamilySpecs {
-		entries = append(entries, catalogEntries(family.specs())...)
+		familyEntries := catalogEntries(family.specs())
+		if family.validate != nil {
+			if err := family.validate(familyEntries); err != nil {
+				panic(fmt.Sprintf("invalid %s contract family specs: %v", family.name, err))
+			}
+		}
+		entries = append(entries, familyEntries...)
 	}
 	return entries
+}
+
+func validateFamilyCatalogEntries(family string, entries []contractCatalogEntry) error {
+	if _, err := NewCatalogFromEntries(entries); err != nil {
+		return fmt.Errorf("validate %s contract catalog: %w", family, err)
+	}
+	return nil
 }
 
 // NewCatalogFromEntries validates and builds a contract catalog from supplied entries.
@@ -223,6 +254,9 @@ func validateContractCatalogIdentity(entry contractCatalogEntry) error {
 		if !strings.HasSuffix(string(entry.ID), "."+string(entry.Action)) {
 			return fmt.Errorf("protocol action %s should be reflected in contract id %q", entry.Action, entry.ID)
 		}
+		if expected := protocolActionContractID(entry.Namespace, entry.Action); expected != entry.ID {
+			return fmt.Errorf("protocol action %s in namespace %s drifted contract id: expected %s", entry.Action, entry.Namespace, expected)
+		}
 	}
 	if entry.ID == "" {
 		return fmt.Errorf("missing contract id")
@@ -270,7 +304,7 @@ func (catalog *ContractCatalog) ContractDescriptorsForDebug() map[ContractID]Con
 }
 
 // ActionContractFor returns the action contract descriptor for a namespaced action.
-func (catalog *ContractCatalog) ActionContractFor(namespace ActionNamespace, action ActionToken) (ContractDescriptor, bool) {
+func (catalog *ContractCatalog) ActionContractFor(namespace ActionNamespace, action ActionVerb) (ContractDescriptor, bool) {
 	binding, ok := catalog.ActionContractBindingFor(namespace, action)
 	if !ok {
 		return ContractDescriptor{}, false
@@ -279,7 +313,7 @@ func (catalog *ContractCatalog) ActionContractFor(namespace ActionNamespace, act
 }
 
 // ActionContractBindingFor returns the binding for a namespaced action.
-func (catalog *ContractCatalog) ActionContractBindingFor(namespace ActionNamespace, action ActionToken) (ActionContractBinding, bool) {
+func (catalog *ContractCatalog) ActionContractBindingFor(namespace ActionNamespace, action ActionVerb) (ActionContractBinding, bool) {
 	if catalog == nil {
 		return ActionContractBinding{}, false
 	}
@@ -291,12 +325,7 @@ func (catalog *ContractCatalog) ActionContractBindingFor(namespace ActionNamespa
 	if !ok {
 		return ActionContractBinding{}, false
 	}
-	for _, binding := range catalog.actionContractBindings {
-		if binding.Namespace == namespace && binding.Action == action && binding.Contract == contractID {
-			return binding, true
-		}
-	}
-	return ActionContractBinding{}, false
+	return ActionContractBinding{Namespace: namespace, Action: action, Contract: contractID}, true
 }
 
 // ActionContractBindings exposes canonical action-to-contract bindings as an immutable copy.
@@ -380,6 +409,10 @@ func defaultRegistrySnapshot() (*ContractCatalog, error) {
 }
 
 // ContractDescriptorFor looks up a contract descriptor by ID from the default catalog.
+//
+// This boolean API is intentionally lossy: it returns false for both missing IDs and
+// transient catalog initialization failures.
+// Use ContractDescriptorForWithError for explicit diagnostics when needed.
 func ContractDescriptorFor(name ContractID) (ContractDescriptor, bool) {
 	registry, err := defaultRegistrySnapshot()
 	if err != nil {
@@ -387,6 +420,13 @@ func ContractDescriptorFor(name ContractID) (ContractDescriptor, bool) {
 	}
 	contract, ok := registry.ContractDescriptorFor(name)
 	return contract, ok
+}
+
+// ContractCatalogInitError returns the current default catalog initialization error, if any.
+// If initialization succeeds this returns nil.
+func ContractCatalogInitError() error {
+	_, err := defaultRegistrySnapshot()
+	return err
 }
 
 // ContractDescriptorForWithError looks up a contract descriptor and surfaces catalog errors.
@@ -412,7 +452,7 @@ func MustContractDescriptor(name ContractID) ContractDescriptor {
 }
 
 // ActionContractFor returns the action contract descriptor for a namespaced action.
-func ActionContractFor(namespace ActionNamespace, action ActionToken) (ContractDescriptor, bool) {
+func ActionContractFor(namespace ActionNamespace, action ActionVerb) (ContractDescriptor, bool) {
 	registry, err := defaultRegistrySnapshot()
 	if err != nil {
 		return ContractDescriptor{}, false
@@ -450,6 +490,24 @@ func ValidateActionContractBindings() error {
 		return err
 	}
 	return registry.ValidateActionContractBindings()
+}
+
+// ValidateGovernanceSchema validates family-level governance specs and combined catalog integrity.
+func ValidateGovernanceSchema() error {
+	entries := make([]contractCatalogEntry, 0, 16)
+	for _, family := range contractCatalogFamilySpecs {
+		familyEntries := catalogEntries(family.specs())
+		if family.validate != nil {
+			if err := family.validate(familyEntries); err != nil {
+				return fmt.Errorf("validate %s governance schema: %w", family.name, err)
+			}
+		}
+		entries = append(entries, familyEntries...)
+	}
+	if _, err := NewCatalogFromEntries(entries); err != nil {
+		return fmt.Errorf("validate combined governance schema: %w", err)
+	}
+	return nil
 }
 
 func validateContractMetadata(contractID ContractID, metadata ContractMetadata) error {

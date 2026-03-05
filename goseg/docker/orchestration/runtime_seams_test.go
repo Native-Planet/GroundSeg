@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"groundseg/config"
+	"groundseg/docker/registry"
 	"groundseg/structs"
 	"groundseg/transition"
 )
@@ -29,8 +30,8 @@ func (ops startupBootstrapTestOps) runtimeOps() StartupBootstrapOps {
 }
 
 type startupImageTestOps struct {
-	getLatestContainerInfoFn func(string) (map[string]string, error)
-	pullImageIfNotExistFn    func(string, map[string]string) (bool, error)
+	getLatestContainerInfoFn func(string) (registry.ImageDescriptor, error)
+	pullImageIfNotExistFn    func(string, registry.ImageDescriptor) (bool, error)
 }
 
 func (ops startupImageTestOps) runtimeOps() StartupImageOps {
@@ -196,11 +197,11 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 			},
 		}),
 		WithRuntimeStartupOps(RuntimeStartupOps{
-			UpdateConfTypedFn: func(...config.ConfUpdateOption) error {
+			UpdateConfigTypedFn: func(...config.ConfigUpdateOption) error {
 				updateConfCalled = true
 				return nil
 			},
-			WithWgOnFn: func(enabled bool) config.ConfUpdateOption {
+			WithWireguardEnabledFn: func(enabled bool) config.ConfigUpdateOption {
 				withWgOnCalled = true
 				return config.WithWgOn(enabled)
 			},
@@ -287,11 +288,11 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 	if got := rt.Check502SettingsSnapshotFn(); !reflect.DeepEqual(got, config.Check502Settings{}) {
 		t.Fatalf("unexpected check502 snapshot: %+v", got)
 	}
-	if err := rt.UpdateConfTypedFn(config.WithWgOn(true)); err != nil {
+	if err := rt.UpdateConfigTypedFn(config.WithWgOn(true)); err != nil {
 		t.Fatalf("unexpected update conf error: %v", err)
 	}
-	if got := rt.WithWgOnFn(true); got == nil {
-		t.Fatalf("expected WithWgOnFn to return a config option")
+	if got := rt.WithWireguardEnabledFn(true); got == nil {
+		t.Fatalf("expected WithWireguardEnabledFn to return a config option")
 	}
 	if err := rt.CycleWgKeyFn(); err != nil {
 		t.Fatalf("unexpected cycle wg key error: %v", err)
@@ -371,13 +372,13 @@ func TestNewStartupRuntimeRespectsOverrideFns(t *testing.T) {
 			},
 		}.runtimeOps()),
 		WithStartupImageOps(startupImageTestOps{
-			getLatestContainerInfoFn: func(kind string) (map[string]string, error) {
+			getLatestContainerInfoFn: func(kind string) (registry.ImageDescriptor, error) {
 				imageContainerType = kind
-				return map[string]string{"kind": kind}, nil
+				return registry.ImageDescriptor{Type: kind, Tag: "latest"}, nil
 			},
-			pullImageIfNotExistFn: func(kind string, imageInfo map[string]string) (bool, error) {
+			pullImageIfNotExistFn: func(kind string, imageInfo registry.ImageDescriptor) (bool, error) {
 				imageContainerTypePulled = kind
-				if kind != "netdata" || len(imageInfo) == 0 {
+				if kind != "netdata" || imageInfo.Tag == "" {
 					return true, pullImageErr
 				}
 				return true, nil
@@ -422,7 +423,7 @@ func TestNewStartupRuntimeRespectsOverrideFns(t *testing.T) {
 	if imageContainerType != "netdata" {
 		t.Fatalf("expected image type netdata, got %s", imageContainerType)
 	}
-	if _, err := runtime.PullImageIfNotExist("netdata", map[string]string{"tag": "latest"}); err != nil {
+	if _, err := runtime.PullImageIfNotExist("netdata", registry.ImageDescriptor{Tag: "latest"}); err != nil {
 		t.Fatalf("expected pull image override to return nil")
 	}
 	if imageContainerTypePulled != "netdata" {
@@ -601,8 +602,8 @@ func TestMinioRuntimeFromDockerWiresRuntimeDependencies(t *testing.T) {
 		MkdirAllFn:  func(string, os.FileMode) error { return nil },
 	}
 	rt.imageOps = RuntimeImageOps{
-		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
-			return map[string]string{"repo": "repo", "tag": "tag", "hash": "hash"}, nil
+		GetLatestContainerInfoFn: func(string) (registry.ImageDescriptor, error) {
+			return registry.ImageDescriptor{Repo: "repo", Tag: "tag", Hash: "hash"}, nil
 		},
 		GetLatestContainerImageFn: func(string) (string, error) {
 			return "image", nil

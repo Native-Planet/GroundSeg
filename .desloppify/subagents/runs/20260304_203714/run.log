@@ -1,0 +1,25 @@
+2026-03-04T20:37:15+00:00 run-start runner=codex parallel=True max_parallel=3 timeout=1200s heartbeat=15.0s stall_warning=0s stall_kill=120s retries=1 retry_backoff=2.0s upper_bound=40m selected=[1, 2, 3, 4]
+2026-03-04T20:37:15+00:00 run-path /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_203714
+2026-03-04T20:37:15+00:00 packet /Users/chuah/NP/GroundSeg/.desloppify/review_packets/holistic_packet_20260304_203714.json
+2026-03-04T20:37:15+00:00 blind-packet /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+2026-03-04T20:37:15+00:00 batch-queued batch=1 position=1/4
+2026-03-04T20:37:15+00:00 batch-start batch=1 position=1/4
+2026-03-04T20:37:15+00:00 batch-queued batch=2 position=2/4
+2026-03-04T20:37:15+00:00 batch-queued batch=3 position=3/4
+2026-03-04T20:37:15+00:00 batch-start batch=2 position=2/4
+2026-03-04T20:37:15+00:00 batch-queued batch=4 position=4/4
+2026-03-04T20:37:15+00:00 batch-start batch=3 position=3/4
+2026-03-04T20:37:30+00:00 heartbeat active=[1, 2, 3] queued=[4] elapsed={1:15, 2:15, 3:15}
+2026-03-04T20:37:45+00:00 heartbeat active=[1, 2, 3] queued=[4] elapsed={1:30, 2:30, 3:30}
+2026-03-04T20:38:00+00:00 heartbeat active=[1, 2, 3] queued=[4] elapsed={1:45, 2:45, 3:45}
+2026-03-04T20:38:07+00:00 batch-start batch=4 position=4/4
+2026-03-04T20:38:07+00:00 batch-done batch=3 position=3/4 code=0 elapsed=52
+2026-03-04T20:38:15+00:00 batch-done batch=2 position=2/4 code=0 elapsed=60
+2026-03-04T20:38:30+00:00 heartbeat active=[1, 4] queued=[] elapsed={1:75, 4:23}
+2026-03-04T20:38:45+00:00 heartbeat active=[1, 4] queued=[] elapsed={1:90, 4:38}
+2026-03-04T20:38:46+00:00 batch-done batch=1 position=1/4 code=0 elapsed=90
+2026-03-04T20:39:01+00:00 heartbeat active=[4] queued=[] elapsed={4:53}
+2026-03-04T20:39:16+00:00 heartbeat active=[4] queued=[] elapsed={4:68}
+2026-03-04T20:39:19+00:00 batch-done batch=4 position=4/4 code=0 elapsed=71
+2026-03-04T20:39:19+00:00 run-summary /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_203714/run_summary.json
+2026-03-04T20:39:19+00:00 run-finished successful=[1, 2, 3, 4] failed=[] imported=/Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_203714/holistic_findings_merged.json

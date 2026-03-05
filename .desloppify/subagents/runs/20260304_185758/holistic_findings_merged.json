@@ -1,0 +1,547 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 54.6,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 71.0,
+        "Indirection Cost": 68.0,
+        "Interface Honesty": 79.0
+      }
+    },
+    "design_coherence": 52.6,
+    "naming_quality": 54.4,
+    "package_organization": 50.8
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Large runtime callback bags are embedded and re-embedded across modules (for example `RuntimeContainerOps`/`RuntimeUrbitOps` in `goseg/docker/orchestration/runtime_ops.go`, then embedded again in `workflowRuntime` in `goseg/shipworkflow/operations_runtime.go` and `importerProvisionRuntime` in `goseg/importer/importer.go`).",
+        "`StartupRuntime` and `startBackgroundServicesRuntime` in `goseg/startuporchestrator/startup_orchestrator.go` use very wide function-field surfaces, plus override hooks, which shifts domain behavior into wiring structs rather than cohesive service interfaces.",
+        "Several packages keep both new and legacy entrypoints/aliases (`StartConfigEventLoop*` and deprecated `StartConfEventLoop*`/`ConfChannel` in `goseg/config/config_events.go`; `OldLogsCleaner*` aliases in `goseg/routines/logstream/logs.go`; legacy startup seams in `goseg/startuporchestrator/startup_orchestrator.go`), increasing indirection cost without new behavior."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 71.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 79.0
+      }
+    },
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows flat, high-count directories for all touched areas: goseg/config/ has 41 files, goseg/shipworkflow/ has 49 files, and goseg/system/ has 39 files, exceeding the >10 mixed-concern split threshold in this review rubric.",
+        "goseg/system/disk_fstab.go is a pure forwarding bridge to groundseg/system/disk (all functions delegate), while goseg/system/disk_health.go is a pure forwarding bridge to groundseg/system/storage; these parent-level bridge files keep disk/storage implementation seams in the broad system package instead of a focused adapter boundary.",
+        "goseg/config/bootstrap.go combines startup/bootstrap responsibilities (Initialize, initializeConfig, initializePaths, env/argv-based runtime setup) alongside global config state declarations, while goseg/config/config.go contains runtime-context state and snapshot APIs; this placement continues the previously flagged mixed-responsibility trend in config/config.go rather than isolating startup concerns.",
+        "goseg/shipworkflow/lifecycle.go contains mostly generic lifecycle helpers (PollWithTimeout, WaitForUrbitStopWith) and persistence seam wiring, but remains in the already overloaded goseg/shipworkflow root with only a placeholder smoke test in goseg/shipworkflow/lifecycle_test.go, indicating weak package-level cohesion around this file's placement."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "design_coherence": {
+      "evidence": [
+        "Runtime seam wiring is repeated across multiple modules with large function-pointer bags and parallel default/normalize/build paths (e.g., `AccessPointRuntime` + `normalizeAccessPointRuntime` in `goseg/accesspoint/accesspoint.go`, `wifiRuntime` + `NewWiFiRuntimeWith` in `goseg/system/wifi_runtime_methods.go`, and 10+ `Runtime*Ops` structs plus `buildRuntimeSeamBundle` in `goseg/docker/orchestration/runtime_ops.go`).",
+        "Config domain shape is duplicated across persistence and patch/update layers (`SysConfig` section/update methods in `goseg/structs/configs.go` and mirrored `ConfPatch` embedded section patches in `goseg/config/config_update_schema.go`), creating parallel structures that must evolve together.",
+        "Test setup logic shows systemic duplication rather than shared builders: long repeated default/custom config fixture assignment blocks in `goseg/config/config_test.go`, callback-setter registry scaffolding in `goseg/startuporchestrator/startup_orchestrator_test.go`, and repeated runtime guard wrappers in `goseg/importer/importer_test.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "naming_quality": {
+      "evidence": [
+        "Acronym/casing conventions drift across the same domains: `EndpointURL` in config-facing settings vs `EndpointUrl` in persisted structs and local variable `endpointUrl` (`goseg/config/config.go`, `goseg/structs/configs.go`, `goseg/rectify/rectify_services.go`).",
+        "Wireguard/WiFi naming mixes `Wg`, `WG`, `Wireguard`, `Wifi`, and `WiFi` in public/runtime symbols (`goseg/docker/orchestration/runtime_ops.go`, `goseg/docker/orchestration/wireguard.go`, `goseg/system/wifi_runtime_api.go`, `goseg/system/wifi_runtime_methods.go`).",
+        "Legacy `Conf*` aliases remain alongside `Config*` names (`Conf`, `StartConfEventLoop`, `ConfChannel`) which duplicates vocabulary for the same behavior (`goseg/config/config.go`, `goseg/config/config_events.go`).",
+        "Leak subsystem intermixes `leak` and `lick` terminology for the same concept (`GetLickStatuses`, `lickStatuses`, `listener`) and this propagates into broadcast runtime seam names (`getLickStatusesFn`) (`goseg/leak/broadcast.go`, `goseg/leak/leak_test.go`, `goseg/broadcast/loop.go`)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_sprawl",
+      "summary": "Runtime seam structs have grown into low-cohesion callback bags reused across unrelated workflows.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many broad `Runtime*Ops` structs with dozens of function fields and minimal policy.",
+        "`importerProvisionRuntime` embeds orchestration ops plus importer-specific callbacks, mixing container lifecycle, publish, workflow, and file concerns in one abstraction.",
+        "`workflowRuntime` similarly embeds orchestration ops and adds transition/publish behavior, reusing the same wide seams rather than bounded domain ports.",
+        "`startBackgroundServicesRuntime` contains a long list of service-start callbacks and selector metadata, acting as a procedural registry rather than a focused abstraction."
+      ],
+      "suggestion": "Split seam structs by use-case ports (for example: `ContainerLifecyclePort`, `UrbitConfigPort`, `TransitionPublisher`, `StartupServiceRegistry`) and pass only the minimal port each workflow needs. Replace embedding of large ops bags with explicit narrow interfaces per workflow package.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overgrown_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "legacy_alias_layers_increase_indirection",
+      "summary": "Backward-compatibility aliases create parallel call paths that dilute the primary abstraction surface.",
+      "related_files": [
+        "goseg/config/config_events.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`config_events.go` keeps `StartConfigEventLoop*` plus deprecated `StartConfEventLoop*` and `ConfChannel`, all forwarding to the same behavior.",
+        "`logs.go` exposes `RunOldLogsCleanupLoop*` and alias methods `OldLogsCleaner*` with no semantic difference.",
+        "`StartupRuntime` carries explicit 'Legacy seams retained' fields and fallback logic in `startupSettings()`, expanding the interface contract for compatibility rather than behavior."
+      ],
+      "suggestion": "Create a bounded compatibility layer/package for deprecated entrypoints and keep core runtime structs on a single canonical API. Mark removals by version and delete duplicate seams once callers migrate.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "compatibility_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "singleton_fallbacks_leak_through_injected_runtimes",
+      "summary": "Global default runtimes remain active alongside injectable seams, weakening abstraction boundaries.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go",
+        "goseg/docker/events/events.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "Broadcast state and loop keep package-level defaults (`defaultBroadcastStateRuntime`, `defaultBroadcastLoopController`) while also accepting runtime injection.",
+        "`events.go` exposes `DefaultEventRuntime()` global singleton plus `NewEventRuntime(overrides...)`, enabling mixed usage patterns in callers.",
+        "`config.go` maintains process-global mutable runtime context with package-level accessors, while other modules try to pass explicit snapshots through seams."
+      ],
+      "suggestion": "Define one ownership model per subsystem: either explicit dependency injection end-to-end or explicit singleton service facade. If injection is the target, move singleton acquisition to composition roots (`main`/startup) and pass runtime dependencies explicitly through constructors.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "mixed_global_and_injected_runtime_model"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "system_bridge_files_inflating_root_system_package",
+      "summary": "Root system package keeps thin disk/storage bridge files instead of focused adapter placement.",
+      "related_files": [
+        "goseg/system/disk_fstab.go",
+        "goseg/system/disk_health.go"
+      ],
+      "evidence": [
+        "disk_fstab.go lines 7-20 are direct pass-through wrappers around groundseg/system/disk functions with no policy, translation, or ownership logic.",
+        "disk_health.go lines 8-25 are direct pass-through wrappers around groundseg/system/storage functions except seam injection in one call path.",
+        "directory_profiles reports goseg/system/ at 39 files, while dedicated subdirectories already exist (goseg/system/disk/, goseg/system/storage/), so wrapper placement increases flattening in an already overloaded package."
+      ],
+      "suggestion": "Staged reorg: (1) create `goseg/system/adapters/` for compatibility bridges, (2) move `disk_fstab.go` and `disk_health.go` there with `git mv goseg/system/disk_fstab.go goseg/system/adapters/disk_fstab_bridge.go` and `git mv goseg/system/disk_health.go goseg/system/adapters/disk_health_bridge.go`, (3) update imports/callers to use `groundseg/system/disk` and `groundseg/system/storage` directly where possible, keeping temporary re-exports only in adapter package, (4) validate with `cd goseg && go test ./system/... ./...` and then remove unused bridge symbols once callers are migrated.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_package_overload"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_bootstrap_concerns_not_isolated",
+      "summary": "Bootstrap lifecycle and runtime bootstrap state live in the crowded config root package.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "bootstrap.go lines 18-38 define broad package-level state and initialization synchronization primitives while lines 48-99 execute startup orchestration and persistence flow.",
+        "config.go lines 98-255 define runtime context APIs and config snapshots, indicating a second responsibility center in the same root package.",
+        "directory_profiles shows goseg/config/ has 41 files (mixed update/view/persistence/runtime/bootstrap concerns), crossing the mixed-concern threshold and matching an existing mixed-responsibility signal on config/config.go."
+      ],
+      "suggestion": "Staged reorg: (1) create `goseg/config/bootstrap/` for startup lifecycle logic and `goseg/config/runtime/` for runtime context APIs, (2) move `bootstrap.go` + `bootstrap_test.go` into `config/bootstrap/` first, then move runtime-context constructs from `config.go` into `config/runtime/` while preserving exported facade functions in `config` as temporary shims, (3) run import updates (`cd goseg && gofmt ./config/...`) and compile checks (`cd goseg && go test ./config/... ./...`), (4) remove facade shims after all internal callers import the focused subpackages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_package_overload"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "shipworkflow_root_contains_generic_lifecycle_utilities",
+      "summary": "Generic lifecycle/polling helpers stay in overloaded shipworkflow root instead of a focused subpackage.",
+      "related_files": [
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go",
+        "goseg/shipworkflow/doc.go"
+      ],
+      "evidence": [
+        "lifecycle.go exposes generic helpers (`PollWithTimeout`, `WaitForUrbitStopWith`) and seam types that are not tightly scoped to a specific shipworkflow subdomain.",
+        "lifecycle_test.go is a placeholder smoke test (`if false`) rather than colocated behavior tests, suggesting this file is not anchored to a clear bounded module in current layout.",
+        "directory_profiles reports goseg/shipworkflow/ at 49 files in one root package, indicating high flattening pressure where utility placement should be segmented."
+      ],
+      "suggestion": "Staged reorg: (1) create `goseg/shipworkflow/lifecycle/` for lifecycle polling and stop-wait helpers, (2) move `lifecycle.go` and `lifecycle_test.go` there (`git mv goseg/shipworkflow/lifecycle.go goseg/shipworkflow/lifecycle/lifecycle.go` and matching test move), (3) keep a temporary compatibility wrapper in root `shipworkflow` only for exported symbols used externally, (4) update imports and validate with `cd goseg && go test ./shipworkflow/... ./...`, then delete compatibility wrappers after callers migrate.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_package_overload"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "protocol_identity_split_across_siblings",
+      "summary": "Protocol action identity is fragmented across `actionids`, `actions`, and `contracts` packages.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines canonical tokens (`NamespaceUpload`, `UploadOpenEndpoint`, `C2CConnect`) as its own package.",
+        "`protocol_contracts.go` rebinds those values into contract-layer types and IDs, importing `protocol/actionids` directly.",
+        "`fixtures_test.go` validates fixtures against `protocol/actions` constants, not `actionids`, so one domain concept is represented across three package boundaries."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1 (target folders): move protocol identity constants into `goseg/protocol/actions/ids.go` as the single public source; keep `goseg/protocol/actionids` as a temporary compatibility shim. Stage 2 (move order): update `goseg/protocol/contracts/protocol_contracts.go` to import/use `protocol/actions`; then update conformance code to reference the same source; finally delete or internalize `goseg/protocol/actionids`. Stage 3 (import updates/validation): run `rg \"protocol/actionids|ActionNamespace|ActionUpload\" goseg/protocol`, then `go test ./goseg/protocol/actions ./goseg/protocol/contracts ./goseg/protocol/conformance` and `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "protocol_boundary_fragmentation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "quality_gate_scope_misses_protocol_identity_boundary",
+      "summary": "README quality-gate scope does not track the package where protocol IDs are actually defined.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "`README.md` backend gate step 2 lists `./protocol/contracts ./protocol/conformance` but not `./protocol/actionids`.",
+        "`protocol_contracts.go` depends on `protocol/actionids` for canonical contract binding tokens.",
+        "A package movement/rename in `actionids` can affect governance contracts without being explicitly represented in the documented protocol gate boundary."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1 (target folders): align governance docs to the actual protocol boundary by either (a) folding `actionids` into `protocol/actions`, or (b) explicitly including `protocol/actionids` in the protocol gate section. Stage 2 (move order): perform package move/import updates first, then update README gate commands and governance docs in `goseg/protocol/contracts/`. Stage 3 (import updates/validation): run `go test ./goseg/protocol/actionids ./goseg/protocol/actions ./goseg/protocol/contracts ./goseg/protocol/conformance`, then `go test ./...` and verify README commands match CI scripts.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "protocol_boundary_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_bag_fragmentation",
+      "summary": "Runtime dependency injection uses multiple oversized function-bag patterns with duplicated default/override wiring, increasing indirection without a consistent abstraction boundary.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many separate seam structs (`RuntimeContainerOps`, `RuntimeSnapshotOps`, `RuntimeUrbitOps`, etc.) and a separate bundle constructor (`buildRuntimeSeamBundle`) that manually maps defaults.",
+        "`accesspoint.go` duplicates seam composition via both `accessPointRuntime()` and `normalizeAccessPointRuntime(...)`, while also projecting strategy/config views (`ConfigView`, `StrategyView`) from the same source struct.",
+        "`wifi_runtime_methods.go` repeats the same pattern again (`NewWiFiRuntime`, `NewWiFiRuntimeWith`, method fallback in `runNmcli`), indicating a cross-module structural style drift rather than one coherent DI pattern."
+      ],
+      "suggestion": "Standardize on a single runtime seam composition model across subsystems: define narrow capability-focused interfaces, provide one canonical default constructor + one override merge helper, and remove duplicated normalize/build/view projections that re-express the same dependencies.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_pattern_drift"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_schema_parallel_structures",
+      "summary": "Configuration shape and mutation logic are represented in parallel structures, creating multi-point edits for a single domain change.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`SysConfig` in `structs/configs.go` exposes per-section getters and five near-identical `Update*Config(...)` methods with repeated nil/update validation logic.",
+        "`config_update_schema.go` introduces a separate `ConfPatch` hierarchy (embedded `ConnectivityPatch`, `RuntimePatch`, `StartramPatch`, `PenpaiPatch`, `AuthSessionPatch`) that mirrors the same config sections in a second representation.",
+        "`config/config.go` adds another layer of section snapshots/settings (e.g., `StartramSettings`, `ImportSettings`, `StartupSettings`), reinforcing that config concerns are distributed across multiple parallel schemas."
+      ],
+      "suggestion": "Introduce a single section registry (section id -> typed accessor/apply/merge behavior) and drive update parsing, section mutation, and snapshot derivation from that registry to avoid keeping mirrored structs and repeated update methods in sync by hand.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_config_models"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_fixture_construction_duplication",
+      "summary": "Large test files repeatedly hand-build runtime/config fixtures, causing structural duplication and obscuring scenario intent.",
+      "related_files": [
+        "goseg/config/config_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`config_test.go` repeats long field-by-field setup blocks for default/custom `SysConfig` test data across multiple tests.",
+        "`startup_orchestrator_test.go` maintains a manual callback-setter dispatch map (`startBackgroundServiceCallbackSetters`) plus wrapper helpers to configure runtime behavior per test.",
+        "`importer_test.go` contains multiple near-identical runtime guard helpers (`initRuntime`, `uploadRuntime`, `provisionRuntime`) that only assert non-nil and return the same pointer.",
+        "`main_test.go` has a large `withC2CState(...)` parameter list to synthesize one runtime shape, showing setup complexity shifted into ad-hoc helper signatures."
+      ],
+      "suggestion": "Adopt shared test builders with composable options per subsystem (config fixture builder, runtime seam builder, transition/event harness) and collapse redundant wrapper helpers into one generic assertion/builder utility so tests express behavior deltas instead of full object wiring.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_harness_fragmentation"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "acronym_casing_drift_url_wg_wifi",
+      "summary": "Acronym casing is inconsistent (URL/Url, WG/Wg, WiFi/Wifi), reducing symbol predictability.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/structs/configs.go",
+        "goseg/rectify/rectify_services.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`StartramSettings` uses `EndpointURL`, while `ConnectivityConfig` uses `EndpointUrl`, and `startramEndpointRoot` introduces `endpointUrl` local spelling.",
+        "Wireguard callbacks alternate between `CreateDefaultWGConfFn` / `WriteWgConfFn`, and WiFi types/methods alternate between `WiFiRuntimeService`, `WifiInfoTicker`, and `NewWifiClient`."
+      ],
+      "suggestion": "Adopt a single acronym policy for exported and internal names (e.g., `URL`, `WG`, `WiFi`) and apply it consistently across runtime structs, config DTOs, and helpers; keep backward compatibility via deprecated wrappers/type aliases where external call sites depend on old names.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "naming_style_guide_absent"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "conf_vs_config_dual_vocabulary",
+      "summary": "Legacy `Conf*` aliases create parallel naming for the same config/event API surface.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/config_events.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`Config()` and `Conf()` both exist for the same snapshot behavior.",
+        "`StartConfigEventLoop*` exists alongside `StartConfEventLoop*`, and `ConfChannel()` is another alias for the same startup path."
+      ],
+      "suggestion": "Choose `Config` as canonical naming, keep `Conf*` only as explicitly deprecated compatibility shims with removal timeline, and migrate internal call sites to canonical names to reduce vocabulary branching.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "legacy_alias_retention"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "leak_lick_term_collision",
+      "summary": "The leak subsystem mixes `leak` and `lick` terms for one concept, obscuring intent.",
+      "related_files": [
+        "goseg/leak/broadcast.go",
+        "goseg/leak/leak_test.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "Within package `leak`, symbols like `lickStatuses`, `GetLickStatuses`, and log lines about `lick channel` coexist with `leak` naming.",
+        "Broadcast runtime consumes `getLickStatusesFn`, spreading the mixed term outside the leak package."
+      ],
+      "suggestion": "Standardize on one domain term (either keep protocol term `lick` everywhere with package-level docs, or rename to `leakSession/status` everywhere) and rename seam fields/functions consistently so call sites do not carry both vocabularies.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "domain_term_unification_gap"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "runtime_callback_name_shape_drift",
+      "summary": "Runtime callback field naming shape is inconsistent, making seam APIs harder to scan.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "Runtime structs mix `*Fn` and non-`Fn` callback names in the same type (`RuntimeStartupOps` has `UpdateConfigTypedFn` and `WithWireguardEnabledFn` but also mixed abbreviation-heavy fields like `LoadMCFn`, `SvcDeleteFn`).",
+        "Across subsystems, equivalent callback intent appears with different naming shapes (e.g., `Initialize*Fn`, `Start*Fn`, bare verbs in startup helper structs)."
+      ],
+      "suggestion": "Define one seam-field naming contract (e.g., verb-based + `Fn` suffix, full words over abbreviations) and enforce it for new runtime structs; then batch-rename existing runtime callback fields per subsystem with compatibility adapters in constructors.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_naming_governance_missing"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 5,
+    "dimension_coverage": 0.25,
+    "evidence_density": 1.267,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 38.23,
+    "dimensions_with_findings": 4
+  },
+  "review_scope": {
+    "reviewed_files_count": 76,
+    "successful_batch_count": 5,
+    "full_sweep_included": false,
+    "total_files": 615,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "naming_quality",
+      "package_organization"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state_lifecycle.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/broadcast/collectors/system_info_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/broadcast/loop.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/importer/importer.go",
+    "goseg/main.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/main_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/routines/version.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/docker/events/events.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/config/config.go",
+    "goseg/config/config_events.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/docker/network/network.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/shipworkflow/doc.go",
+    "goseg/shipworkflow/lifecycle.go",
+    "goseg/shipworkflow/lifecycle_test.go",
+    "goseg/config/bootstrap.go",
+    "goseg/config/bootstrap_test.go",
+    "goseg/system/disk_fstab.go",
+    "goseg/system/disk_fstab_test.go",
+    "goseg/system/disk_health.go",
+    "README.md",
+    "goseg/protocol/actionids/actionids.go",
+    "goseg/protocol/conformance/fixtures_test.go",
+    "goseg/protocol/contracts/family_specs_test.go",
+    "goseg/protocol/contracts/protocol_contracts.go",
+    "goseg/protocol/contracts/startram_contracts.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/system/disk/adapter.go",
+    "goseg/accesspoint/accesspoint.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/protocol/actions/actions.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_c2c_flow_test.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_185758",
+    "created_at": "2026-03-04T19:00:44+00:00",
+    "batch_count": 5,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "e5f028eed32edcd729d81490200e1a02db3ff3aedee66299c19be61b30c7ad22"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "naming_quality",
+      "abstraction_fitness",
+      "package_organization",
+      "design_coherence"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "naming_quality",
+      "package_organization"
+    ],
+    "missing_dimensions": [
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration"
+    ]
+  }
+}

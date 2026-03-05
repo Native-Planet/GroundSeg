@@ -31,10 +31,12 @@ type AccessPointRuntime struct {
 	EnsureRootDirFn      func(string) error
 	StartRouterFn        func(AccessPointRuntime) error
 	StopRouterFn         func(AccessPointRuntime) error
-	UseDefaultStartFn    bool
-	UseDefaultStopFn     bool
 	RunProcessProbeFn    func(name string, arg ...string) *exec.Cmd
 	NetInterfacesFn      func() ([]net.Interface, error)
+}
+
+type resolvedAccessPointRuntime struct {
+	runtime AccessPointRuntime
 }
 
 var (
@@ -43,10 +45,17 @@ var (
 	ip                = "192.168.45.1"
 	netmask           = "255.255.255.0"
 	ssid              = "NativePlanetConnect"
-	password          = resolveAPPassword()
+	password          = ""
 	rootDir           = "/etc/accesspoint/"
 	hostapdConfigPath = filepath.Join(rootDir, "hostapd.config")
 )
+
+func defaultAccessPointPassword() string {
+	if password != "" {
+		return password
+	}
+	return resolveAPPasswordForContext(wlan, ip)
+}
 
 func defaultAccessPointContext() AccessPointRuntime {
 	return AccessPointRuntime{
@@ -55,7 +64,7 @@ func defaultAccessPointContext() AccessPointRuntime {
 		IP:                ip,
 		Netmask:           netmask,
 		SSID:              ssid,
-		Password:          password,
+		Password:          defaultAccessPointPassword(),
 		RootDir:           rootDir,
 		HostapdConfigPath: hostapdConfigPath,
 	}
@@ -68,7 +77,7 @@ func accessPointRuntime() AccessPointRuntime {
 		IP:                  ip,
 		Netmask:             netmask,
 		SSID:                ssid,
-		Password:            password,
+		Password:            defaultAccessPointPassword(),
 		RootDir:             rootDir,
 		HostapdConfigPath:   hostapdConfigPath,
 		CheckDependenciesFn: checkDependencies,
@@ -82,8 +91,6 @@ func accessPointRuntime() AccessPointRuntime {
 		EnsureRootDirFn:      ensureRootDir,
 		StartRouterFn:        startRouterWithRuntime,
 		StopRouterFn:         stopRouterWithRuntime,
-		UseDefaultStartFn:    true,
-		UseDefaultStopFn:     true,
 		RunProcessProbeFn:    exec.Command,
 		NetInterfacesFn:      net.Interfaces,
 	}
@@ -131,15 +138,9 @@ func normalizeAccessPointRuntime(rt AccessPointRuntime) AccessPointRuntime {
 	}
 	if rt.StartRouterFn == nil {
 		rt.StartRouterFn = startRouterWithRuntime
-		rt.UseDefaultStartFn = true
-	} else {
-		rt.UseDefaultStartFn = false
 	}
 	if rt.StopRouterFn == nil {
 		rt.StopRouterFn = stopRouterWithRuntime
-		rt.UseDefaultStopFn = true
-	} else {
-		rt.UseDefaultStopFn = false
 	}
 	if rt.RunProcessProbeFn == nil {
 		rt.RunProcessProbeFn = exec.Command
@@ -150,14 +151,19 @@ func normalizeAccessPointRuntime(rt AccessPointRuntime) AccessPointRuntime {
 	return rt
 }
 
+func resolveAccessPointRuntime(rt AccessPointRuntime) resolvedAccessPointRuntime {
+	normalized := normalizeAccessPointRuntime(rt)
+	return resolvedAccessPointRuntime{
+		runtime: normalized,
+	}
+}
+
 func StartWithRuntime(rt AccessPointRuntime) error {
-	rt = normalizeAccessPointRuntime(rt)
-	return accessPointLifecycleCoordinator{}.Start(rt)
+	return accessPointLifecycleCoordinator{}.StartResolved(resolveAccessPointRuntime(rt))
 }
 
 func StopWithRuntime(rt AccessPointRuntime) error {
-	rt = normalizeAccessPointRuntime(rt)
-	return accessPointLifecycleCoordinator{}.Stop(rt)
+	return accessPointLifecycleCoordinator{}.StopResolved(resolveAccessPointRuntime(rt))
 }
 
 func resolveAPPassword() string {
@@ -186,18 +192,10 @@ func Start(dev string) error {
 	return StartWithRuntime(runtime)
 }
 
-func startWithRuntime(rt AccessPointRuntime) error {
-	return accessPointLifecycleCoordinator{}.Start(rt)
-}
-
 func Stop(dev string) error {
 	runtime := accessPointRuntime()
 	runtime.Wlan = dev
 	return StopWithRuntime(runtime)
-}
-
-func stopWithRuntime(rt AccessPointRuntime) error {
-	return accessPointLifecycleCoordinator{}.Stop(rt)
 }
 
 func ensureRootDir(path string) error {

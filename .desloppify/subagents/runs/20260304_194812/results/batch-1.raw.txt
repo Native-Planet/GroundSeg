@@ -1,0 +1,74 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action identifiers are authored in multiple boundary layers: `goseg/protocol/actionids/actionids.go` defines raw namespace/action tokens, while `goseg/protocol/contracts/protocol_contracts.go` redefines typed namespace/action constants from those values and also defines contract IDs.",
+        "`goseg/protocol/conformance/fixtures_test.go` validates fixtures through `groundseg/protocol/actions` constants instead of the `actionids` or `contracts` authority used by the catalog code, creating a third coordination surface for the same protocol vocabulary.",
+        "`goseg/protocol/contracts/protocol_contracts.go` maintains parallel contract IDs (`UploadOpenEndpointAction` and backwards-compatible alias `UploadActionOpenEndpoint`, similarly for reset), which keeps dual names active in the architecture boundary and increases drift risk for downstream modules/tests."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_action_vocabulary_authority",
+      "summary": "Protocol action identity is split across actionids, contracts, and action-facing tests, weakening boundary ownership and increasing cross-module drift risk.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines canonical raw values (`upload`, `c2c`, `open-endpoint`, `reset`, `connect`).",
+        "`protocol_contracts.go` wraps those same values into separate `ActionNamespace`/`ActionVerb` constants and then builds contract IDs from the wrapped layer.",
+        "`fixtures_test.go` validates fixture compatibility using `protocol/actions` symbols instead of the `actionids`/`contracts` vocabulary used by the contract catalog path.",
+        "`actions_test.go` asserts local upload action constants and contract map alignment, adding another package-specific coupling point for the same identifiers."
+      ],
+      "suggestion": "Establish one canonical protocol action authority package (typed namespace/action + ID derivation) and have contracts, conformance fixtures, and upload action tests consume that API directly; remove duplicated token wrappers and cross-package reinterpretation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "no_single_protocol_boundary"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "dual_contract_id_namespaces",
+      "summary": "Backward-compatible alias IDs keep duplicate contract identities live in the same module, creating avoidable coupling and migration drag.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` exports both new IDs (`UploadOpenEndpointAction`, `UploadResetAction`) and old aliases (`UploadActionOpenEndpoint`, `UploadActionReset`) for identical contracts.",
+        "`family_specs_test.go` and related tests still reference alias-style IDs, which indicates architectural consumers are not converged on one naming boundary.",
+        "Maintaining parallel exported names for identical concepts prolongs module-level coupling because importers can bind to either path and impede cleanup sequencing."
+      ],
+      "suggestion": "Introduce a staged deprecation plan: designate one canonical exported ID family, migrate tests and consumers to it, and then remove alias exports in the next compatibility window to restore a single contract boundary.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "no_single_protocol_boundary"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol identity concerns (action tokens, typed action verbs, contract IDs, and test fixtures) are distributed across multiple packages without a single architectural owner.",
+      "Compatibility aliases were introduced without a bounded retirement path, so cross-module consumers remain coupled to legacy names."
+    ],
+    "likely_symptoms": [
+      "split_action_vocabulary_authority",
+      "dual_contract_id_namespaces"
+    ],
+    "possible_false_positives": []
+  }
+}

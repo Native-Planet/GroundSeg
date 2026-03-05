@@ -252,7 +252,7 @@ func TestGracefulShipExitReturnsErrorOnInitialStatusFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected gracefulShipExit to fail when initial status fetch fails")
 	}
-	if !strings.Contains(err.Error(), "Failed to retrieve ship information") {
+	if !strings.Contains(err.Error(), "failed to retrieve ship information") {
 		t.Fatalf("unexpected error for initial status failure: %v", err)
 	}
 }

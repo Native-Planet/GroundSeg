@@ -3,11 +3,12 @@ package leak
 import (
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"groundseg/auth/tokens"
 	"groundseg/leakchannel"
 	"groundseg/structs"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func watchPasswordLogoutTimeout(patp string) {

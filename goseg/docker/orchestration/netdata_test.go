@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"errors"
+	"groundseg/docker/registry"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
@@ -23,8 +24,8 @@ func testNetdataRuntime() dockerRuntime {
 		},
 	}
 	rt.imageOps = RuntimeImageOps{
-		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
-			return map[string]string{"repo": "repo/netdata", "tag": "stable", "hash": "abcd"}, nil
+		GetLatestContainerInfoFn: func(string) (registry.ImageDescriptor, error) {
+			return registry.ImageDescriptor{Repo: "repo/netdata", Tag: "stable", Hash: "abcd"}, nil
 		},
 		GetLatestContainerImageFn: func(string) (string, error) { return "netdata:latest", nil },
 	}
@@ -41,8 +42,8 @@ func testNetdataRuntime() dockerRuntime {
 func TestNetdataContainerConfBuildsExpectedConfig(t *testing.T) {
 	rt := testNetdataRuntime()
 	rt.imageOps = RuntimeImageOps{
-		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
-			return map[string]string{"repo": "repo/netdata", "tag": "stable", "hash": "abcd"}, nil
+		GetLatestContainerInfoFn: func(string) (registry.ImageDescriptor, error) {
+			return registry.ImageDescriptor{Repo: "repo/netdata", Tag: "stable", Hash: "abcd"}, nil
 		},
 	}
 

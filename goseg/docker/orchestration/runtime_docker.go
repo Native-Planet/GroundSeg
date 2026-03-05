@@ -3,7 +3,6 @@ package orchestration
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"groundseg/config"
 	"groundseg/docker/registry"
 	"groundseg/structs"
@@ -52,8 +51,8 @@ func newWireguardRuntimeForTests() WireguardRuntime {
 	runtime.MkdirAllFn = func(string, os.FileMode) error { return nil }
 	runtime.StartContainerFn = func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil }
 	runtime.UpdateContainerStateFn = func(string, structs.ContainerState) {}
-	runtime.GetLatestContainerInfoFn = func(string) (map[string]string, error) {
-		return map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}, nil
+	runtime.GetLatestContainerInfoFn = func(string) (registry.ImageDescriptor, error) {
+		return registry.ImageDescriptor{Repo: "repo/wg", Tag: "latest", Hash: "hash"}, nil
 	}
 	runtime.GetLatestContainerImageFn = func(string) (string, error) { return "wg:latest", nil }
 	runtime.CreateDefaultWGConfFn = func() error { return nil }
@@ -153,7 +152,7 @@ func latestContainerImage(containerType string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"]), nil
+	return containerInfo.Reference(), nil
 }
 
 func runtimePollInterval() time.Duration {

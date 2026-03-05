@@ -1,0 +1,94 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "naming_quality": 81.4
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "Config APIs mix full and abbreviated vocabulary for the same concept: `Conf()`, `StartConfEventLoop`, and `ConfChannel` coexist with `StartConfigEventLoop` and `configEventRuntime` in `goseg/config/bootstrap.go` and `goseg/config/config_events.go`.",
+        "Protocol action identifiers use inconsistent word ordering and token shape across related layers: `UploadActionOpenEndpoint`/`UploadActionReset` vs `C2CConnectAction` in `goseg/protocol/contracts/protocol_contracts.go`, and `ActionUploadOpenEndpoint`/`ActionC2CConnect` in `goseg/protocol/actions/actions.go`.",
+        "Runtime-injection suffixes are inconsistently stacked, producing low-signal distinctions such as `LoadStartramRegionsWithRuntime` vs `LoadStartramRegionsWithRuntimeState` and alias pairs like `StartConfEventLoopWithRuntime` in `goseg/broadcast/state_lifecycle.go` and `goseg/config/config_events.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "naming_quality",
+      "identifier": "config_conf_alias_drift",
+      "summary": "Config naming drifts between `Conf` and `Config`, obscuring a single concept.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config_events.go",
+        "goseg/config/config_update_registry.go"
+      ],
+      "evidence": [
+        "`bootstrap.go` exposes `Conf()` and comments like \"global conf var\" while newer APIs in the same package use `Config` wording.",
+        "`config_events.go` keeps both `StartConfigEventLoop` and legacy aliases `StartConfEventLoop`/`StartConfEventLoopWithRuntime` plus `ConfChannel`.",
+        "`config_update_registry.go` uses `confPatch*` type families, reinforcing the abbreviated vocabulary in parallel with non-abbreviated names."
+      ],
+      "suggestion": "Standardize on `Config` terminology for new and internal identifiers (for example `ConfigSnapshot`, `StartConfigEventLoopLegacy` if needed), keep compatibility shims deprecated but clearly marked, and migrate internal type families from `confPatch*` to `configPatch*` in one coordinated rename pass.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "legacy_abbreviation_carryover"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "protocol_action_naming_inconsistent_order",
+      "summary": "Protocol action names use inconsistent token order across layers.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/actionids/actionids.go"
+      ],
+      "evidence": [
+        "Contracts define `UploadActionOpenEndpoint` and `UploadActionReset`, but C2C flips shape to `C2CConnectAction`.",
+        "Actions package uses another pattern: `ActionUploadOpenEndpoint` and `ActionC2CConnect`.",
+        "All map back to shared raw tokens in `actionids.go`, so names differ by layer rather than domain meaning."
+      ],
+      "suggestion": "Adopt one canonical pattern (for example `<Domain><Verb><Object>Action`) and align contracts/actions constants to it, keeping temporary aliases where required for compatibility until references are migrated.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "protocol_naming_convention_gap"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "runtime_suffix_overload",
+      "summary": "Runtime-injection naming is over-suffixed and inconsistent, reducing intent clarity.",
+      "related_files": [
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/config/config_events.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`state_lifecycle.go` has both `LoadStartramRegionsWithRuntime` and `LoadStartramRegionsWithRuntimeState`, where the second suffix does not add clear semantic distinction.",
+        "`config_events.go` multiplies variants (`StartConfigEventLoopWithRuntime`, `StartConfEventLoopWithRuntime`) that differ mostly by compatibility naming.",
+        "`operations_runtime.go` repeats near-identical pair naming (`RunTransitionedOperation` and `RunTransitionedOperationWithRuntime`) across many call paths."
+      ],
+      "suggestion": "Define a small, consistent naming matrix for injection variants (for example `X`, `XWithRuntime`, and no additional suffix tiers), collapse ambiguous names like `WithRuntimeState`, and isolate compatibility wrappers under clearly marked legacy names.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_variant_naming_sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Long-lived backward-compatibility aliases were retained without a strict naming deprecation policy.",
+      "Cross-package naming conventions for protocol/action identifiers were not normalized from a single style guide.",
+      "Runtime seam injection expanded organically, creating variant-name sprawl instead of a constrained naming pattern."
+    ],
+    "likely_symptoms": [
+      "config_conf_alias_drift",
+      "protocol_action_naming_inconsistent_order",
+      "runtime_suffix_overload"
+    ],
+    "possible_false_positives": []
+  }
+}

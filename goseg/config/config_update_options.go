@@ -119,9 +119,9 @@ func WithKeyfile(path string) ConfUpdateOption {
 	}
 }
 
-func WithC2cInterval(seconds int) ConfUpdateOption {
+func WithC2CInterval(seconds int) ConfUpdateOption {
 	return func(patch *ConfPatch) {
-		patch.C2cInterval = &seconds
+		patch.C2CInterval = &seconds
 	}
 }
 

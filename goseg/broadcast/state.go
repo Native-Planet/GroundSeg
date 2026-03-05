@@ -10,32 +10,31 @@ import (
 	"maps"
 	"sync"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 var (
-	defaultBroadcastStateRuntime = NewBroadcastStateRuntime()
+	defaultBroadcastStateRuntimeMu sync.RWMutex
+	defaultBroadcastStateRuntime   = NewBroadcastStateRuntime()
+	errBroadcastRuntimeRequired    = errors.New("broadcast state runtime is required")
 )
 
 type broadcastStateRuntime struct {
 	sync.RWMutex      // synchronize access to broadcastState
 	broadcastState    structs.AuthBroadcast
 	scheduledPacks    map[string]time.Time
-	urbitTransitions  map[string]structs.UrbitTransitionBroadcast
 	schedulePackBus   chan string
 	packMu            sync.RWMutex
-	urbTransMu        sync.RWMutex
-	sysTransMu        sync.RWMutex
-	systemTransitions structs.SystemTransitionBroadcast
 	pierCollector     collectors.BroadcastPierCollectorContract
 	infoCollector     collectors.BroadcastInfoCollectorContract
 	startramCollector collectors.BroadcastStartramCollectorContract
+	delivery          broadcastDeliveryRuntime
 }
+
+const maxSystemTransitionErrors = 8
 
 func (runtime *broadcastStateRuntime) GetState() structs.AuthBroadcast {
 	if runtime == nil {
-		runtime = resolveDefaultBroadcastStateRuntime()
+		return structs.AuthBroadcast{}
 	}
 	runtime.RLock()
 	defer runtime.RUnlock()
@@ -44,16 +43,16 @@ func (runtime *broadcastStateRuntime) GetState() structs.AuthBroadcast {
 
 func (runtime *broadcastStateRuntime) UpdateBroadcast(next structs.AuthBroadcast) {
 	if runtime == nil {
-		runtime = resolveDefaultBroadcastStateRuntime()
+		return
 	}
 	runtime.Lock()
 	defer runtime.Unlock()
-	runtime.broadcastState = next
+	runtime.broadcastState = cloneBroadcastState(next)
 }
 
 func (runtime *broadcastStateRuntime) GetScheduledPack(patp string) time.Time {
 	if runtime == nil {
-		runtime = resolveDefaultBroadcastStateRuntime()
+		return time.Time{}
 	}
 	runtime.packMu.RLock()
 	defer runtime.packMu.RUnlock()
@@ -64,9 +63,22 @@ func (runtime *broadcastStateRuntime) GetScheduledPack(patp string) time.Time {
 	return nextPack
 }
 
+func (runtime *broadcastStateRuntime) AddSystemTransitionError(message string) {
+	if runtime == nil || message == "" {
+		return
+	}
+	runtime.Lock()
+	defer runtime.Unlock()
+	next := append([]string{message}, runtime.broadcastState.System.Transition.Error...)
+	if len(next) > maxSystemTransitionErrors {
+		next = next[:maxSystemTransitionErrors]
+	}
+	runtime.broadcastState.System.Transition.Error = next
+}
+
 func (runtime *broadcastStateRuntime) UpdateScheduledPack(patp string, meldNext time.Time) error {
 	if runtime == nil {
-		runtime = resolveDefaultBroadcastStateRuntime()
+		return errBroadcastRuntimeRequired
 	}
 	runtime.packMu.Lock()
 	defer runtime.packMu.Unlock()
@@ -76,7 +88,7 @@ func (runtime *broadcastStateRuntime) UpdateScheduledPack(patp string, meldNext 
 
 func (runtime *broadcastStateRuntime) PublishSchedulePack(reason string) error {
 	if runtime == nil {
-		runtime = resolveDefaultBroadcastStateRuntime()
+		return errBroadcastRuntimeRequired
 	}
 	select {
 	case runtime.schedulePackBus <- reason:
@@ -88,16 +100,53 @@ func (runtime *broadcastStateRuntime) PublishSchedulePack(reason string) error {
 
 func (runtime *broadcastStateRuntime) SchedulePackEvents() <-chan string {
 	if runtime == nil {
-		runtime = resolveDefaultBroadcastStateRuntime()
+		return nil
 	}
 	return runtime.schedulePackBus
 }
 
 func (runtime *broadcastStateRuntime) BroadcastToClients() error {
 	if runtime == nil {
-		runtime = resolveDefaultBroadcastStateRuntime()
+		return errBroadcastRuntimeRequired
 	}
 	return broadcastToClientsWithRuntime(runtime)
+}
+
+func (runtime *broadcastStateRuntime) pierCollectorContract() collectors.BroadcastPierCollectorContract {
+	if runtime != nil && runtime.pierCollector != nil {
+		return runtime.pierCollector
+	}
+	return collectors.DefaultBroadcastPierCollectorContract()
+}
+
+func (runtime *broadcastStateRuntime) infoCollectorContract() collectors.BroadcastInfoCollectorContract {
+	if runtime != nil && runtime.infoCollector != nil {
+		return runtime.infoCollector
+	}
+	return collectors.DefaultBroadcastInfoCollectorContract()
+}
+
+func (runtime *broadcastStateRuntime) startramCollectorContract() collectors.BroadcastStartramCollectorContract {
+	if runtime != nil && runtime.startramCollector != nil {
+		return runtime.startramCollector
+	}
+	return collectors.DefaultBroadcastStartramCollectorContract()
+}
+
+func (runtime *broadcastStateRuntime) collectPierInfo(urbits map[string]structs.Urbit, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
+	return runtime.pierCollectorContract().CollectPierInfo(urbits, scheduled)
+}
+
+func (runtime *broadcastStateRuntime) collectAppsInfo() structs.Apps {
+	return runtime.infoCollectorContract().CollectAppsInfo()
+}
+
+func (runtime *broadcastStateRuntime) collectProfileInfo(regions map[string]structs.StartramRegion) structs.Profile {
+	return runtime.infoCollectorContract().CollectProfileInfo(regions)
+}
+
+func (runtime *broadcastStateRuntime) collectSystemInfo() structs.System {
+	return runtime.infoCollectorContract().CollectSystemInfo()
 }
 
 var errSchedulePackBusFull = errors.New("broadcast schedule bus is full")
@@ -106,102 +155,34 @@ func NewBroadcastStateRuntime() *broadcastStateRuntime {
 	return &broadcastStateRuntime{
 		broadcastState:    structs.AuthBroadcast{},
 		scheduledPacks:    make(map[string]time.Time),
-		urbitTransitions:  make(map[string]structs.UrbitTransitionBroadcast),
 		schedulePackBus:   make(chan string, 64),
 		pierCollector:     collectors.DefaultBroadcastPierCollectorContract(),
 		infoCollector:     collectors.DefaultBroadcastInfoCollectorContract(),
 		startramCollector: collectors.DefaultBroadcastStartramCollectorContract(),
+		delivery:          defaultBroadcastDeliveryRuntime(),
 	}
 }
 
+// DefaultBroadcastStateRuntime returns the shared process-wide broadcast runtime for bootstrap
+// code and callers that do not yet inject an explicit runtime.
 func DefaultBroadcastStateRuntime() *broadcastStateRuntime {
-	return resolveDefaultBroadcastStateRuntime()
-}
-
-func resolveDefaultBroadcastStateRuntime() *broadcastStateRuntime {
+	defaultBroadcastStateRuntimeMu.RLock()
+	defer defaultBroadcastStateRuntimeMu.RUnlock()
 	return defaultBroadcastStateRuntime
 }
 
-func resolveBroadcastStateRuntime(runtime ...*broadcastStateRuntime) *broadcastStateRuntime {
-	if len(runtime) > 0 && runtime[0] != nil {
-		return runtime[0]
+func SetDefaultBroadcastStateRuntime(runtime *broadcastStateRuntime) *broadcastStateRuntime {
+	if runtime == nil {
+		runtime = NewBroadcastStateRuntime()
 	}
-	return resolveDefaultBroadcastStateRuntime()
+	defaultBroadcastStateRuntimeMu.Lock()
+	defaultBroadcastStateRuntime = runtime
+	defaultBroadcastStateRuntimeMu.Unlock()
+	return runtime
 }
 
-// take in config file and addt'l info to initialize broadcast
-func bootstrapBroadcastState(runtime ...*broadcastStateRuntime) error {
-	zap.L().Info("Bootstrapping state")
-	// this returns a map of ship:running status
-	zap.L().Info("Resolving pier status")
-	resolved := resolveBroadcastStateRuntime(runtime...)
-	state := resolved.GetState()
-	urbits, err := constructPierInfoWithRuntime(resolved, state.Urbits, resolved.GetScheduledPack)
-	if err != nil {
-		return fmt.Errorf("bootstrap broadcast state: %w", err)
-	}
-	nextState := structs.AuthBroadcast{
-		Urbits:  urbits,
-		System:  constructSystemInfoWithRuntime(resolved),
-		Profile: constructProfileInfoWithRuntime(resolved, state.Profile.Startram.Info.Regions),
-		Apps:    constructAppsInfoWithRuntime(resolved),
-	}
-	resolved.Lock()
-	resolved.broadcastState = nextState
-	resolved.Unlock()
-	// start looping info refreshes
-	StartBroadcastLoop()
-	return nil
-}
-
-func LoadStartramRegionsWithRuntime(runtime ...*broadcastStateRuntime) error {
-	resolved := resolveBroadcastStateRuntime(runtime...)
-	zap.L().Info("Retrieving StarTram region info")
-	regions, err := broadcastStartramCollectorContract(resolved).LoadStartramRegions()
-	if err != nil {
-		return fmt.Errorf("load startram regions: %w", err)
-	}
-	resolved.Lock()
-	resolved.broadcastState.Profile.Startram.Info.Regions = regions
-	resolved.Unlock()
-	return nil
-}
-
-func broadcastPierCollectorContract(runtime *broadcastStateRuntime) collectors.BroadcastPierCollectorContract {
-	if runtime != nil && runtime.pierCollector != nil {
-		return runtime.pierCollector
-	}
-	return collectors.DefaultBroadcastPierCollectorContract()
-}
-
-func broadcastInfoCollectorContract(runtime *broadcastStateRuntime) collectors.BroadcastInfoCollectorContract {
-	if runtime != nil && runtime.infoCollector != nil {
-		return runtime.infoCollector
-	}
-	return collectors.DefaultBroadcastInfoCollectorContract()
-}
-
-func broadcastStartramCollectorContract(runtime *broadcastStateRuntime) collectors.BroadcastStartramCollectorContract {
-	if runtime != nil && runtime.startramCollector != nil {
-		return runtime.startramCollector
-	}
-	return collectors.DefaultBroadcastStartramCollectorContract()
-}
-
-func constructPierInfoWithRuntime(runtime *broadcastStateRuntime, urbits map[string]structs.Urbit, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
-	return broadcastPierCollectorContract(runtime).CollectPierInfo(urbits, scheduled)
-}
-
-func constructAppsInfoWithRuntime(runtime *broadcastStateRuntime) structs.Apps {
-	return broadcastInfoCollectorContract(runtime).CollectAppsInfo()
-}
-
-func constructProfileInfoWithRuntime(runtime *broadcastStateRuntime, regions map[string]structs.StartramRegion) structs.Profile {
-	return broadcastInfoCollectorContract(runtime).CollectProfileInfo(regions)
-}
-
-func constructSystemInfoWithRuntime(runtime *broadcastStateRuntime) structs.System {
-	return broadcastInfoCollectorContract(runtime).CollectSystemInfo()
+func ResetDefaultBroadcastStateRuntime() *broadcastStateRuntime {
+	return SetDefaultBroadcastStateRuntime(NewBroadcastStateRuntime())
 }
 
 func cloneBroadcastState(in structs.AuthBroadcast) structs.AuthBroadcast {
@@ -239,11 +220,11 @@ func cloneBroadcastState(in structs.AuthBroadcast) structs.AuthBroadcast {
 	return out
 }
 
-// return json string of current broadcast state
-func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
+// GetStateJson returns a serialized broadcast envelope with an explicit auth level.
+func GetStateJson(bState structs.AuthBroadcast, authLevel transition.BroadcastAuthLevel) ([]byte, error) {
 	envelope := authBroadcastEnvelope{
 		Type:      string(transition.BroadcastMessageTypeStructure),
-		AuthLevel: string(transition.BroadcastAuthLevelAuthorized),
+		AuthLevel: string(authLevel),
 		Payload:   bState,
 	}
 	broadcastJson, err := json.Marshal(envelope)
@@ -251,17 +232,4 @@ func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 		return nil, fmt.Errorf("marshalling broadcast state payload: %w", err)
 	}
 	return broadcastJson, nil
-}
-
-func ReloadUrbits() error {
-	zap.L().Info("Reloading ships in broadcast")
-	resolved := resolveBroadcastStateRuntime()
-	urbits, err := constructPierInfoWithRuntime(resolved, resolved.GetState().Urbits, resolved.GetScheduledPack)
-	if err != nil {
-		return fmt.Errorf("reload urbit states for broadcast: %w", err)
-	}
-	resolved.Lock()
-	resolved.broadcastState.Urbits = urbits
-	resolved.Unlock()
-	return nil
 }

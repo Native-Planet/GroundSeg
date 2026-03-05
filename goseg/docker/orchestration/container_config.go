@@ -3,8 +3,9 @@ package orchestration
 import (
 	"fmt"
 
-	"github.com/docker/docker/api/types/container"
 	"groundseg/transition"
+
+	"github.com/docker/docker/api/types/container"
 )
 
 type containerConfigBuilder func(dockerRuntime, string) (container.Config, container.HostConfig, error)

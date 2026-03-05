@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"groundseg/session"
+
+	"github.com/gorilla/websocket"
 )
 
 type countingBoundary struct {
@@ -48,19 +49,20 @@ func TestAuthSessionBoundaryInjectionSafeUnderConcurrentLoad(t *testing.T) {
 	const totalRemoves = totalCalls
 
 	var wg sync.WaitGroup
+	addErrCh := make(chan error, totalCalls)
 	for i := 0; i < totalCalls; i++ {
 		i := i
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
+			var err error
 			if i%2 == 0 {
-				if err := AddToAuthMapWithBoundary(boundaryA, conn, token, true); err != nil {
-					t.Fatalf("unexpected add error: %v", err)
-				}
+				err = AddToAuthMapWithBoundary(boundaryA, conn, token, true)
 			} else {
-				if err := AddToAuthMapWithBoundary(boundaryB, conn, token, true); err != nil {
-					t.Fatalf("unexpected add error: %v", err)
-				}
+				err = AddToAuthMapWithBoundary(boundaryB, conn, token, true)
+			}
+			if err != nil {
+				addErrCh <- err
 			}
 		}()
 		go func(i int) {
@@ -73,6 +75,10 @@ func TestAuthSessionBoundaryInjectionSafeUnderConcurrentLoad(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+	close(addErrCh)
+	for err := range addErrCh {
+		t.Fatalf("unexpected add error: %v", err)
+	}
 
 	boundaryAAdd, boundaryARemove := boundaryA.snapshot()
 	boundaryBAdd, boundaryBRemove := boundaryB.snapshot()
@@ -156,16 +162,21 @@ func TestSessionStoreAddToAuthMapConcurrentAddsAreDeduplicated(t *testing.T) {
 
 	const iterations = 200
 	var wg sync.WaitGroup
+	addErrCh := make(chan error, iterations)
 	for i := 0; i < iterations; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			if err := store.AddToAuthMap(conn, connToken, false); err != nil {
-				t.Fatalf("unexpected add error: %v", err)
+				addErrCh <- err
 			}
 		}()
 	}
 	wg.Wait()
+	close(addErrCh)
+	for err := range addErrCh {
+		t.Fatalf("unexpected add error: %v", err)
+	}
 
 	if got := cm.UnauthClientCount("token-id"); got != 1 {
 		t.Fatalf("expected single client entry after deduplicated concurrent adds, got %d", got)

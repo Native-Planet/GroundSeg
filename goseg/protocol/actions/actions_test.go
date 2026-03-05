@@ -1,11 +1,12 @@
 package actions
 
 import (
+	"encoding/json"
 	"errors"
 	"groundseg/protocol/contracts"
 	"reflect"
-	"time"
 	"testing"
+	"time"
 )
 
 func versionBefore(reference string) string {
@@ -14,6 +15,78 @@ func versionBefore(reference string) string {
 		return reference
 	}
 	return referenceTime.Add(-24 * time.Hour).Format("2006.01.02")
+}
+
+func mustSupportedActions(t *testing.T, namespace Namespace) []Action {
+	t.Helper()
+	actions, err := SupportedActions(namespace)
+	if err != nil {
+		t.Fatalf("supported actions for %s: %v", namespace, err)
+	}
+	return actions
+}
+
+func mustActionMetas(t *testing.T, namespace Namespace) []ActionMeta {
+	t.Helper()
+	metas, err := ActionMetas(namespace)
+	if err != nil {
+		t.Fatalf("action metadata for %s: %v", namespace, err)
+	}
+	return metas
+}
+
+func mustUploadActionContracts(t *testing.T) []UploadActionContract {
+	t.Helper()
+	contracts, err := UploadActionContracts()
+	if err != nil {
+		t.Fatalf("upload action contracts: %v", err)
+	}
+	return contracts
+}
+
+func mustUploadActionContract(t *testing.T, action Action) UploadActionContract {
+	t.Helper()
+	contract, err := UploadActionContractForAction(action)
+	if err != nil {
+		t.Fatalf("upload action contract for %s: %v", action, err)
+	}
+	return contract
+}
+
+func mustContractForAction(t *testing.T, namespace Namespace, action Action) ActionContract {
+	t.Helper()
+	contract, err := ContractForAction(namespace, action)
+	if err != nil {
+		t.Fatalf("contract for %s:%s: %v", namespace, action, err)
+	}
+	return contract
+}
+
+func mustContractMetadata(t *testing.T, namespace Namespace, action Action) contracts.ContractMetadata {
+	t.Helper()
+	metadata, err := ContractMetadataForAction(namespace, action)
+	if err != nil {
+		t.Fatalf("contract metadata for %s:%s: %v", namespace, action, err)
+	}
+	return metadata
+}
+
+func mustActionActive(t *testing.T, namespace Namespace, version string, action Action) bool {
+	t.Helper()
+	active, err := IsActionContractActive(namespace, version, action)
+	if err != nil {
+		t.Fatalf("action active for %s:%s at %s: %v", namespace, action, version, err)
+	}
+	return active
+}
+
+func mustActionDeprecated(t *testing.T, namespace Namespace, version string, action Action) bool {
+	t.Helper()
+	deprecated, err := IsActionContractDeprecated(namespace, version, action)
+	if err != nil {
+		t.Fatalf("action deprecated for %s:%s at %s: %v", namespace, action, version, err)
+	}
+	return deprecated
 }
 
 func TestParseActionValidatesNamespace(t *testing.T) {
@@ -58,7 +131,7 @@ func TestParseActionRejectsActionFromOtherNamespace(t *testing.T) {
 }
 
 func TestParseUploadActionReportsDeterministicErrorType(t *testing.T) {
-	_, err := ParseUploadAction("definitely-not-upload")
+	_, err := ParseAction(NamespaceUpload, "definitely-not-upload")
 	if err == nil {
 		t.Fatal("expected unknown upload action to be rejected")
 	}
@@ -69,13 +142,13 @@ func TestParseUploadActionReportsDeterministicErrorType(t *testing.T) {
 }
 
 func TestSupportedActionsUnknownNamespaceReturnsNil(t *testing.T) {
-	if got := SupportedActions("invalid"); got != nil {
-		t.Fatalf("expected nil supported actions for invalid namespace, got %v", got)
+	if _, err := SupportedActions("invalid"); err == nil {
+		t.Fatal("expected unsupported namespace error")
 	}
 }
 
 func TestActionMetasReturnsContractsByNamespace(t *testing.T) {
-	upload := ActionMetas(NamespaceUpload)
+	upload := mustActionMetas(t, NamespaceUpload)
 	expectedUpload := []ActionMeta{
 		{Action: ActionUploadOpenEndpoint, Description: "open upload endpoint"},
 		{Action: ActionUploadReset, Description: "reset upload session"},
@@ -84,7 +157,7 @@ func TestActionMetasReturnsContractsByNamespace(t *testing.T) {
 		t.Fatalf("unexpected upload action metadata: got %#v", upload)
 	}
 
-	c2c := ActionMetas(NamespaceC2C)
+	c2c := mustActionMetas(t, NamespaceC2C)
 	expectedC2C := []ActionMeta{
 		{Action: ActionC2CConnect, Description: "connect c2c client"},
 	}
@@ -94,13 +167,13 @@ func TestActionMetasReturnsContractsByNamespace(t *testing.T) {
 }
 
 func TestActionMetasForInvalidNamespaceReturnsNil(t *testing.T) {
-	if got := ActionMetas("invalid"); got != nil {
-		t.Fatalf("expected nil action metadata for invalid namespace, got %v", got)
+	if _, err := ActionMetas("invalid"); err == nil {
+		t.Fatal("expected unsupported namespace error")
 	}
 }
 
 func TestActionMetasReturnsCopyByValue(t *testing.T) {
-	first := ActionMetas(NamespaceUpload)
+	first := mustActionMetas(t, NamespaceUpload)
 	if len(first) == 0 {
 		t.Fatal("expected at least one upload action metadata entry")
 	}
@@ -110,7 +183,7 @@ func TestActionMetasReturnsCopyByValue(t *testing.T) {
 	first[0].Action = "mutated"
 	first[0].Description = "mutated description"
 
-	second := ActionMetas(NamespaceUpload)
+	second := mustActionMetas(t, NamespaceUpload)
 	if second[0].Action == first[0].Action {
 		t.Fatalf("expected ActionMetas return value to be copied by value, got mutated action %q", second[0].Action)
 	}
@@ -119,22 +192,8 @@ func TestActionMetasReturnsCopyByValue(t *testing.T) {
 	}
 }
 
-func TestParseUploadActionRejectsUnknown(t *testing.T) {
-	_, err := ParseUploadAction("bogus")
-	if err == nil {
-		t.Fatalf("expected unknown upload action to be rejected")
-	}
-	unsupported, ok := err.(UnsupportedActionError)
-	if !ok {
-		t.Fatalf("expected UnsupportedActionError, got %T: %v", err, err)
-	}
-	if unsupported.Namespace != NamespaceUpload {
-		t.Fatalf("expected upload namespace, got %s", unsupported.Namespace)
-	}
-}
-
 func TestSupportedUploadActionsMatchesContract(t *testing.T) {
-	got := SupportedUploadActions()
+	got := mustSupportedActions(t, NamespaceUpload)
 	expected := []Action{ActionUploadOpenEndpoint, ActionUploadReset}
 	if len(got) != len(expected) {
 		t.Fatalf("expected %d upload actions, got %d", len(expected), len(got))
@@ -143,35 +202,36 @@ func TestSupportedUploadActionsMatchesContract(t *testing.T) {
 		if got[i] != action {
 			t.Fatalf("expected upload action %q at index %d, got %q", action, i, got[i])
 		}
-		if _, err := ParseUploadAction(string(action)); err != nil {
+		if _, err := ParseAction(NamespaceUpload, string(action)); err != nil {
 			t.Fatalf("expected action %q to parse as supported: %v", action, err)
 		}
 	}
 }
 
 func TestUploadActionContractsIncludesExpectedActions(t *testing.T) {
-	got := UploadActionContracts()
+	got := mustUploadActionContracts(t)
 	if len(got) != 2 {
 		t.Fatalf("expected 2 upload action contracts, got %d", len(got))
 	}
 
 	got[0].Action = "mutated"
-	gotCopy := UploadActionContracts()
+	gotCopy := mustUploadActionContracts(t)
 	if gotCopy[0].Action == "mutated" {
 		t.Fatalf("expected upload action contracts to be copied by value")
 	}
 }
 
 func TestUploadActionContractsAreOrdered(t *testing.T) {
-	got := UploadActionContracts()
+	got := mustUploadActionContracts(t)
 	want := []UploadActionContract{
 		{
 			ActionContract: ActionContract{
 				Action:      ActionUploadOpenEndpoint,
+				ID:          contracts.UploadOpenEndpointAction,
 				Description: "open upload endpoint",
 				Contract: contracts.ContractDescriptor{
 					Description: "open upload endpoint",
-					Name:        "UploadActionOpenEndpoint",
+					Name:        "UploadOpenEndpointAction",
 					ContractMetadata: contracts.ContractMetadata{
 						IntroducedIn:  "2026.03.02",
 						Compatibility: contracts.CompatibilityBackwardSafe,
@@ -184,10 +244,11 @@ func TestUploadActionContractsAreOrdered(t *testing.T) {
 		{
 			ActionContract: ActionContract{
 				Action:      ActionUploadReset,
+				ID:          contracts.UploadResetAction,
 				Description: "reset upload session",
 				Contract: contracts.ContractDescriptor{
 					Description: "reset upload session",
-					Name:        "UploadActionReset",
+					Name:        "UploadResetAction",
 					ContractMetadata: contracts.ContractMetadata{
 						IntroducedIn:  "2026.03.02",
 						Compatibility: contracts.CompatibilityBackwardSafe,
@@ -207,10 +268,7 @@ func TestUploadActionContractsAreOrdered(t *testing.T) {
 func TestUploadActionContractForActionResolvesKnownAction(t *testing.T) {
 	for _, action := range []Action{ActionUploadOpenEndpoint, ActionUploadReset} {
 		t.Run(string(action), func(t *testing.T) {
-			contract, ok := UploadActionContractForAction(action)
-			if !ok {
-				t.Fatalf("expected %q contract to resolve", action)
-			}
+			contract := mustUploadActionContract(t, action)
 			if contract.Action != action {
 				t.Fatalf("unexpected contract action: %v", contract.Action)
 			}
@@ -219,31 +277,28 @@ func TestUploadActionContractForActionResolvesKnownAction(t *testing.T) {
 }
 
 func TestUploadActionContractForActionUnknownAction(t *testing.T) {
-	_, ok := UploadActionContractForAction("upload-action-does-not-exist")
-	if ok {
-		t.Fatal("expected unknown upload action contract lookup to miss")
+	_, err := UploadActionContractForAction("upload-action-does-not-exist")
+	if err == nil {
+		t.Fatal("expected unknown upload action contract lookup to fail")
 	}
 }
 
 func TestUploadActionContractForActionReturnsCopy(t *testing.T) {
-	got := UploadActionContracts()
+	got := mustUploadActionContracts(t)
 	if len(got) == 0 {
 		t.Fatal("expected at least one upload action contract")
 	}
 	contract := got[0]
 	contract.Action = "mutated"
 
-	rechecked, ok := UploadActionContractForAction(got[0].Action)
-	if !ok {
-		t.Fatal("expected looked-up action to resolve")
-	}
+	rechecked := mustUploadActionContract(t, got[0].Action)
 	if rechecked.Action != got[0].Action {
 		t.Fatalf("expected contract copy lookup to stay stable, got %q", rechecked.Action)
 	}
 }
 
 func TestSupportedC2CActionsMatchesContract(t *testing.T) {
-	got := SupportedC2CActions()
+	got := mustSupportedActions(t, NamespaceC2C)
 	expected := []Action{ActionC2CConnect}
 	if len(got) != len(expected) {
 		t.Fatalf("expected %d c2c actions, got %d", len(expected), len(got))
@@ -257,10 +312,7 @@ func TestSupportedC2CActionsMatchesContract(t *testing.T) {
 
 func TestUploadActionMetadataContainsLifecycle(t *testing.T) {
 	for _, action := range []Action{ActionUploadOpenEndpoint, ActionUploadReset} {
-		meta, ok := UploadActionContractMetadataForAction(action)
-		if !ok {
-			t.Fatalf("missing metadata for action %q", action)
-		}
+		meta := mustContractMetadata(t, NamespaceUpload, action)
 		if meta.IntroducedIn == "" {
 			t.Fatalf("expected introduced version for %q", action)
 		}
@@ -271,10 +323,7 @@ func TestUploadActionMetadataContainsLifecycle(t *testing.T) {
 }
 
 func TestC2CActionMetadataContainsLifecycle(t *testing.T) {
-	meta, ok := C2CActionContractMetadataForAction(ActionC2CConnect)
-	if !ok {
-		t.Fatal("missing metadata for C2C connect action")
-	}
+	meta := mustContractMetadata(t, NamespaceC2C, ActionC2CConnect)
 	if meta.IntroducedIn == "" {
 		t.Fatal("expected introduced version for C2C connect action")
 	}
@@ -284,69 +333,66 @@ func TestC2CActionMetadataContainsLifecycle(t *testing.T) {
 }
 
 func TestUploadActionCompatibilityChecksUseMetadata(t *testing.T) {
-	if !IsUploadActionContractActive(CurrentContractVersion, ActionUploadOpenEndpoint) {
+	if !mustActionActive(t, NamespaceUpload, CurrentContractVersion, ActionUploadOpenEndpoint) {
 		t.Fatal("expected upload open-endpoint action to be active at current version")
 	}
-	if IsUploadActionContractDeprecated(CurrentContractVersion, ActionUploadOpenEndpoint) {
+	if mustActionDeprecated(t, NamespaceUpload, CurrentContractVersion, ActionUploadOpenEndpoint) {
 		t.Fatal("did not expect action to be deprecated at current version")
 	}
-	if IsUploadActionContractActive("2026.01.01", ActionUploadOpenEndpoint) {
+	if mustActionActive(t, NamespaceUpload, "2026.01.01", ActionUploadOpenEndpoint) {
 		t.Fatal("did not expect action to be active before introduction date")
 	}
 }
 
 func TestC2CActionContractForActionResolvesKnownAction(t *testing.T) {
-	contract, ok := C2CActionContractForAction(ActionC2CConnect)
-	if !ok {
-		t.Fatalf("expected C2C connect action contract to resolve")
-	}
+	contract := mustContractForAction(t, NamespaceC2C, ActionC2CConnect)
 	if contract.Action != ActionC2CConnect {
 		t.Fatalf("unexpected C2C contract action: %q", contract.Action)
 	}
 }
 
 func TestC2CActionCompatibilityChecksUseMetadata(t *testing.T) {
-	if !IsC2CActionContractActive(CurrentContractVersion, ActionC2CConnect) {
+	if !mustActionActive(t, NamespaceC2C, CurrentContractVersion, ActionC2CConnect) {
 		t.Fatal("expected C2C connect action to be active at current version")
 	}
-	if IsC2CActionContractDeprecated(CurrentContractVersion, ActionC2CConnect) {
+	if mustActionDeprecated(t, NamespaceC2C, CurrentContractVersion, ActionC2CConnect) {
 		t.Fatal("did not expect action to be deprecated at current version")
 	}
-	if IsC2CActionContractActive("2026.01.01", ActionC2CConnect) {
+	if mustActionActive(t, NamespaceC2C, "2026.01.01", ActionC2CConnect) {
 		t.Fatal("did not expect C2C connect action to be active before introduction date")
 	}
 }
 
 func TestUploadActionCompatibilityBoundaryCases(t *testing.T) {
-	if IsUploadActionContractActive("", ActionUploadOpenEndpoint) {
+	if mustActionActive(t, NamespaceUpload, "", ActionUploadOpenEndpoint) {
 		t.Fatal("expected empty version to be inactive")
 	}
-	if IsUploadActionContractActive("2026.01.01", ActionUploadOpenEndpoint) {
+	if mustActionActive(t, NamespaceUpload, "2026.01.01", ActionUploadOpenEndpoint) {
 		t.Fatal("expected open-endpoint to be inactive before introduction")
 	}
-	if IsUploadActionContractActive("bad-version", ActionUploadOpenEndpoint) {
+	if mustActionActive(t, NamespaceUpload, "bad-version", ActionUploadOpenEndpoint) {
 		t.Fatal("expected malformed version to be inactive")
 	}
-	if IsUploadActionContractDeprecated(CurrentContractVersion, ActionUploadOpenEndpoint) {
+	if mustActionDeprecated(t, NamespaceUpload, CurrentContractVersion, ActionUploadOpenEndpoint) {
 		t.Fatal("expected current action not to be deprecated")
 	}
-	if IsUploadActionContractDeprecated("", ActionUploadOpenEndpoint) {
+	if mustActionDeprecated(t, NamespaceUpload, "", ActionUploadOpenEndpoint) {
 		t.Fatal("expected empty version not to be deprecated")
 	}
-	if !IsUploadActionContractActive(CurrentContractVersion, ActionUploadReset) {
+	if !mustActionActive(t, NamespaceUpload, CurrentContractVersion, ActionUploadReset) {
 		t.Fatal("expected reset action to be active at current version")
 	}
-	if IsUploadActionContractDeprecated("", ActionUploadReset) {
+	if mustActionDeprecated(t, NamespaceUpload, "", ActionUploadReset) {
 		t.Fatal("expected empty version not to be deprecated")
 	}
 }
 
 func TestUploadActionCompatibilityRejectsUnknownAction(t *testing.T) {
-	if IsUploadActionContractActive(CurrentContractVersion, Action("does-not-exist")) {
-		t.Fatal("expected unknown action to be inactive")
+	if _, err := IsActionContractActive(NamespaceUpload, CurrentContractVersion, Action("does-not-exist")); err == nil {
+		t.Fatal("expected unknown action to return an error for active check")
 	}
-	if IsUploadActionContractDeprecated("2026.03.02", Action("does-not-exist")) {
-		t.Fatal("expected unknown action to be non-deprecated")
+	if _, err := IsActionContractDeprecated(NamespaceUpload, "2026.03.02", Action("does-not-exist")); err == nil {
+		t.Fatal("expected unknown action to return an error for deprecated check")
 	}
 }
 
@@ -361,13 +407,13 @@ func TestActionContractsMatchContractDescriptors(t *testing.T) {
 			name:      "upload open-endpoint",
 			namespace: NamespaceUpload,
 			action:    ActionUploadOpenEndpoint,
-			contract:  contracts.UploadActionOpenEndpoint,
+			contract:  contracts.UploadOpenEndpointAction,
 		},
 		{
 			name:      "upload reset",
 			namespace: NamespaceUpload,
 			action:    ActionUploadReset,
-			contract:  contracts.UploadActionReset,
+			contract:  contracts.UploadResetAction,
 		},
 		{
 			name:      "c2c connect",
@@ -378,21 +424,7 @@ func TestActionContractsMatchContractDescriptors(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var contract ActionContract
-			var ok bool
-			switch tc.namespace {
-			case NamespaceUpload:
-				uploadContract, found := UploadActionContractForAction(tc.action)
-				ok = found
-				contract = uploadContract.ActionContract
-			case NamespaceC2C:
-				contract, ok = C2CActionContractForAction(tc.action)
-			default:
-				t.Fatalf("unsupported namespace: %s", tc.namespace)
-			}
-			if !ok {
-				t.Fatalf("expected action %s in namespace %s to resolve", tc.action, tc.namespace)
-			}
+			contract := mustContractForAction(t, tc.namespace, tc.action)
 			catalogDescriptor, ok := contracts.ContractDescriptorFor(tc.contract)
 			if !ok {
 				t.Fatalf("expected contract descriptor %s to be present", tc.contract)
@@ -410,5 +442,80 @@ func TestActionContractsMatchContractDescriptors(t *testing.T) {
 				t.Fatalf("expected action contract compatibility %q to match catalog compatibility %q", contract.Contract.Compatibility, catalogDescriptor.Compatibility)
 			}
 		})
+	}
+}
+
+func TestContractBindingsConformanceMatrix(t *testing.T) {
+	bindings := contracts.ActionContractBindings()
+	if len(bindings) == 0 {
+		t.Fatal("expected canonical action contract bindings")
+	}
+
+	seen := make(map[contracts.ActionContractBinding]struct{}, len(bindings))
+	for _, binding := range bindings {
+		namespace := Namespace(binding.Namespace)
+		action := Action(binding.Action)
+
+		parsed, err := ParseAction(namespace, string(action))
+		if err != nil {
+			t.Fatalf("expected parser to accept %s:%s: %v", namespace, action, err)
+		}
+		if parsed != action {
+			t.Fatalf("expected parser output %q, got %q", action, parsed)
+		}
+
+		contract := mustContractForAction(t, namespace, action)
+		if contract.Contract.Name == "" || contract.Contract.Description == "" {
+			t.Fatalf("contract metadata missing descriptor fields for %s:%s", namespace, action)
+		}
+
+		if namespace == NamespaceC2C {
+			payloadBytes, err := MarshalC2CPayload(action, "HomeWiFi", "secret")
+			if err != nil {
+				t.Fatalf("marshal c2c payload for %s failed: %v", action, err)
+			}
+			var payload C2CPayload
+			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+				t.Fatalf("decode c2c payload for %s failed: %v", action, err)
+			}
+			if payload.Type != C2CPayloadType {
+				t.Fatalf("unexpected c2c payload type for %s: %q", action, payload.Type)
+			}
+			if payload.Payload.Action != string(action) {
+				t.Fatalf("payload action mismatch for %s: got %q", action, payload.Payload.Action)
+			}
+		}
+
+		seen[binding] = struct{}{}
+	}
+
+	if len(seen) != len(bindings) {
+		t.Fatalf("expected %d unique bindings, got %d", len(bindings), len(seen))
+	}
+}
+
+func TestContractNamespacesRejectUnsupportedActions(t *testing.T) {
+	bindings := contracts.ActionContractBindings()
+	if len(bindings) == 0 {
+		t.Fatal("expected canonical action contract bindings")
+	}
+
+	seenNamespaces := make(map[Namespace]struct{})
+	for _, binding := range bindings {
+		seenNamespaces[Namespace(binding.Namespace)] = struct{}{}
+	}
+
+	for namespace := range seenNamespaces {
+		_, err := ParseAction(namespace, "definitely-unsupported-action")
+		if err == nil {
+			t.Fatalf("expected unsupported action error for namespace %s", namespace)
+		}
+		var unsupported UnsupportedActionError
+		if !errors.As(err, &unsupported) {
+			t.Fatalf("expected UnsupportedActionError for namespace %s, got %T: %v", namespace, err, err)
+		}
+		if unsupported.Namespace != namespace {
+			t.Fatalf("unsupported namespace mismatch: got %s want %s", unsupported.Namespace, namespace)
+		}
 	}
 }

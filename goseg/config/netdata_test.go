@@ -12,7 +12,7 @@ import (
 )
 
 func resetNetdataSeams() {
-	confForNetdata = Conf
+	confForNetdata = Config
 	getVersionChannelForNetdata = GetVersionChannel
 }
 
@@ -35,8 +35,8 @@ func TestCreateDefaultNetdataConfWritesDefaults(t *testing.T) {
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("unmarshal netdata.json failed: %v", err)
 	}
-	if !reflect.DeepEqual(got, defaults.NetdataConfig) {
-		t.Fatalf("unexpected netdata defaults: got %+v want %+v", got, defaults.NetdataConfig)
+	if !reflect.DeepEqual(got, defaults.DefaultNetdataConfig()) {
+		t.Fatalf("unexpected netdata defaults: got %+v want %+v", got, defaults.DefaultNetdataConfig())
 	}
 }
 

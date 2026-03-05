@@ -11,7 +11,7 @@ import (
 	"groundseg/config"
 	"groundseg/startram"
 	"groundseg/structs"
-	"groundseg/system"
+	systemdisk "groundseg/system/disk"
 
 	"go.uber.org/zap"
 )
@@ -19,7 +19,7 @@ import (
 type Dependencies struct {
 	IsDevMode                bool
 	ListHardDisks            func() (structs.LSBLKDevice, error)
-	Conf                     func() structs.SysConfig
+	Config                   func() structs.SysConfig
 	CreateLocalBackup        func(patp, backupRoot string) error
 	UploadLatestBackup       func(patp, pw, backupRoot string) error
 	RestoreBackupWithRequest func(startram.RestoreBackupRequest) error
@@ -27,16 +27,16 @@ type Dependencies struct {
 	Now                      func() time.Time
 	UrbitConf                func(string) structs.UrbitDocker
 	SendNotification         func(string, structs.HarkNotification) error
-	UpdateConfTyped          func(...config.ConfUpdateOption) error
-	WithStartramReminderAll  func(bool) config.ConfUpdateOption
+	UpdateConfTyped          func(...config.ConfigUpdateOption) error
+	WithStartramReminderAll  func(bool) config.ConfigUpdateOption
 	BackupDir                string
 }
 
 var (
 	isDevFn                        = checkDevMode
 	backupDirFn                    = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
-	listHardDisksForDev            = system.ListHardDisks
-	confForDev                     = config.Conf
+	listHardDisksForDev            = systemdisk.ListHardDisks
+	configForDev                   = config.Config
 	createLocalBackupForDev        = backupsvc.CreateLocalBackup
 	uploadLatestBackupForDev       = backupsvc.UploadLatestBackup
 	restoreBackupWithRequestForDev = startram.RestoreBackupWithRequest
@@ -44,7 +44,7 @@ var (
 	nowForDev                      = time.Now
 	urbitConfForDev                = config.UrbitConf
 	sendNotificationForDev         = click.SendNotification
-	updateConfTypedForDev          = config.UpdateConfTyped
+	updateConfTypedForDev          = config.UpdateConfigTyped
 	withStartramReminderAllForDev  = config.WithStartramReminderAll
 )
 
@@ -65,7 +65,7 @@ func DevHandler(msg []byte) error {
 	return Handler(msg, Dependencies{
 		IsDevMode:                isDevFn(),
 		ListHardDisks:            listHardDisksForDev,
-		Conf:                     confForDev,
+		Config:                   configForDev,
 		CreateLocalBackup:        createLocalBackupForDev,
 		UploadLatestBackup:       uploadLatestBackupForDev,
 		RestoreBackupWithRequest: restoreBackupWithRequestForDev,
@@ -101,14 +101,14 @@ func Handler(msg []byte, deps Dependencies) error {
 			zap.L().Debug(fmt.Sprintf("lsblk: %+v", blockDevices))
 		}
 	case "backup-tlon":
-		conf := deps.Conf()
+		conf := deps.Config()
 		for _, patp := range conf.Connectivity.Piers {
 			if err := deps.CreateLocalBackup(patp, deps.BackupDir); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to backup tlon for %v", err))
 			}
 		}
 	case "remote-backup-tlon":
-		conf := deps.Conf()
+		conf := deps.Config()
 		for _, patp := range conf.Connectivity.Piers {
 			if err := deps.UploadLatestBackup(patp, conf.Connectivity.RemoteBackupPassword, deps.BackupDir); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to upload backup for %s: %v", patp, err))
@@ -131,7 +131,7 @@ func Handler(msg []byte, deps Dependencies) error {
 			}
 		}
 	case "startram-reminder":
-		conf := deps.Conf()
+		conf := deps.Config()
 		if !conf.Connectivity.WgRegistered {
 			return fmt.Errorf("No startram registration")
 		}
@@ -177,8 +177,8 @@ func Handler(msg []byte, deps Dependencies) error {
 func ResetDevSeams() {
 	isDevFn = checkDevMode
 	backupDirFn = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
-	listHardDisksForDev = system.ListHardDisks
-	confForDev = config.Conf
+	listHardDisksForDev = systemdisk.ListHardDisks
+	configForDev = config.Config
 	createLocalBackupForDev = backupsvc.CreateLocalBackup
 	uploadLatestBackupForDev = backupsvc.UploadLatestBackup
 	restoreBackupWithRequestForDev = startram.RestoreBackupWithRequest
@@ -186,6 +186,6 @@ func ResetDevSeams() {
 	nowForDev = time.Now
 	urbitConfForDev = config.UrbitConf
 	sendNotificationForDev = click.SendNotification
-	updateConfTypedForDev = config.UpdateConfTyped
+	updateConfTypedForDev = config.UpdateConfigTyped
 	withStartramReminderAllForDev = config.WithStartramReminderAll
 }

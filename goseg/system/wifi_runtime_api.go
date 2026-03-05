@@ -4,14 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"groundseg/internal/seams"
+	"os/exec"
 	"strings"
 )
 
-var ErrWifiInterfaceNotFound = errors.New("wifi interface not found")
+var ErrWiFiInterfaceNotFound = errors.New("wifi interface not found")
 
 type WiFiRuntimeService struct {
-	runtime wifiRuntime
-	state   *wifiRuntimeState
+	runtime         wifiRuntime
+	state           *wifiRuntimeState
+	prepareErr      error
+	runtimePrepared bool
 }
 
 func resolveWiFiRuntime(overrides ...wifiRuntime) wifiRuntime {
@@ -22,26 +26,57 @@ func resolveWiFiRuntime(overrides ...wifiRuntime) wifiRuntime {
 }
 
 func NewWiFiRuntimeService(runtime ...wifiRuntime) *WiFiRuntimeService {
-	runtimeInstance := NewWiFiRuntime()
-	if len(runtime) > 0 {
-		runtimeInstance = NewWiFiRuntimeWith(runtime[0])
-	}
-	return &WiFiRuntimeService{
+	runtimeInstance := resolveWiFiRuntime(runtime...)
+	service := &WiFiRuntimeService{
 		runtime: runtimeInstance,
 		state:   DefaultWiFiRuntimeState(),
 	}
+	if err := validateWiFiRuntime(service.runtime); err != nil {
+		service.prepareErr = err
+	} else {
+		service.runtimePrepared = true
+	}
+	return service
+}
+
+func validateWiFiRuntime(runtime wifiRuntime) error {
+	if runtime.ExecCommand == nil {
+		return seams.MissingRuntimeDependency("wifi runtime ExecCommand callback", "")
+	}
+	if runtime.RunCommand == nil {
+		return seams.MissingRuntimeDependency("wifi runtime RunCommand callback", "")
+	}
+	if runtime.RunNmcliFn == nil {
+		return seams.MissingRuntimeDependency("wifi runtime RunNmcliFn callback", "")
+	}
+	if runtime.NewWifiClient == nil {
+		return seams.MissingRuntimeDependency("wifi runtime NewWifiClient callback", "")
+	}
+	if runtime.ClientInterfacesFn == nil {
+		return seams.MissingRuntimeDependency("wifi runtime ClientInterfacesFn callback", "")
+	}
+	if runtime.ClientBSSFn == nil {
+		return seams.MissingRuntimeDependency("wifi runtime ClientBSSFn callback", "")
+	}
+	if runtime.WifiInfoTicker == nil {
+		return seams.MissingRuntimeDependency("wifi runtime WifiInfoTicker callback", "")
+	}
+	return nil
 }
 
 func (service *WiFiRuntimeService) prepareForUse() (wifiRuntime, *wifiRuntimeState, error) {
 	if service == nil {
 		return wifiRuntime{}, nil, fmt.Errorf("wifi runtime service is nil")
 	}
-
-	if service.runtime.RunCommand == nil {
-		service.runtime = NewWiFiRuntime()
+	if !service.runtimePrepared {
+		service.runtime = resolveWiFiRuntime(service.runtime)
+		if err := validateWiFiRuntime(service.runtime); err != nil {
+			service.prepareErr = err
+		}
+		service.runtimePrepared = true
 	}
-	if service.runtime.RunCommand == nil {
-		return wifiRuntime{}, nil, fmt.Errorf("wifi runtime failed to initialize")
+	if service.prepareErr != nil {
+		return wifiRuntime{}, nil, service.prepareErr
 	}
 
 	if service.state == nil {
@@ -54,21 +89,25 @@ func (service *WiFiRuntimeService) prepareForUse() (wifiRuntime, *wifiRuntimeSta
 	return service.runtime, service.state, nil
 }
 
-func (service *WiFiRuntimeService) IsWifiEnabled() (bool, error) {
+func (service *WiFiRuntimeService) IsWiFiEnabled() (bool, error) {
 	runtime, _, err := service.prepareForUse()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("prepare wifi runtime for IsWiFiEnabled: %w", err)
 	}
-	return runtime.ifCheck()
+	enabled, err := runtime.isWiFiRadioEnabled()
+	if err != nil {
+		return false, fmt.Errorf("read wifi enabled state: %w", err)
+	}
+	return enabled, nil
 }
 
-func (service *WiFiRuntimeService) ConstructWifiInfo(dev string) error {
+func (service *WiFiRuntimeService) RefreshWiFiInfo(interfaceName string) error {
 	runtime, state, err := service.prepareForUse()
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare wifi runtime for RefreshWiFiInfo: %w", err)
 	}
 
-	device := strings.TrimSpace(dev)
+	device := strings.TrimSpace(interfaceName)
 	if device == "" {
 		device = WiFiDevice(state)
 	}
@@ -80,23 +119,27 @@ func (service *WiFiRuntimeService) ConstructWifiInfo(dev string) error {
 	return nil
 }
 
-func (service *WiFiRuntimeService) ListWifiSSIDs(dev string) ([]string, error) {
+func (service *WiFiRuntimeService) ListWiFiSSIDs(interfaceName string) ([]string, error) {
 	runtime, state, err := service.prepareForUse()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("prepare wifi runtime for ListWiFiSSIDs: %w", err)
 	}
 
-	device, err := resolveDevice(dev, runtime, state)
+	device, err := resolveInterfaceName(interfaceName, runtime, state)
 	if err != nil {
 		return nil, fmt.Errorf("resolve wifi device: %w", err)
 	}
-	return runtime.listSSIDs(device)
+	ssids, err := runtime.listSSIDs(device)
+	if err != nil {
+		return nil, fmt.Errorf("list wifi SSIDs for %s: %w", device, err)
+	}
+	return ssids, nil
 }
 
-func (service *WiFiRuntimeService) ConnectToWifi(ssid, password string) error {
+func (service *WiFiRuntimeService) ConnectToWiFi(ssid, password string) error {
 	runtime, _, err := service.prepareForUse()
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare wifi runtime for ConnectToWiFi: %w", err)
 	}
 
 	ssid = strings.TrimSpace(ssid)
@@ -104,7 +147,7 @@ func (service *WiFiRuntimeService) ConnectToWifi(ssid, password string) error {
 		return fmt.Errorf("ssid cannot be empty")
 	}
 
-	enabled, err := runtime.ifCheck()
+	enabled, err := runtime.isWiFiRadioEnabled()
 	if err != nil {
 		return fmt.Errorf("check wifi radio before connect: %w", err)
 	}
@@ -113,47 +156,59 @@ func (service *WiFiRuntimeService) ConnectToWifi(ssid, password string) error {
 			return fmt.Errorf("enable wifi radio before connect: %w", err)
 		}
 	}
-	return runtime.connect(ssid, password)
+	if err := runtime.connect(ssid, password); err != nil {
+		return fmt.Errorf("connect to wifi SSID %q: %w", ssid, err)
+	}
+	return nil
 }
 
-func (service *WiFiRuntimeService) DisconnectWifi(ifaceName string) error {
+func (service *WiFiRuntimeService) DisconnectWiFi(interfaceName string) error {
 	runtime, state, err := service.prepareForUse()
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare wifi runtime for DisconnectWiFi: %w", err)
 	}
 
-	device, err := resolveDevice(ifaceName, runtime, state)
+	device, err := resolveInterfaceName(interfaceName, runtime, state)
 	if err != nil {
 		return fmt.Errorf("resolve wifi device for disconnect: %w", err)
 	}
-	return runtime.disconnect(device)
+	if err := runtime.disconnect(device); err != nil {
+		return fmt.Errorf("disconnect wifi interface %s: %w", device, err)
+	}
+	return nil
 }
 
-func (service *WiFiRuntimeService) ToggleDevice(dev string) error {
+func (service *WiFiRuntimeService) ToggleDevice(interfaceName string) error {
 	runtime, state, err := service.prepareForUse()
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare wifi runtime for ToggleDevice: %w", err)
 	}
 
-	device, err := resolveDevice(dev, runtime, state)
+	device, err := resolveInterfaceName(interfaceName, runtime, state)
 	if err != nil {
 		return fmt.Errorf("resolve wifi device for toggle: %w", err)
 	}
-	return runtime.toggleDevice(device)
+	if err := runtime.toggleDevice(device); err != nil {
+		return fmt.Errorf("toggle wifi device %s: %w", device, err)
+	}
+	return nil
 }
 
 func (service *WiFiRuntimeService) StartWiFiInfoLoop(ctx context.Context) error {
 	runtime, state, err := service.prepareForUse()
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare wifi runtime for StartWiFiInfoLoop: %w", err)
 	}
-	return startWiFiInfoLoop(ctx, runtime, state)
+	if err := startWiFiInfoLoop(ctx, runtime, state); err != nil {
+		return fmt.Errorf("start wifi info loop: %w", err)
+	}
+	return nil
 }
 
-func (service *WiFiRuntimeService) StopWiFiInfoLoop() {
+func (service *WiFiRuntimeService) StopWiFiInfoLoop() error {
 	_, state, err := service.prepareForUse()
 	if err != nil {
-		return
+		return fmt.Errorf("prepare wifi runtime for StopWiFiInfoLoop: %w", err)
 	}
 
 	state.stopMu.Lock()
@@ -164,18 +219,22 @@ func (service *WiFiRuntimeService) StopWiFiInfoLoop() {
 	if stop != nil {
 		stop()
 	}
+	return nil
 }
 
 func (service *WiFiRuntimeService) ApplyCaptiveRules() error {
 	runtime, _, err := service.prepareForUse()
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare wifi runtime for ApplyCaptiveRules: %w", err)
 	}
-	return runtime.applyCaptiveRules()
+	if err := runtime.applyCaptiveRules(); err != nil {
+		return fmt.Errorf("apply captive rules: %w", err)
+	}
+	return nil
 }
 
-func resolveDevice(dev string, runtime wifiRuntime, state *wifiRuntimeState) (string, error) {
-	device := strings.TrimSpace(dev)
+func resolveInterfaceName(interfaceName string, runtime wifiRuntime, state *wifiRuntimeState) (string, error) {
+	device := strings.TrimSpace(interfaceName)
 	if device != "" {
 		return device, nil
 	}
@@ -218,7 +277,7 @@ func startWiFiInfoLoopWithRadio(ctx context.Context, runtime wifiRuntime, radio 
 	return connectInfoLoop(ctx, runtime, radio, state)
 }
 
-func wifiInfoLoop(ctx context.Context, dev string, runtime wifiRuntime, radio wifiRadioService) {
+func wifiInfoLoop(ctx context.Context, interfaceName string, runtime wifiRuntime, radio wifiRadioService) {
 	ticker := runtime.WifiInfoTicker()
 	defer ticker.Stop()
 	for {
@@ -226,7 +285,22 @@ func wifiInfoLoop(ctx context.Context, dev string, runtime wifiRuntime, radio wi
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			radio.RefreshInfo(dev)
+			radio.RefreshInfo(interfaceName)
 		}
 	}
+}
+
+var rebootHostCommand = func() error {
+	cmd := exec.Command("reboot")
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("reboot host: %w", err)
+	}
+	return nil
+}
+
+// RebootHost performs a host reboot using the system runtime command path.
+// It is factored as a seam for safe test overrides.
+func RebootHost() error {
+	return rebootHostCommand()
 }

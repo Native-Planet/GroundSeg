@@ -1,0 +1,104 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 69.7
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime seams are modeled as large callback/ops structs across multiple modules (for container, snapshot, urbit, wireguard, startup/workflow concerns), and these seams are repeatedly retyped or wrapped rather than shared through a single cohesive contract.",
+        "Several packages reconstruct identical callback wiring via copy/paste-style assignments (`resolver`/`setter` functions map many fields from one bundle to another), so abstraction shape and dependency surface are duplicated instead of being a stable interface boundary.",
+        "Startup orchestration builds service start behavior via ad-hoc registries and manual lifecycle functions keyed by service names and mode flags, which centralizes flow control but does not provide a composable lifecycle abstraction."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 72.3,
+        "indirection_cost": 64.5,
+        "interface_honesty": 72.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bundles_redundant",
+      "summary": "The same operation capabilities are rewrapped through multiple duplicated callback bundles instead of a single cross-module interface, creating fragile and costly abstraction drift.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Both orchestration and workflow/importer paths define separate `*RuntimeOps`-style structs and repeatedly forward equivalent container/snapshot/urbit/wireguard operations field-by-field.",
+        "Runtime construction and resolution code copies many callbacks into new struct instances instead of relying on a shared contract or adapter boundary.",
+        "Main/bootstrap code introduces another seam layer that again wraps and forwards operations, increasing depth without introducing new abstraction behavior."
+      ],
+      "suggestion": "Introduce a small, explicit domain contract (e.g., a container/control-plane interface set) and build package-level adapters from implementations to that contract; consolidate duplicate runtime bundle definitions into shared interfaces and composition aliases, then delete repeated wrapper copy wiring.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_bundle_duplication"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "startup_service_callback_schema",
+      "summary": "Background-service startup/health/stop dependencies are encoded in service-name registries and callback schemas rather than behavior-driven lifecycle abstractions.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "Startup orchestration defines a large callback struct for background services and per-service start functions plus metadata maps instead of an explicit lifecycle abstraction interface.",
+        "Service mode differences are handled through spec arrays and runtime setter maps, which require new callsite edits for each behavior extension.",
+        "Tests interact with the callback schema directly, binding expected orchestration behavior to registration mechanics rather than contract-level service semantics."
+      ],
+      "suggestion": "Replace the flat callback registry with a `BackgroundService` interface (start/health/stop/retry policy methods) and wire concrete services through a small registry of implementations; keep mode-specific policy in service implementations, not orchestration glue.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_bundle_duplication"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "thin_wrapper_layers_without_contract",
+      "summary": "Several runtime helper functions are pass-through wrappers that add little behavioral value and obscure where abstraction boundaries should sit.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/transitions.go",
+        "goseg/broadcast/loop.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "Broadcast transition/runtime updates are split into multiple tiny forwarding functions that mostly delegate to lower-level handlers without adding domain-level validation or transformation.",
+        "Wi-Fi/system runtime methods similarly expose callback-heavy forwarding seams instead of a clearer interface for system-runtime operations.",
+        "The abstraction chain deepens call depth for tests and production code, while intent of each layer is not clearly differentiated."
+      ],
+      "suggestion": "Collapse unnecessary wrapper layers where they are semantic no-ops; convert to direct calls into cohesive interfaces or keep only layers that enforce invariant checks and explicit domain boundaries.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_bundle_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Over-fragmented seam model: callback bundles repeated across packages instead of shared, composable contracts.",
+      "Abstraction layers chosen for wiring flexibility rather than behavior encapsulation, increasing indirection overhead.",
+      "Service lifecycle concerns encoded as registration metadata/callback maps instead of explicit interfaces."
+    ],
+    "likely_symptoms": [
+      "callback_bundles_redundant",
+      "startup_service_callback_schema",
+      "thin_wrapper_layers_without_contract"
+    ],
+    "possible_false_positives": [
+      "Prior blind findings on importer/config may have represented historical warnings; I did not re-emit unless still observable in this batch context."
+    ]
+  }
+}

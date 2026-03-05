@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"groundseg/internal/resource"
 	"groundseg/structs"
 	"io"
 	"net"
@@ -32,7 +33,9 @@ func listener(patp string, conn net.Conn, info LickStatus) {
 		lickMu.Unlock()
 		// close connection
 		if conn != nil {
-			conn.Close()
+			if closeErr := resource.JoinCloseError(nil, conn, "close leak connection"); closeErr != nil {
+				zap.L().Warn(fmt.Sprintf("failed to close leak connection for %s: %v", patp, closeErr))
+			}
 		}
 		zap.L().Info(fmt.Sprintf("Closed lick channel for %s", patp))
 	}()

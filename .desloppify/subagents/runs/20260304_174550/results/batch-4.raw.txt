@@ -1,0 +1,119 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Configuration ownership is split between process-runtime context and unrelated Startram cache state in one module (`goseg/config/config.go`), while orchestration wiring pulls that global state directly (`goseg/docker/orchestration/runtime_ops.go`).",
+        "Action API surface in `goseg/protocol/actions/actions.go` repeats namespace-specific wrappers (`ParseUploadAction`/`ParseC2CAction`, `SupportedUploadActions`/`SupportedC2CActions`, metadata/compatibility pairs), indicating branch-per-namespace scaling instead of data-driven dispatch.",
+        "Contract conformance checks are repeated in separate test modules (`goseg/uploadsvc/service_test.go`, `goseg/system/wifi_c2c_flow_test.go`) with each scanning fixtures independently rather than sharing one domain-level contract assertion path.",
+        "Large tests repeatedly perform manual global-state restore patterns (`goseg/main_test.go`, `goseg/startuporchestrator/startup_orchestrator_test.go`, `goseg/handler/ship/urbit_test.go`, `goseg/importer/importer_test.go`), showing hidden coupling to mutable singletons."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "global_config_state_crosscut",
+      "summary": "Config module mixes unrelated responsibilities and forces cross-subsystem mutable singleton coupling.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/main_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/handler/ship/urbit_test.go"
+      ],
+      "evidence": [
+        "`goseg/config/config.go` contains both runtime process context mutation (`SetBasePath`, `SetArchitecture`, `SetDebugMode`, `SetDockerDir`) and separate Startram cache mutation (`SetStartramConfig`/`GetStartramConfig`) in the same package-level singleton state surface.",
+        "`goseg/docker/orchestration/runtime_ops.go` wires runtime seams directly to global config getters, coupling orchestration behavior to mutable package state rather than explicit dependency objects.",
+        "Multiple tests in different modules must snapshot and restore global config (`config.SetDebugMode` in `goseg/main_test.go`; repeated `config.SetBasePath` save/restore in `goseg/startuporchestrator/startup_orchestrator_test.go`; `config.SetStartramConfig` restore in `goseg/handler/ship/urbit_test.go`)."
+      ],
+      "suggestion": "Split config into focused services (process runtime context vs Startram snapshot store), pass immutable snapshots/dependencies into orchestration constructors, and centralize test fixtures around scoped runtime providers instead of direct global mutation.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_singleton_state"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "namespace_wrapper_duplication_in_actions",
+      "summary": "Action contract API repeats namespace-specific wrappers, creating change amplification for each new namespace.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/actions/actions_test.go",
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/uploadsvc/service_test.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` duplicates near-identical Upload/C2C wrappers for parse/supported-actions/metadata/compatibility helpers, each delegating to generic namespace methods with fixed constants.",
+        "Tests mirror this split surface and duplicate validation paths; e.g., upload and C2C behavior is asserted in separate modules (`goseg/uploadsvc/service_test.go`, `goseg/system/wifi_c2c_flow_test.go`) instead of exercising one normalized namespace contract table.",
+        "`goseg/protocol/actions/actions_test.go` contains overlapping unknown-upload parse tests (`TestParseUploadActionReportsDeterministicErrorType` and `TestParseUploadActionRejectsUnknown`) signaling API/test sprawl."
+      ],
+      "suggestion": "Collapse namespace-specific wrappers into a table-driven namespace descriptor API (single parse/support/metadata entrypoints + generated convenience aliases only where required) and consolidate tests around shared namespace conformance cases.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "namespace_specific_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "contract_fixture_checks_fragmented",
+      "summary": "Contract conformance checks are fragmented across feature tests instead of centralized, causing duplicated responsibility.",
+      "related_files": [
+        "goseg/uploadsvc/service_test.go",
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/protocol/contracts/contracts_test.go"
+      ],
+      "evidence": [
+        "`goseg/uploadsvc/service_test.go` scans all fixtures and validates upload namespace contracts inline (`TestUploadActionFixturesRemainConformant`).",
+        "`goseg/system/wifi_c2c_flow_test.go` performs another fixture scan for C2C alignment (`TestC2CPayloadAndContractsStayAligned`) using a similar loop pattern and failure handling.",
+        "`goseg/protocol/contracts/contracts_test.go` already validates registry/binding correctness globally, so additional per-feature fixture scans duplicate structural contract governance logic."
+      ],
+      "suggestion": "Move fixture enumeration/conformance assertions into a single protocol contract test helper package and let feature tests assert only feature behavior against typed actions, not catalog scanning.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "namespace_specific_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_runtime_state_harness_scattered",
+      "summary": "Large tests reimplement ad-hoc state/reset harnesses, reducing coherence of test architecture.",
+      "related_files": [
+        "goseg/importer/importer_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main_test.go",
+        "goseg/accesspoint/accesspoint_test.go"
+      ],
+      "evidence": [
+        "`goseg/importer/importer_test.go` defines multiple local reset/setup helpers (`resetUploadSessionsForTest`, `setUploadDirsForTest`, runtime accessor guards) to manually control global/static state.",
+        "`goseg/startuporchestrator/startup_orchestrator_test.go` embeds a large callback-setter map and custom runtime options to wire tests, then still uses repeated global config restoration patterns.",
+        "`goseg/main_test.go` and `goseg/accesspoint/accesspoint_test.go` use separate per-file seam/reset idioms instead of a shared test runtime fixture abstraction."
+      ],
+      "suggestion": "Introduce shared test runtime fixture builders for global config mutation, seam registration, and callback wiring; migrate repeated per-file setup/reset helpers to this common harness to reduce structural duplication.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "global_singleton_state"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Package-level mutable singleton state is still a core composition mechanism across runtime and tests.",
+      "Namespace growth is handled by additive wrapper functions instead of table-driven extension points.",
+      "Protocol governance assertions are distributed into feature modules rather than concentrated in one contract verification layer."
+    ],
+    "likely_symptoms": [
+      "namespace_wrapper_duplication_in_actions",
+      "contract_fixture_checks_fragmented",
+      "test_runtime_state_harness_scattered"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 81.0,
+    "high_level_elegance": 83.0,
+    "test_strategy": 87.0,
+    "package_organization": 89.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/protocol_contracts.go exports contract identities as package vars (`UploadActionOpenEndpoint`, `UploadActionReset`, `C2CConnectAction`) derived at init time, not immutable constants.",
+        "goseg/protocol/contracts/startram_contracts.go also exports `APIConnectionError` as a mutable package var, so canonical cross-module contract IDs can be reassigned in-package.",
+        "README.md documents these identifiers as compatibility-critical contract surfaces, so mutable symbol form weakens boundary integrity for modules depending on stable IDs."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "README.md hard-codes a long governance matrix of specific files/tests/workflow scripts for contract compatibility, creating a policy surface that must be manually synchronized with runtime evolution.",
+        "protocol_contracts.go and startram_contracts.go define contract catalog entries locally but do not embed policy metadata that can drive docs/CI generation from one source of truth.",
+        "This leaves architecture governance split between prose policy and runtime declarations, increasing docs-vs-runtime drift risk as new contract families are added."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md defines explicit backend quality-gate commands and a path-aware `Runtime Contract Gate` with targeted contract tests for protocol and StarTram surfaces.",
+        "README.md still depends on manual execution for core commands (`go test ./...` and integration-tag tests), so local/CI parity depends on process discipline rather than one enforced command path.",
+        "Contract declaration files (protocol_contracts.go, startram_contracts.go) contain critical identifiers/messages but no in-file guardrails (such as compile-time invariants) to complement external test enforcement."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Quality gates are present but partly process-driven; contract safety relies more on external workflow discipline than directly enforced invariants near declaration sites."
+    },
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows `goseg/protocol/contracts/` at 7 files (4 production, 3 test), which is a compact package shape rather than a large mixed-concern flat directory.",
+        "Assigned contract files are scoped to family-specific catalog declarations (`protocol_contracts.go`, `startram_contracts.go`) and align with package purpose.",
+        "README.md centralizes install/runtime/governance content in a single root file, which is practical but mixes user onboarding and deep backend governance details in one location."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Root documentation currently combines broad product docs and detailed backend governance policy, which slightly dilutes discoverability of package-level ownership boundaries."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_canonical_contract_ids",
+      "summary": "Canonical contract IDs are exported as mutable vars, weakening boundary guarantees.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`UploadActionOpenEndpoint`, `UploadActionReset`, `C2CConnectAction`, and `APIConnectionError` are package-level `var` exports, not immutable constants/accessors.",
+        "README marks protocol/StarTram contract surfaces as compatibility-governed and CI-gated, but the identifiers themselves are mutable by in-package code.",
+        "Mutable canonical IDs increase risk of accidental reassignment during future refactors and blur stable contract boundaries."
+      ],
+      "suggestion": "Refactor contract identity exports to immutable-style APIs: keep raw IDs unexported, expose typed getter functions (`func UploadActionOpenEndpointID() ContractID`), and add a package test that verifies registry descriptors use those accessors and remain stable. Stage order: 1) introduce new accessors in `protocol_contracts.go` and `startram_contracts.go`, 2) update call sites to use accessors, 3) add regression tests for identity stability, 4) run `cd goseg && go test ./protocol/contracts ./protocol/actions ./startram`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_not_encoded_as_immutable_primitives"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "governance_split_between_readme_and_runtime",
+      "summary": "Contract governance is documented as manual prose instead of generated from runtime catalog.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README embeds detailed per-file governance requirements and CI gate scope as static prose.",
+        "Contract family declarations in `protocol_contracts.go` and `startram_contracts.go` do not carry governance attributes that can be consumed to auto-produce policy docs/check inputs.",
+        "As contract families evolve, policy synchronization requires manual multi-location updates, increasing architectural drift risk."
+      ],
+      "suggestion": "Create a single machine-readable governance manifest in `goseg/protocol/contracts` (for families, required tests, lifecycle policy), then generate README governance snippets and gate inputs from it. Staged reorg plan: 1) add `goseg/protocol/contracts/governance_manifest.go` (or JSON under `goseg/protocol/contracts/metadata/`), 2) move family policy tokens from README prose into manifest-backed docs section, 3) update gate script/workflow consumers to read manifest, 4) validate with `cd goseg && go test ./protocol/contracts` and run existing gate script (`.github/scripts/check-upload-contract.sh`) in CI.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_not_encoded_as_immutable_primitives"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Compatibility policy is encoded primarily in documentation/process, not strongly in immutable code primitives and generated governance artifacts."
+    ],
+    "likely_symptoms": [
+      "mutable_canonical_contract_ids",
+      "governance_split_between_readme_and_runtime"
+    ],
+    "possible_false_positives": [
+      "Some mutability risk may be partially mitigated by tests outside assigned files, but that mitigation is not visible within this batch scope."
+    ]
+  }
+}

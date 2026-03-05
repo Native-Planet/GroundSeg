@@ -70,19 +70,19 @@ type supportRequest struct {
 
 func defaultSupportRuntime() supportRuntime {
 	return supportRuntime{
-		now:                     time.Now,
-		unmarshal:               json.Unmarshal,
+		now:       time.Now,
+		unmarshal: json.Unmarshal,
 		publishSystemTransition: func(transition structs.SystemTransition) {
 			_ = events.DefaultEventRuntime().PublishSystemTransition(context.Background(), transition)
 		},
-		reportRootPath:          makeBugReportPath,
-		mkdirAllFn:              os.MkdirAll,
-		removeAllFn:             os.RemoveAll,
-		zipDirFn:                zipDir,
-		dumpBugReportFn:         dumpBugReport,
-		captureCPUProfileFn:     captureCPUProfile,
-		bugEndpoint:             defaultBugEndpoint,
-		sendBugReportFn:         sendBugReportWithEndpoint,
+		reportRootPath:      makeBugReportPath,
+		mkdirAllFn:          os.MkdirAll,
+		removeAllFn:         os.RemoveAll,
+		zipDirFn:            zipDir,
+		dumpBugReportFn:     dumpBugReport,
+		captureCPUProfileFn: captureCPUProfile,
+		bugEndpoint:         defaultBugEndpoint,
+		sendBugReportFn:     sendBugReportWithEndpoint,
 	}
 }
 
@@ -310,24 +310,28 @@ func (p defaultSupportTransitionPublisher) PublishSuccess() {
 	if p.publish == nil {
 		return
 	}
-	shipworkflow.PublishTransitionWithPolicy(
+	if err := shipworkflow.PublishTransitionWithPolicy(
 		p.publish,
 		structs.SystemTransition{Type: "bugReport", Event: "success"},
 		structs.SystemTransition{Type: "bugReport", Event: "done"},
 		3*time.Second,
-	)
+	); err != nil {
+		zap.L().Warn(fmt.Sprintf("failed to publish support success transition: %v", err))
+	}
 }
 
 func (p defaultSupportTransitionPublisher) PublishFailure(message string) {
 	if p.publish == nil {
 		return
 	}
-	shipworkflow.PublishTransitionWithPolicy(
+	if err := shipworkflow.PublishTransitionWithPolicy(
 		p.publish,
 		structs.SystemTransition{Type: "bugReportError", Event: message},
 		structs.SystemTransition{Type: "bugReportError", Event: ""},
 		3*time.Second,
-	)
+	); err != nil {
+		zap.L().Warn(fmt.Sprintf("failed to publish support failure transition: %v", err))
+	}
 }
 
 func decodeSupportRequest(msg []byte, now func() time.Time, unmarshal func([]byte, any) error) (supportRequest, error) {

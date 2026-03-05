@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/hsanjuan/go-captive"
 	"groundseg/system/wifi/transport"
+
+	"github.com/hsanjuan/go-captive"
 )
 
 type captiveTransportAdapter struct {
@@ -19,8 +20,8 @@ func newCaptiveTransportAdapter(deps c2cServiceDeps) *captiveTransportAdapter {
 			return processC2CMessageForAdapterWithDeps(msg, deps)
 		},
 	}
-	listSSIDs := func(dev string) ([]string, error) {
-		return NewWiFiRuntimeService().ListWifiSSIDs(dev)
+	listSSIDs := func(interfaceName string) ([]string, error) {
+		return NewWiFiRuntimeService().ListWiFiSSIDs(interfaceName)
 	}
 	adapter.inner = transport.NewCaptiveTransportAdapter(listSSIDs, adapter.processMessage)
 	return adapter
@@ -41,6 +42,6 @@ func (a *captiveTransportAdapter) processMessage(msg []byte) error {
 	return a.processC2CMessage(msg)
 }
 
-func (a *captiveTransportAdapter) broadcastNetworks(dev string) {
-	a.inner.BroadcastNetworks(dev)
+func (a *captiveTransportAdapter) broadcastNetworks(interfaceName string) {
+	a.inner.BroadcastNetworks(interfaceName)
 }

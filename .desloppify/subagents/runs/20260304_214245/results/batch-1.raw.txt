@@ -1,0 +1,74 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract identity primitives are re-declared in multiple modules: `ProtocolActionContractRoot` and action namespace/action constants exist in both `goseg/protocol/contracts/protocolfamily/specs.go` and `goseg/uploadsvc/contractspec/specs.go`.",
+        "Each module assembles contract IDs independently (`C2CConnectActionID`, `UploadOpenEndpointActionID`, `UploadResetActionID`) rather than consuming a single shared boundary model, increasing drift risk when IDs or naming conventions evolve.",
+        "Cross-package consistency is enforced mainly through tests (`goseg/protocol/contracts/family_specs_test.go`, `goseg/uploadsvc/contractspec/contractspec_test.go`, `goseg/protocol/contracts/conformance/fixtures_test.go`) instead of compile-time architectural ownership.",
+        "No import-time side effects were observed in the assigned files; modules are data/spec oriented and test-only coordination is explicit."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "duplicated_contract_identity_boundary",
+      "summary": "Protocol contract identity rules are duplicated across protocol and uploadsvc packages instead of owned by one shared boundary.",
+      "related_files": [
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/uploadsvc/contractspec/specs.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/uploadsvc/contractspec/contractspec_test.go"
+      ],
+      "evidence": [
+        "`ProtocolActionContractRoot` is defined in both protocolfamily and uploadsvc contractspec packages.",
+        "Both packages construct contract IDs by string concatenation with local constants, creating parallel sources of truth for naming and ID shape.",
+        "Alignment is validated after the fact by integration-style tests rather than by shared type/constructor ownership."
+      ],
+      "suggestion": "Extract contract identity primitives (root, namespace/action keys, ID constructor/validator) into a single shared contracts boundary package and make feature packages supply only domain-specific entries. Keep one canonical constructor for action contract IDs and reuse it from both protocol and uploadsvc specs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fragmented_contract_model"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "parallel_spec_models_without_common_contract_schema",
+      "summary": "Multiple near-identical spec structs across modules indicate a missing shared contract schema boundary.",
+      "related_files": [
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/uploadsvc/contractspec/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go"
+      ],
+      "evidence": [
+        "`ActionSpec`, `UploadActionSpec`, and `ContractSpec` all encode overlapping metadata (`ID/ContractID`, name, description, owner) with inconsistent field shape.",
+        "The schema divergence forces mapping/validation glue in tests and contract assembly paths, rather than direct reuse of one cross-module model.",
+        "This pattern increases coupling via coordination overhead whenever metadata requirements change (e.g., governance fields, message fields)."
+      ],
+      "suggestion": "Define a single canonical spec DTO in `protocol/contracts` (with optional typed extensions where needed) and have family-specific packages return that shared shape. Add package-level constructors/adapters so cross-module wiring composes one model instead of parallel structs.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_contract_model"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract boundary ownership is distributed across feature packages instead of centralized in one architectural contract module.",
+      "Schema duplication has been tolerated and backstopped by tests, masking architectural drift until validation time."
+    ],
+    "likely_symptoms": [
+      "duplicated_contract_identity_boundary",
+      "parallel_spec_models_without_common_contract_schema"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 72.0,
+    "dependency_health": 84.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime wiring is split into many callback-bag structs with group-tag validation instead of cohesive interfaces (e.g., startupInitCoreRuntime/startupInitHostRuntime/startupInitStorageRuntime and startBackgroundServicesRuntime in goseg/startuporchestrator/startup_orchestrator.go; importerStorageRuntime/importerUploadRuntime/importerProvisionRuntime in goseg/importer/importer.go; RuntimeContainerOps/RuntimeSnapshotOps/RuntimeUrbitOps/... in goseg/docker/orchestration/runtime_ops.go).",
+        "Multiple helper methods only reshape runtime bags without adding policy (importerRuntime.initRuntime/workflowRuntime/publishRuntime and importerWorkflowRuntime.publishRuntime in goseg/importer/importer.go).",
+        "Several service methods are thin prepare-and-forward wrappers (e.g., WiFiRuntimeService methods in goseg/system/wifi_runtime_api.go repeatedly call prepareForUse and delegate immediately), increasing indirection depth without reducing domain complexity."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 68.0,
+        "indirection_cost": 70.0,
+        "interface_honesty": 78.0
+      }
+    },
+    "dependency_health": {
+      "evidence": [
+        "The broad cross-module dependency on groundseg/structs is concentrated in many assigned files (e.g., goseg/broadcast/state.go, goseg/leak/broadcast.go, goseg/routines/version.go, goseg/docker/events/events.go, goseg/docker/orchestration/subsystem/subsystem_events.go, goseg/shipworkflow/operations_runtime.go), creating a high-fan-in shared-types hub.",
+        "Config event handling depends directly on system package channel source (goseg/config/config_events.go uses system.ConfigEventChannel), while startup orchestration also binds config event startup to system-channel behavior (goseg/startuporchestrator/startup_orchestrator.go). This couples configuration flow to system runtime implementation details."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_runtime_sprawl",
+      "summary": "Runtime behavior is fragmented into large callback-bag structs, causing high indirection and weak domain boundaries.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "startuporchestrator defines multiple runtime bags plus separate validate paths (startupInitRuntime.validate, StartupRuntime.validate, startBackgroundServicesRuntime.validate), all based on callback presence groups.",
+        "importer repeats the same pattern with importerStorageRuntime/importerUploadRuntime/importerProvisionRuntime and multiple validation passes (validateImporterConfigRuntime/upload/provision/publish).",
+        "orchestration runtime defines many function-only ops structs (RuntimeContainerOps, RuntimeSnapshotOps, RuntimeUrbitOps, RuntimeWireguardOps, etc.), then assembles them via runtimeSeamRegistry/buildRuntimeSeamBundle.",
+        "This pattern appears in entrypoints (main bootstrapRuntime/c2cRuntime) and workflow runtime resolution, indicating systemic abstraction style rather than isolated need."
+      ],
+      "suggestion": "Introduce narrower role interfaces around stable capabilities (for example, container lifecycle, config snapshots, transition publishing), and convert callback-bag structs into composed implementations of those interfaces. Keep test seams at constructors only, not throughout call chains.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_callback_bag_pattern"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_runtime_slicing",
+      "summary": "Several runtime helpers only copy/reshape callback fields, adding API surface without behavior.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "importerRuntime.initRuntime/workflowRuntime/publishRuntime and importerWorkflowRuntime.publishRuntime mostly repackage existing fields with no policy or transformation logic.",
+        "WiFiRuntimeService public methods repeatedly follow prepareForUse then immediate single-runtime-call forwarding, which duplicates wrapper boilerplate per method.",
+        "EventRuntime methods (Publish*/Transitions*) are repetitive delegate-or-fallback wrappers over the same routing pattern."
+      ],
+      "suggestion": "Collapse pure reshaping layers into one runtime preparation boundary and use reusable execution helpers for repeated delegate patterns. Keep only wrappers that enforce distinct policy (timeouts, retries, auth, error mapping).",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_callback_bag_pattern"
+    },
+    {
+      "dimension": "dependency_health",
+      "identifier": "shared_structs_hub_and_event_source_coupling",
+      "summary": "A central shared-types hub plus config-to-system event sourcing creates tight cross-subsystem coupling.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/docker/events/events.go",
+        "goseg/broadcast/state.go",
+        "goseg/leak/broadcast.go",
+        "goseg/routines/version.go",
+        "goseg/config/config_events.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "Many unrelated packages depend directly on groundseg/structs payloads and config shapes, concentrating dependency fan-in on a single mutable schema package.",
+        "config_events default runtime pulls channel directly from system.ConfigEventChannel, binding config runtime to a system package dependency instead of a local event interface.",
+        "startuporchestrator wires StartConfigEventLoopFn to StartConfigEventLoopFromSystemChannel, reinforcing the same cross-package source coupling."
+      ],
+      "suggestion": "Split `structs` into bounded DTO packages per domain (config, transitions, docker events, broadcast payloads) and move config event source behind an injected interface owned by config (system should implement provider, not be imported directly by config).",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "cross_subsystem_coupling_via_shared_types"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Preference for function-field runtime bags as the default seam mechanism led to broad indirection across runtime-critical paths.",
+      "Cross-domain DTOs accumulated in a single shared package, making package boundaries porous and dependency direction less explicit."
+    ],
+    "likely_symptoms": [
+      "pass_through_runtime_slicing"
+    ],
+    "possible_false_positives": []
+  }
+}

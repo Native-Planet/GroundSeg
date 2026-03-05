@@ -1,0 +1,91 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 4,
+  "assessments": {
+    "high_level_elegance": 72.0
+  },
+  "dimension_notes": {
+    "high_level_elegance": {
+      "evidence": [
+        "`goseg/config/bootstrap.go` performs process bootstrap concerns (CLI arg parsing in `setDebugMode`, environment-based base path detection, one-time init orchestration) while `goseg/config/config.go` also holds long-lived config state and snapshot APIs, so package ownership spans boot/runtime/store layers.",
+        "`goseg/system/disk_fstab.go` and `goseg/system/disk_health.go` are mostly pass-through bridges to `system/disk` and `system/storage` with little policy, creating overlapping boundaries between parent `system` and child packages.",
+        "`goseg/shipworkflow/lifecycle.go` contains generic helpers (`PollWithTimeout`) and thin persistence forwarding (`PersistUrbitConfig`) inside a package documented as lifecycle coordination in `goseg/shipworkflow/doc.go`, which weakens domain-focused placement."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "config_bootstrap_runtime_boundary_blur",
+      "summary": "The config package mixes bootstrap orchestration, runtime context wiring, and config-state ownership.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "`initializeConfig` in `bootstrap.go` handles process startup sequencing and environment-derived setup, including debug-mode argument parsing and base-path initialization.",
+        "`config.go` also owns runtime context defaults (`basePathDefault`, `architectureDefault`, `dockerDirDefault`) and mutable config snapshots/state APIs (`SetStartramConfig`, settings snapshot structs), combining execution-context concerns with config-domain state."
+      ],
+      "suggestion": "Split ownership into explicit layers: keep persistent config/state APIs in `config`, move process/runtime bootstrap and runtime-context derivation into a dedicated bootstrap/runtime package, and leave `config.Initialize` as a thin composition point.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "package_boundary_blur"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "system_disk_shim_overlap",
+      "summary": "Top-level `system` files duplicate subpackage APIs via pass-through shims, obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/system/disk_fstab.go",
+        "goseg/system/disk_health.go",
+        "goseg/system/disk_fstab_test.go"
+      ],
+      "evidence": [
+        "`disk_fstab.go` re-exports behavior from `system/disk` (`ParseFstabLine`, `ReconcileFstabLines`, `ReadFstabLines`, `WriteFstabLines`) via aliases/wrappers with no additional policy.",
+        "`disk_health.go` similarly forwards SMART/disk operations to `system/storage` (`SmartResultsSnapshot`, `SetSmartResults`, `ListHardDisks`, `SmartCheckAllDrives`).",
+        "`disk_fstab_test.go` is only a smoke placeholder, indicating the parent-layer files are largely structural shims rather than a validated facade contract."
+      ],
+      "suggestion": "Choose one boundary: either expose disk behavior directly from `system/disk` and `system/storage` (remove shims), or define a cohesive, policy-bearing `system` facade with explicit domain semantics and real contract tests.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "package_boundary_blur"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "shipworkflow_contains_non_domain_utilities",
+      "summary": "Ship workflow package includes generic utility and persistence plumbing not aligned with lifecycle ownership.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go"
+      ],
+      "evidence": [
+        "`doc.go` describes `shipworkflow` as lifecycle/transition coordination, but `lifecycle.go` includes generic polling infrastructure (`PollWithTimeout`) reusable outside ship workflows.",
+        "`PersistUrbitConfig` is a thin forwarder around injected persistence function, placing config mutation plumbing in lifecycle package rather than at boundary-specific composition points.",
+        "`lifecycle_test.go` is only a placeholder smoke test, so package-level responsibility drift is not constrained by behavior-focused tests."
+      ],
+      "suggestion": "Keep `shipworkflow` focused on lifecycle orchestration: move generic polling to a shared runtime utility package and move config persistence adapters closer to config/integration seams; retain only ship-domain operations in this package.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "package_boundary_blur"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Historical convenience wrappers were retained at parent package level instead of enforcing a single authoritative boundary per domain.",
+      "Process/bootstrap concerns were allowed to accumulate in domain packages, creating mixed ownership across runtime, state, and orchestration layers."
+    ],
+    "likely_symptoms": [
+      "system_disk_shim_overlap",
+      "shipworkflow_contains_non_domain_utilities"
+    ],
+    "possible_false_positives": []
+  }
+}

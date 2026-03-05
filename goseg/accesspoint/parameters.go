@@ -3,12 +3,16 @@ package accesspoint
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 // validateIP validates the IP address format.
 func validateIP(ip string) bool {
-	parsedIP := net.ParseIP(ip)
-	return parsedIP != nil
+	parsedIP := net.ParseIP(strings.TrimSpace(ip))
+	if parsedIP == nil {
+		return false
+	}
+	return parsedIP.To4() != nil
 }
 
 func hasInterface(interfaceNames []string, target string) bool {

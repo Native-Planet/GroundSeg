@@ -36,7 +36,7 @@ func (s *stubC2CService) Execute(action actions.Action, ssid, password string) e
 		}
 		return s.RestartGroundSeg()
 	default:
-		return actions.UnsupportedActionError{Namespace: "c2c", Action: action}
+		return actions.UnsupportedActionError{Namespace: actions.NamespaceC2C, Action: action}
 	}
 }
 

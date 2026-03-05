@@ -1,0 +1,719 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_213121/results/batch-5.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 5
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy, package_organization
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/protocolfamily/specs.go
+- goseg/protocol/contracts/startramfamily/specs.go
+- goseg/uploadsvc/actions_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+9a. For package_organization, ground scoring in objective structure signals from `holistic_context.structure` (root_files fan_in/fan_out roles, directory_profiles, coupling_matrix). Prefer thresholded evidence (for example: fan_in < 5 for root stragglers, import-affinity > 60%, directories > 10 files with mixed concerns).
+9b. Suggestions must include a staged reorg plan (target folders, move order, and import-update/validation commands).
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 71.0,
+    "package_organization": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/contracts/protocolfamily/specs.go` defines its own `ActionSpec` and hard-coded contract constants/owner strings, while `goseg/protocol/contracts/family_specs_test.go` exercises `contractFamilyEntrySpec`/catalog validation paths from a different contract model.",
+        "`goseg/protocol/contracts/startramfamily/specs.go` similarly defines a separate `ContractSpec` shape and IDs outside the validated family-entry pipeline covered in `family_specs_test.go`.",
+        "The listed tests (`fixtures_test.go`, `family_specs_test.go`, `actions_test.go`) verify local invariants but do not establish a single enforced boundary between runtime contract families and governance metadata."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`family_specs_test.go` builds synthetic `contractFamilyEntrySpec` values inline instead of validating real outputs from `protocolfamily.ActionSpecs()` and `startramfamily.ContractSpecs()`.",
+        "`fixtures_test.go` validates fixture/binding consistency but does not assert that family spec declarations remain synchronized with canonical bindings and governance metadata.",
+        "`uploadsvc/actions_test.go` validates parser behavior only; it does not test cross-module compatibility from parsed action -> contract binding -> family spec governance."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "From `holistic_context.structure.directory_profiles`, `goseg/protocol/contracts/` is a mixed directory with 11 files (5 production, 6 test), indicating broad concern concentration at one level.",
+        "The assigned family spec files live in `goseg/protocol/contracts/protocolfamily/` and `goseg/protocol/contracts/startramfamily/`, but these directories are not represented in `directory_profiles`, while neighboring `conformance/` is represented; this creates a discoverability mismatch between real code placement and structural metadata.",
+        "Family declarations are split across multiple small leaf packages plus root-level contract tests (`family_specs_test.go`), which increases navigation cost for governance-contract changes."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_family_model_split_brain",
+      "summary": "Contract family declarations use separate data models without a single enforced architecture contract.",
+      "related_files": [
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go"
+      ],
+      "evidence": [
+        "`family_specs_test.go` validates `contractFamilyEntrySpec`/catalog governance paths, but `protocolfamily/specs.go` and `startramfamily/specs.go` define separate `ActionSpec`/`ContractSpec` models.",
+        "Both family packages carry contract IDs and owner metadata as independent string constants, creating parallel authority for governance data."
+      ],
+      "suggestion": "Create one canonical family-spec schema in `goseg/protocol/contracts` (shared struct + validator), then make `protocolfamily` and `startramfamily` producers of that schema only. Remove duplicated model types and route all family declarations through one compile-time checked conversion path before catalog/binding registration.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "governance_contract_source_fragmentation"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "governance_tests_use_synthetic_inputs",
+      "summary": "Governance tests validate synthetic specs but miss regression coverage for real family declarations.",
+      "related_files": [
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`family_specs_test.go` constructs local sample specs instead of loading `ActionSpecs()`/`ContractSpecs()` from family packages.",
+        "`fixtures_test.go` and `actions_test.go` do not bridge parser/binding behavior to governance family declarations, leaving compatibility drift undetected."
+      ],
+      "suggestion": "Add contract-integration tests that: (1) load all real family declarations, (2) assert each declared action/error maps to canonical catalog/bindings, and (3) assert parser-accepted actions (`uploadsvc`) resolve to governed contract entries. Keep existing unit tests, but add this cross-module suite as a required quality gate.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_contract_source_fragmentation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "family_contract_layout_hides_ownership",
+      "summary": "Family contract files are split across root and micro-packages, obscuring ownership and change boundaries.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go"
+      ],
+      "evidence": [
+        "README sets backend quality-gate expectations, but contract-governance code is dispersed across `contracts/` root tests and separate family leaf packages with different local schemas.",
+        "`directory_profiles` shows `goseg/protocol/contracts/` already has 11 mixed files, and family package placement is not reflected consistently in structure metadata, reducing navigability."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1: create `goseg/protocol/contracts/families/protocol/` and `goseg/protocol/contracts/families/startram/` with a shared `families/spec.go` schema in `goseg/protocol/contracts/families/`. Stage 2: move `protocolfamily/specs.go` and `startramfamily/specs.go` into those targets and rename local types to the shared schema. Stage 3: move/adjust family-governance tests to `goseg/protocol/contracts/families/...` so tests are colocated with declarations. Stage 4: run import updates and validation commands: `cd goseg && gofmt -w ./protocol/contracts/... && go test ./protocol/contracts/... ./uploadsvc/... && go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_contract_source_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance contract authority is fragmented across multiple package-local spec types instead of one canonical contract model.",
+      "Tests emphasize local unit invariants, not cross-module governance compatibility paths."
+    ],
+    "likely_symptoms": [
+      "contract_family_model_split_brain",
+      "governance_tests_use_synthetic_inputs",
+      "family_contract_layout_hides_ownership"
+    ],
+    "possible_false_positives": [
+      "directory_profiles omission for some family subdirectories may partly reflect analyzer visibility limits rather than intentional package design"
+    ]
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cbac4-0145-7342-bdf1-c88ec8e5e340
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 5
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy, package_organization
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/protocolfamily/specs.go
+- goseg/protocol/contracts/startramfamily/specs.go
+- goseg/uploadsvc/actions_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+9a. For package_organization, ground scoring in objective structure signals from `holistic_context.structure` (root_files fan_in/fan_out roles, directory_profiles, coupling_matrix). Prefer thresholded evidence (for example: fan_in < 5 for root stragglers, import-affinity > 60%, directories > 10 files with mixed concerns).
+9b. Suggestions must include a staged reorg plan (target folders, move order, and import-update/validation commands).
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll review only the specified batch inputs and dimensions by reading the blind packet plus the six listed files, then return a strict JSON assessment with evidence-backed findings. I’m starting by collecting those files now.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' README.md" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/contracts/protocolfamily/specs.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/contracts/family_specs_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/contracts/conformance/fixtures_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/contracts/startramfamily/specs.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,320p' goseg/uploadsvc/actions_test.go" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+package conformance
+
+import (
+	"testing"
+
+	"groundseg/protocol/actions"
+	"groundseg/protocol/contracts"
+)
+
+func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+	fixtures := ActionContractFixtures()
+	if len(fixtures) == 0 {
+		t.Fatal("expected at least one action contract fixture")
+	}
+
+	foundC2C := false
+	for _, fixture := range fixtures {
+		if err := ValidateActionContractFixture(fixture); err != nil {
+			t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+		}
+ succeeded in 52ms:
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "ai_generated_debt",
+    "api_surface_coherence",
+    "abstraction_fitness",
+    "convention_outlier",
+    "cross_module_architecture",
+    "design_coherence",
+    "error_consistency",
+    "initialization_coupling",
+    "naming_quality",
+    "package_organization",
+    "test_strategy"
+  ],
+  "dimension_prompts": {
+    "ai_generated_debt": {
+      "description": "LLM-hallmark patterns: restating comments, defensive overengineering, boilerplate",
+ succeeded in 52ms:
+package protocolfamily
+
+const (
+	ProtocolActionContractRoot = "protocol.actions"
+
+	ActionNamespaceC2C = "c2c"
+	ActionC2CConnect   = "connect"
+)
+
+const C2CConnectActionID = ProtocolActionContractRoot + "." + ActionNamespaceC2C + "." + ActionC2CConnect
+
+type ActionSpec struct {
+	Namespace   string
+	Action      string
+	ContractID  string
+	Name        string
+	Description string
+	Owner       string
+}
+
+ succeeded in 52ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+ succeeded in 51ms:
+package contracts
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestBuildContractFamilyEntriesFromSpecs(t *testing.T) {
+	specs := []contractFamilyEntrySpec{
+		{
+			ID:          UploadOpenEndpointAction,
+			Namespace:   ActionNamespaceUpload,
+			Action:      ActionUploadOpenEndpoint,
+			Name:        "upload open endpoint",
+			Description: "open upload endpoint contract",
+			Message:     "upload open endpoint message",
+			Governance: contractGovernanceMetadata{
+				OwnerModule:  "uploadsvc",
+				Stability:    CompatibilityBackwardSafe,
+				SinceVersion: contractMetadataFor(UploadOpenEndpointAction).IntroducedIn,
+ succeeded in 52ms:
+package startramfamily
+
+const (
+	ContractFamily = "startram"
+	ContractScope  = "errors"
+	APIConnSlug    = "api-connection"
+
+	APIConnectionErrorMessage     = "Unable to connect to API server"
+	APIConnectionErrorName        = "APIConnectionError"
+	APIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+)
+
+const APIConnectionErrorID = ContractFamily + "." + ContractScope + "." + APIConnSlug
+
+type ContractSpec struct {
+	ID          string
+	Name        string
+	Description string
+	Message     string
+	Owner       string
+ succeeded in 51ms:
+package uploadsvc
+
+import "testing"
+
+func TestParseUploadActionAcceptsKnownActions(t *testing.T) {
+	t.Parallel()
+
+	gotOpen, err := ParseUploadAction(string(ActionUploadOpenEndpoint))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(open-endpoint) returned error: %v", err)
+	}
+	if gotOpen != ActionUploadOpenEndpoint {
+		t.Fatalf("unexpected parsed open-endpoint action: %q", gotOpen)
+	}
+
+	gotReset, err := ParseUploadAction(string(ActionUploadReset))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(reset) returned error: %v", err)
+	}
+	if gotReset != ActionUploadReset {
+codex
+I’ve loaded the target files; next I need the rest of the blind packet (especially `system_prompt`, prior findings, and structure metrics) to ensure the output format and scoring constraints are exact. I’m pulling the remaining sections now.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && wc -l .desloppify/review_packet_blind.json && sed -n '261,620p' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+    6531 .desloppify/review_packet_blind.json
+          "file": "goseg/uploadsvc/contractspec/contractspec_test.go",
+          "line": 34,
+          "code": "t.Fatalf(\"missing open-endpoint contract entry\")"
+        },
+        {
+          "file": "goseg/uploadsvc/contractspec/specs.go",
+          "line": 8,
+          "code": "ActionUploadOpenEndpoint = \"open-endpoint\""
+        },
+        {
+          "file": "goseg/uploadsvc/contractspec/specs.go",
+          "line": 33,
+          "code": "Description: \"open upload endpoint\","
+        }
+      ]
+    },
+    "conventions": {
+      "naming_by_directory": {},
+      "sibling_behavior": {}
+codex
+I have enough file content; now I’m locating the batch-specific section in the blind packet (including any prior flagged issues and structure signals) so findings are scoped correctly and consistent with packet instructions.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '6200,6531p' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg -n 'Governance & Contracts|batch_index|system_prompt|previous|prior|cross_module_architecture|package_organization|test_strategy|structure|root_files|directory_profiles|coupling_matrix' .desloppify/review_packet_blind.json | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go",
+        "goseg/config/bootstrap.go",
+        "goseg/config/bootstrap_test.go",
+        "goseg/config/config.go",
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_bridge_test.go",
+        "goseg/docker/orchestration/container_config.go"
+      ],
+      "why": "file placement, directory boundaries, architectural layering"
+    },
+    {
+      "name": "Governance & Contracts",
+      "dimensions": [
+        "cross_module_architecture",
+        "test_strategy",
+        "package_organization"
+      ],
+      "files_to_read": [
+        "README.md",
+ succeeded in 51ms:
+10:    "cross_module_architecture",
+15:    "package_organization",
+16:    "test_strategy"
+67:        "If the core issue is dependency direction or cycles, use cross_module_architecture"
+78:        "Inconsistent plugin organization: sibling plugins structured differently",
+79:        "Large __init__.py re-export surfaces that obscure internal module structure"
+86:    "cross_module_architecture": {
+99:        "Package naming/placement tidy-ups without boundary harm (belongs to package_organization)",
+166:    "package_organization": {
+169:        "Use holistic_context.structure as objective evidence: root_files (fan_in/fan_out + role), directory_profiles (file_count/avg fan-in/out), and coupling_matrix (cross-directory edges)",
+178:        "Small projects (<20 files) where flat structure is appropriate",
+180:        "Test directories mirroring production structure",
+184:    "test_strategy": {
+542:        "BackupInfrastructureService",
+1384:        "SetBackupInfrastructureService",
+2750:    "structure": {
+2751:      "directory_profiles": {
+3896:            "structured.go",
+3897:            "structured_test.go"
+5466:      "goseg/orchestration/structured.go": [
+codex
+I found the batch metadata and system prompt. I’m now extracting objective structure/coupling entries tied to `README`, `protocol/contracts`, and `uploadsvc` so the `package_organization` score is grounded in the packet’s thresholds.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '2738,2915p' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg -n '\"root_files\"|\"directory_profiles\"|\"coupling_matrix\"|\"README.md\"|\"goseg/protocol/contracts\"|\"goseg/uploadsvc\"' .desloppify/review_packet_blind.json | sed -n '1,320p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+2751:      "directory_profiles": {
+6219:        "README.md",
+6337:        "README.md",
+ succeeded in 52ms:
+        "WriteFstabLines",
+        "WriteHeader",
+        "WriteNDConf",
+        "WriteNDConfToFileWithRuntime",
+        "WriteNDConfWithRuntime",
+        "WriteWgConf",
+        "WsAuthCheck",
+        "WsHandler",
+        "WsIsAuthenticated",
+        "WsNilSession"
+      ]
+    },
+    "structure": {
+      "directory_profiles": {
+        "goseg/accesspoint/": {
+          "file_count": 11,
+          "files": [
+            "accesspoint.go",
+            "accesspoint_entrypoint_test.go",
+            "accesspoint_test.go",
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && jq '.holistic_context.structure | keys' .desloppify/review_packet_blind.json | sed -n '1,120p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+[
+  "directory_profiles"
+]
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && jq '.holistic_context.structure.directory_profiles[\"goseg/protocol/contracts/\"] , .holistic_context.structure.directory_profiles[\"goseg/protocol/contracts/conformance/\"] , .holistic_context.structure.directory_profiles[\"goseg/protocol/contracts/protocolfamily/\"] , .holistic_context.structure.directory_profiles[\"goseg/protocol/contracts/startramfamily/\"] , .holistic_context.structure.directory_profiles[\"goseg/uploadsvc/\"]' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+{
+  "file_count": 11,
+  "files": [
+    "contract_metadata.go",
+    "contract_metadata_test.go",
+    "contracts.go",
+    "contracts_test.go",
+    "family_specs.go",
+    "family_specs_test.go",
+    "governance_surface_test.go",
+    "protocol_contracts.go",
+    "protocol_contracts_test.go",
+    "startram_contracts.go",
+    "startram_contracts_test.go"
+  ],
+  "total_loc": 1909,
+  "avg_fan_in": 0.0,
+  "avg_fan_out": 0.0,
+  "zones": {
+    "production": 5,
+codex
+The structure payload is sparse (only `directory_profiles` and no `root_files`/`coupling_matrix`), so I’m extracting all matching profile keys to avoid over-claiming package-structure evidence.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && jq -r '.holistic_context.structure.directory_profiles | keys[]' .desloppify/review_packet_blind.json | rg 'goseg/protocol/contracts|goseg/uploadsvc|README|protocolfamily|startramfamily'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/protocol/contracts/
+goseg/protocol/contracts/conformance/
+goseg/uploadsvc/
+goseg/uploadsvc/adapters/
+goseg/uploadsvc/contractspec/
+goseg/uploadsvc/importeradapter/
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 71.0,
+    "package_organization": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/contracts/protocolfamily/specs.go` defines its own `ActionSpec` and hard-coded contract constants/owner strings, while `goseg/protocol/contracts/family_specs_test.go` exercises `contractFamilyEntrySpec`/catalog validation paths from a different contract model.",
+        "`goseg/protocol/contracts/startramfamily/specs.go` similarly defines a separate `ContractSpec` shape and IDs outside the validated family-entry pipeline covered in `family_specs_test.go`.",
+        "The listed tests (`fixtures_test.go`, `family_specs_test.go`, `actions_test.go`) verify local invariants but do not establish a single enforced boundary between runtime contract families and governance metadata."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`family_specs_test.go` builds synthetic `contractFamilyEntrySpec` values inline instead of validating real outputs from `protocolfamily.ActionSpecs()` and `startramfamily.ContractSpecs()`.",
+        "`fixtures_test.go` validates fixture/binding consistency but does not assert that family spec declarations remain synchronized with canonical bindings and governance metadata.",
+        "`uploadsvc/actions_test.go` validates parser behavior only; it does not test cross-module compatibility from parsed action -> contract binding -> family spec governance."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "From `holistic_context.structure.directory_profiles`, `goseg/protocol/contracts/` is a mixed directory with 11 files (5 production, 6 test), indicating broad concern concentration at one level.",
+        "The assigned family spec files live in `goseg/protocol/contracts/protocolfamily/` and `goseg/protocol/contracts/startramfamily/`, but these directories are not represented in `directory_profiles`, while neighboring `conformance/` is represented; this creates a discoverability mismatch between real code placement and structural metadata.",
+        "Family declarations are split across multiple small leaf packages plus root-level contract tests (`family_specs_test.go`), which increases navigation cost for governance-contract changes."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_family_model_split_brain",
+      "summary": "Contract family declarations use separate data models without a single enforced architecture contract.",
+      "related_files": [
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go"
+      ],
+      "evidence": [
+        "`family_specs_test.go` validates `contractFamilyEntrySpec`/catalog governance paths, but `protocolfamily/specs.go` and `startramfamily/specs.go` define separate `ActionSpec`/`ContractSpec` models.",
+        "Both family packages carry contract IDs and owner metadata as independent string constants, creating parallel authority for governance data."
+      ],
+      "suggestion": "Create one canonical family-spec schema in `goseg/protocol/contracts` (shared struct + validator), then make `protocolfamily` and `startramfamily` producers of that schema only. Remove duplicated model types and route all family declarations through one compile-time checked conversion path before catalog/binding registration.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "governance_contract_source_fragmentation"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "governance_tests_use_synthetic_inputs",
+      "summary": "Governance tests validate synthetic specs but miss regression coverage for real family declarations.",
+      "related_files": [
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`family_specs_test.go` constructs local sample specs instead of loading `ActionSpecs()`/`ContractSpecs()` from family packages.",
+        "`fixtures_test.go` and `actions_test.go` do not bridge parser/binding behavior to governance family declarations, leaving compatibility drift undetected."
+      ],
+      "suggestion": "Add contract-integration tests that: (1) load all real family declarations, (2) assert each declared action/error maps to canonical catalog/bindings, and (3) assert parser-accepted actions (`uploadsvc`) resolve to governed contract entries. Keep existing unit tests, but add this cross-module suite as a required quality gate.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_contract_source_fragmentation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "family_contract_layout_hides_ownership",
+      "summary": "Family contract files are split across root and micro-packages, obscuring ownership and change boundaries.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go"
+      ],
+      "evidence": [
+        "README sets backend quality-gate expectations, but contract-governance code is dispersed across `contracts/` root tests and separate family leaf packages with different local schemas.",
+        "`directory_profiles` shows `goseg/protocol/contracts/` already has 11 mixed files, and family package placement is not reflected consistently in structure metadata, reducing navigability."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1: create `goseg/protocol/contracts/families/protocol/` and `goseg/protocol/contracts/families/startram/` with a shared `families/spec.go` schema in `goseg/protocol/contracts/families/`. Stage 2: move `protocolfamily/specs.go` and `startramfamily/specs.go` into those targets and rename local types to the shared schema. Stage 3: move/adjust family-governance tests to `goseg/protocol/contracts/families/...` so tests are colocated with declarations. Stage 4: run import updates and validation commands: `cd goseg && gofmt -w ./protocol/contracts/... && go test ./protocol/contracts/... ./uploadsvc/... && go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_contract_source_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance contract authority is fragmented across multiple package-local spec types instead of one canonical contract model.",
+      "Tests emphasize local unit invariants, not cross-module governance compatibility paths."
+    ],
+    "likely_symptoms": [
+      "contract_family_model_split_brain",
+      "governance_tests_use_synthetic_inputs",
+      "family_contract_layout_hides_ownership"
+    ],
+    "possible_false_positives": [
+      "directory_profiles omission for some family subdirectories may partly reflect analyzer visibility limits rather than intentional package design"
+    ]
+  }
+}
+tokens used
+35,243
+

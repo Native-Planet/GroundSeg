@@ -1,0 +1,89 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 4,
+  "assessments": {
+    "naming_quality": 78.6
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "The same Wi-Fi subsystem mixes `WiFi` and `Wifi` in exported and internal names (`NewWiFiRuntime`, `isWiFiRadioEnabled`, `ErrWiFiInterfaceNotFound` vs `NewWifiClient`, `WifiInfoTicker`, `testWifiRuntime`).",
+        "Config naming mixes abbreviated and full forms in public and core patch types (`Conf()`, `ConfPatch`, `ConfUpdateOption`) alongside `Config()`, `ConfigPatch`, and `ConfigUpdateOption` aliases.",
+        "Session logstream naming drifts between `Sys*` and `System*` for the same concept (`SysLogSessions`, `SysSessionsToRemove` vs `SystemLogMessages`, `PublishSystemLog`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "naming_quality",
+      "identifier": "wifi_acronym_casing_drift",
+      "summary": "Wi-Fi symbols use inconsistent acronym casing (`WiFi` vs `Wifi`) within one subsystem.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi_runtime_methods.go` defines `NewWiFiRuntime`, `isWiFiRadioEnabled`, and `ErrWiFiInterfaceNotFound` usage, but the same runtime struct exposes `NewWifiClient` and `WifiInfoTicker`.",
+        "`goseg/system/wifi_test.go` mirrors the same drift with helpers like `resetWifiSeamsForTest`, `testWifiRuntime`, plus tests for `StartWiFiInfoLoop` and `RefreshWiFiInfo`."
+      ],
+      "suggestion": "Choose one canonical acronym style for this package (prefer Go initialism style, e.g. `WiFi`) and rename fields/helpers consistently (`NewWiFiClient`, `WiFiInfoTicker`, `resetWiFiSeamsForTest`, `testWiFiRuntime`) with compatibility shims only where required.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_and_abbreviation_policy_missing"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "config_conf_abbreviation_split",
+      "summary": "Config APIs split between `Conf` and `Config`, creating avoidable vocabulary drift.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`goseg/config/bootstrap.go` exports both `Config()` and `Conf()` (documented as backward-compatible alias), leaving two names for the same concept.",
+        "`goseg/config/config_update_schema.go` defines `ConfPatch`/`ConfUpdateOption` and then aliases `ConfigPatch`/`ConfigUpdateOption`, duplicating terminology in core schema types.",
+        "`goseg/config/config.go` uses full-form `Config` naming heavily (`SetStartramConfig`, `GetStartramConfigSnapshot`), increasing inconsistency with `Conf*` symbols."
+      ],
+      "suggestion": "Standardize on `Config` for public/core names and deprecate `Conf*` aliases behind transitional wrappers; update call sites and tests so one term is canonical in code search and API docs.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_and_abbreviation_policy_missing"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "sys_vs_system_term_mixing",
+      "summary": "Logstream session store mixes `Sys` and `System` prefixes for the same domain concept.",
+      "related_files": [
+        "goseg/session/logstream_session_store.go",
+        "goseg/logger/logger_test.go"
+      ],
+      "evidence": [
+        "`goseg/session/logstream_session_store.go` interface and methods use both `SysLogSessions`/`SysSessionsToRemove` and `SystemLogMessages`/`PublishSystemLog` for one system-log responsibility.",
+        "`goseg/logger/logger_test.go` uses explicit `SystemLog` terminology (`testSystemLogSink`, `drainSystemLogChannel`), reinforcing that session store abbreviations are a local outlier."
+      ],
+      "suggestion": "Normalize session-store method names to one vocabulary (prefer `System*` for clarity), e.g. `SystemLogSessions`, `SystemSessionsToRemove`, with temporary forwarding methods for backwards compatibility if needed.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_and_abbreviation_policy_missing"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No enforced naming policy for acronym casing and abbreviation usage across subsystems.",
+      "Backward-compatibility aliases were retained without a deprecation convergence plan, so dual vocabularies became permanent."
+    ],
+    "likely_symptoms": [
+      "wifi_acronym_casing_drift",
+      "config_conf_abbreviation_split",
+      "sys_vs_system_term_mixing"
+    ],
+    "possible_false_positives": []
+  }
+}

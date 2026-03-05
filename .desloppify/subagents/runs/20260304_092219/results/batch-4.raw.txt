@@ -1,0 +1,34 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 91.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "The assigned test surfaces show explicit lifecycle boundaries and deterministic failure routing in core orchestrators (e.g., optional/required startup steps and duplicate-loop guards in `startuporchestrator/startup_orchestrator_test.go`, and error propagation for broadcast tick failures in `broadcast/loop_test.go`).",
+        "Runtime abstraction seams are consistently centralized (for example, `defaultRuntime*` factories and seam structs in `docker/orchestration/runtime_ops.go`), which keeps cross-module interaction explicit despite broad surface area.",
+        "Critical path modules in scope (`goseg/shipworkflow`, `goseg/config`, `goseg/broadcast`, `goseg/system`, `goseg/accesspoint`) are highly stateful and side-effect oriented, and tests already encode those boundaries instead of hiding them behind unrelated wrappers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Residual mechanical debt remains from broad seam-heavy, boundary-crossing modules (for example, `startuporchestrator` and `importer`/`broadcast` orchestration paths) still carrying configuration and control concerns together; a follow-up review could focus on reducing coupling by narrowing seam interfaces and introducing higher-level use-case orchestration types per subsystem."
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "Cross-cutting runtime orchestration currently concentrates multiple concerns in singleton-style, seam-driven modules.",
+      "Stateful global/module-wide mutability remains a dominant pattern in control-plane packages."
+    ],
+    "likely_symptoms": [
+      "Test and harness complexity in orchestration-heavy modules can rise with feature growth.",
+      "Refactoring risk when changing transition or startup behavior tends to be high due shared seams."
+    ],
+    "possible_false_positives": [
+      "Most observed coupling is intentional for platform/runtime integration with hardware/process boundaries; structural concerns may be deliberate rather than flawed design."
+    ]
+  }
+}

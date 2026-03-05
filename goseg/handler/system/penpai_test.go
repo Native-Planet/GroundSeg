@@ -12,11 +12,11 @@ import (
 )
 
 func resetPenpaiSeams() {
-	confForPenpai = config.Conf
+	confForPenpai = config.Config
 	stopContainerByNameForPenpai = orchestration.StopContainerByName
 	startContainerForPenpai = orchestration.StartContainer
 	updateContainerStateForPenpai = config.UpdateContainerState
-	updateConfTypedForPenpai = config.UpdateConfTyped
+	updateConfTypedForPenpai = config.UpdateConfigTyped
 	withPenpaiRunningForPenpai = config.WithPenpaiRunning
 	withPenpaiActiveForPenpai = config.WithPenpaiActive
 	withPenpaiCoresForPenpai = config.WithPenpaiCores
@@ -63,7 +63,7 @@ func TestPenpaiHandlerValidationAndToggle(t *testing.T) {
 		}
 	}
 	confUpdates := 0
-	updateConfTypedForPenpai = func(...config.ConfUpdateOption) error {
+	updateConfTypedForPenpai = func(...config.ConfigUpdateOption) error {
 		confUpdates++
 		return nil
 	}
@@ -97,7 +97,7 @@ func TestPenpaiHandlerSetModelAndSetCores(t *testing.T) {
 		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 	}
 	updateConfCalls := 0
-	updateConfTypedForPenpai = func(...config.ConfUpdateOption) error {
+	updateConfTypedForPenpai = func(...config.ConfigUpdateOption) error {
 		updateConfCalls++
 		return nil
 	}
@@ -151,7 +151,7 @@ func TestPenpaiHandlerPropagatesOperationalErrors(t *testing.T) {
 	}
 
 	stopContainerByNameForPenpai = func(string) error { return nil }
-	updateConfTypedForPenpai = func(...config.ConfUpdateOption) error { return nil }
+	updateConfTypedForPenpai = func(...config.ConfigUpdateOption) error { return nil }
 	deleteContainerForPenpai = func(string) error { return errors.New("delete failed") }
 	if err := PenpaiHandler(penpaiMessage(t, "set-model", "phi.gguf", 0)); err == nil {
 		t.Fatalf("expected delete error propagation")

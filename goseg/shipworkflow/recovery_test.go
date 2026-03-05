@@ -81,9 +81,9 @@ type testRecoveryRuntimeConfig struct {
 
 func (runtime testRecoveryRuntimeConfig) runtimeOps() orchestration.RuntimeStartupOps {
 	return orchestration.RuntimeStartupOps{
-		UpdateConfTypedFn: func(...config.ConfUpdateOption) error { return nil },
-		WithWgOnFn:        func(enabled bool) config.ConfUpdateOption { return config.WithWgOn(enabled) },
-		CycleWgKeyFn:      func() error { return nil },
+		UpdateConfigTypedFn:    func(...config.ConfigUpdateOption) error { return nil },
+		WithWireguardEnabledFn: func(enabled bool) config.ConfigUpdateOption { return config.WithWgOn(enabled) },
+		CycleWgKeyFn:           func() error { return nil },
 		BarExitFn: func(patp string) error {
 			if runtime.barExitFn == nil {
 				return nil
@@ -250,5 +250,13 @@ func TestRecoverWireguardFleetAggregatesErrors(t *testing.T) {
 	}
 	if slices.Contains(calls, "delete:mc") {
 		t.Fatal("did not expect delete mc call when deleteMinioClient is false")
+	}
+}
+
+func TestRecoverWireguardFleetValidatesRuntime(t *testing.T) {
+	t.Parallel()
+
+	if err := RecoverWireguardFleet(wireguardRecoveryRuntime{}, []string{"~zod"}, false); err == nil {
+		t.Fatal("expected validation error for zero-value wireguard recovery runtime")
 	}
 }

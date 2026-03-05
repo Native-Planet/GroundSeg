@@ -28,8 +28,8 @@ func TestCreateDefaultWGConfAndGetWgConf(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetWgConf failed: %v", err)
 	}
-	if !reflect.DeepEqual(got, defaults.WgConfig) {
-		t.Fatalf("unexpected default wireguard config: got %+v want %+v", got, defaults.WgConfig)
+	if !reflect.DeepEqual(got, defaults.DefaultWgConfig()) {
+		t.Fatalf("unexpected default wireguard config: got %+v want %+v", got, defaults.DefaultWgConfig())
 	}
 }
 

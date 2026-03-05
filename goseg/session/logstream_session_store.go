@@ -1,8 +1,9 @@
 package session
 
 import (
-	"github.com/gorilla/websocket"
 	"sync"
+
+	"github.com/gorilla/websocket"
 )
 
 type LogstreamRuntime interface {
@@ -26,7 +27,7 @@ type logstreamSessionStore struct {
 	sysLogMu           sync.RWMutex
 	sysLogSessions     []*websocket.Conn
 	sysSessionsToClear []*websocket.Conn
-	sysLogMessages     chan []byte
+	systemLogBus       *systemLogMessageBus
 
 	dockerLogMu       sync.RWMutex
 	dockerLogSessions map[string]map[*websocket.Conn]bool
@@ -35,7 +36,7 @@ type logstreamSessionStore struct {
 func newLogstreamSessionStore() *logstreamSessionStore {
 	return &logstreamSessionStore{
 		dockerLogSessions: make(map[string]map[*websocket.Conn]bool),
-		sysLogMessages:    make(chan []byte, 100),
+		systemLogBus:      newSystemLogMessageBus(100),
 	}
 }
 
@@ -45,9 +46,7 @@ func (store *logstreamSessionStore) SysLogSessions() []*websocket.Conn {
 	}
 	store.sysLogMu.RLock()
 	defer store.sysLogMu.RUnlock()
-	result := make([]*websocket.Conn, len(store.sysLogSessions))
-	copy(result, store.sysLogSessions)
-	return result
+	return snapshotSlice(store.sysLogSessions, clonePtrConn)
 }
 
 func (store *logstreamSessionStore) SetSysLogSessions(sessions []*websocket.Conn) {
@@ -60,7 +59,7 @@ func (store *logstreamSessionStore) SetSysLogSessions(sessions []*websocket.Conn
 		store.sysLogSessions = nil
 		return
 	}
-	store.sysLogSessions = append([]*websocket.Conn(nil), sessions...)
+	store.sysLogSessions = snapshotSlice(sessions, clonePtrConn)
 }
 
 func (store *logstreamSessionStore) SysSessionsToRemove() []*websocket.Conn {
@@ -69,9 +68,7 @@ func (store *logstreamSessionStore) SysSessionsToRemove() []*websocket.Conn {
 	}
 	store.sysLogMu.RLock()
 	defer store.sysLogMu.RUnlock()
-	result := make([]*websocket.Conn, len(store.sysSessionsToClear))
-	copy(result, store.sysSessionsToClear)
-	return result
+	return snapshotSlice(store.sysSessionsToClear, clonePtrConn)
 }
 
 func (store *logstreamSessionStore) SetSysSessionsToRemove(sessions []*websocket.Conn) {
@@ -84,7 +81,7 @@ func (store *logstreamSessionStore) SetSysSessionsToRemove(sessions []*websocket
 		store.sysSessionsToClear = nil
 		return
 	}
-	store.sysSessionsToClear = append([]*websocket.Conn(nil), sessions...)
+	store.sysSessionsToClear = snapshotSlice(sessions, clonePtrConn)
 }
 
 func (store *logstreamSessionStore) AddSysLogSession(conn *websocket.Conn) {
@@ -93,7 +90,7 @@ func (store *logstreamSessionStore) AddSysLogSession(conn *websocket.Conn) {
 	}
 	store.sysLogMu.Lock()
 	defer store.sysLogMu.Unlock()
-	store.sysLogSessions = append(store.sysLogSessions, conn)
+	store.sysLogSessions = appendIfConnMissing(store.sysLogSessions, conn, clonePtrConn)
 }
 
 func (store *logstreamSessionStore) RemoveSysLogSessions() {
@@ -106,18 +103,18 @@ func (store *logstreamSessionStore) RemoveSysLogSessions() {
 		store.sysSessionsToClear = nil
 		return
 	}
-	remove := make(map[*websocket.Conn]struct{}, len(store.sysSessionsToClear))
+	removals := make(map[*websocket.Conn]struct{}, len(store.sysSessionsToClear))
 	for _, session := range store.sysSessionsToClear {
-		remove[session] = struct{}{}
+		removals[session] = struct{}{}
 	}
-	remaining := make([]*websocket.Conn, 0, len(store.sysLogSessions))
+	filtered := store.sysLogSessions[:0]
 	for _, session := range store.sysLogSessions {
-		if _, found := remove[session]; found {
+		if _, remove := removals[session]; remove {
 			continue
 		}
-		remaining = append(remaining, session)
+		filtered = append(filtered, session)
 	}
-	store.sysLogSessions = remaining
+	store.sysLogSessions = filtered
 	store.sysSessionsToClear = nil
 }
 
@@ -127,7 +124,7 @@ func (store *logstreamSessionStore) AddSysSessionToRemove(conn *websocket.Conn) 
 	}
 	store.sysLogMu.Lock()
 	defer store.sysLogMu.Unlock()
-	store.sysSessionsToClear = append(store.sysSessionsToClear, conn)
+	store.sysSessionsToClear = appendIfConnMissing(store.sysSessionsToClear, conn, clonePtrConn)
 }
 
 func (store *logstreamSessionStore) DockerLogSessions() map[string]map[*websocket.Conn]bool {
@@ -206,17 +203,12 @@ func (store *logstreamSessionStore) SystemLogMessages() <-chan []byte {
 	if store == nil {
 		return nil
 	}
-	store.sysLogMu.RLock()
-	defer store.sysLogMu.RUnlock()
-	return store.sysLogMessages
+	return store.systemLogBus.Messages()
 }
 
 func (store *logstreamSessionStore) PublishSystemLog(logData []byte) {
-	if store == nil || store.sysLogMessages == nil {
+	if store == nil {
 		return
 	}
-	store.sysLogMu.Lock()
-	messageBus := store.sysLogMessages
-	store.sysLogMu.Unlock()
-	messageBus <- logData
+	store.systemLogBus.Publish(logData)
 }

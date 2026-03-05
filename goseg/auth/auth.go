@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"go.uber.org/zap"
 	"groundseg/auth/lifecycle"
 	"groundseg/auth/tokens"
 	"groundseg/structs"
+
+	"go.uber.org/zap"
 )
 
 // UploadTokenAuthorizationPolicy binds upload-token checking behavior for lifecycle entrypoints.
@@ -46,14 +47,16 @@ func ValidateUploadSessionTokenRequest(
 	return ValidateUploadSessionToken(sessionToken, providedToken, r, UploadAuthPolicy())
 }
 
-func Initialize() {
-	InitializeWithContext(context.Background())
+func Initialize() error {
+	return InitializeWithContext(context.Background())
 }
 
-func InitializeWithContext(ctx context.Context) {
+func InitializeWithContext(ctx context.Context) error {
 	if err := Start(ctx); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to initialize auth lifecycle: %v", err))
+		return err
 	}
+	return nil
 }
 
 func Start(ctx context.Context) error {

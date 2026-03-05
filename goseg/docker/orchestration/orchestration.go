@@ -141,19 +141,19 @@ func (runtime *orchestrationRuntime) createContainer(containerName string, conta
 	return runtime.lifecycleRuntime.CreateContainer(containerName, containerType)
 }
 
-func GetLatestContainerInfo(containerType string) (map[string]string, error) {
+func GetLatestContainerInfo(containerType string) (registry.ImageDescriptor, error) {
 	return getOrchestrationRuntime().getLatestContainerInfo(containerType)
 }
 
-func (runtime *orchestrationRuntime) getLatestContainerInfo(containerType string) (map[string]string, error) {
+func (runtime *orchestrationRuntime) getLatestContainerInfo(containerType string) (registry.ImageDescriptor, error) {
 	return registry.GetLatestContainerInfo(containerType)
 }
 
-func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
+func PullImageIfNotExist(desiredImage string, imageInfo registry.ImageDescriptor) (bool, error) {
 	return getOrchestrationRuntime().pullImageIfNotExist(desiredImage, imageInfo)
 }
 
-func (runtime *orchestrationRuntime) pullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
+func (runtime *orchestrationRuntime) pullImageIfNotExist(desiredImage string, imageInfo registry.ImageDescriptor) (bool, error) {
 	if desiredImage == "" {
 		return false, fmt.Errorf("desired image is required")
 	}

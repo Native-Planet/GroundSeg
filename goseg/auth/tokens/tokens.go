@@ -67,7 +67,11 @@ func requestIdentityFromRequest(r *http.Request) (string, string, error) {
 		return "", "", fmt.Errorf("request is required")
 	}
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		return strings.Split(forwarded, ",")[0], r.Header.Get("User-Agent"), nil
+		candidate := strings.TrimSpace(strings.Split(forwarded, ",")[0])
+		if host, _, err := net.SplitHostPort(candidate); err == nil {
+			candidate = host
+		}
+		return candidate, r.Header.Get("User-Agent"), nil
 	}
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -236,9 +240,18 @@ func CreateToken(r *http.Request, conn *websocket.Conn, authed bool) (map[string
 	settings := config.AuthSettingsSnapshot()
 	now := time.Now().Format("2006-01-02_15:04:05")
 	// generate random strings for id, secret, and padding
-	id := config.RandString(32)
-	secret := config.RandString(128)
-	padding := config.RandString(32)
+	id, err := config.RandStringWithError(32)
+	if err != nil || id == "" {
+		return nil, fmt.Errorf("generate token id: %w", err)
+	}
+	secret, err := config.RandStringWithError(128)
+	if err != nil || secret == "" {
+		return nil, fmt.Errorf("generate token secret: %w", err)
+	}
+	padding, err := config.RandStringWithError(32)
+	if err != nil || padding == "" {
+		return nil, fmt.Errorf("generate token padding: %w", err)
+	}
 	contents := map[string]string{
 		"id":         id,
 		"ip":         ip,

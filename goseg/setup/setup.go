@@ -21,7 +21,7 @@ var (
 		"complete": 3,
 	}
 
-	updateConfTypedForSetup  = config.UpdateConfTyped
+	updateConfTypedForSetup  = config.UpdateConfigTyped
 	hasherForSetup           = tokens.Hasher
 	cycleWgKeyForSetup       = config.CycleWgKey
 	startramRegisterForSetup = startram.Register

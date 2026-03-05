@@ -19,26 +19,149 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	fixAcmeFn       = acme.Fix
-	clearLusCodeFn  = luscode.ClearLusCode
-	getLusCodeFn    = luscode.GetLusCode
-	reviveDeskFn    = desk.ReviveDesk
-	uninstallDeskFn = desk.UninstallDesk
-	installDeskFn   = desk.InstallDesk
-	getDeskFn       = desk.GetDesk
-	mountDeskFn     = desk.MountDesk
-	commitDeskFn    = desk.CommitDesk
+type ClickRuntime interface {
+	FixAcme(string) error
+	ClearLusCode(string)
+	GetLusCode(string) (string, error)
+	ReviveDesk(string, string) error
+	UninstallDesk(string, string) error
+	InstallDesk(string, string, string) error
+	GetDesk(string, string, bool) (string, error)
+	MountDesk(string, string) error
+	CommitDesk(string, string) error
+	BarExit(string) error
+	SendNotification(string, structs.HarkNotification) error
+	SendPack(string) error
+	UnlinkStorage(string) error
+	LinkStorage(string, string, structs.MinIOServiceAccount) error
+	RestoreTlon(string) error
+	BackupTlon(string) error
+}
 
-	barExitFn = lifecycle.BarExit
+type clickRuntime struct {
+	fixAcmeFn       func(string) error
+	clearLusCodeFn  func(string)
+	getLusCodeFn    func(string) (string, error)
+	reviveDeskFn    func(string, string) error
+	uninstallDeskFn func(string, string) error
+	installDeskFn   func(string, string, string) error
+	getDeskFn       func(string, string, bool) (string, error)
+	mountDeskFn     func(string, string) error
+	commitDeskFn    func(string, string) error
 
-	sendNotificationFn = notify.SendNotification
-	sendPackFn         = pack.SendPack
-	unlinkStorageFn    = storage.UnlinkStorage
-	linkStorageFn      = storage.LinkStorage
-	restoreTlonFn      = restore.RestoreTlon
-	backupTlonFn       = backupdomain.BackupTlon
-)
+	barExitFn func(string) error
+
+	sendNotificationFn func(string, structs.HarkNotification) error
+	sendPackFn         func(string) error
+	unlinkStorageFn    func(string) error
+	linkStorageFn      func(string, string, structs.MinIOServiceAccount) error
+	restoreTlonFn      func(string) error
+	backupTlonFn       func(string) error
+}
+
+func (runtime clickRuntime) FixAcme(patp string) error {
+	return runtime.fixAcmeFn(patp)
+}
+
+func (runtime clickRuntime) ClearLusCode(patp string) {
+	runtime.clearLusCodeFn(patp)
+}
+
+func (runtime clickRuntime) GetLusCode(patp string) (string, error) {
+	return runtime.getLusCodeFn(patp)
+}
+
+func (runtime clickRuntime) ReviveDesk(patp, deskName string) error {
+	return runtime.reviveDeskFn(patp, deskName)
+}
+
+func (runtime clickRuntime) UninstallDesk(patp, deskName string) error {
+	return runtime.uninstallDeskFn(patp, deskName)
+}
+
+func (runtime clickRuntime) InstallDesk(patp, ship, deskName string) error {
+	return runtime.installDeskFn(patp, ship, deskName)
+}
+
+func (runtime clickRuntime) GetDesk(patp, deskName string, bypass bool) (string, error) {
+	return runtime.getDeskFn(patp, deskName, bypass)
+}
+
+func (runtime clickRuntime) MountDesk(patp, deskName string) error {
+	return runtime.mountDeskFn(patp, deskName)
+}
+
+func (runtime clickRuntime) CommitDesk(patp, deskName string) error {
+	return runtime.commitDeskFn(patp, deskName)
+}
+
+func (runtime clickRuntime) BarExit(patp string) error {
+	return runtime.barExitFn(patp)
+}
+
+func (runtime clickRuntime) SendNotification(patp string, payload structs.HarkNotification) error {
+	return runtime.sendNotificationFn(patp, payload)
+}
+
+func (runtime clickRuntime) SendPack(patp string) error {
+	return runtime.sendPackFn(patp)
+}
+
+func (runtime clickRuntime) UnlinkStorage(patp string) error {
+	return runtime.unlinkStorageFn(patp)
+}
+
+func (runtime clickRuntime) LinkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) error {
+	return runtime.linkStorageFn(patp, endpoint, svcAccount)
+}
+
+func (runtime clickRuntime) RestoreTlon(patp string) error {
+	return runtime.restoreTlonFn(patp)
+}
+
+func (runtime clickRuntime) BackupTlon(patp string) error {
+	return runtime.backupTlonFn(patp)
+}
+
+func defaultClickRuntime() clickRuntime {
+	return clickRuntime{
+		fixAcmeFn:          acme.Fix,
+		clearLusCodeFn:     luscode.ClearLusCode,
+		getLusCodeFn:       luscode.GetLusCode,
+		reviveDeskFn:       desk.ReviveDesk,
+		uninstallDeskFn:    desk.UninstallDesk,
+		installDeskFn:      desk.InstallDesk,
+		getDeskFn:          desk.GetDesk,
+		mountDeskFn:        desk.MountDesk,
+		commitDeskFn:       desk.CommitDesk,
+		barExitFn:          lifecycle.BarExit,
+		sendNotificationFn: notify.SendNotification,
+		sendPackFn:         pack.SendPack,
+		unlinkStorageFn:    storage.UnlinkStorage,
+		linkStorageFn:      storage.LinkStorage,
+		restoreTlonFn:      restore.RestoreTlon,
+		backupTlonFn:       backupdomain.BackupTlon,
+	}
+}
+
+var runtimeRuntime ClickRuntime = defaultClickRuntime()
+
+// SetRuntime replaces the internal click runtime used by exported wrappers.
+func SetRuntime(handler ClickRuntime) {
+	if handler == nil {
+		runtimeRuntime = defaultClickRuntime()
+		return
+	}
+	runtimeRuntime = handler
+}
+
+func resetClickRuntime() {
+	SetRuntime(nil)
+}
+
+func getClickRuntime() ClickRuntime {
+	return runtimeRuntime
+}
 
 func validatePatp(patp string) error {
 	if strings.TrimSpace(patp) == "" {
@@ -59,7 +182,7 @@ func FixAcme(patp string) error {
 	if err := validatePatp(patp); err != nil {
 		return err
 	}
-	if err := fixAcmeFn(patp); err != nil {
+	if err := runtimeRuntime.FixAcme(patp); err != nil {
 		return fmt.Errorf("fix acme for %s: %w", patp, err)
 	}
 	return nil
@@ -71,7 +194,7 @@ func ClearLusCode(patp string) {
 		zap.L().Warn(err.Error())
 		return
 	}
-	clearLusCodeFn(patp)
+	runtimeRuntime.ClearLusCode(patp)
 }
 
 // GetLusCode fetches +code from cache or executes click.
@@ -79,7 +202,7 @@ func GetLusCode(patp string) (string, error) {
 	if err := validatePatp(patp); err != nil {
 		return "", err
 	}
-	result, err := getLusCodeFn(patp)
+	result, err := runtimeRuntime.GetLusCode(patp)
 	if err != nil {
 		return "", fmt.Errorf("get +code for %s: %w", patp, err)
 	}
@@ -94,7 +217,7 @@ func ReviveDesk(patp, deskName string) error {
 	if err := validateArg("desk", deskName); err != nil {
 		return fmt.Errorf("%w for %s", err, patp)
 	}
-	if err := reviveDeskFn(patp, deskName); err != nil {
+	if err := runtimeRuntime.ReviveDesk(patp, deskName); err != nil {
 		return fmt.Errorf("revive desk %s on %s: %w", deskName, patp, err)
 	}
 	return nil
@@ -108,7 +231,7 @@ func UninstallDesk(patp, deskName string) error {
 	if err := validateArg("desk", deskName); err != nil {
 		return fmt.Errorf("%w for %s", err, patp)
 	}
-	if err := uninstallDeskFn(patp, deskName); err != nil {
+	if err := runtimeRuntime.UninstallDesk(patp, deskName); err != nil {
 		return fmt.Errorf("uninstall desk %s on %s: %w", deskName, patp, err)
 	}
 	return nil
@@ -125,7 +248,7 @@ func InstallDesk(patp, ship, deskName string) error {
 	if err := validateArg("desk", deskName); err != nil {
 		return fmt.Errorf("%w for %s", err, patp)
 	}
-	if err := installDeskFn(patp, ship, deskName); err != nil {
+	if err := runtimeRuntime.InstallDesk(patp, ship, deskName); err != nil {
 		return fmt.Errorf("install desk %s on %s: %w", deskName, patp, err)
 	}
 	return nil
@@ -139,7 +262,7 @@ func GetDesk(patp, deskName string, bypass bool) (string, error) {
 	if err := validateArg("desk", deskName); err != nil {
 		return "", fmt.Errorf("%w for %s", err, patp)
 	}
-	got, err := getDeskFn(patp, deskName, bypass)
+	got, err := runtimeRuntime.GetDesk(patp, deskName, bypass)
 	if err != nil {
 		return "", fmt.Errorf("get desk %s on %s: %w", deskName, patp, err)
 	}
@@ -154,7 +277,7 @@ func MountDesk(patp, deskName string) error {
 	if err := validateArg("desk", deskName); err != nil {
 		return fmt.Errorf("%w for %s", err, patp)
 	}
-	if err := mountDeskFn(patp, deskName); err != nil {
+	if err := runtimeRuntime.MountDesk(patp, deskName); err != nil {
 		return fmt.Errorf("mount desk %s on %s: %w", deskName, patp, err)
 	}
 	return nil
@@ -168,7 +291,7 @@ func CommitDesk(patp, deskName string) error {
 	if err := validateArg("desk", deskName); err != nil {
 		return fmt.Errorf("%w for %s", err, patp)
 	}
-	if err := commitDeskFn(patp, deskName); err != nil {
+	if err := runtimeRuntime.CommitDesk(patp, deskName); err != nil {
 		return fmt.Errorf("commit desk %s on %s: %w", deskName, patp, err)
 	}
 	return nil
@@ -179,7 +302,7 @@ func BarExit(patp string) error {
 	if err := validatePatp(patp); err != nil {
 		return err
 	}
-	if err := barExitFn(patp); err != nil {
+	if err := runtimeRuntime.BarExit(patp); err != nil {
 		return fmt.Errorf("bar exit for %s: %w", patp, err)
 	}
 	return nil
@@ -190,7 +313,7 @@ func SendNotification(patp string, payload structs.HarkNotification) error {
 	if err := validatePatp(patp); err != nil {
 		return err
 	}
-	if err := sendNotificationFn(patp, payload); err != nil {
+	if err := runtimeRuntime.SendNotification(patp, payload); err != nil {
 		return fmt.Errorf("send notification for %s: %w", patp, err)
 	}
 	return nil
@@ -201,7 +324,7 @@ func SendPack(patp string) error {
 	if err := validatePatp(patp); err != nil {
 		return err
 	}
-	if err := sendPackFn(patp); err != nil {
+	if err := runtimeRuntime.SendPack(patp); err != nil {
 		return fmt.Errorf("send pack for %s: %w", patp, err)
 	}
 	return nil
@@ -212,7 +335,7 @@ func UnlinkStorage(patp string) error {
 	if err := validatePatp(patp); err != nil {
 		return err
 	}
-	if err := unlinkStorageFn(patp); err != nil {
+	if err := runtimeRuntime.UnlinkStorage(patp); err != nil {
 		return fmt.Errorf("unlink storage for %s: %w", patp, err)
 	}
 	return nil
@@ -226,7 +349,7 @@ func LinkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) 
 	if err := validateArg("endpoint", endpoint); err != nil {
 		return fmt.Errorf("%w for %s", err, patp)
 	}
-	if err := linkStorageFn(patp, endpoint, svcAccount); err != nil {
+	if err := runtimeRuntime.LinkStorage(patp, endpoint, svcAccount); err != nil {
 		return fmt.Errorf("link storage for %s: %w", patp, err)
 	}
 	return nil
@@ -237,7 +360,7 @@ func RestoreTlon(patp string) error {
 	if err := validatePatp(patp); err != nil {
 		return err
 	}
-	if err := restoreTlonFn(patp); err != nil {
+	if err := runtimeRuntime.RestoreTlon(patp); err != nil {
 		return fmt.Errorf("restore tlon for %s: %w", patp, err)
 	}
 	return nil
@@ -248,7 +371,7 @@ func BackupTlon(patp string) error {
 	if err := validatePatp(patp); err != nil {
 		return err
 	}
-	if err := backupTlonFn(patp); err != nil {
+	if err := runtimeRuntime.BackupTlon(patp); err != nil {
 		return fmt.Errorf("backup tlon for %s: %w", patp, err)
 	}
 	return nil

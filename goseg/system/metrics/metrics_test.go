@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shirou/gopsutil/cpu"
 	"groundseg/internal/testseams"
+
+	"github.com/shirou/gopsutil/cpu"
 )
 
 func withMetricsDependencies(

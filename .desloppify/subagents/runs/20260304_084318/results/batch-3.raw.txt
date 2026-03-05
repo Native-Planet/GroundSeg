@@ -1,0 +1,45 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 95.0,
+    "test_strategy": 93.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Protocol and StarTram contract governance relies on `README.md` plus code-side catalog specs (`protocol_contracts.go`, `startram_contracts.go`) without a formal cross-file contract manifest that validates doc-to-runtime alignment.",
+        "Contract-family boundaries are implicit via file-local constants and helper slices, so cross-module expectations are enforced manually in prose/CI config rather than through an explicit boundary model in the contract package itself.",
+        "`protocol_contracts.go` and `startram_contracts.go` encode governance data independently, which is correct structurally but creates a drift risk if documentation/check lists are updated without synchronized code checks."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Introduce an explicit contract-governance manifest/test that couples documented gates and package-level contract families, so README/CI scope changes are programmatically validated with contract catalog membership."
+    },
+    "test_strategy": {
+      "evidence": [
+        "`README.md` defines a contract-focused quality gate and file-path expectations, but this batch’s contract files are pure declaration tables with no local behavior assertions visible here.",
+        "The governance model for contract changes is therefore validated indirectly through external test suites (`contracts_test` and gate scripts) rather than in-module invariants in the listed contract declaration files themselves.",
+        "Critical cross-module surfaces (`protocol_contracts.go`, `startram_contracts.go`) depend on `README.md` guidance and external gate files for coverage guarantees."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "low",
+      "issues_preventing_higher_score": "Add a targeted contract-governance test matrix in this module that asserts expected families, required contract families, and CI-doc alignment, then link failures directly to this module’s contract declarations."
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "Runtime governance for contract changes is documented in prose/CI configs rather than being fully encoded in-contract.",
+      "Cross-module policy coverage for contract surfaces is validated outside the module, increasing alignment risk."
+    ],
+    "likely_symptoms": [
+      "Potential drift between documented contract expectations and active catalog entries if policy files are updated without synchronized code checks."
+    ],
+    "possible_false_positives": [
+      "existing finding: security: hardcoded secret in variable 'ActionToken' (appears to be a scanner false-positive on string-typed contract constants)"
+    ]
+  }
+}

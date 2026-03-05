@@ -1,0 +1,116 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {
+    "design_coherence": 78.6
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Configuration mutation/parsing logic is implemented through multiple string-keyed mechanisms: `UrbitDocker.UnmarshalJSON` in `goseg/structs/configs.go` has a long per-key switch, while `goseg/config/config_update_schema.go` has a separate per-key registry/parsing/apply pipeline, creating parallel abstractions for the same domain updates.",
+        "`goseg/shipworkflow/urbit_operations_runtime.go` combines command adapters, transition step assembly, config persistence, container lifecycle actions, alias validation, and MinIO link orchestration in one file, indicating mixed responsibilities in a central workflow module.",
+        "Test orchestration helpers and state-drain patterns are repeated instead of centralized (`drainImportTransitions` logic and import transition collection in both `goseg/importer/importer_test.go` and `goseg/importer/extract_test.go`), and very broad scenario tests bundle many unrelated action paths in single test functions (`goseg/handler/systemsvc/system_test.go`, `goseg/system/wifi_test.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_dual_update_models",
+      "summary": "Config update behavior is split across two independent string-keyed frameworks, increasing drift and maintenance risk.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`UrbitDocker.UnmarshalJSON` in `goseg/structs/configs.go` manually switches over many JSON keys and parses values field-by-field.",
+        "`goseg/config/config_update_schema.go` defines a separate key registry (`confPatchByKey`) with per-field parse/apply handlers and its own value parsers.",
+        "Both paths encode overlapping config semantics with raw string keys and duplicated primitive parsing helpers, so adding/changing fields requires synchronized edits in multiple abstractions."
+      ],
+      "suggestion": "Introduce one canonical schema/field-definition source for config keys and derive both unmarshal and patch-apply behavior from it (or retire one path), with typed section-level adapters to remove string-key duplication.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "stringly_typed_config_mutation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_workflow_god_module",
+      "summary": "Urbit operations runtime mixes orchestration, persistence, and infrastructure concerns in a single module.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "`goseg/shipworkflow/urbit_operations_runtime.go` contains transition routing (`runUrbitTransitionFromCommand`), config persistence mutations, container start/rebuild flows, alias checks, and MinIO link/unlink orchestration.",
+        "`runShipConfigTransition` centralizes persistence, cleanup, restart, and post-action policy in one generic function with multiple callback parameters, indicating high orchestration density.",
+        "Adjacent runtime seam composition in `goseg/docker/orchestration/runtime_ops.go` and broadcast publication calls from this workflow show cross-subsystem coupling concentrated in one file."
+      ],
+      "suggestion": "Split this module into focused collaborators (transition planner, config mutator, container lifecycle executor, external-link coordinator) and keep the top-level command layer as thin composition only.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "workflow_responsibility_accumulation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_access_pattern_inconsistency",
+      "summary": "State/runtime access patterns are inconsistent (global singleton fallback, nil-normalization, explicit injection), obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/state.go` uses a package-global default runtime plus variadic runtime-optional wrappers (`bootstrapBroadcastState(runtime ...*broadcastStateRuntime)`).",
+        "`goseg/docker/orchestration/subsystem/subsystem_events.go` also normalizes nil runtimes to a global default (`normalizeDockerSubsystemRuntime`) and exposes both default and runtime-specific entrypoints.",
+        "`goseg/session/logstream_session_store.go` uses explicit store receiver methods without package-level fallback, creating a different ownership/injection model than neighboring subsystems."
+      ],
+      "suggestion": "Standardize on one runtime ownership convention (prefer explicit dependency injection with constructors) and deprecate default-singleton fallbacks behind compatibility shims.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_ownership_inconsistency"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_harness_duplication_and_broad_scenarios",
+      "summary": "Tests repeatedly reimplement event/runtime harness logic and bundle multiple behaviors into broad scenario tests.",
+      "related_files": [
+        "goseg/importer/importer_test.go",
+        "goseg/importer/extract_test.go",
+        "goseg/handler/systemsvc/system_test.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "Importer tests duplicate import-transition bus draining/collection mechanics across files instead of sharing one helper utility (`drainImportTransitions` and equivalent channel-drain loops).",
+        "`goseg/handler/systemsvc/system_test.go` includes large tests that cover multiple actions and side effects in one function (for example mixed swap/wifi/update behaviors), coupling unrelated assertions.",
+        "`goseg/system/wifi_test.go` mixes nmcli parsing/runtime tests with C2C action-processing and service wiring tests in one file, blending separate concerns."
+      ],
+      "suggestion": "Extract shared test harness utilities for event channels/runtime seams and split broad scenario tests into focused per-behavior table-driven tests grouped by subsystem concern.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_structure_entropy"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Stringly-typed configuration evolution without a single canonical schema source.",
+      "Incremental feature growth concentrated orchestration and side-effect logic into central runtime files.",
+      "Test code grew organically without a shared harness layer or strict concern boundaries."
+    ],
+    "likely_symptoms": [
+      "config_dual_update_models",
+      "urbit_workflow_god_module",
+      "test_harness_duplication_and_broad_scenarios"
+    ],
+    "possible_false_positives": [
+      "runtime_access_pattern_inconsistency may be partially intentional for backward-compatible package APIs, but still imposes coherence cost."
+    ]
+  }
+}

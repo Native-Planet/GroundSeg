@@ -1,8 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
 
-import "go.uber.org/zap"
+	"go.uber.org/zap"
+)
 
 func loadService(loadFn func() error, failureMessage string) {
 	if loadFn == nil {

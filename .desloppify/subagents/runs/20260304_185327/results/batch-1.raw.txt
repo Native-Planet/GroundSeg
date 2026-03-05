@@ -1,0 +1,104 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "high_level_elegance": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action vocabulary is defined in `goseg/protocol/actionids/actionids.go` but conformance checks in `goseg/protocol/conformance/fixtures_test.go` use `groundseg/protocol/actions` symbols, creating multiple package-level authorities for the same namespace/action bindings.",
+        "`goseg/protocol/contracts/protocol_contracts.go` re-wraps `actionids` constants into contract-local types and IDs, while `goseg/uploadsvc/actions_test.go` validates upload action support via uploadsvc-local action APIs; this spreads canonical binding ownership across protocol, contracts, and service layers.",
+        "Cross-module alignment is enforced via test assertions in multiple packages (conformance/contracts/uploadsvc), indicating boundary integrity depends on distributed checks rather than a single authoritative manifest boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "Contract governance ownership and lifecycle metadata are string literals in multiple families (`OwnerModule`, `SinceVersion` in both `protocol_contracts.go` and `startram_contracts.go`), increasing drift risk and weakening explicit ownership boundaries.",
+        "Public contract-ID naming policy is inconsistent: upload has explicit backward-compatible aliases in `protocol_contracts.go`, while other families/actions use different naming exposure patterns, forcing mixed usage conventions in tests (`family_specs_test.go`).",
+        "Descriptor/governance declaration patterns are repeated per contract entry with no shared higher-level declaration model, so adding a new action likely requires edits in several files and conventions."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "distributed_action_authority",
+      "summary": "Canonical protocol action identity is split across multiple modules, creating a high-coupling change surface.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines raw namespace/action tokens.",
+        "`protocol_contracts.go` redefines those tokens as contract-layer typed constants and derives contract IDs from them.",
+        "`fixtures_test.go` validates bindings against `protocol/actions` package symbols instead of `actionids` or contract IDs.",
+        "`actions_test.go` checks upload action coverage via uploadsvc action APIs, adding another representation boundary."
+      ],
+      "suggestion": "Introduce a single protocol action manifest package that owns namespace/action/contract-ID tuples and have contracts, conformance fixtures, and uploadsvc mapping consume that manifest directly; keep thin typed adapters only where required.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_single_source_protocol_manifest"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "stringly_governance_metadata",
+      "summary": "Governance ownership/version metadata is duplicated as free-form strings across contract families.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` repeats `OwnerModule` and `SinceVersion` literals per entry (e.g., `uploadsvc`, `system/wifi`, `2026.03.02`).",
+        "`startram_contracts.go` duplicates the same pattern with separate literals (`startram`, `2026.01.20`).",
+        "`family_specs_test.go` hardcodes matching ownership semantics in test fixture specs, increasing synchronization burden."
+      ],
+      "suggestion": "Define typed governance owners and version constants in one shared governance declaration layer, then reference those constants from all family specs and tests to prevent drift.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_contract_governance"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "inconsistent_contract_alias_policy",
+      "summary": "Backward-compatibility alias strategy is applied unevenly, producing an inconsistent top-level contract surface.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines upload backward-compatible aliases (`UploadActionOpenEndpoint`, `UploadActionReset`) but no equivalent alias policy for C2C IDs.",
+        "`family_specs_test.go` mixes alias-era naming (`UploadActionOpenEndpoint`) with canonical naming (`C2CConnectAction`), reflecting inconsistent public naming conventions."
+      ],
+      "suggestion": "Codify one alias/deprecation policy for all contract families (either canonical-only or uniform alias coverage) and enforce it with a dedicated naming-policy test.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_single_source_protocol_manifest"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol action semantics lack one authoritative declaration consumed uniformly across contracts, conformance, and service APIs.",
+      "Governance metadata is modeled as duplicated literals rather than shared typed declarations.",
+      "Compatibility naming policy is not centrally defined, so surfaces evolve inconsistently by family."
+    ],
+    "likely_symptoms": [
+      "distributed_action_authority",
+      "inconsistent_contract_alias_policy"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -2,6 +2,7 @@ package broadcast
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,6 +10,23 @@ import (
 	"groundseg/leak"
 	"groundseg/structs"
 )
+
+type countingInfoCollector struct {
+	systemCalled *bool
+}
+
+func (collector countingInfoCollector) CollectAppsInfo() structs.Apps { return structs.Apps{} }
+
+func (collector countingInfoCollector) CollectProfileInfo(map[string]structs.StartramRegion) structs.Profile {
+	return structs.Profile{}
+}
+
+func (collector countingInfoCollector) CollectSystemInfo() structs.System {
+	if collector.systemCalled != nil {
+		*collector.systemCalled = true
+	}
+	return structs.System{}
+}
 
 func TestPreserveTransitionHelpers(t *testing.T) {
 	oldState := structs.AuthBroadcast{
@@ -56,10 +74,7 @@ func TestRunBroadcastTickSkipsWhenNoSessionsOrLeaks(t *testing.T) {
 		}
 	})
 	constructed := false
-	runtime.constructSystemInfoFn = func() structs.System {
-		constructed = true
-		return structs.System{}
-	}
+	runtime.stateRuntime.infoCollector = countingInfoCollector{systemCalled: &constructed}
 
 	runBroadcastTickWithRuntime(runtime)
 	if constructed {
@@ -68,6 +83,8 @@ func TestRunBroadcastTickSkipsWhenNoSessionsOrLeaks(t *testing.T) {
 }
 
 func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
+	withIsolatedBroadcastDefaults(t)
+
 	oldState := structs.AuthBroadcast{
 		System: structs.System{
 			Transition: structs.SystemTransitionBroadcast{BugReport: "loading"},
@@ -92,23 +109,19 @@ func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{"zod": {}}
 		}
-		rt.constructSystemInfoFn = func() structs.System {
-			system := structs.System{}
-			system.Info.Usage.CPU = 42
-			return system
+		system := structs.System{}
+		system.Info.Usage.CPU = 42
+		apps := structs.Apps{}
+		apps.Penpai.Info.ActiveModel = "llama"
+		profile := structs.Profile{}
+		profile.Startram.Info.Endpoint = "api.example.com"
+		rt.stateRuntime.infoCollector = testInfoCollector{
+			system:  system,
+			apps:    apps,
+			profile: profile,
 		}
-		rt.constructPierInfoFn = func() (map[string]structs.Urbit, error) {
-			return map[string]structs.Urbit{"zod": {}}, nil
-		}
-		rt.constructAppsInfoFn = func() structs.Apps {
-			apps := structs.Apps{}
-			apps.Penpai.Info.ActiveModel = "llama"
-			return apps
-		}
-		rt.constructProfileInfoFn = func() structs.Profile {
-			profile := structs.Profile{}
-			profile.Startram.Info.Endpoint = "api.example.com"
-			return profile
+		rt.stateRuntime.pierCollector = testPierCollector{
+			urbits: map[string]structs.Urbit{"zod": {}},
 		}
 	})
 	var updated structs.AuthBroadcast
@@ -148,16 +161,21 @@ func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
 }
 
 func TestRunBroadcastTickHandlesPierInfoError(t *testing.T) {
-	saved := structs.Urbit{}
-	saved.Transition = structs.UrbitTransitionBroadcast{Pack: "packing"}
-	saved.Info.LusCode = "0v0"
+	withIsolatedBroadcastDefaults(t)
 
-	DefaultBroadcastStateRuntime().UpdateBroadcast(structs.AuthBroadcast{
+	initialState := structs.AuthBroadcast{
+		System: structs.System{Transition: structs.SystemTransitionBroadcast{Error: []string{"old-error"}}},
 		Urbits: map[string]structs.Urbit{
-			"zod": saved,
+			"zod": {
+				Transition: structs.UrbitTransitionBroadcast{Pack: "packing"},
+			},
 		},
+	}
+	DefaultBroadcastStateRuntime().UpdateBroadcast(initialState)
+	t.Cleanup(func() {
+		DefaultBroadcastStateRuntime().UpdateBroadcast(structs.AuthBroadcast{})
 	})
-	var updated structs.AuthBroadcast
+
 	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
 		rt.getClientManagerFn = func() *structs.ClientManager {
 			return auth.NewClientManager()
@@ -165,24 +183,70 @@ func TestRunBroadcastTickHandlesPierInfoError(t *testing.T) {
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{"zod": {}}
 		}
-		rt.constructSystemInfoFn = func() structs.System { return structs.System{} }
-		rt.constructPierInfoFn = func() (map[string]structs.Urbit, error) {
-			return nil, errors.New("failed")
+		rt.stateRuntime.infoCollector = testInfoCollector{}
+		rt.stateRuntime.pierCollector = testPierCollector{
+			err: errors.New("failed"),
 		}
-		rt.constructAppsInfoFn = func() structs.Apps { return structs.Apps{} }
-		rt.constructProfileInfoFn = func() structs.Profile { return structs.Profile{} }
 		rt.broadcastToClientsFn = func() error { return nil }
 	})
-	runtime.updateBroadcastFn = func(next structs.AuthBroadcast) { updated = next }
 
-	// Should not panic even when pier info builder returns error and nil map.
-	runBroadcastTickWithRuntime(runtime)
-
-	if got := updated.Urbits["zod"]; got.Transition.Pack != "packing" {
-		t.Fatalf("expected prior urbit transition to be preserved, got %+v", got.Transition)
+	gotErr := runBroadcastTickWithRuntime(runtime)
+	if gotErr == nil {
+		t.Fatal("expected pier info collector error")
 	}
-	if got := updated.Urbits["zod"]; got.Info.LusCode != "0v0" {
-		t.Fatalf("expected prior urbit info to be preserved, got %+v", got.Info)
+
+	state := DefaultBroadcastStateRuntime().GetState()
+	if got := state.Urbits["zod"]; got.Transition.Pack != "packing" {
+		t.Fatalf("expected prior urbit transition to remain, got %+v", got.Transition)
+	}
+	if got := state.System.Transition.Error; len(got) == 0 || got[0] != gotErr.Error() {
+		t.Fatalf("expected system transition error to be recorded, got %+v", got)
+	}
+}
+
+func TestRunBroadcastTickRecordsPierInfoError(t *testing.T) {
+	withIsolatedBroadcastDefaults(t)
+
+	collectorErr := errors.New("collector failure")
+
+	originalState := DefaultBroadcastStateRuntime().GetState()
+	t.Cleanup(func() {
+		DefaultBroadcastStateRuntime().UpdateBroadcast(originalState)
+	})
+
+	DefaultBroadcastStateRuntime().UpdateBroadcast(structs.AuthBroadcast{
+		System: structs.System{
+			Transition: structs.SystemTransitionBroadcast{
+				Error: []string{},
+			},
+		},
+	})
+
+	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
+		rt.getClientManagerFn = func() *structs.ClientManager {
+			return auth.NewClientManager()
+		}
+		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
+			return map[string]leak.LickStatus{"zod": {}}
+		}
+		rt.stateRuntime.infoCollector = testInfoCollector{}
+		rt.stateRuntime.pierCollector = testPierCollector{
+			err: collectorErr,
+		}
+		rt.broadcastToClientsFn = func() error { return nil }
+	})
+
+	gotErr := runBroadcastTickWithRuntime(runtime)
+	if gotErr == nil {
+		t.Fatal("expected collector error to propagate")
+	}
+	if !errors.Is(gotErr, collectorErr) {
+		t.Fatalf("unexpected tick error: %v", gotErr)
+	}
+
+	state := DefaultBroadcastStateRuntime().GetState()
+	if len(state.System.Transition.Error) == 0 || state.System.Transition.Error[0] != gotErr.Error() {
+		t.Fatalf("expected system transition error to be recorded, got %+v", state.System.Transition.Error)
 	}
 }
 
@@ -194,15 +258,15 @@ func TestRunBroadcastTickReturnsBroadcastError(t *testing.T) {
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{"zod": {}}
 		}
-		rt.constructSystemInfoFn = func() structs.System { return structs.System{} }
-		rt.constructPierInfoFn = func() (map[string]structs.Urbit, error) { return map[string]structs.Urbit{}, nil }
-		rt.constructAppsInfoFn = func() structs.Apps { return structs.Apps{} }
-		rt.constructProfileInfoFn = func() structs.Profile { return structs.Profile{} }
+		rt.stateRuntime.infoCollector = testInfoCollector{}
+		rt.stateRuntime.pierCollector = testPierCollector{
+			urbits: map[string]structs.Urbit{},
+		}
 	})
 	expectedErr := errors.New("broadcast transport failure")
 	runtime.broadcastToClientsFn = func() error { return expectedErr }
 
-	if got := runBroadcastTickWithRuntime(runtime); got == nil || got.Error() != expectedErr.Error() {
+	if got := runBroadcastTickWithRuntime(runtime); !errors.Is(got, expectedErr) {
 		t.Fatalf("expected broadcast error propagation, got %v", got)
 	}
 }
@@ -219,12 +283,10 @@ func TestRunBroadcastLoopReportsTickErrors(t *testing.T) {
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{"zod": {}}
 		}
-		rt.constructSystemInfoFn = func() structs.System { return structs.System{} }
-		rt.constructPierInfoFn = func() (map[string]structs.Urbit, error) {
-			return map[string]structs.Urbit{}, nil
+		rt.stateRuntime.infoCollector = testInfoCollector{}
+		rt.stateRuntime.pierCollector = testPierCollector{
+			urbits: map[string]structs.Urbit{},
 		}
-		rt.constructAppsInfoFn = func() structs.Apps { return structs.Apps{} }
-		rt.constructProfileInfoFn = func() structs.Profile { return structs.Profile{} }
 		rt.broadcastToClientsFn = func() error { return errors.New("broadcast transport failure") }
 		rt.tickErrorFn = func(err error) {
 			eventCh <- err
@@ -241,12 +303,14 @@ func TestRunBroadcastLoopReportsTickErrors(t *testing.T) {
 	case <-time.After(250 * time.Millisecond):
 		t.Fatal("expected tick error to be reported")
 	}
-	if gotErr == nil || gotErr.Error() != "broadcast transport failure" {
+	if gotErr == nil || !strings.Contains(gotErr.Error(), "broadcast transport failure") {
 		t.Fatalf("unexpected tick error %v", gotErr)
 	}
 }
 
 func TestStartBroadcastLoopGuardsDuplicateStarts(t *testing.T) {
+	withIsolatedBroadcastDefaults(t)
+
 	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
 		rt.getClientManagerFn = func() *structs.ClientManager {
 			return nil
@@ -254,12 +318,30 @@ func TestStartBroadcastLoopGuardsDuplicateStarts(t *testing.T) {
 	})
 
 	StopBroadcastLoop()
-	if !StartBroadcastLoopWithRuntime(runtime) {
-		t.Fatal("expected initial broadcast loop start to succeed")
+	if err := StartBroadcastLoopWithRuntime(runtime); err != nil {
+		t.Fatalf("expected initial broadcast loop start to succeed: %v", err)
 	}
-	if StartBroadcastLoopWithRuntime(runtime) {
-		t.Fatal("expected duplicate broadcast loop start to be rejected")
+	if err := StartBroadcastLoopWithRuntime(runtime); !errors.Is(err, errBroadcastLoopAlreadyRunning) {
+		t.Fatalf("expected duplicate broadcast loop start to be rejected, got %v", err)
 	}
 
 	StopBroadcastLoop()
+}
+
+func TestStopBroadcastLoopWithRuntimeStopsCustomController(t *testing.T) {
+	withIsolatedBroadcastDefaults(t)
+
+	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
+		rt.getClientManagerFn = func() *structs.ClientManager { return nil }
+		rt.loopController = newBroadcastLoopController()
+	})
+
+	if err := StartBroadcastLoopWithRuntime(runtime); err != nil {
+		t.Fatalf("expected custom runtime loop start to succeed: %v", err)
+	}
+	StopBroadcastLoopWithRuntime(runtime)
+	if err := StartBroadcastLoopWithRuntime(runtime); err != nil {
+		t.Fatalf("expected loop to restart after runtime-scoped stop: %v", err)
+	}
+	StopBroadcastLoopWithRuntime(runtime)
 }

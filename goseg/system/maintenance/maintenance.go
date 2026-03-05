@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.uber.org/zap"
 	"groundseg/defaults"
+
+	"go.uber.org/zap"
 )
 
 // IsNPBox returns true when basePath/natively planet marker exists.

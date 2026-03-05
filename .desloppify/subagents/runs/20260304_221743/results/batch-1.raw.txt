@@ -1,0 +1,70 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 81.6
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action contract data is validated across multiple registries in tests: uploadsvc compares `contracts.UploadActionBindingSpecs()`, `UploadActionContractByAction()`, and `contracts.ActionContractFor(...)` in `goseg/uploadsvc/actions_test.go`.",
+        "Conformance tests separately verify fixture bindings against canonical bindings while also referencing familycatalog constants in `goseg/protocol/contracts/conformance/fixtures_test.go`.",
+        "The contract catalog embeds concrete owner module path strings (`uploadsvc`, `system/wifi`) in `goseg/protocol/contracts/familycatalog/catalog.go`, coupling protocol contracts to implementation package layout."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "action_contract_source_of_truth_split",
+      "summary": "Upload action contract truth is split across catalog, bindings, and service mappings.",
+      "related_files": [
+        "goseg/protocol/contracts/familycatalog/catalog.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`actions_test.go` must cross-check three APIs (`UploadActionBindingSpecs`, `UploadActionContractByAction`, `ActionContractFor`) to confirm consistency, showing duplicated contract ownership.",
+        "`fixtures_test.go` revalidates binding parity against canonical contract bindings, indicating additional synchronization surface.",
+        "`catalog.go` defines the same action domain metadata (namespace/action/contract/name/description), creating another contract-definition layer."
+      ],
+      "suggestion": "Consolidate upload action contract definition into one canonical registry (preferably protocol contracts/family catalog) and have uploadsvc consume typed descriptors directly; remove parallel mapping surfaces so tests verify behavior rather than cross-registry parity.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fragmented_contract_ownership"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "protocol_catalog_leaks_runtime_module_paths",
+      "summary": "Protocol contract catalog is coupled to concrete runtime package paths via owner strings.",
+      "related_files": [
+        "goseg/protocol/contracts/familycatalog/catalog.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "`catalog.go` hard-codes owner values as implementation-oriented paths (`OwnerUploadService = \"uploadsvc\"`, `OwnerSystemWiFi = \"system/wifi\"`).",
+        "`doc.go` defines upload action validation semantics inside uploadsvc while catalog also carries action metadata/ownership, splitting boundary responsibility between protocol and runtime package details."
+      ],
+      "suggestion": "Replace path-like owner strings with domain-stable ownership identifiers (or remove owner from protocol specs) and keep implementation/package mapping in a runtime composition layer so protocol contracts remain independent of package structure.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_contract_ownership"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract metadata ownership is fragmented across protocol catalog, bindings, fixtures, and service-level mappings.",
+      "Protocol-layer data model includes implementation-layer ownership details."
+    ],
+    "likely_symptoms": [
+      "action_contract_source_of_truth_split",
+      "protocol_catalog_leaks_runtime_module_paths"
+    ],
+    "possible_false_positives": []
+  }
+}

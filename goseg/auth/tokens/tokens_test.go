@@ -34,6 +34,25 @@ func TestRequestIdentityFromRequestReadsForwardedAddress(t *testing.T) {
 	}
 }
 
+func TestRequestIdentityFromRequestTrimsForwardedAddressWhitespace(t *testing.T) {
+	req := &http.Request{
+		Header: map[string][]string{
+			"X-Forwarded-For": {" 203.0.113.1, 198.51.100.1"},
+			"User-Agent":      {"unit-test-agent"},
+		},
+	}
+	ip, userAgent, err := requestIdentityFromRequest(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ip != "203.0.113.1" {
+		t.Fatalf("unexpected ip: %q", ip)
+	}
+	if userAgent != "unit-test-agent" {
+		t.Fatalf("unexpected user-agent: %q", userAgent)
+	}
+}
+
 func TestCreateTokenRequiresRequest(t *testing.T) {
 	token, err := CreateToken(nil, nil, false)
 	if err == nil {

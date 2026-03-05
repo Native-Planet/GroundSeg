@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	"github.com/shirou/gopsutil/disk"
+	"go.uber.org/zap"
 )
 
 func checkIsEMMCMachine() bool {
 	partitions, err := disk.Partitions(true)
 	if err != nil {
-		fmt.Println("Failed to get partitions, defaulting to non-eMMC assumption")
+		zap.L().Warn("failed to read disk partitions; defaulting to non-eMMC assumption", zap.Error(err))
 		return false
 	}
 
@@ -37,7 +38,7 @@ func GetStoragePath(operation string) (string, error) {
 		basePath = "/opt/nativeplanet/groundseg"
 	}
 	if !strings.HasPrefix(basePath, "/") {
-		fmt.Println("Base path is not absolute! Using default")
+		zap.L().Warn("storage base path is not absolute; using default", zap.String("basePath", basePath))
 		basePath = "/opt/nativeplanet/groundseg"
 	}
 	var operationPaths = map[string]string{
@@ -55,7 +56,7 @@ func GetStoragePath(operation string) (string, error) {
 	if isEMMCMachine {
 		storagePath = filepath.Join("/media/data", opPath)
 		if _, err := os.Stat("/media/data"); os.IsNotExist(err) {
-			fmt.Printf("/media/data not found, falling back to %s\n", basePath)
+			zap.L().Warn("eMMC storage root missing; falling back to base path", zap.String("basePath", basePath))
 			storagePath = filepath.Join(basePath, opPath)
 		}
 	} else {

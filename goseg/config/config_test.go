@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"groundseg/structs"
@@ -42,7 +43,7 @@ func TestGetSHA256(t *testing.T) {
 func TestMergeConfigsNewInstallSetupAndSalt(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
 	defaultCfg.Runtime.Setup = "complete"
-	defaultCfg.Connectivity.EndpointUrl = "default.endpoint"
+	defaultCfg.Connectivity.EndpointURL = "default.endpoint"
 	customCfg := structs.SysConfig{}
 	customCfg.AuthSession.PwHash = ""
 
@@ -57,14 +58,14 @@ func TestMergeConfigsNewInstallSetupAndSalt(t *testing.T) {
 
 func TestMergeConfigsPrefersCustomEndpoint(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
-	defaultCfg.Connectivity.EndpointUrl = "default.endpoint"
+	defaultCfg.Connectivity.EndpointURL = "default.endpoint"
 	customCfg := structs.SysConfig{}
-	customCfg.Connectivity.EndpointUrl = "custom.endpoint"
+	customCfg.Connectivity.EndpointURL = "custom.endpoint"
 	customCfg.AuthSession.PwHash = "hash"
 
 	merged := mergeConfigs(defaultCfg, customCfg)
-	if merged.Connectivity.EndpointUrl != "custom.endpoint" {
-		t.Fatalf("expected custom endpoint to win, got %q", merged.Connectivity.EndpointUrl)
+	if merged.Connectivity.EndpointURL != "custom.endpoint" {
+		t.Fatalf("expected custom endpoint to win, got %q", merged.Connectivity.EndpointURL)
 	}
 }
 
@@ -73,11 +74,11 @@ func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing
 	defaultCfg.Runtime.GracefulExit = true
 	defaultCfg.Runtime.Setup = "complete"
 	defaultCfg.Runtime.LastKnownMDNS = "default-mdns"
-	defaultCfg.Connectivity.EndpointUrl = "https://default.endpoint"
+	defaultCfg.Connectivity.EndpointURL = "https://default.endpoint"
 	defaultCfg.Connectivity.ApiVersion = "v2"
 	defaultCfg.Connectivity.NetCheck = "default-netcheck"
 	defaultCfg.Connectivity.UpdateMode = "default-mode"
-	defaultCfg.Connectivity.UpdateUrl = "https://default-update"
+	defaultCfg.Connectivity.UpdateURL = "https://default-update"
 	defaultCfg.Connectivity.UpdateBranch = "main"
 	defaultCfg.Runtime.SwapVal = 99
 	defaultCfg.Runtime.SwapFile = "/default/swap"
@@ -86,7 +87,7 @@ func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing
 	defaultCfg.Connectivity.WgOn = true
 	defaultCfg.Connectivity.WgRegistered = true
 	defaultCfg.Runtime.UpdateInterval = 15
-	defaultCfg.Connectivity.C2cInterval = 2000
+	defaultCfg.Connectivity.C2CInterval = 2000
 	defaultCfg.Runtime.GsVersion = "v2.0"
 	defaultCfg.Runtime.CfgDir = "/default/cfg"
 	defaultCfg.Runtime.BinHash = "bin-default"
@@ -142,7 +143,7 @@ func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing
 	if merged.Runtime.LastKnownMDNS != defaultCfg.Runtime.LastKnownMDNS {
 		t.Fatalf("expected last known mdns to use default when custom is empty")
 	}
-	if merged.Connectivity.EndpointUrl != defaultCfg.Connectivity.EndpointUrl || merged.Connectivity.ApiVersion != defaultCfg.Connectivity.ApiVersion {
+	if merged.Connectivity.EndpointURL != defaultCfg.Connectivity.EndpointURL || merged.Connectivity.ApiVersion != defaultCfg.Connectivity.ApiVersion {
 		t.Fatalf("expected defaults for empty custom scalar fields")
 	}
 	if merged.AuthSession.PwHash != customCfg.AuthSession.PwHash {
@@ -188,12 +189,12 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	defaultCfg.Runtime.GracefulExit = true
 	defaultCfg.Runtime.LastKnownMDNS = "default-mdns"
 	defaultCfg.Runtime.Setup = "default-setup"
-	defaultCfg.Connectivity.EndpointUrl = "https://default.endpoint"
+	defaultCfg.Connectivity.EndpointURL = "https://default.endpoint"
 	defaultCfg.Connectivity.ApiVersion = "v2"
 	defaultCfg.Connectivity.Piers = []string{"default"}
 	defaultCfg.Connectivity.NetCheck = "default-netcheck"
 	defaultCfg.Connectivity.UpdateMode = "default-mode"
-	defaultCfg.Connectivity.UpdateUrl = "https://default-update"
+	defaultCfg.Connectivity.UpdateURL = "https://default-update"
 	defaultCfg.Connectivity.UpdateBranch = "default"
 	defaultCfg.Runtime.SwapVal = 10
 	defaultCfg.Runtime.SwapFile = "/default/swap"
@@ -201,7 +202,7 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	defaultCfg.Runtime.DockerData = "/default/docker"
 	defaultCfg.Connectivity.WgOn = true
 	defaultCfg.Connectivity.WgRegistered = true
-	defaultCfg.Connectivity.C2cInterval = 1200
+	defaultCfg.Connectivity.C2CInterval = 1200
 	defaultCfg.Runtime.GsVersion = "default-gs"
 	defaultCfg.Runtime.CfgDir = "/default/cfg"
 	defaultCfg.Runtime.UpdateInterval = 30
@@ -248,12 +249,12 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	customCfg.Runtime.LastKnownMDNS = "custom-mdns"
 	customCfg.Runtime.Setup = "custom-setup"
 	customCfg.AuthSession.PwHash = "present"
-	customCfg.Connectivity.EndpointUrl = "https://custom.endpoint"
+	customCfg.Connectivity.EndpointURL = "https://custom.endpoint"
 	customCfg.Connectivity.ApiVersion = "v10"
 	customCfg.Connectivity.Piers = []string{"a", "b", "c"}
 	customCfg.Connectivity.NetCheck = "custom-netcheck"
 	customCfg.Connectivity.UpdateMode = "poll"
-	customCfg.Connectivity.UpdateUrl = "https://custom-update"
+	customCfg.Connectivity.UpdateURL = "https://custom-update"
 	customCfg.Connectivity.UpdateBranch = "stable"
 	customCfg.Runtime.SwapVal = 20
 	customCfg.Runtime.SwapFile = "/custom/swap"
@@ -272,7 +273,7 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 		Value:    2,
 		Interval: "3m",
 	}
-	customCfg.Connectivity.C2cInterval = 3000
+	customCfg.Connectivity.C2CInterval = 3000
 	customCfg.Runtime.GsVersion = "v10"
 	customCfg.Runtime.CfgDir = "/custom/cfg"
 	customCfg.Runtime.UpdateInterval = 60
@@ -293,7 +294,7 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	if !merged.Runtime.GracefulExit {
 		t.Fatal("expected merged graceful exit from custom false or default true to be true")
 	}
-	if merged.Runtime.LastKnownMDNS != customCfg.Runtime.LastKnownMDNS || merged.Connectivity.EndpointUrl != customCfg.Connectivity.EndpointUrl {
+	if merged.Runtime.LastKnownMDNS != customCfg.Runtime.LastKnownMDNS || merged.Connectivity.EndpointURL != customCfg.Connectivity.EndpointURL {
 		t.Fatalf("expected non-empty custom string fields to override defaults")
 	}
 	if !reflect.DeepEqual(merged.Connectivity.Piers, customCfg.Connectivity.Piers) {
@@ -437,7 +438,7 @@ func TestMergeConfigsFallbackWhenMergerNilUsesDefaultMerger(t *testing.T) {
 	defaultConfig.Runtime.LastKnownMDNS = "default.mdns"
 	defaultConfig.Runtime.Setup = "complete"
 	defaultConfig.AuthSession.PwHash = "default-hash"
-	defaultConfig.Connectivity.EndpointUrl = "https://default"
+	defaultConfig.Connectivity.EndpointURL = "https://default"
 	defaultConfig.Connectivity.UpdateMode = "poll"
 	defaultConfig.Penpai.PenpaiModels = []structs.Penpai{{ModelName: "default-a"}}
 	defaultConfig.Penpai.PenpaiActive = "default-a"
@@ -456,7 +457,7 @@ func TestMergeConfigsFallbackWhenMergerNilUsesDefaultMerger(t *testing.T) {
 	if merged.Runtime.LastKnownMDNS != defaultConfig.Runtime.LastKnownMDNS {
 		t.Fatalf("expected default mdns when custom value missing")
 	}
-	if merged.Connectivity.EndpointUrl != defaultConfig.Connectivity.EndpointUrl {
+	if merged.Connectivity.EndpointURL != defaultConfig.Connectivity.EndpointURL {
 		t.Fatalf("expected default endpoint when custom missing")
 	}
 	if merged.AuthSession.Salt == "" {
@@ -470,12 +471,12 @@ func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 	defaultConfig.Runtime.LastKnownMDNS = "default-mdns"
 	defaultConfig.Runtime.Setup = "migrated"
 	defaultConfig.AuthSession.PwHash = "default-hash"
-	defaultConfig.Connectivity.EndpointUrl = "https://default-endpoint"
+	defaultConfig.Connectivity.EndpointURL = "https://default-endpoint"
 	defaultConfig.Connectivity.ApiVersion = "1.0"
 	defaultConfig.Connectivity.Piers = []string{"default-pier"}
 	defaultConfig.Connectivity.NetCheck = "default-netcheck"
 	defaultConfig.Connectivity.UpdateMode = "default"
-	defaultConfig.Connectivity.UpdateUrl = "https://updates.example.com"
+	defaultConfig.Connectivity.UpdateURL = "https://updates.example.com"
 	defaultConfig.Connectivity.UpdateBranch = "main"
 	defaultConfig.Runtime.SwapVal = 1
 	defaultConfig.Runtime.SwapFile = "/tmp/default-swap"
@@ -484,7 +485,7 @@ func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 	defaultConfig.Connectivity.WgOn = false
 	defaultConfig.Connectivity.WgRegistered = false
 	defaultConfig.Connectivity.DiskWarning = map[string]structs.DiskWarning{"default": {Eighty: true}}
-	defaultConfig.Connectivity.C2cInterval = 1000
+	defaultConfig.Connectivity.C2CInterval = 1000
 	defaultConfig.Runtime.GsVersion = "v1"
 	defaultConfig.Runtime.CfgDir = "/default/cfg"
 	defaultConfig.Runtime.UpdateInterval = 20
@@ -522,9 +523,9 @@ func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 	customConfig := structs.SysConfig{}
 	customConfig.Runtime.GracefulExit = true
 	customConfig.Runtime.LastKnownMDNS = "" // force default
-	customConfig.Connectivity.EndpointUrl = "https://custom-endpoint"
+	customConfig.Connectivity.EndpointURL = "https://custom-endpoint"
 	customConfig.AuthSession.PwHash = "" // triggers new install logic
-	customConfig.Runtime.SwapVal = 0 // fallback to default
+	customConfig.Runtime.SwapVal = 0     // fallback to default
 	customConfig.Connectivity.WgOn = true
 	customConfig.Connectivity.WgRegistered = true
 	customConfig.Connectivity.DiskWarning = map[string]structs.DiskWarning{"custom": {}}
@@ -533,7 +534,7 @@ func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 	customConfig.Penpai.PenpaiCores = 0          // fallback
 	customConfig.Penpai.PenpaiModels = nil       // ignored
 	customConfig.Penpai.PenpaiActive = "invalid" // should fallback
-	customConfig.Runtime.Disable502 = false       // default should stay true
+	customConfig.Runtime.Disable502 = false      // default should stay true
 	customConfig.Startram.StartramSetReminder = struct {
 		One   bool `json:"one"`
 		Three bool `json:"three"`
@@ -552,7 +553,7 @@ func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 	if merged.Runtime.LastKnownMDNS != defaultConfig.Runtime.LastKnownMDNS {
 		t.Fatalf("expected default mdns on empty custom value")
 	}
-	if merged.Connectivity.EndpointUrl != customConfig.Connectivity.EndpointUrl {
+	if merged.Connectivity.EndpointURL != customConfig.Connectivity.EndpointURL {
 		t.Fatalf("expected custom endpoint to win")
 	}
 	if merged.Connectivity.ApiVersion != defaultConfig.Connectivity.ApiVersion {
@@ -606,7 +607,40 @@ func TestMergeConfigsAppliesDefaultsAndCustomOverrides(t *testing.T) {
 	if !reflect.DeepEqual(merged.Connectivity.DiskWarning, customConfig.Connectivity.DiskWarning) {
 		t.Fatalf("expected custom disk warning")
 	}
-	if merged.Connectivity.C2cInterval != defaultConfig.Connectivity.C2cInterval || merged.Runtime.GsVersion != defaultConfig.Runtime.GsVersion || merged.Runtime.CfgDir != defaultConfig.Runtime.CfgDir {
+	if merged.Connectivity.C2CInterval != defaultConfig.Connectivity.C2CInterval || merged.Runtime.GsVersion != defaultConfig.Runtime.GsVersion || merged.Runtime.CfgDir != defaultConfig.Runtime.CfgDir {
 		t.Fatalf("expected default scalar fields when custom zero/empty")
+	}
+}
+
+func TestRuntimeContextSettersSerializeUpdates(t *testing.T) {
+	const iterations = 200
+	var wg sync.WaitGroup
+	wg.Add(iterations * 2)
+
+	originalBasePath := BasePath()
+	originalArchitecture := Architecture()
+	originalDebugMode := DebugMode()
+	t.Cleanup(func() {
+		SetBasePath(originalBasePath)
+		SetArchitecture(originalArchitecture)
+		SetDebugMode(originalDebugMode)
+	})
+
+	for i := 0; i < iterations; i++ {
+		go func(i int) {
+			defer wg.Done()
+			SetBasePath(filepath.Join("/tmp", "base", t.Name(), "a", string(rune('a'+(i%26)))))
+		}(i)
+		go func(i int) {
+			defer wg.Done()
+			SetArchitecture(filepath.Join("amd", "arch", string(rune('a'+(i%26)))))
+			SetDebugMode(i%2 == 0)
+		}(i)
+	}
+	wg.Wait()
+
+	ctx := RuntimeContextSnapshot()
+	if ctx.BasePath == "" || ctx.Architecture == "" {
+		t.Fatal("runtime context fields should remain set after concurrent updates")
 	}
 }

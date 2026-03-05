@@ -1,0 +1,181 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 78.0,
+    "error_consistency": 72.0,
+    "abstraction_fitness": 75.0,
+    "test_strategy": 87.0,
+    "design_coherence": 80.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/click/internal/runtime/runtime.go binds click execution directly to lifecycle.DefaultRuntime() and config package globals (DockerDir, UrbitConf), so click domain logic depends on docker/config infrastructure internals.",
+        "goseg/docker/lifecycle/lifecycle.go exposes mutable process-wide runtime via SetDefaultRuntime/DefaultRuntime, and callers in other modules consume it as an implicit dependency.",
+        "goseg/broadcast/state.go and goseg/broadcast/loop.go use shared process-wide default runtimes/controllers, coupling lifecycle control to package state instead of explicit composition."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "Error wrapping is inconsistent: several paths use %v instead of %w (e.g., goseg/click/internal/runtime/runtime.go, goseg/click/luscode/luscode.go, goseg/docker/orchestration/container/llama.go), which drops unwrap semantics used elsewhere.",
+        "Error message conventions drift across the same subsystem (capitalized/legacy strings like \"Couldn't...\", \"Error ...\", mixed with lower-case wrapped context in goseg/docker/lifecycle/containers.go and goseg/docker/lifecycle/lifecycle.go).",
+        "goseg/config/storage.go prints operational failures/fallbacks to stdout and continues, while sibling config paths (e.g., goseg/config/persistence.go, goseg/config/config_update_executor.go) propagate structured errors."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Click packages define many runtime interfaces and pass-through wrappers that mostly forward calls without additional policy/translation (goseg/click/click.go, goseg/click/pack/pack.go, goseg/click/backup/service.go).",
+        "Runtime injection is implemented repeatedly with per-package globals + SetRuntime/reset boilerplate, increasing indirection surface without a shared abstraction boundary.",
+        "Call depth increases from facade wrappers to internal runtime helpers before real work happens, but leverage is limited because interfaces commonly have a single concrete implementation."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 70.0,
+        "indirection_cost": 63.0,
+        "interface_honesty": 79.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "Critical orchestration code relies on package-global mutable runtime state (e.g., goseg/click/click.go runtimeRuntime, goseg/docker/lifecycle/lifecycle.go defaultRuntimeValue), which raises concurrency/regression risk and typically needs stronger race/concurrency test focus.",
+        "State-caching logic in goseg/click/luscode/luscode.go and loop/controller state in goseg/broadcast/loop.go indicate time/concurrency-sensitive behavior where integration-level validation is important."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Concurrency-sensitive global runtime/state patterns suggest residual risk unless explicitly stress-tested (parallel/race/integration scenarios) around shared mutable process state."
+    },
+    "design_coherence": {
+      "evidence": [
+        "goseg/click/click.go centralizes many commands with repeated validate->delegate->wrap patterns, creating a broad command hub where cross-cutting changes (validation or wrapping policy) require touching many near-duplicate branches.",
+        "goseg/config/config_update_registry.go concentrates a very large registry and merge policy surface in one file (allConfPatchFields + many merge helpers), making policy evolution high-friction and harder to reason about by section ownership."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "implicit_global_runtime_coupling",
+      "summary": "Process-wide mutable runtime singletons create hidden cross-module coupling",
+      "related_files": [
+        "goseg/click/internal/runtime/runtime.go",
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "click runtime resolves docker behavior through lifecycle.DefaultRuntime() rather than an explicit dependency seam.",
+        "docker lifecycle exposes global runtime mutation via SetDefaultRuntime, enabling process-wide behavior changes from unrelated modules.",
+        "broadcast loop/state rely on default process-wide runtime/controller instances."
+      ],
+      "suggestion": "Introduce explicit dependency wiring at subsystem boundaries (startup/bootstrap), pass runtime interfaces via constructors, and keep package-level defaults as thin compatibility shims only.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_runtime_state"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "lossy_error_wrapping_patterns",
+      "summary": "Several error paths lose causal context by formatting with %v instead of %w",
+      "related_files": [
+        "goseg/click/internal/runtime/runtime.go",
+        "goseg/click/luscode/luscode.go",
+        "goseg/docker/orchestration/container/llama.go",
+        "goseg/docker/lifecycle/containers.go"
+      ],
+      "evidence": [
+        "executeClickCommand and parsing paths use fmt.Errorf(... %v, err), preventing errors.Is/errors.As traversal.",
+        "llama orchestration uses mixed wrapped/unwrapped formatting for runtime failures.",
+        "docker lifecycle mixes casing and style conventions in error strings, reducing predictability for operators and tests."
+      ],
+      "suggestion": "Standardize on wrapped errors (%w) for propagated failures, reserve plain strings for terminal boundaries, and enforce one error-message style guide (lowercase, action/context first) across lifecycle/click/orchestration packages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "stdout_fallbacks_in_config_errors",
+      "summary": "Config storage path uses stdout fallbacks instead of structured error handling",
+      "related_files": [
+        "goseg/config/storage.go",
+        "goseg/config/persistence.go",
+        "goseg/config/config_update_executor.go"
+      ],
+      "evidence": [
+        "storage.go prints failures/fallback decisions with fmt.Println/fmt.Printf and proceeds silently.",
+        "Sibling config modules generally return wrapped errors, so caller-level handling is inconsistent."
+      ],
+      "suggestion": "Refactor storage path resolution to return typed/wrapped errors (or explicit warning values) and route user-visible diagnostics through the project logger at call boundaries.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_drift"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "low_leverage_runtime_wrappers",
+      "summary": "Repeated runtime interfaces/wrappers add indirection with little behavioral leverage",
+      "related_files": [
+        "goseg/click/click.go",
+        "goseg/click/pack/pack.go",
+        "goseg/click/backup/service.go",
+        "goseg/click/restore/restore.go"
+      ],
+      "evidence": [
+        "Multiple runtime interfaces are thin pass-throughs to one implementation and mostly mirror function signatures.",
+        "Each package reimplements similar SetRuntime/reset/global runtime patterns."
+      ],
+      "suggestion": "Collapse repetitive per-package runtime scaffolding into one shared execution seam (or explicit service object) and keep wrappers only where they add policy, validation, or translation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "global_runtime_state"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "command_hub_repetition_and_policy_scatter",
+      "summary": "Large wrapper hubs repeat validation/error policy across many near-identical functions",
+      "related_files": [
+        "goseg/click/click.go",
+        "goseg/config/config_update_registry.go"
+      ],
+      "evidence": [
+        "click.go contains many similar methods with duplicated argument validation and error wrapping patterns.",
+        "config_update_registry.go centralizes a very large patch/merge matrix in one file, increasing cognitive load and making policy edits broad."
+      ],
+      "suggestion": "Use a small command descriptor table + shared validator/wrapper helper for click operations, and split config patch registry by domain section (connectivity/auth/penpai/etc.) with composable registration.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "policy_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Reliance on package-global mutable runtime state for wiring and test seams",
+      "No unified cross-package error contract (wrapping, style, propagation boundary)",
+      "Cross-cutting policies encoded as repeated imperative wrappers instead of shared declarative structures"
+    ],
+    "likely_symptoms": [
+      "lossy_error_wrapping_patterns",
+      "command_hub_repetition_and_policy_scatter",
+      "stdout_fallbacks_in_config_errors"
+    ],
+    "possible_false_positives": []
+  }
+}

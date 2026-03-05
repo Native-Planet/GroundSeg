@@ -43,7 +43,7 @@ func (rt WireguardRuntime) wgContainerConf() (dockerc.Config, dockerc.HostConfig
 	if err != nil {
 		return dockerc.Config{}, dockerc.HostConfig{}, fmt.Errorf("unable to load latest wireguard image metadata: %w", err)
 	}
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
+	desiredImage := containerInfo.Reference()
 	containerConfig := dockerc.Config{
 		Image:     desiredImage,
 		Hostname:  "wireguard",
@@ -79,7 +79,7 @@ func (rt WireguardRuntime) buildWgConf() (string, error) {
 	}
 	confBytes, err := base64.StdEncoding.DecodeString(confB64)
 	if err != nil {
-		return "", fmt.Errorf("failed to decode remote WG base64: %w", err)
+		return "", fmt.Errorf("failed to decode remote wireguard base64: %w", err)
 	}
 	return strings.Replace(string(confBytes), "privkey", rt.GetWgPrivkeyFn(), -1), nil
 }
@@ -101,14 +101,15 @@ func (rt WireguardRuntime) WriteWgConf() error {
 	filePath := filepath.Join(rt.DockerDirFn(), "wireguard", "_data", "wg0.conf")
 	existingConf, err := rt.ReadFileFn(filePath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if !errors.Is(err, os.ErrNotExist) {
+			zap.L().Warn(fmt.Sprintf("failed to read existing wireguard config for %q: %v", filePath, err))
+		} else {
 			zap.L().Info("Creating WG config")
-			if writeErr := artifactwriter.Write(wireguardConfigWriteArtifactOptions(rt, filePath, newConf)); writeErr != nil {
-				return fmt.Errorf("unable to create wireguard config: %w", writeErr)
-			}
-			return nil
 		}
-		return fmt.Errorf("failed to read existing wireguard config: %w", err)
+		if writeErr := artifactwriter.Write(wireguardConfigWriteArtifactOptions(rt, filePath, newConf)); writeErr != nil {
+			return fmt.Errorf("unable to refresh wireguard config: %w", writeErr)
+		}
+		return nil
 	}
 	if string(existingConf) == newConf {
 		return nil
@@ -142,7 +143,7 @@ func wireguardConfigWriteArtifactOptions(rt WireguardRuntime, filePath string, c
 			}
 			return rt.GetLatestContainerImageFn("wireguard")
 		},
-		CopyErrorPrefix: "Failed to copy WG config file to volume",
+		CopyErrorPrefix: "failed to copy wireguard config file to volume",
 		EnsureVolumesFn: artifactwriter.NewVolumeInitializationPlan(artifactwriter.VolumeOps{
 			VolumeExistsFn: rt.VolumeExistsFn,
 			CreateVolumeFn: rt.CreateVolumeFn,

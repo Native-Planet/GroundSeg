@@ -1,0 +1,101 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 76.8
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Large callback-bag runtime structs are repeated across subsystems: `RuntimeContainerOps`/`RuntimeSnapshotOps`/`RuntimeUrbitOps` in `goseg/docker/orchestration/runtime_ops.go`, `StartupRuntime` + `startBackgroundServicesRuntime` in `goseg/startuporchestrator/startup_orchestrator.go`, `importerRuntime` in `goseg/importer/importer.go`, and `workflowRuntime` in `goseg/shipworkflow/operations_runtime.go`.",
+        "Many functions pay repeated resolve/validate indirection before doing work (e.g., `resolveImporterRuntimeFor*` path in `goseg/importer/importer.go`, `resolveWorkflowRuntime` calls in multiple `goseg/shipworkflow/operations_runtime.go` entry points), indicating abstraction overhead at call-sites.",
+        "`StartConfEventLoop` and `StartConfEventLoopWithRuntime` in `goseg/config/config_events.go` duplicate nearly the same goroutine/select loop, showing seam indirection without consolidation."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 72.4,
+        "indirection_cost": 68.9,
+        "interface_honesty": 89.1
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bags_exceed_domain_boundaries",
+      "summary": "Cross-module runtime callback bags create high indirection with low domain cohesion",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many coarse-grained ops structs (`RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeSnapshotOps`, etc.) and these are embedded into higher-level runtimes elsewhere.",
+        "`startup_orchestrator.go` carries broad startup callback structs (`startupInitRuntime`, `StartupRuntime`, `startBackgroundServicesRuntime`) with long callback lists, then further wraps them through `resolve*`/`*WithDefaults` paths.",
+        "`importer.go` combines storage/upload/provision callbacks plus embedded docker ops into `importerRuntime`, then introduces multiple scoped runtime projections (`initRuntime`, `workflowRuntime`, `publishRuntime`).",
+        "`operations_runtime.go` repeats the same pattern via `workflowRuntime` embedding orchestration ops and per-call `resolveWorkflowRuntime`.",
+        "`main.go` adds another layer (`bootstrapRuntime`) that forwards into startup orchestration."
+      ],
+      "suggestion": "Replace callback-bag structs with narrower domain services (e.g., `StartupCore`, `ImporterUploadService`, `WorkflowTransitionPublisher`) and inject one composed dependency object per subsystem at construction time. Keep test seams at package boundaries instead of per-function callback fields.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "callback_seam_overgrowth"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "repeated_runtime_resolution_chains",
+      "summary": "Repeated resolve/validate chains add ceremony and obscure operational flow",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`importer.go` has layered resolvers (`resolveImporterRuntimeFor`, `resolveImporterRuntimeForRequirements`, `resolveImporterRuntimeForInit/Upload/Workflow/Publish`) and many public functions call them before doing core work.",
+        "`operations_runtime.go` repeatedly calls `resolveWorkflowRuntime(...)` in separate helpers (`runTransitionLifecycle`, `dispatchUploadImport`, `emitWorkflowTransition`, `publishTransition`, `RunTransitionedOperationWithRuntime`, etc.).",
+        "Startup similarly resolves then validates runtime in multiple places (`resolveStartupRuntime`, `resolveStartBackgroundServicesRuntime`, `startupRuntimeWithDefaults`, `startBackgroundServicesRuntimeWithDefaults`)."
+      ],
+      "suggestion": "Resolve and validate subsystem runtime once at boundary entry (e.g., request/session/startup phase) and pass a strongly-typed resolved runtime through internal calls. Remove per-helper resolution functions except where a genuinely different scope is required.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "callback_seam_overgrowth"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_event_loop_duplicate_paths",
+      "summary": "Config event loop exposes two near-identical implementations with minimal abstraction gain",
+      "related_files": [
+        "goseg/config/config_events.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`StartConfEventLoop` and `StartConfEventLoopWithRuntime` both create goroutines with almost identical `select` loops over context cancellation and event channel reads.",
+        "The startup default runtime uses `StartConfEventLoop` directly, while a second runtime-aware API exists, leaving two code paths to maintain for the same behavior."
+      ],
+      "suggestion": "Keep one internal loop implementation (runtime-driven) and make `StartConfEventLoop` a thin adapter that delegates to it; then have startup use that single path as well.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplicate_seam_entrypoints"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Test seam strategy has expanded from boundary-level substitution into pervasive function-pointer dependency bags.",
+      "Subsystem APIs are optimized for override flexibility, but the same flexibility is re-applied at every call path instead of once per lifecycle boundary.",
+      "Legacy compatibility paths were retained as parallel entrypoints instead of being funneled through one internal abstraction."
+    ],
+    "likely_symptoms": [
+      "runtime_callback_bags_exceed_domain_boundaries",
+      "repeated_runtime_resolution_chains",
+      "config_event_loop_duplicate_paths"
+    ],
+    "possible_false_positives": []
+  }
+}

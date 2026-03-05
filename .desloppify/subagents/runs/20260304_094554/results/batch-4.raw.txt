@@ -1,0 +1,71 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 84.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Transition-builder functions in urbit workflow capture mutable ship config once during step construction, then execute logic later in closures (`buildRuntimeConfigIntSteps`, `buildToggleDevModeSteps`, `buildRebuildContainerSteps`), which is a fragile control-plane pattern when runtime state can change between build and execution.",
+        "Power/network toggle handlers and transition builders duplicate the same lifecycle flow (status read -> config section persist -> cleanup/start logic) across files instead of a shared transition coordinator.",
+        "The transition path mixes transition-routing glue with runtime mutation and restart side-effects in several small functions, creating repeated branching logic that is easy to drift across similar operations."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "stale_transition_config_snapshot",
+      "summary": "Captured ship config snapshots are used later inside transition closures, risking decisions on stale state",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/shipworkflow/urbit_operations_runtime_handlers.go"
+      ],
+      "evidence": [
+        "`buildUrbitDomainSteps`, `buildMinIODomainSteps`, `buildRebuildContainerSteps`, and `buildRuntimeConfigIntSteps` read ship config into local variables before returning closures that execute transition actions later.",
+        "Closures then branch on captured values (`shipConf.BootStatus`, `currentConf` from the builder path) instead of refreshing state at execution time.",
+        "`runTogglePowerTransition` and `runToggleNetworkTransition` in handlers already re-read status/config, showing execution-time reads are possible and needed in this workflow."
+      ],
+      "suggestion": "Introduce a runtime transition context object that reads current ship/runtime state inside each `Run` function (or via a single helper called at execution time), and make step builders pass only immutable inputs (patp/payload/action metadata) to remove stale snapshots as a dependency.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "transition_state_capture"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicate_urbit_toggle_orchestration",
+      "summary": "Power/network toggle flows duplicate lifecycle orchestration logic instead of using one transition coordinator",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime_handlers.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`runTogglePowerTransition` and `runToggleNetworkTransition` both perform repeated inline sequences: read ship status/config, persist section updates, optional desired-state updates, cleanup, and conditional container start/stop.",
+        "The operations builders in `goseg/shipworkflow/urbit_operations_runtime.go` re-wrap these same lifecycle motifs (`buildTogglePowerSteps`, `buildToggleDevModeSteps`, `buildRuntimeConfigIntSteps`) with additional closure-specific branches.",
+        "New transition types must currently duplicate this orchestration by copy/paste across both handler and operations files, increasing risk of behavioral drift."
+      ],
+      "suggestion": "Extract a small `runUrbitTransition` coordinator API that standardizes: resolve current state, apply section mutation callback, optional desired-state updates, optional cleanup, and restart policy; update `runTogglePowerTransition`, `runToggleNetworkTransition`, and toggle step builders to consume it.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transition_state_capture"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Transition configuration is snapshot-first and duplicated across builders/handlers instead of being centrally executed through shared stateful orchestrators."
+    ],
+    "likely_symptoms": [
+      "Inconsistent transition behavior under concurrent ship state changes or delayed execution",
+      "Hard-to-maintain duplicated power/network toggle branches when adding new transition types"
+    ],
+    "possible_false_positives": [
+      "Transition steps may always execute synchronously in this code path, which would reduce the staleness risk"
+    ]
+  }
+}

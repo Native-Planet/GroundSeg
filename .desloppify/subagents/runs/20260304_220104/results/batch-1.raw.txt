@@ -1,0 +1,71 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 81.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Cross-package tests enforce each other’s internals in both directions: `goseg/protocol/contracts/family_specs_test.go` imports `groundseg/uploadsvc/contractspec`, while `goseg/uploadsvc/contractspec/contractspec_test.go` imports `groundseg/protocol/contracts` and validates protocol binding counts.",
+        "The same contract identity model is re-declared in multiple modules (`goseg/protocol/actionids/actionids.go`, `goseg/protocol/contracts/protocolfamily/specs.go`, `goseg/uploadsvc/contractspec/specs.go`) and held together by conformance tests instead of a single owning catalog boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "bidirectional_contract_test_coupling",
+      "summary": "Protocol and uploadsvc tests are mutually coupled, creating boundary-crossing change blast radius.",
+      "related_files": [
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/uploadsvc/contractspec/contractspec_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "`family_specs_test.go` validates protocol catalog behavior using `uploadsvc/contractspec.UploadActionSpecs()`, so protocol tests depend on uploadsvc package details.",
+        "`contractspec_test.go` validates uploadsvc behavior by enumerating `contracts.ActionContractBindings()` from protocol contracts, so uploadsvc tests depend on protocol catalog internals.",
+        "This two-way assertion pattern means a local contract change in either package requires synchronized edits in both test suites."
+      ],
+      "suggestion": "Introduce a single contract-governance test seam (for example, a shared conformance fixture package under `protocol/contracts/conformance`) that owns cross-package assertions. Keep feature-package tests focused on local parsing/behavior and remove direct protocol<->feature mutual assertions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_contract_ownership"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_contract_ownership_across_packages",
+      "summary": "Contract IDs and action specs are distributed across multiple packages with no single authoritative module.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/uploadsvc/contractspec/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines canonical namespace/action/contract-id constants, while `protocolfamily/specs.go` and `uploadsvc/contractspec/specs.go` each rebuild family-specific catalogs by re-exporting and recombining those constants.",
+        "Conformance tests (`fixtures_test.go` and related tests) are required to keep these parallel declarations aligned, indicating coordination through duplicated declarations rather than a single owning boundary.",
+        "Adding or changing an action currently requires touching multiple modules and tests to preserve consistency, increasing architectural drift risk."
+      ],
+      "suggestion": "Create one authoritative contract catalog package that owns namespace/action/ID/spec metadata, and have protocolfamily/uploadsvc expose thin views generated from that catalog. Keep conformance tests as verification, not as the primary mechanism stitching duplicate declarations together.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fragmented_contract_ownership"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance is split between protocol and feature packages instead of being owned by one boundary.",
+      "Cross-package consistency is currently enforced mostly by reciprocal tests rather than by architecture that prevents divergence."
+    ],
+    "likely_symptoms": [
+      "bidirectional_contract_test_coupling"
+    ],
+    "possible_false_positives": []
+  }
+}

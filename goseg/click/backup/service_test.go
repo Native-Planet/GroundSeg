@@ -8,20 +8,24 @@ import (
 )
 
 func resetBackupSeams() {
-	executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
-		return "", nil
+	SetRuntime(nil)
+}
+
+func withBackupRuntime(mutator func(*backupRuntime)) {
+	runtime := defaultBackupRuntime()
+	if mutator != nil {
+		mutator(&runtime)
 	}
-	joinGapForBackup = func(parts []string) string {
-		return strings.Join(parts, "  ")
-	}
-	backupAgentFn = backupAgent
+	SetRuntime(runtime)
 }
 
 func TestBackupAgentExecFailure(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
-	executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
-		return "", errors.New("exec failed")
-	}
+	withBackupRuntime(func(runtime *backupRuntime) {
+		runtime.executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+			return "", errors.New("exec failed")
+		}
+	})
 
 	err := backupAgent("~zod", "groups")
 	if err == nil {
@@ -34,9 +38,11 @@ func TestBackupAgentExecFailure(t *testing.T) {
 
 func TestBackupAgentFilterFailure(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
-	executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
-		return "", errors.New("parse failed")
-	}
+	withBackupRuntime(func(runtime *backupRuntime) {
+		runtime.executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+			return "", errors.New("parse failed")
+		}
+	})
 
 	err := backupAgent("~zod", "groups")
 	if err == nil {
@@ -49,9 +55,11 @@ func TestBackupAgentFilterFailure(t *testing.T) {
 
 func TestBackupAgentPokeFailure(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
-	executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
-		return "", errors.New("click command failed")
-	}
+	withBackupRuntime(func(runtime *backupRuntime) {
+		runtime.executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+			return "", errors.New("click command failed")
+		}
+	})
 
 	err := backupAgent("~zod", "groups")
 	if err == nil {
@@ -66,19 +74,21 @@ func TestBackupAgentBuildsExpectedCommand(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
 
 	var gotPatp, gotFile, gotHoon, gotOperation string
-	executeClickCommandForBackup = func(
-		patp, file, hoon, sourcePath, successToken, operation string,
-		_clearLusCode func(string),
-	) (string, error) {
-		gotPatp = patp
-		gotFile = file
-		gotHoon = hoon
-		gotOperation = operation
-		return "ok", nil
-	}
-	joinGapForBackup = func(parts []string) string {
-		return strings.Join(parts, "  ")
-	}
+	withBackupRuntime(func(runtime *backupRuntime) {
+		runtime.executeClickCommandForBackup = func(
+			patp, file, hoon, sourcePath, successToken, operation string,
+			_clearLusCode func(string),
+		) (string, error) {
+			gotPatp = patp
+			gotFile = file
+			gotHoon = hoon
+			gotOperation = operation
+			return "ok", nil
+		}
+		runtime.joinGapForBackup = func(parts []string) string {
+			return strings.Join(parts, "  ")
+		}
+	})
 
 	if err := backupAgent("~zod", "profile"); err != nil {
 		t.Fatalf("expected success, got %v", err)
@@ -102,11 +112,15 @@ func TestBackupAgentBuildsExpectedCommand(t *testing.T) {
 
 func TestBackupTlonRunsAllAgents(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
+
 	var got []string
-	backupAgentFn = func(_ string, agent string) error {
-		got = append(got, agent)
-		return nil
-	}
+	withBackupRuntime(func(runtime *backupRuntime) {
+		runtime.executeClickCommandForBackup = func(patp, file, _, _, _, _ string, _ func(string)) (string, error) {
+			got = append(got, strings.TrimPrefix(file, "backup-"))
+			return "", nil
+		}
+		runtime.joinGapForBackup = func(parts []string) string { return strings.Join(parts, "  ") }
+	})
 
 	if err := BackupTlon("~zod"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -120,19 +134,29 @@ func TestBackupTlonRunsAllAgents(t *testing.T) {
 
 func TestBackupTlonAggregatesErrors(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
-	backupAgentFn = func(_ string, agent string) error {
-		if agent == "channels" || agent == "profile" {
-			return errors.New("boom")
+	withBackupRuntime(func(runtime *backupRuntime) {
+		runtime.executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+			return "", nil
 		}
-		return nil
-	}
+		runtime.joinGapForBackup = func(parts []string) string { return strings.Join(parts, "  ") }
+	})
 
+	withBackupRuntime(func(runtime *backupRuntime) {
+		runtime.executeClickCommandForBackup = func(_, file, _, _, _, _ string, _ func(string)) (string, error) {
+			if file == "backup-channels" || file == "backup-profile" {
+				return "", errors.New("boom")
+			}
+			return "", nil
+		}
+		runtime.joinGapForBackup = func(parts []string) string { return strings.Join(parts, "  ") }
+	})
 	err := BackupTlon("~zod")
 	if err == nil {
 		t.Fatalf("expected error")
 	}
 	msg := err.Error()
-	if !strings.Contains(msg, "channels: boom") || !strings.Contains(msg, "profile: boom") {
+	if !strings.Contains(msg, "channels: click command failed for backup-channels") ||
+		!strings.Contains(msg, "profile: click command failed for backup-profile") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

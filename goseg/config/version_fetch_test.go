@@ -68,7 +68,7 @@ func TestFetchVersionFromServerRetriesThenSucceeds(t *testing.T) {
 		sleepCalls++
 	})
 	setVersionFetchPolicy(3, time.Millisecond)
-	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateURL = "https://updates.example/version"
 
 	client := &stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
@@ -104,7 +104,7 @@ func TestFetchVersionFromServerFailsAfterRetryExhaustion(t *testing.T) {
 
 	setVersionFetchSleep(func(_ time.Duration) {})
 	setVersionFetchPolicy(2, time.Millisecond)
-	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateURL = "https://updates.example/version"
 	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{err: errors.New("network down")},

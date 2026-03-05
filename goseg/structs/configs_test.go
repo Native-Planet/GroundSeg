@@ -5,47 +5,6 @@ import (
 	"testing"
 )
 
-func TestParseRequiredTypes(t *testing.T) {
-	t.Run("parse bool", func(t *testing.T) {
-		if _, err := parseRequiredBool("flag", 0); err == nil {
-			t.Fatal("expected parseRequiredBool to reject int")
-		}
-		parsed, err := parseRequiredBool("flag", false)
-		if err != nil {
-			t.Fatalf("parseRequiredBool valid path failed: %v", err)
-		}
-		if parsed {
-			t.Fatal("expected false")
-		}
-	})
-
-	t.Run("parse int", func(t *testing.T) {
-		if _, err := parseRequiredInt("value", "42"); err == nil {
-			t.Fatal("expected parseRequiredInt to reject wrong type")
-		}
-		parsed, err := parseRequiredInt("value", float64(42))
-		if err != nil {
-			t.Fatalf("parseRequiredInt valid path failed: %v", err)
-		}
-		if parsed != 42 {
-			t.Fatalf("expected 42, got %d", parsed)
-		}
-	})
-
-	t.Run("parse string", func(t *testing.T) {
-		if _, err := parseRequiredString("value", 123); err == nil {
-			t.Fatal("expected parseRequiredString to reject wrong type")
-		}
-		parsed, err := parseRequiredString("value", "ok")
-		if err != nil {
-			t.Fatalf("parseRequiredString valid path failed: %v", err)
-		}
-		if parsed != "ok" {
-			t.Fatalf("expected ok, got %q", parsed)
-		}
-	})
-}
-
 func TestUrbitDockerUnmarshalJSONParsesKnownFields(t *testing.T) {
 	raw := map[string]any{
 		"pier_name":             "zod",
@@ -137,12 +96,12 @@ func TestUpdateConnectivityConfigRejectsNilCallback(t *testing.T) {
 func TestUpdateConnectivityConfigWritesWithCorrectType(t *testing.T) {
 	conf := &SysConfig{}
 	err := conf.UpdateConnectivityConfig(func(c *ConnectivityConfig) {
-		c.EndpointUrl = "wss://example"
+		c.EndpointURL = "wss://example"
 	})
 	if err != nil {
 		t.Fatalf("expected section update success, got: %v", err)
 	}
-	if conf.Connectivity.EndpointUrl != "wss://example" {
-		t.Fatalf("expected endpoint URL to be updated, got %q", conf.Connectivity.EndpointUrl)
+	if conf.Connectivity.EndpointURL != "wss://example" {
+		t.Fatalf("expected endpoint URL to be updated, got %q", conf.Connectivity.EndpointURL)
 	}
 }

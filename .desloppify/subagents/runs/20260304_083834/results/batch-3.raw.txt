@@ -1,0 +1,64 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 88.0,
+    "test_strategy": 96.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract message text is duplicated across `goseg/protocol/contracts/startram_contracts.go` and `goseg/startram/errors.go` (`\"Unable to connect to API server\" appears in both files).",
+        "`goseg/startram/errors.go` uses its own exported `APIConnectionErrorMessage` constant for masking, while the canonical contract metadata is defined independently in `protocol/contracts`.",
+        "Runtime contract governance references both modules in the README, so this boundary couples user-facing masking behavior to a duplicated literal that is not sourced from the contract descriptor."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "No single source-of-truth contract message exists between contract metadata and StarTram masking behavior; this keeps cross-module drift possible during versioned compatibility updates."
+    },
+    "test_strategy": {
+      "evidence": [
+        "README declares explicit runtime contract gate checks for changed files in this surface area, but those checks are externalized in CI/contract scripts rather than being locally self-evident in these contract/error files.",
+        "No in-file test scaffolding is present in `protocol_contracts.go`, `startram_contracts.go`, or `errors.go`; validation depends on broader package-level tests and CI scripts."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "The contract governance contract remains CI-script-driven and not codified as in-module invariants in these files, creating weaker local test discoverability for future edits."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract-message-single-source-of-truth",
+      "summary": "Duplicate StarTram API connection message literals split contract and runtime ownership",
+      "related_files": [
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/contracts/startram_contracts.go` defines `startramAPIConnectionErrorMessage` as `\"Unable to connect to API server\"` inside `ContractDescriptor{... Message: ...}`.",
+        "`goseg/startram/errors.go` defines a separate exported `APIConnectionErrorMessage` with the same value and uses it in `wrapAPIConnectionError`.",
+        "The two modules independently own the same user-visible contract message, so changing one without the other can desynchronize masking and contract metadata."
+      ],
+      "suggestion": "Remove the duplicate constant by deriving the masked message from the contract descriptor (`APIConnectionErrorContract().Message`) or by exporting/centralizing a single message value from `protocol/contracts` and consuming that in `startram/errors.go`; add/retain tests to pin the cross-file parity.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract-message-drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract metadata and runtime masking behavior were defined in separate modules without a unified ownership boundary for message constants.",
+      "Cross-module invariants are partially enforced by CI scripts, which can reduce local discoverability of required contract/test coupling."
+    ],
+    "likely_symptoms": [
+      "contract-message-single-source-of-truth"
+    ],
+    "possible_false_positives": [
+      "Existing packet note about `protocol_contracts.go` \"hardcoded secret in variable 'ActionToken'\" appears to be a low-confidence detector artifact, since these ActionToken values are plain protocol tokens."
+    ]
+  }
+}

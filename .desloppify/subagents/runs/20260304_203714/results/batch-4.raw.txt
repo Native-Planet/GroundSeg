@@ -1,0 +1,90 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Access point behavior is configured through both package-level mutable globals (`wlan`, `inet`, `ip`, `ssid`, `password`, `rootDir`, `hostapdConfigPath`) and runtime structs (`AccessPointRuntime`), with defaults repeated in `defaultAccessPointContext`, `accessPointRuntime`, and `normalizeAccessPointRuntime`.",
+        "The same access-point module requires extensive global reset harnessing in tests (`resetParameterGlobalsForTest`, `resetRouterGlobalsForTest`, repeated `testseams.WithRestore`), indicating hidden shared state at the design boundary.",
+        "`goseg/docker/orchestration/runtime_ops.go` centralizes many unrelated seam bundles and factories (container lifecycle, startup/bootstrap, urbit config, startram, netdata, minio, volume/network, file/image/context) in one file, creating a mixed-responsibility orchestration hub.",
+        "Config mutation shape is duplicated across `structs.SysConfig` section models and `config` patch models (`ConnectivityPatch`, `RuntimePatch`, `StartramPatch`, `PenpaiPatch`, `AuthSessionPatch`) with manual parse/apply wiring, which increases structural drift risk."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "accesspoint_dual_configuration_model",
+      "summary": "Access point flow mixes global mutable state and runtime injection, creating one feature with two config authorities.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/accesspoint/accesspoint_test.go"
+      ],
+      "evidence": [
+        "`accesspoint.go` keeps package globals for core settings and also defines `AccessPointRuntime` with overlapping fields, then re-applies defaults in multiple constructors/normalizers.",
+        "Tests repeatedly restore globals (`resetParameterGlobalsForTest`, `resetRouterGlobalsForTest`) before most cases, signaling shared state leakage across behavior that should be runtime-scoped."
+      ],
+      "suggestion": "Choose a single authority model for access point state: move all operational settings to an immutable runtime config object passed through Start/Stop paths, keep globals only as one-time boot defaults, and remove test-time global restoration by constructing explicit runtime fixtures.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shared_mutable_runtime_state"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "orchestration_runtime_ops_god_seam",
+      "summary": "Runtime seam wiring aggregates too many subsystem concerns in one orchestration surface.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many seam groups and default factories spanning unrelated domains (container ops, startup ops, urbit ops, startram ops, wireguard/netdata/minio, context/file/image/volume).",
+        "Ship workflow transitions rely on this broad orchestration seam ecosystem, so boundary contracts are centered around a large shared assembly point instead of domain-scoped composition roots."
+      ],
+      "suggestion": "Split orchestration seam assembly into domain-focused packages (for example `orchestration/startup`, `orchestration/containers`, `orchestration/urbit`) with narrow composition functions, then let ship workflow depend only on the minimal interface set it actually needs.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "centralized_composition_hub"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_schema_mirroring",
+      "summary": "Config update pipeline mirrors config schema in parallel types and manual mapping logic.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`config_update_schema.go` defines section patch structs that largely mirror fields in `structs.SysConfig` sections and then layers generic parse/apply/merge machinery on top.",
+        "`config.go` also exposes multiple section snapshot/settings wrappers, adding another representation layer over the same configuration domain."
+      ],
+      "suggestion": "Introduce a single canonical section descriptor registry (section key, field metadata, parse/apply hooks) and generate or derive patch/update wiring from that registry so schema changes are declared once and reused by snapshot, patch, and merge paths.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "parallel_config_representations"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Long-running migration from globals to runtime seams without fully removing old authority paths.",
+      "Centralized composition files accumulating cross-domain wiring responsibilities.",
+      "Configuration domain represented in parallel models rather than a single schema source."
+    ],
+    "likely_symptoms": [
+      "accesspoint_dual_configuration_model",
+      "orchestration_runtime_ops_god_seam",
+      "config_patch_schema_mirroring"
+    ],
+    "possible_false_positives": []
+  }
+}

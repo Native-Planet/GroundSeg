@@ -11,35 +11,16 @@ import (
 	"sync"
 )
 
-type UrbitConfigSection int
+type UrbitConfigSection = structs.UrbitConfigSection
 
 const (
-	UrbitConfigSectionRuntime UrbitConfigSection = iota
-	UrbitConfigSectionNetwork
-	UrbitConfigSectionSchedule
-	UrbitConfigSectionFeature
-	UrbitConfigSectionWeb
-	UrbitConfigSectionBackup
+	UrbitConfigSectionRuntime  = structs.UrbitConfigSectionRuntime
+	UrbitConfigSectionNetwork  = structs.UrbitConfigSectionNetwork
+	UrbitConfigSectionSchedule = structs.UrbitConfigSectionSchedule
+	UrbitConfigSectionFeature  = structs.UrbitConfigSectionFeature
+	UrbitConfigSectionWeb      = structs.UrbitConfigSectionWeb
+	UrbitConfigSectionBackup   = structs.UrbitConfigSectionBackup
 )
-
-func (section UrbitConfigSection) String() string {
-	switch section {
-	case UrbitConfigSectionRuntime:
-		return "runtime"
-	case UrbitConfigSectionNetwork:
-		return "network"
-	case UrbitConfigSectionSchedule:
-		return "schedule"
-	case UrbitConfigSectionFeature:
-		return "feature"
-	case UrbitConfigSectionWeb:
-		return "web"
-	case UrbitConfigSectionBackup:
-		return "backup"
-	default:
-		return "unknown"
-	}
-}
 
 var (
 	UrbitsConfig = make(map[string]structs.UrbitDocker)
@@ -130,61 +111,88 @@ func UpdateUrbit(pier string, mutateFn func(*structs.UrbitDocker) error) error {
 	return persistUrbitConfigLocked(pier, current)
 }
 
-func UpdateUrbitRuntimeConfig(pier string, mutateFn func(*structs.UrbitRuntimeConfig) error) error {
+func UpdateUrbitSection(pier string, section UrbitConfigSection, mutateFn func(any) error) error {
 	if mutateFn == nil {
 		return fmt.Errorf("mutate function is required")
 	}
 	return UpdateUrbit(pier, func(conf *structs.UrbitDocker) error {
-		return mutateFn(&conf.UrbitRuntimeConfig)
+		return mutateUrbitSection(conf, section, mutateFn)
 	})
 }
 
+func mutateUrbitSection(conf *structs.UrbitDocker, section UrbitConfigSection, mutateFn func(any) error) error {
+	if mutateFn == nil {
+		return fmt.Errorf("mutate function is required")
+	}
+	switch section {
+	case UrbitConfigSectionRuntime:
+		return mutateFn(&conf.UrbitRuntimeConfig)
+	case UrbitConfigSectionNetwork:
+		return mutateFn(&conf.UrbitNetworkConfig)
+	case UrbitConfigSectionSchedule:
+		return mutateFn(&conf.UrbitScheduleConfig)
+	case UrbitConfigSectionFeature:
+		return mutateFn(&conf.UrbitFeatureConfig)
+	case UrbitConfigSectionWeb:
+		return mutateFn(&conf.UrbitWebConfig)
+	case UrbitConfigSectionBackup:
+		return mutateFn(&conf.UrbitBackupConfig)
+	default:
+		return fmt.Errorf("unsupported urbit section: %s", section)
+	}
+}
+
+// AdaptUrbitSectionMutation adapts a typed urbit section mutation function to the generic section update contract.
+func AdaptUrbitSectionMutation[T any](mutateFn func(*T) error) func(any) error {
+	return func(section any) error {
+		typed, ok := section.(*T)
+		if !ok {
+			return fmt.Errorf("unsupported section payload: expected %T, got %T", *new(T), section)
+		}
+		return mutateFn(typed)
+	}
+}
+
+func UpdateUrbitRuntimeConfig(pier string, mutateFn func(*structs.UrbitRuntimeConfig) error) error {
+	if mutateFn == nil {
+		return fmt.Errorf("mutate function is required")
+	}
+	return UpdateUrbitSection(pier, UrbitConfigSectionRuntime, AdaptUrbitSectionMutation(mutateFn))
+}
 
 func UpdateUrbitNetworkConfig(pier string, mutateFn func(*structs.UrbitNetworkConfig) error) error {
 	if mutateFn == nil {
 		return fmt.Errorf("mutate function is required")
 	}
-	return UpdateUrbit(pier, func(conf *structs.UrbitDocker) error {
-		return mutateFn(&conf.UrbitNetworkConfig)
-	})
+	return UpdateUrbitSection(pier, UrbitConfigSectionNetwork, AdaptUrbitSectionMutation(mutateFn))
 }
-
 
 func UpdateUrbitScheduleConfig(pier string, mutateFn func(*structs.UrbitScheduleConfig) error) error {
 	if mutateFn == nil {
 		return fmt.Errorf("mutate function is required")
 	}
-	return UpdateUrbit(pier, func(conf *structs.UrbitDocker) error {
-		return mutateFn(&conf.UrbitScheduleConfig)
-	})
+	return UpdateUrbitSection(pier, UrbitConfigSectionSchedule, AdaptUrbitSectionMutation(mutateFn))
 }
-
 
 func UpdateUrbitFeatureConfig(pier string, mutateFn func(*structs.UrbitFeatureConfig) error) error {
 	if mutateFn == nil {
 		return fmt.Errorf("mutate function is required")
 	}
-	return UpdateUrbit(pier, func(conf *structs.UrbitDocker) error {
-		return mutateFn(&conf.UrbitFeatureConfig)
-	})
+	return UpdateUrbitSection(pier, UrbitConfigSectionFeature, AdaptUrbitSectionMutation(mutateFn))
 }
 
 func UpdateUrbitWebConfig(pier string, mutateFn func(*structs.UrbitWebConfig) error) error {
 	if mutateFn == nil {
 		return fmt.Errorf("mutate function is required")
 	}
-	return UpdateUrbit(pier, func(conf *structs.UrbitDocker) error {
-		return mutateFn(&conf.UrbitWebConfig)
-	})
+	return UpdateUrbitSection(pier, UrbitConfigSectionWeb, AdaptUrbitSectionMutation(mutateFn))
 }
 
 func UpdateUrbitBackupConfig(pier string, mutateFn func(*structs.UrbitBackupConfig) error) error {
 	if mutateFn == nil {
 		return fmt.Errorf("mutate function is required")
 	}
-	return UpdateUrbit(pier, func(conf *structs.UrbitDocker) error {
-		return mutateFn(&conf.UrbitBackupConfig)
-	})
+	return UpdateUrbitSection(pier, UrbitConfigSectionBackup, AdaptUrbitSectionMutation(mutateFn))
 }
 
 func loadUrbitConfigFromDisk(pier string) (structs.UrbitDocker, error) {

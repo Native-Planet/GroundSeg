@@ -1,0 +1,72 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 79.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "README.md defines contract governance entrypoints around `goseg/protocol/contracts/familycatalog/`, `goseg/protocol/contracts/`, `goseg/protocol/contracts/conformance/`, and `goseg/uploadsvc/`.",
+        "goseg/protocol/contracts/familycatalog/catalog.go mixes action-catalog declarations (upload/c2c action namespace/spec constants) with Startram error-contract declarations in one file/package.",
+        "holistic_context.structure shows `goseg/protocol/contracts/` at 11 files (>10 threshold) with mixed concerns (contract metadata, family specs, governance tests, protocol/startram contract files), indicating flattening around governance responsibilities.",
+        "Conformance ownership is split between `goseg/protocol/contracts/conformance/fixtures_test.go` and `goseg/uploadsvc/actions_test.go`, where both perform contract-registry parity checks for upload actions/rules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "familycatalog_mixes_action_and_error_domains",
+      "summary": "familycatalog combines unrelated contract domains, obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/protocol/contracts/familycatalog/catalog.go",
+        "README.md"
+      ],
+      "evidence": [
+        "catalog.go defines upload/c2c action namespace and action specs, then also defines Startram error-contract identifiers/spec metadata in the same package.",
+        "README.md presents `familycatalog/` as a governance entrypoint for contract declarations, but current placement folds two domain families (action protocol + Startram errors) into one catalog surface."
+      ],
+      "suggestion": "Stage 1: create `goseg/protocol/contracts/actioncatalog/` for action namespace/action spec constants and `goseg/protocol/contracts/errorcatalog/startram/` for Startram error contract specs. Stage 2: move symbols in this order: (a) action constants/spec builders, (b) Startram error constants/spec builders, (c) ownership enums split by domain package. Stage 3: keep `familycatalog` as a temporary compatibility shim re-exporting moved symbols for one release window, then remove shim. Stage 4: update imports with `rg -n \"protocol/contracts/familycatalog\" goseg` and adjust call sites, then validate with `cd goseg && go test ./protocol/contracts/... ./uploadsvc/...` and `cd goseg && go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_surface_scatter"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "contract_conformance_checks_scattered_across_consumer_and_core",
+      "summary": "Contract conformance rules are split across core conformance and uploadsvc test locations.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "README.md",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "fixtures_test.go asserts canonical action fixture/binding coverage and upload payload-rule validity from the contracts side.",
+        "actions_test.go also validates upload parser/action contract parity against `contracts.UploadActionBindingSpecs()`, duplicating governance assertions in a consumer package.",
+        "README.md defines a shared contract gate over `./protocol/contracts/... ./uploadsvc/...`, confirming governance checks are intentionally distributed rather than co-located."
+      ],
+      "suggestion": "Stage 1: introduce `goseg/protocol/contracts/conformance/uploadsvc/` (or equivalent governance-owned conformance package) and move cross-package contract-parity assertions there. Stage 2: keep uploadsvc tests focused on parser/service behavior and replace contract-governance assertions with thin smoke checks that call shared conformance helpers. Stage 3: update README governance map to include the new conformance location and clarify ownership boundaries (core contracts vs consumer behavior). Stage 4: run `cd goseg && go test ./protocol/contracts/conformance/... ./uploadsvc/...` followed by `cd goseg && go test ./...` to confirm import and gate integrity.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_surface_scatter"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance responsibilities are partitioned by historical evolution instead of a single package-boundary policy.",
+      "Catalog and conformance concerns are aggregated in convenience locations, then mirrored in consumer tests, creating boundary ambiguity."
+    ],
+    "likely_symptoms": [
+      "familycatalog_mixes_action_and_error_domains",
+      "contract_conformance_checks_scattered_across_consumer_and_core"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 86.5
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "The contract-governance surface is split across three directories: `goseg/protocol/contracts/family_specs_test.go` validates family/governance metadata, `goseg/protocol/conformance/fixtures_test.go` validates canonical fixture bindings against `contracts.ActionContractBindings()`, and `goseg/uploadsvc/actions_test.go` re-validates upload action/contract alignment.",
+        "`goseg/protocol/conformance/` has only 2 files in `holistic_context.structure.directory_profiles`, and one assigned file (`fixtures_test.go`) is primarily a protocol-contract catalog consistency test rather than a runtime conformance harness.",
+        "README quality-gate guidance runs these checks as one cross-package command (`go test ./protocol/contracts ./protocol/conformance ... ./uploadsvc/...`), which reinforces that governance checks are currently distributed instead of being organized around a single ownership boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Contract compatibility governance is fragmented across `protocol/contracts`, `protocol/conformance`, and `uploadsvc`, which makes ownership and navigation less direct for contract-change workflows."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "contract_governance_scattered_across_packages",
+      "summary": "Contract compatibility checks are organized across multiple packages with overlapping ownership, increasing navigation and change-boundary friction.",
+      "related_files": [
+        "goseg/protocol/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/uploadsvc/actions_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`fixtures_test.go` in `protocol/conformance` verifies canonical action-contract bindings against `contracts.ActionContractBindings()`, which is contract-catalog integrity rather than endpoint/runtime conformance.",
+        "`family_specs_test.go` in `protocol/contracts` validates family-level catalog/governance rules, and `uploadsvc/actions_test.go` separately checks upload action-to-contract alignment; together they implement one governance concern in separate package locations.",
+        "README presents one combined backend quality gate for these directories, indicating contributors must know multiple package locations to change a single contract family safely."
+      ],
+      "suggestion": "Stage 1: create a focused governance test location under `goseg/protocol/contracts/conformance/` (or `goseg/protocol/contracts/tests/`) and move contract-catalog consistency tests from `goseg/protocol/conformance/fixtures_test.go` there first; Stage 2: keep protocol-level invariants in that package and move upload contract-alignment checks that are purely catalog-consistency from `goseg/uploadsvc/actions_test.go` into protocol contract conformance tests while retaining upload parsing behavior tests in uploadsvc; Stage 3: update package docs so README backend gate points to the new contract-governance test target and keep domain-runtime tests in their owning service packages. After moves, run `go test ./goseg/protocol/contracts/... ./goseg/uploadsvc/...`, then `go test ./...` to validate imports and package boundaries.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_test_boundary_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Compatibility governance evolved as incremental tests in local feature packages instead of a single contract-governance boundary.",
+      "Quality-gate policy is documented centrally, but test ownership remains distributed by historical placement."
+    ],
+    "likely_symptoms": [
+      "contract_governance_scattered_across_packages"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 4,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 78.0,
+    "package_organization": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md delegates governance to multiple documents (`goseg/protocol/contracts/GOVERNANCE.md`, `goseg/uploadsvc/GOVERNANCE.md`, `goseg/system/wifi/README.md`, `goseg/startram/GOVERNANCE.md`), but assigned contract files expose only ID/name/description/message fields and local ID-prefix validation.",
+        "`goseg/protocol/contracts/protocol_contracts.go` defines protocol action literals and validates formula/prefix consistency internally, while runtime behavior in `goseg/system/wifi_c2c_flow_test.go` depends on `groundseg/protocol/actions` constants, creating cross-module synchronization by convention rather than a single authoritative contract surface.",
+        "`goseg/protocol/contracts/startram_contracts.go` validates only non-empty ID for StarTram entries, with no explicit compatibility/stability metadata to enforce policy stated in README-linked governance docs."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/system/wifi_c2c_flow_test.go` has good positive/negative unit coverage for parse/process/connect error paths, but governance compatibility is asserted indirectly through one fixture lookup and not as a broader contract/runtime matrix.",
+        "The test suite still contains literal protocol values (for example `payload.Type != \"c2c\"`) mixed with constant-based checks, which increases drift risk when contracts evolve across packages.",
+        "README.md defines backend/frontend quality gates and governance references, but the assigned tests do not verify that contract catalog semantics and runtime action parsing remain aligned across all declared protocol contract entries."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "From `holistic_context.structure.directory_profiles`, `goseg/system/` has 42 files with mixed concerns (apt, disk, maintenance, metrics, wifi, transport adapters), exceeding the >10 mixed-concern threshold and indicating flat-directory overload.",
+        "The same structure data shows dedicated subfolders already exist (`goseg/system/maintenance/`, `goseg/system/metrics/`, `goseg/system/storage/`, `goseg/system/wifi/service/`, `goseg/system/wifi/transport/`), but `wifi_c2c_flow_test.go` remains at `goseg/system/` root, signaling incomplete boundary migration.",
+        "README.md points to subsystem-specific governance docs, but physical placement of WiFi C2C governance tests in the broad `system` root weakens navigability and ownership alignment with those documented boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "governance_contract_not_executable",
+      "summary": "Governance policy is documented across modules but not enforced through a shared executable contract schema.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README references multiple governance policy files for runtime boundaries.",
+        "Protocol and StarTram contract specs validate local IDs/prefixes, but do not carry explicit compatibility fields (for example stability level, version epoch, owner module) to make governance checks machine-enforceable.",
+        "This leaves architecture contracts split between prose docs and isolated validators."
+      ],
+      "suggestion": "Add shared governance metadata to contract entries (for example `Stability`, `SinceVersion`, `OwnerModule`, `Deprecates`) and extend `validateContractFamilySpecs` to enforce required metadata plus cross-family compatibility rules; then expose one conformance entrypoint consumed by runtime modules and CI so policy and code remain in lockstep.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "action_literal_duplication_across_boundaries",
+      "summary": "Protocol action identity is duplicated across `contracts` and `actions` modules, relying on convention-level synchronization.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines `ActionC2CConnect` as a local contract verb literal and builds contract IDs from it.",
+        "`wifi_c2c_flow_test.go` exercises runtime behavior through `actions.ActionC2CConnect`, not through a single shared contract source type.",
+        "Alignment is tested, but compile-time ownership of action identity is still split."
+      ],
+      "suggestion": "Make one module authoritative for action identity (prefer `protocol/actions`), and have contract catalog builders import typed action descriptors from that source instead of redefining literals; keep conformance tests as regression checks, not primary synchronization.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "governance_conformance_tests_too_narrow",
+      "summary": "Coverage validates one C2C fixture path but lacks a full contract-to-runtime conformance matrix.",
+      "related_files": [
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`TestC2CPayloadAndContractsStayAligned` checks a single C2C connect fixture.",
+        "No assigned test enumerates all protocol contract specs and proves every declared action has runtime parse/handling coverage and expected failure semantics.",
+        "StarTram contract file defines canonical error contract, but no assigned tests assert runtime emission paths remain bound to that canonical contract."
+      ],
+      "suggestion": "Create a table-driven conformance suite that iterates the contract catalog and asserts parser acceptance/rejection, envelope type behavior, and canonical error mapping for each declared contract; fail CI on any unmapped contract entry.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "system_root_flattening_hides_wifi_boundaries",
+      "summary": "WiFi C2C tests remain in an overloaded `system` root package despite existing WiFi subpackages and documented subsystem governance.",
+      "related_files": [
+        "README.md",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "`directory_profiles` reports `goseg/system/` with 42 files and mixed responsibilities.",
+        "WiFi-specific subfolders (`goseg/system/wifi/service/`, `goseg/system/wifi/transport/`) already exist, indicating intended modularization.",
+        "`wifi_c2c_flow_test.go` is still at `goseg/system/` root, reducing ownership clarity and making WiFi governance harder to navigate."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1: create/standardize `goseg/system/wifi/flow/` (or `goseg/system/wifi/c2c/`) as the C2C runtime boundary; Stage 2: move WiFi C2C runtime files and `wifi_c2c_flow_test.go` there before moving generic adapters; Stage 3: update package declarations/imports with `goimports ./...`; Stage 4: validate with `go test ./goseg/system/...` and `go test ./goseg/protocol/...`; Stage 5: run `go test ./...` to confirm no boundary regressions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance is primarily prose-defined while executable contract metadata is minimal, so boundary guarantees rely on developer discipline and selective tests.",
+      "Package migration toward focused WiFi subdomains is partial, leaving legacy root placement that weakens ownership signals."
+    ],
+    "likely_symptoms": [
+      "action_literal_duplication_across_boundaries",
+      "governance_conformance_tests_too_narrow",
+      "system_root_flattening_hides_wifi_boundaries"
+    ],
+    "possible_false_positives": []
+  }
+}

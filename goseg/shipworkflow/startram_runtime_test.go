@@ -107,7 +107,7 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 			},
 		}),
 		orchestration.WithRuntimeStartupOps(orchestration.RuntimeStartupOps{
-			UpdateConfTypedFn: func(...config.ConfUpdateOption) error {
+			UpdateConfigTypedFn: func(...config.ConfigUpdateOption) error {
 				updateConfCalled = true
 				return nil
 			},
@@ -133,7 +133,7 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 	}
 	runtime.StartramSettingsSnapshotFn = runtimeConfig.StartramSettingsSnapshotFn
 	runtime.UrbitConfFn = runtimeConfig.UrbitConfFn
-	runtime.UpdateConfTypedFn = runtimeConfig.UpdateConfTypedFn
+	runtime.UpdateConfigTypedFn = runtimeConfig.UpdateConfigTypedFn
 	runtime.StopContainerByNameFn = runtimeConfig.StopContainerByNameFn
 	runtime.DeleteContainerFn = runtimeConfig.DeleteContainerFn
 	runtime.LoadMCFn = runtimeConfig.LoadMCFn

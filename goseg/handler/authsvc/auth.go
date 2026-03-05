@@ -166,7 +166,7 @@ func LogoutHandler(msg []byte) error {
 }
 
 func C2CHandler(msg []byte) ([]byte, error) {
-	var c2cPayload structs.WsC2cPayload
+	var c2cPayload structs.WsC2CPayload
 	err := json.Unmarshal(msg, &c2cPayload)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't unmarshal c2c payload: %w", err)
@@ -208,9 +208,9 @@ func PwHandler(msg []byte, urbitMode bool) error {
 	switch pwPayload.Payload.Action {
 	case "modify":
 		zap.L().Info("Setting new password")
-		conf := config.Conf()
+		conf := config.Config()
 		if tokens.Hasher(pwPayload.Payload.Old) == conf.AuthSession.PwHash {
-			if err := config.UpdateConfTyped(config.WithPwHash(tokens.Hasher(pwPayload.Payload.Password))); err != nil {
+			if err := config.UpdateConfigTyped(config.WithPwHash(tokens.Hasher(pwPayload.Payload.Password))); err != nil {
 				return fmt.Errorf("Unable to update password: %w", err)
 			}
 			if urbitMode {

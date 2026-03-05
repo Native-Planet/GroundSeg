@@ -1,11 +1,14 @@
 package systemsvc
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"groundseg/config"
 	"groundseg/structs"
 	"groundseg/system"
+	"groundseg/transition"
 	"time"
 
 	"go.uber.org/zap"
@@ -17,33 +20,34 @@ type CommandRunner interface {
 
 type SystemDependencies struct {
 	Unmarshal               func(data []byte, target any) error
-	Conf                    func() structs.SysConfig
+	Config                  func() structs.SysConfig
 	StopContainerByName     func(name string) error
-	UpdateConfTyped         func(...config.ConfUpdateOption) error
-	WithPenpaiAllow         func(bool) config.ConfUpdateOption
+	UpdateConfTyped         func(...config.ConfigUpdateOption) error
+	WithPenpaiAllow         func(bool) config.ConfigUpdateOption
 	LoadLlama               func() error
-	WithGracefulExit        func(bool) config.ConfUpdateOption
+	WithGracefulExit        func(bool) config.ConfigUpdateOption
 	ExecCommand             func(string, ...string) CommandRunner
 	ConfigureSwap           func(file string, value int) error
-	WithSwapVal             func(int) config.ConfUpdateOption
+	WithSwapVal             func(int) config.ConfigUpdateOption
 	RunUpgrade              func() error
 	ToggleDevice            func(string) error
-	ConnectToWifi           func(ssid, password string) error
-	PublishSystemTransition func(structs.SystemTransition)
+	ConnectToWiFi           func(ssid, password string) error
+	PublishSystemTransition func(context.Context, structs.SystemTransition) error
+	TransitionPublishPolicy transition.TransitionPublishPolicy
 	Sleep                   func(time.Duration)
 	IsDebugMode             bool
 }
 
 type PenpaiDependencies struct {
 	Unmarshal            func(data []byte, target any) error
-	Conf                 func() structs.SysConfig
+	Config               func() structs.SysConfig
 	StopContainerByName  func(name string) error
 	StartContainerByName func(name, containerType string) (structs.ContainerState, error)
 	UpdateContainerState func(name string, state structs.ContainerState)
-	UpdateConfTyped      func(...config.ConfUpdateOption) error
-	WithPenpaiRunning    func(bool) config.ConfUpdateOption
-	WithPenpaiActive     func(string) config.ConfUpdateOption
-	WithPenpaiCores      func(int) config.ConfUpdateOption
+	UpdateConfTyped      func(...config.ConfigUpdateOption) error
+	WithPenpaiRunning    func(bool) config.ConfigUpdateOption
+	WithPenpaiActive     func(string) config.ConfigUpdateOption
+	WithPenpaiCores      func(int) config.ConfigUpdateOption
 	DeleteContainer      func(name string) error
 	NumCPU               func() int
 }
@@ -57,10 +61,27 @@ func HandleSystem(msg []byte, deps SystemDependencies) error {
 	if err := unmarshal(msg, &systemPayload); err != nil {
 		return fmt.Errorf("Couldn't unmarshal system payload: %v", err)
 	}
+	publishPolicy := deps.TransitionPublishPolicy
+	if publishPolicy == "" {
+		publishPolicy = transition.TransitionPolicyForCriticality(transition.TransitionPublishCritical)
+	}
+	publishTransition := func(transitionEvent structs.SystemTransition) error {
+		if deps.PublishSystemTransition == nil {
+			return nil
+		}
+		if err := deps.PublishSystemTransition(context.Background(), transitionEvent); err != nil {
+			return transition.HandleTransitionPublishError(
+				"publish system transition",
+				err,
+				publishPolicy,
+			)
+		}
+		return nil
+	}
 
 	switch systemPayload.Payload.Action {
 	case "toggle-penpai-feature":
-		conf := deps.Conf()
+		conf := deps.Config()
 		if conf.Penpai.PenpaiAllow {
 			if err := deps.StopContainerByName("llama-gpt-api"); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to stop Llama API: %v", err))
@@ -133,7 +154,7 @@ func HandleSystem(msg []byte, deps SystemDependencies) error {
 		}
 	case "modify-swap":
 		zap.L().Info(fmt.Sprintf("Updating swap with value %v", systemPayload.Payload.Value))
-		conf := deps.Conf()
+		conf := deps.Config()
 		file := conf.Runtime.SwapFile
 		if err := deps.ConfigureSwap(file, systemPayload.Payload.Value); err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to set swap: %v", err))
@@ -154,16 +175,26 @@ func HandleSystem(msg []byte, deps SystemDependencies) error {
 			zap.L().Error(fmt.Sprintf("Couldn't toggle wifi device: %v", err))
 		}
 	case "wifi-connect":
-		deps.PublishSystemTransition(structs.SystemTransition{Type: "wifiConnect", Event: "connecting"})
-		if err := deps.ConnectToWifi(systemPayload.Payload.SSID, systemPayload.Payload.Password); err != nil {
-			deps.PublishSystemTransition(structs.SystemTransition{Type: "wifiConnect", Event: "error"})
-			deps.Sleep(3 * time.Second)
-			deps.PublishSystemTransition(structs.SystemTransition{Type: "wifiConnect", Event: ""})
-			return fmt.Errorf("Couldn't connect to wifi: %v", err)
+		if err := publishTransition(structs.SystemTransition{Type: "wifiConnect", Event: "connecting"}); err != nil {
+			return err
 		}
-		deps.PublishSystemTransition(structs.SystemTransition{Type: "wifiConnect", Event: "success"})
+		if err := deps.ConnectToWiFi(systemPayload.Payload.SSID, systemPayload.Payload.Password); err != nil {
+			publishErr := publishTransition(structs.SystemTransition{Type: "wifiConnect", Event: "error"})
+			deps.Sleep(3 * time.Second)
+			clearErr := publishTransition(structs.SystemTransition{Type: "wifiConnect", Event: ""})
+			return errors.Join(
+				publishErr,
+				clearErr,
+				fmt.Errorf("Couldn't connect to wifi: %w", err),
+			)
+		}
+		if err := publishTransition(structs.SystemTransition{Type: "wifiConnect", Event: "success"}); err != nil {
+			return err
+		}
 		deps.Sleep(3 * time.Second)
-		deps.PublishSystemTransition(structs.SystemTransition{Type: "wifiConnect", Event: ""})
+		if err := publishTransition(structs.SystemTransition{Type: "wifiConnect", Event: ""}); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("Unrecognized system action: %v", systemPayload.Payload.Action)
 	}
@@ -179,7 +210,7 @@ func HandlePenpai(msg []byte, deps PenpaiDependencies) error {
 	if err := unmarshal(msg, &penpaiPayload); err != nil {
 		return fmt.Errorf("Couldn't unmarshal penpai payload: %v", err)
 	}
-	conf := deps.Conf()
+	conf := deps.Config()
 	switch penpaiPayload.Payload.Action {
 	case "toggle":
 		running := false

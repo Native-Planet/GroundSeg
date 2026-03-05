@@ -12,22 +12,35 @@ import (
 	"go.uber.org/zap"
 )
 
-func PackScheduleLoop() {
-	// check once at start
-	if err := queuePack(); err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to make initial pack queue: %v", err))
+type packScheduleRuntime struct {
+	schedulePackEvents func() <-chan string
+	updateScheduled    func(string, time.Time) error
+	newTicker          func(time.Duration) *time.Ticker
+	now                func() time.Time
+}
+
+var packRuntimeFactory = func() packScheduleRuntime {
+	broadcastRuntime := broadcast.DefaultBroadcastStateRuntime()
+	return packScheduleRuntime{
+		schedulePackEvents: broadcastRuntime.SchedulePackEvents,
+		updateScheduled:    broadcastRuntime.UpdateScheduledPack,
+		newTicker:          time.NewTicker,
+		now:                time.Now,
 	}
-	runtime := broadcast.DefaultBroadcastStateRuntime()
-	ticker := time.NewTicker(1 * time.Minute)
-	//ticker := time.NewTicker(15 * time.Second)
+}
+
+func PackScheduleLoop() {
+	runtime := packRuntimeFactory()
+	queuePackWithRuntime(runtime)
+	ticker := runtime.newTicker(1 * time.Minute)
 	for {
 		select {
-		case <-runtime.SchedulePackEvents():
-			if err := queuePack(); err != nil {
+		case <-runtime.schedulePackEvents():
+			if err := queuePackWithRuntime(runtime); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))
 			}
 		case <-ticker.C:
-			if err := queuePack(); err != nil {
+			if err := queuePackWithRuntime(runtime); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to make pack queue with ticker: %v", err))
 			}
 		}
@@ -38,22 +51,22 @@ func PackScheduleLoopWithContext(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if err := queuePack(); err != nil {
+	runtime := packRuntimeFactory()
+	if err := queuePackWithRuntime(runtime); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to make initial pack queue: %v", err))
 	}
-	runtime := broadcast.DefaultBroadcastStateRuntime()
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := runtime.newTicker(1 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-runtime.SchedulePackEvents():
-			if err := queuePack(); err != nil {
+		case <-runtime.schedulePackEvents():
+			if err := queuePackWithRuntime(runtime); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))
 			}
 		case <-ticker.C:
-			if err := queuePack(); err != nil {
+			if err := queuePackWithRuntime(runtime); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to make pack queue with ticker: %v", err))
 			}
 		}
@@ -61,9 +74,17 @@ func PackScheduleLoopWithContext(ctx context.Context) error {
 }
 
 func queuePack() error {
+	return queuePackWithRuntime(packRuntimeFactory())
+}
+
+func queuePackWithRuntime(runtime packScheduleRuntime) error {
+	if runtime.updateScheduled == nil || runtime.schedulePackEvents == nil || runtime.newTicker == nil || runtime.now == nil {
+		return fmt.Errorf("pack runtime dependencies are not configured")
+	}
+	// check once at start
 	var err error
 	zap.L().Debug("Updating pack schedule")
-	conf := config.Conf()
+	conf := config.Config()
 	for _, patp := range conf.Connectivity.Piers {
 		shipConf := config.UrbitConf(patp)
 		// is scheduled
@@ -110,11 +131,11 @@ func queuePack() error {
 				continue
 			}
 		}
-		if err := broadcast.DefaultBroadcastStateRuntime().UpdateScheduledPack(patp, meldNext); err != nil {
+		if err := runtime.updateScheduled(patp, meldNext); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to update pack schedule struct for %s: %v", patp, err))
 		}
 
-		now := time.Now()
+		now := runtime.now()
 		// if less than 1 * time.Minute left, create routine with timer
 		zap.L().Debug(fmt.Sprintf("Next pack for %s on %v", patp, meldNext))
 		oneMinuteLater := now.Add(1 * time.Minute)

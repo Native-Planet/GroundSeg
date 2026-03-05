@@ -1,0 +1,117 @@
+{
+  "batch": "AI Debt & Migrations",
+  "batch_index": 3,
+  "assessments": {
+    "ai_generated_debt": 82.0,
+    "incomplete_migration": 79.0,
+    "low_level_elegance": 84.0
+  },
+  "dimension_notes": {
+    "ai_generated_debt": {
+      "evidence": [
+        "goseg/shipworkflow/startram.go contains only package declaration plus generic explanatory comments about module splitting, with no executable contract or API documentation.",
+        "goseg/system/system.go mirrors the same template-like pattern (package declaration + high-level split rationale), suggesting repeated boilerplate text islands rather than concise package docs in canonical doc files.",
+        "goseg/startram/doc.go and goseg/uploadsvc/doc.go contain broad one-line package summaries, while the extra narrative comments in startram.go/system.go duplicate organizational intent instead of adding actionable technical context."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "incomplete_migration": {
+      "evidence": [
+        "goseg/shipworkflow/startram.go appears to be a leftover anchor file after decomposition ('split into focused service runtime files') but retains the legacy topical filename without active code.",
+        "goseg/system/system.go similarly retains a former central module name while now acting as a placeholder note, indicating migration cleanup was not completed to stable package-doc conventions.",
+        "The same package-level intent is split across placeholder files and doc.go files in neighboring modules (startram/uploadsvc), indicating partial transition to canonical package documentation patterns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "Two files (goseg/shipworkflow/startram.go, goseg/system/system.go) provide no behavior and only narrative comments, creating low-signal file-level artifacts.",
+        "The package-documentation pattern is inconsistent: some packages use doc.go while others use topic-named files with only comments, reducing local navigability and precision.",
+        "Comments like 'split into focused modules' describe repository history/process rather than precise package contract, which weakens directness at file level."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "incomplete_migration",
+      "identifier": "placeholder-files-after-split",
+      "summary": "Legacy-named placeholder files remain after decomposition, signaling an unfinished migration to canonical package documentation layout.",
+      "related_files": [
+        "goseg/shipworkflow/startram.go",
+        "goseg/system/system.go",
+        "goseg/startram/doc.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "startram.go and system.go contain only package declarations and comments describing prior splitting/refactor state.",
+        "Parallel packages already use doc.go for package commentary, showing mixed old/new documentation placement patterns.",
+        "No runtime/API definitions in the placeholder files indicate these are migration remnants rather than intentional module entrypoints."
+      ],
+      "suggestion": "Complete the migration by moving any necessary package comments into canonical doc.go files per package, then remove or repurpose placeholder files so filenames map to active behavior rather than historical context.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "doc-layout-migration-drift"
+    },
+    {
+      "dimension": "ai_generated_debt",
+      "identifier": "template-comment-boilerplate",
+      "summary": "Repeated high-level explanatory comments form boilerplate debt that restates structure without defining concrete contracts.",
+      "related_files": [
+        "goseg/shipworkflow/startram.go",
+        "goseg/system/system.go",
+        "goseg/startram/doc.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "Comments in startram.go and system.go are generic process statements ('split into focused modules') rather than package semantics, constraints, or usage.",
+        "The comment style is near-template prose and duplicated intent across files.",
+        "Given no code in those files, the comments become the only content and still do not provide operationally useful documentation."
+      ],
+      "suggestion": "Replace generic boilerplate with concise package contracts in one canonical location per package (doc.go), focusing on responsibilities, invariants, and external touchpoints; remove duplicated narrative comments.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "doc-layout-migration-drift"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "non-canonical-doc-placement",
+      "summary": "File-level elegance is reduced by inconsistent documentation placement and zero-behavior files with broad narrative comments.",
+      "related_files": [
+        "goseg/shipworkflow/startram.go",
+        "goseg/system/system.go",
+        "goseg/startram/doc.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "Two files have no executable declarations beyond package statement, increasing navigation noise.",
+        "Package commentary is split between doc.go and non-doc topic files, forcing extra file hops for equivalent information.",
+        "Narrative comments are not tightly scoped to file-level behavior because the files have no behavior."
+      ],
+      "suggestion": "Standardize on doc.go for package-level docs and keep non-doc files behavior-bearing; if a package needs no extra docs, prefer removing narrative-only stubs entirely.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "doc-layout-migration-drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Documentation and decomposition migration stopped at an intermediate state, leaving structural placeholder artifacts.",
+      "Lack of a single convention for package documentation location (doc.go vs topic-named placeholder files)."
+    ],
+    "likely_symptoms": [
+      "template-comment-boilerplate",
+      "non-canonical-doc-placement"
+    ],
+    "possible_false_positives": []
+  }
+}

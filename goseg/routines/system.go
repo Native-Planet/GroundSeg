@@ -6,6 +6,7 @@ import (
 	"groundseg/config"
 	"groundseg/structs"
 	"groundseg/system"
+	maintenanceapt "groundseg/system/maintenance/apt"
 	"net"
 	"strings"
 	"time"
@@ -17,8 +18,8 @@ import (
 var (
 	LocalDomain = "nativeplanet.local"
 
-	updateCheckForAptLoop          = system.UpdateCheck
-	configForSystemRoutine         = config.Conf
+	updateCheckForAptLoop          = maintenanceapt.UpdateCheck
+	configForSystemRoutine         = config.Config
 	netInterfacesForSystemRoutine  = net.Interfaces
 	interfaceAddrsForSystemRoutine = func(i net.Interface) ([]net.Addr, error) {
 		return i.Addrs()
@@ -74,7 +75,7 @@ func aptUpdateCheckInterval(conf structs.SysConfig) time.Duration {
 }
 
 func mDNSServer() {
-	conf := config.Conf()
+	conf := config.Config()
 	if !conf.Runtime.GracefulExit && (len(conf.Runtime.LastKnownMDNS) > 0) {
 		system.SetLocalUrl(conf.Runtime.LastKnownMDNS)
 	} else {
@@ -118,7 +119,7 @@ func mDNSServer() {
 			zap.L().Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
 		} else {
 			zap.L().Info(fmt.Sprintf("Caching %v", localUrl))
-			if err = config.UpdateConfTyped(
+			if err = config.UpdateConfigTyped(
 				config.WithGracefulExit(false),
 				config.WithLastKnownMDNS(localUrl),
 			); err != nil {

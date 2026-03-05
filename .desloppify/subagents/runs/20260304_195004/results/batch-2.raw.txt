@@ -1,0 +1,94 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 2,
+  "assessments": {
+    "package_organization": 74.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "Holistic structure shows large flat directories with mixed concerns: goseg/config/ (41 files), goseg/shipworkflow/ (49 files), and goseg/system/ (36 files), which exceeds the prompt’s >10 mixed-concern overload signal.",
+        "goseg/system/disk_shims_test.go contains non-test exported compatibility functions (e.g., ListHardDisks, CreateGroundSegFilesystem) despite `_test.go` placement, while adjacent files are true tests (disk_health_test.go, disk_storage_test.go).",
+        "goseg/config/bootstrap.go owns startup/bootstrap behavior plus runtime environment detection (getBasePath/getArchitecture/setDebugMode), while goseg/config/config.go owns runtime context model/mutators; the runtime-context concern is split across files with different responsibilities in the same overloaded folder.",
+        "goseg/shipworkflow/lifecycle.go defines broadly reusable polling/config persistence helpers (PollWithTimeout, PersistUrbitConfig) inside a package already containing many workflow-specific files, increasing boundary ambiguity."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "system_disk_shims_misplaced_in_test_file",
+      "summary": "Production disk shim API is placed in a `_test.go` file, obscuring module ownership.",
+      "related_files": [
+        "goseg/system/disk_shims_test.go",
+        "goseg/system/disk_health_test.go",
+        "goseg/system/disk_storage_test.go"
+      ],
+      "evidence": [
+        "goseg/system/disk_shims_test.go defines non-test wrappers like ListHardDisks, CreateGroundSegFilesystem, SmartCheckAllDrives, and fstab helpers.",
+        "Adjacent files in the same cluster are actual tests and call those wrappers, reinforcing an implicit production surface hidden behind test-file naming.",
+        "This placement blurs whether disk orchestration belongs to goseg/system/, goseg/system/disk/, or goseg/system/storage/."
+      ],
+      "suggestion": "Staged reorg plan: (1) move shim declarations out of `_test.go` into `goseg/system/disk_shims.go` (or `goseg/system/disk_bridge.go`) to make ownership explicit; (2) keep only tests in `disk_shims_test.go`, updating any package-level helper setup there; (3) if wrappers are only compatibility bridges, place them in `goseg/system/storage/bridge.go` and expose minimal forwarding API from `goseg/system`; (4) run `go test ./goseg/system/...` and `go test ./...` to validate imports and package boundaries after moves.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_directory_boundary_blur"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_runtime_context_split_across_bootstrap_and_state",
+      "summary": "Runtime context concern is split across bootstrap and config state files in an overloaded package.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "bootstrap.go defines environment/runtime detection functions (getBasePath/getArchitecture/setDebugMode) and initialization flow.",
+        "config.go defines RuntimeContext model and mutators (SetBasePath/SetArchitecture/SetDebugMode/SetDockerDir), creating one concern spread across unrelated file roles.",
+        "bootstrap_test.go targets runtime/env helpers that are not strictly bootstrap orchestration behavior, confirming mixed ownership."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/config/runtimecontext/` (or `goseg/config/runtime/`) for runtime context model + env/default resolvers; (2) move RuntimeContext types/mutators from `config.go` first, then move getBasePath/getArchitecture/setDebugMode and their tests from `bootstrap.go`/`bootstrap_test.go`; (3) keep `bootstrap.go` as orchestration-only initialization entrypoint calling the runtimecontext package; (4) run `go test ./goseg/config/...` and `go test ./...` to verify import updates and startup behavior.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_directory_boundary_blur"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "shipworkflow_shared_helpers_not_extracted",
+      "summary": "Generic lifecycle helpers remain inside an already overloaded `shipworkflow` package.",
+      "related_files": [
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go",
+        "goseg/shipworkflow/doc.go"
+      ],
+      "evidence": [
+        "lifecycle.go includes generic helpers (PollWithTimeout, PersistUrbitConfig contract wrapper) alongside ship-stop logic.",
+        "shipworkflow package profile is large (49 files), indicating broad responsibilities where helper placement has high navigability cost.",
+        "doc.go describes broad workflow coordination scope, while lifecycle.go mixes domain flow and generic utility behavior."
+      ],
+      "suggestion": "Staged reorg plan: (1) extract generic polling/config-persist helpers from `shipworkflow/lifecycle.go` into `goseg/lifecycle/` or `goseg/internal/workflow/` as reusable primitives; (2) keep only ship-specific orchestration (WaitForUrbitStop*) in `shipworkflow`; (3) move/adjust tests so utility tests live with the extracted package and shipworkflow tests cover workflow semantics only; (4) run `go test ./goseg/shipworkflow/... ./goseg/lifecycle/...` (or target package) and then `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_directory_boundary_blur"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Large flat top-level packages are carrying both domain orchestration and technical utility concerns without consistent subpackage extraction.",
+      "Compatibility/bridge code is not given explicit package homes, causing ownership to drift into whichever file already exists."
+    ],
+    "likely_symptoms": [
+      "system_disk_shims_misplaced_in_test_file",
+      "config_runtime_context_split_across_bootstrap_and_state",
+      "shipworkflow_shared_helpers_not_extracted"
+    ],
+    "possible_false_positives": []
+  }
+}

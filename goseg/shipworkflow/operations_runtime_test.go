@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"groundseg/shipworkflow/adapters/lifecyclebridge"
 )
 
 func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
@@ -20,7 +22,7 @@ func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 		Sleeper: workflowSleeperFn(func(time.Duration) {}),
 	}
 
-	err := runTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", time.Second, func() error { return nil })
+	err := RunTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", time.Second, func() error { return nil })
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -29,7 +31,7 @@ func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 	}
 
 	events = nil
-	err = runTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", 0, func() error {
+	err = RunTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", 0, func() error {
 		return errors.New("boom")
 	})
 	if err == nil {
@@ -42,7 +44,7 @@ func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 
 func TestPollWithTimeout(t *testing.T) {
 	attempts := 0
-	err := PollWithTimeout(context.Background(), time.Millisecond, func() (bool, error) {
+	err := lifecyclebridge.PollWithTimeout(context.Background(), time.Millisecond, func() (bool, error) {
 		attempts++
 		return attempts >= 2, nil
 	})
@@ -53,7 +55,7 @@ func TestPollWithTimeout(t *testing.T) {
 		t.Fatalf("expected repeated polling attempts, got %d", attempts)
 	}
 
-	if err := PollWithTimeout(context.Background(), time.Millisecond, func() (bool, error) {
+	if err := lifecyclebridge.PollWithTimeout(context.Background(), time.Millisecond, func() (bool, error) {
 		return false, errors.New("condition failed")
 	}); err == nil {
 		t.Fatalf("expected condition error")
@@ -61,7 +63,7 @@ func TestPollWithTimeout(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
 	defer cancel()
-	err = PollWithTimeout(ctx, 10*time.Millisecond, func() (bool, error) { return false, nil })
+	err = lifecyclebridge.PollWithTimeout(ctx, 10*time.Millisecond, func() (bool, error) { return false, nil })
 	if err == nil {
 		t.Fatalf("expected context timeout/cancel error")
 	}
@@ -76,7 +78,9 @@ func TestPublishTransitionWithPolicy(t *testing.T) {
 	publish := func(value int) {
 		events = append(events, value)
 	}
-	publishTransition(runtime, publish, 1, 0, time.Second)
+	if err := publishTransition(runtime, publish, 1, 0, time.Second); err != nil {
+		t.Fatalf("expected publish transition to succeed, got: %v", err)
+	}
 	if !reflect.DeepEqual(events, []int{1, 0}) {
 		t.Fatalf("unexpected transition sequence: %v", events)
 	}

@@ -1,0 +1,69 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both files implement near-parallel contract catalog pipelines (constants -> catalog specs -> validator) with separate local conventions instead of a shared contract-family boundary.",
+        "goseg/protocol/contracts/protocol_contracts.go validates bindings via namespace/action key mapping and formula checks, while goseg/protocol/contracts/startram_contracts.go validates by fixed length and `entries[0]` positional assumption.",
+        "Contract ID composition rules are encoded differently per file (protocol action formula path vs StarTram prefix+singleton assumption), increasing drift risk as new contracts are added."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_catalog_governance_fragmented",
+      "summary": "Contract-family governance is duplicated with divergent validation models across sibling modules",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Both files define their own mini-framework for catalog entry construction and validation (`protocolActionContract`/`validateProtocolContractSpecs` vs `startramContract`/`validateStartramContractSpecs`).",
+        "Protocol contracts enforce semantic binding integrity (namespace/action -> expected ID + formula), while StarTram contracts enforce only prefix + singleton shape.",
+        "This creates two boundary contracts for the same package-level concern (`contracts` governance), so behavior for adding new contract families is inconsistent by file."
+      ],
+      "suggestion": "Extract a shared contract-family validator pattern in `contracts` (e.g., declarative family spec with reusable ID rule + binding rule hooks), then have both protocol and StarTram register through that common path so expansion uses one architectural contract.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_catalog_governance_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_positional_validation_coupling",
+      "summary": "StarTram validation is position-coupled (`entries[0]`) and drifts from key-based sibling validation",
+      "related_files": [
+        "goseg/protocol/contracts/startram_contracts.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "In `validateStartramContractSpecs`, correctness depends on `len(entries) == 1` and `entries[0].ID == APIConnectionError`.",
+        "In `validateProtocolContractSpecs`, validation is order-independent via key lookups over all entries.",
+        "This asymmetry means StarTram’s model will require rewrite when additional StarTram contracts are introduced, creating architecture drift between sibling contract domains."
+      ],
+      "suggestion": "Replace StarTram positional singleton checks with an order-independent expected-ID set/map (same structural style as protocol validation), and keep singleton behavior as policy data (expected count) rather than indexing assumptions.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_catalog_governance_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Missing shared abstraction for contract-family governance inside the `contracts` package allows each family file to define independent validation architecture.",
+      "Contract evolution policy is encoded as local logic (singleton/order assumptions) instead of declarative family metadata."
+    ],
+    "likely_symptoms": [
+      "startram_positional_validation_coupling"
+    ],
+    "possible_false_positives": []
+  }
+}

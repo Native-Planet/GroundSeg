@@ -1,0 +1,69 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/protocol_contracts.go defines protocol action tokens (e.g., ActionC2CConnect) and binding IDs, while goseg/system/wifi_c2c_flow_test.go also relies on a separate actions action model and explicitly checks they stay aligned.",
+        "goseg/system/wifi_c2c_flow_test.go imports both groundseg/protocol/actions and groundseg/protocol/contracts and contains TestC2CPayloadAndContractsStayAligned, indicating two protocol representations must be manually synchronized.",
+        "goseg/protocol/contracts/startram_contracts.go and goseg/protocol/contracts/protocol_contracts.go each keep local hardcoded validation maps/sets, reinforcing distributed contract authority instead of one authoritative protocol definition."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "dual_protocol_action_authority",
+      "summary": "C2C action semantics are owned in both contracts and actions, creating cross-module drift risk.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "protocol_contracts.go declares ActionC2CConnect and contract binding constants as canonical protocol metadata.",
+        "wifi_c2c_flow_test.go must verify actions payload values match contracts values in TestC2CPayloadAndContractsStayAligned, proving duplication requires ongoing synchronization checks."
+      ],
+      "suggestion": "Consolidate action token authority into a single module (preferably contract catalog metadata) and have parsing/marshalling consume that source directly or generated code from it; remove parallel hand-maintained action enums.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "split_protocol_governance"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "system_tests_bound_to_contract_registry",
+      "summary": "System WiFi flow tests directly depend on contract registry internals instead of a local boundary.",
+      "related_files": [
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "wifi_c2c_flow_test.go imports contracts and calls contracts.ActionContractFor(...) inside system tests.",
+        "The test couples system behavior checks to protocol catalog internals rather than validating only system-facing behavior, increasing blast radius when contract catalog internals evolve."
+      ],
+      "suggestion": "Introduce a narrow protocol capability interface or exported helper in the actions boundary for system use/tests, so system tests validate behavior without direct dependency on contract catalog lookup mechanics.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "split_protocol_governance"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol governance is split across multiple packages (contracts and actions) without one enforced source of truth.",
+      "Boundary ownership between protocol-definition and system-consumer layers is porous in tests, indicating architectural seams are not explicit."
+    ],
+    "likely_symptoms": [
+      "dual_protocol_action_authority",
+      "system_tests_bound_to_contract_registry"
+    ],
+    "possible_false_positives": []
+  }
+}

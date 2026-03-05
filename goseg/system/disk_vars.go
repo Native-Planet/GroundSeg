@@ -4,8 +4,9 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/shirou/gopsutil/disk"
 	"groundseg/system/storage"
+
+	"github.com/shirou/gopsutil/disk"
 )
 
 var (
@@ -43,8 +44,8 @@ func resolveDiskSeams() storage.DiskSeams {
 		MkdirFn:           mkdirFn,
 		OpenFn:            openFn,
 		OpenFileFn:        openFileFn,
-		MountAllCommandFn:  mountAllCommandFn,
-		MkfsExt4CommandFn:  mkfsExt4CommandFn,
+		MountAllCommandFn: mountAllCommandFn,
+		MkfsExt4CommandFn: mkfsExt4CommandFn,
 		StatFn:            statFn,
 		ReadDirFn:         readDirFn,
 		RemoveFn:          removeFn,

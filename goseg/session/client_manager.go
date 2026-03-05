@@ -3,9 +3,10 @@ package session
 import (
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/gorilla/websocket"
 )

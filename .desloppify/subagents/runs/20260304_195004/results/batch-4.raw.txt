@@ -1,0 +1,116 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 78.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Runtime dependency/config bags are broad and mixed across domains: `AccessPointRuntime` combines AP config fields and many behavior seams, then `normalizeAccessPointRuntime` fills defaults for both (`goseg/accesspoint/accesspoint.go`), while `wifiRuntime` repeats the same mixed pattern (`goseg/system/wifi_runtime_methods.go`).",
+        "Protocol action API has repeated namespace-specific wrappers over the same core behavior (`ParseUploadAction`/`ParseC2CAction`, `SupportedUploadActions`/`SupportedC2CActions`, metadata/deprecation helpers) in `goseg/protocol/actions/actions.go`.",
+        "Config mutation flow is section-by-section boilerplate duplicated in multiple layers: `SysConfig.Update*Config` methods repeat the same nil-check + mutate pattern (`goseg/structs/configs.go`) while `config_update_schema.go` maintains parallel section patch structs and field wiring (`goseg/config/config_update_schema.go`).",
+        "Tests show recurring per-package seam-reset harnesses and global-state orchestration (`resetWifiSeamsForTest`, `resetLeakStateForTest`, `resetRouterGlobalsForTest`) across multiple files, indicating production state/control surfaces are hard to isolate cleanly."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "mixed_runtime_bag_pattern",
+      "summary": "Runtime structs mix domain configuration and injectable behavior seams, creating high-entropy constructors/normalizers.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`AccessPointRuntime` holds network/config fields and many function pointers, and `normalizeAccessPointRuntime` assigns defaults for both concerns in one pass.",
+        "`wifiRuntime` also combines command execution plumbing with WiFi domain operations and parse/runtime wiring.",
+        "`runtime_ops.go` expands the same seam-bag approach into many large operation structs (`RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeStartupOps`), increasing coupling between composition and behavior details."
+      ],
+      "suggestion": "Split runtime types into smaller role-focused components: immutable config structs, behavior interfaces/seams, and dedicated builders per capability; then compose them in thin orchestration entrypoints rather than monolithic normalize/build functions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overaggregation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "namespace_wrapper_duplication",
+      "summary": "Action namespace handling duplicates wrapper APIs instead of using a single namespace-parameterized contract surface.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/actions/actions_test.go",
+        "goseg/protocol/contracts/contracts_test.go"
+      ],
+      "evidence": [
+        "`actions.go` defines parallel upload/c2c wrappers (`ParseUploadAction` vs `ParseC2CAction`, `SupportedUploadActions` vs `SupportedC2CActions`, duplicate active/deprecated metadata accessors).",
+        "Tests in `actions_test.go` and `contracts_test.go` must repeatedly validate both namespace paths, reflecting API duplication rather than behavior differences.",
+        "Adding a new namespace requires extending multiple wrapper families and tests, increasing drift risk."
+      ],
+      "suggestion": "Center callers on one namespace-aware API (parse/supported/contracts/metadata) and keep convenience wrappers generated or minimal; use table-driven tests keyed by namespace to remove mirrored test logic.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "namespace_specific_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_section_parallel_boilerplate",
+      "summary": "Config section updates are implemented as parallel, manually synchronized patterns across structs and patch schema.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`SysConfig` has multiple nearly identical `Update*Config` methods differing only by section type.",
+        "`config_update_schema.go` mirrors section structure via separate patch structs and field registration plumbing, requiring repetitive per-field setup.",
+        "Snapshot/update entrypoints in `config.go` add another layer that must stay consistent with section definitions."
+      ],
+      "suggestion": "Introduce a typed section registry (section key -> accessor/mutator/parser metadata) to drive update, patch parse/apply, and snapshots from one source of truth; this reduces per-section boilerplate and synchronization errors.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_config_abstractions"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_global_state_harness_sprawl",
+      "summary": "Tests rely on repeated ad-hoc global seam reset helpers, signaling production APIs that are hard to test in isolated units.",
+      "related_files": [
+        "goseg/system/wifi_test.go",
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/leak/broadcast_test.go",
+        "goseg/leak/handler_test.go",
+        "goseg/accesspoint/accesspoint_test.go"
+      ],
+      "evidence": [
+        "`resetWifiSeamsForTest` is invoked across many wifi tests and reused by c2c-flow tests.",
+        "`resetLeakStateForTest` is maintained and repeatedly called in both leak broadcast and leak handler tests.",
+        "`accesspoint_test.go` repeatedly calls global reset helpers (`resetRouterGlobalsForTest`, `resetParameterGlobalsForTest`) before many cases."
+      ],
+      "suggestion": "Move to explicit constructor-injected dependencies and instance-scoped state for these subsystems, then provide shared package test fixtures/builders so tests stop mutating package globals per case.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overaggregation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Dependency injection is primarily implemented as large function-field bags rather than small capability boundaries.",
+      "Namespace/section extensibility is handled by manual parallel wrappers instead of data-driven registries.",
+      "Global mutable state in runtime/seams pushes complexity into tests via repetitive reset scaffolding."
+    ],
+    "likely_symptoms": [
+      "namespace_wrapper_duplication",
+      "test_global_state_harness_sprawl"
+    ],
+    "possible_false_positives": []
+  }
+}

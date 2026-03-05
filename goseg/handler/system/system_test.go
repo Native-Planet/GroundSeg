@@ -15,12 +15,13 @@ import (
 	"groundseg/handler/systemsvc"
 	"groundseg/structs"
 	"groundseg/system"
+	maintenanceapt "groundseg/system/maintenance/apt"
 )
 
 func resetSystemSeams() {
-	confForSystemHandler = config.Conf
+	confForSystemHandler = config.Config
 	stopContainerForSystemHandler = orchestration.StopContainerByName
-	updateConfTypedForSystemHandler = config.UpdateConfTyped
+	updateConfTypedForSystemHandler = config.UpdateConfigTyped
 	withPenpaiAllowForSystemHandler = config.WithPenpaiAllow
 	loadLlamaForSystemHandler = orchestration.LoadLlama
 	withGracefulExitForSystemHandler = config.WithGracefulExit
@@ -29,12 +30,12 @@ func resetSystemSeams() {
 	}
 	configureSwapForSystemHandler = system.ConfigureSwap
 	withSwapValForSystemHandler = config.WithSwapVal
-	runUpgradeForSystemHandler = system.RunUpgrade
+	runUpgradeForSystemHandler = maintenanceapt.RunUpgrade
 	toggleDeviceForSystemHandler = func(dev string) error {
 		return system.NewWiFiRuntimeService().ToggleDevice(dev)
 	}
 	connectToWifiForSystemHandler = func(ssid, password string) error {
-		return system.NewWiFiRuntimeService().ConnectToWifi(ssid, password)
+		return system.NewWiFiRuntimeService().ConnectToWiFi(ssid, password)
 	}
 	publishSystemTransitionForSystemHandler = func(_ context.Context, transition structs.SystemTransition) error {
 		_ = events.DefaultEventRuntime().PublishSystemTransition(context.Background(), transition)
@@ -77,7 +78,7 @@ func TestSystemHandlerTogglePenpaiFeature(t *testing.T) {
 		return nil
 	}
 	updateCalls := 0
-	updateConfTypedForSystemHandler = func(...config.ConfUpdateOption) error {
+	updateConfTypedForSystemHandler = func(...config.ConfigUpdateOption) error {
 		updateCalls++
 		return nil
 	}
@@ -111,7 +112,7 @@ func TestSystemHandlerGroundsegPowerAndSwap(t *testing.T) {
 	t.Cleanup(func() { config.SetDebugMode(origDebug) })
 
 	updateCalls := 0
-	updateConfTypedForSystemHandler = func(...config.ConfUpdateOption) error {
+	updateConfTypedForSystemHandler = func(...config.ConfigUpdateOption) error {
 		updateCalls++
 		return nil
 	}

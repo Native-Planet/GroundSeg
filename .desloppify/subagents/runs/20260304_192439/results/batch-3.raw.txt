@@ -1,0 +1,127 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "api_surface_coherence": 78.0,
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "Protocol action identity is defined in two public-facing layers: raw string constants in goseg/protocol/actionids/actionids.go and typed namespace/action constants plus backward-compatible aliases in goseg/protocol/contracts/protocol_contracts.go.",
+        "Config package exposes overlapping read surfaces with different semantics: Config() returns the package-level SysConfig snapshot while BasePath()/Architecture()/DebugMode()/DockerDir() read a separate runtime context snapshot in goseg/config/config.go, and bootstrap wiring mutates both during initialization in goseg/config/bootstrap.go.",
+        "Ship lifecycle polling exposes a 'With timeout' variant and a default-timeout variant, but the timeout/error behavior contract is not documented in exported package docs (goseg/shipworkflow/doc.go, goseg/shipworkflow/lifecycle.go)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "Error-wrapping policy is inconsistent: initializeConfig wraps nearly every boundary error with operation context in goseg/config/bootstrap.go, while system disk API wrappers in goseg/system/disk_storage.go pass underlying storage errors through without added context.",
+        "Lifecycle logic uses untyped string errors for contract-like failures (e.g., 'mutate function is required', 'persist function is required', 'status for <patp> not found') in goseg/shipworkflow/lifecycle.go, and tests assert substrings rather than typed/sentinel behavior in goseg/shipworkflow/lifecycle_test.go.",
+        "Polling path treats some failures as retriable by swallowing them (returning nil until failure budget is exhausted) in WaitForUrbitStopWith, but PollWithTimeout returns condition errors immediately, yielding inconsistent failure semantics inside the same package (goseg/shipworkflow/lifecycle.go).",
+        "Disk health test coverage has a placeholder smoke test with no executable assertions in goseg/system/disk_health_test.go, leaving disk/storage error behavior effectively unverified despite exported disk wrappers in goseg/system/disk_storage.go and goseg/system/disk_shims_test.go."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "duplicated_action_identity_layers",
+      "summary": "Protocol action IDs are exposed through duplicated public layers, creating a drift-prone API surface.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "goseg/protocol/actionids/actionids.go defines namespace/action strings (e.g., NamespaceUpload, UploadOpenEndpoint, C2CConnect).",
+        "goseg/protocol/contracts/protocol_contracts.go redefines those values as ActionNamespace/ActionVerb constants and additional ContractID aliases (UploadActionOpenEndpoint, UploadOpenEndpointAction, etc.).",
+        "Conformance tests validate fixture coverage against action-layer symbols, while contract catalog validation uses contract-layer symbols, so callers/tests must navigate two identifier taxonomies for one concept."
+      ],
+      "suggestion": "Consolidate to one canonical exported identity surface (either actionids or contracts) and make the other internal/derived; generate the derived layer mechanically to eliminate manual duplication and alias proliferation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "split_source_of_truth_for_public_contracts"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "config_dual_read_surface",
+      "summary": "Config runtime API mixes two state models, making read behavior non-obvious at call sites.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/bootstrap.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "Config() returns package-level globalConfig, while BasePath()/Architecture()/DebugMode()/DockerDir() return fields from a separately stored RuntimeContext snapshot.",
+        "initializeConfig in bootstrap mutates runtime context via SetBasePath/setDebugMode and also persists/reads global config state, so initialization order implicitly affects what each API returns.",
+        "Tests cover individual helpers (getBasePath, setDebugMode) but do not define/verify cross-surface invariants between Config() and RuntimeContext-backed getters."
+      ],
+      "suggestion": "Define a single explicit public config-read contract: either unify reads behind one immutable snapshot type or clearly split process-context vs persisted-config APIs with naming that encodes lifecycle semantics (e.g., RuntimeContextSnapshot vs PersistedConfigSnapshot) and add invariance tests.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "split_source_of_truth_for_public_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "error_context_policy_drift",
+      "summary": "Boundary error context is applied inconsistently across subsystems.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/system/disk_storage.go",
+        "goseg/shipworkflow/lifecycle.go"
+      ],
+      "evidence": [
+        "bootstrap.initializeConfig wraps each boundary error with operation context (e.g., 'load system config: %w', 'persist config: %w').",
+        "disk_storage wrappers return raw storage errors without contextual wrapping (e.g., CreateGroundSegFilesystem, SetupTmpDir, IsMountedMMC, RemoveMultipartFiles).",
+        "shipworkflow wraps some retrieval failures with context ('retrieve ship status for %s: %w') but returns other contract failures as bare formatted strings."
+      ],
+      "suggestion": "Adopt and document a package-level error policy (typed/sentinel categories + `%w` contextual wrappers at I/O boundaries) and apply it consistently across config, shipworkflow, and system/disk wrapper APIs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "no_shared_error_contract_standard"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "string_error_contracts_and_untested_paths",
+      "summary": "String-based error contracts and shallow tests make failure modes brittle and hard to evolve safely.",
+      "related_files": [
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/shipworkflow/lifecycle_test.go",
+        "goseg/system/disk_health_test.go",
+        "goseg/system/disk_shims_test.go"
+      ],
+      "evidence": [
+        "lifecycle.go emits plain text errors for API misuse and missing status; no exported typed/sentinel errors exist for callers to branch on.",
+        "lifecycle_test.go validates errors using `strings.Contains`, coupling behavior to message text instead of stable error identity.",
+        "disk_health_test.go contains a placeholder `if false` smoke test, leaving error flows for disk wrappers effectively unvalidated."
+      ],
+      "suggestion": "Introduce typed or sentinel errors for stable failure classes, use `errors.Is`/`errors.As` in tests, and replace placeholder disk health tests with explicit negative-path assertions for storage and shim wrappers.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "no_shared_error_contract_standard"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Public contracts are defined through parallel layers rather than one canonical source of truth.",
+      "No unified cross-package error contract standard (type taxonomy + wrapping rules + test expectations)."
+    ],
+    "likely_symptoms": [
+      "duplicated_action_identity_layers",
+      "config_dual_read_surface",
+      "error_context_policy_drift",
+      "string_error_contracts_and_untested_paths"
+    ],
+    "possible_false_positives": []
+  }
+}

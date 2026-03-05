@@ -24,7 +24,11 @@ func copyFileToVolumeWithTempContainer(
 	if err != nil {
 		return fmt.Errorf("initialize docker client for %s: %w", writerContainerName, err)
 	}
-	defer cli.Close()
+	defer func() {
+		if closeErr := cli.Close(); closeErr != nil {
+			zap.L().Error(fmt.Sprintf("Failed to close docker client for %s: %v", writerContainerName, closeErr))
+		}
+	}()
 
 	image, err := selectImage()
 	if err != nil {

@@ -41,7 +41,7 @@ var (
 	publishUrbitTransitionForExporter = func(ctx context.Context, transition structs.UrbitTransition) error {
 		return events.DefaultEventRuntime().PublishUrbitTransition(ctx, transition)
 	}
-	getShipStatusForExporter          = orchestration.GetShipStatus
+	getShipStatusForExporter = orchestration.GetShipStatus
 )
 
 func Initialize() error {

@@ -17,8 +17,8 @@ var (
 	authStaleTimeout = 30 * time.Minute
 )
 
-func Initialize() {
-	_ = InitializeWithContext(context.Background())
+func Initialize() error {
+	return InitializeWithContext(context.Background())
 }
 
 func InitializeWithContext(ctx context.Context) error {

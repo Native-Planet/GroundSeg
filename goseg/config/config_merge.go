@@ -33,7 +33,7 @@ func mergeConfigs(defaultConfig structs.SysConfig, customConfig structs.SysConfi
 func (DefaultConfigMerger) Merge(defaultConfig structs.SysConfig, customConfig structs.SysConfig) structs.SysConfig {
 	mergedConfig := defaultConfig
 	mergedConfig.AuthSession.Salt = ""
-	for _, field := range allConfPatchFields() {
+	for _, field := range allConfigPatchFields() {
 		field.merge(defaultConfig, customConfig, &mergedConfig)
 	}
 	return mergedConfig

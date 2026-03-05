@@ -1,0 +1,81 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 82.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Fail-fast startup services are only checked for up to 250ms during startup (`startupFailFastServiceTimeout`) and the parent continues if the service fails afterward",
+        "The same startup orchestration loop later uses a non-blocking health pass that can return success when fail-fast services have not yet reported terminal failure",
+        "`failUploadRequest` both emits an HTTP response and returns a publish-side error, while `HTTPUploadHandler` treats any returned error as another fatal path and emits `http.Error` again",
+        "`failUploadRequest` is used in request validation/chunk handling and can return transport/publish failures that are then collapsed into a second response strategy"
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 72.0,
+        "indirection_cost": 58.0,
+        "interface_honesty": 46.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "startup_failfast_error_window",
+      "summary": "Fail-fast background service errors can be silently dropped after startup returns",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "`startBackgroundServicesWithRuntime` waits on each fail-fast service with `select { case serviceErr := <-handle.err ... case <-time.After(startupFailFastServiceTimeout) }`",
+        "`startupFailFastServiceTimeout` is fixed at 250ms before startup continues",
+        "`startupBackgroundServices.health` returns immediately on default when no immediate error is present, so delayed failures are not consistently propagated",
+        "The startup contract therefore allows startup success despite fail-fast services that fail just after the startup gate"
+      ],
+      "suggestion": "Treat fail-fast startup supervision as a stable startup barrier: either await each fail-fast service's first terminal error with a bounded startup context, or require each fail-fast service to send periodic health/error status that startup health checks poll for a grace window before continuing, with a dedicated timeout and explicit failure return path.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "inconsistent_boundary_error_model"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "http_error_boundary_double_write",
+      "summary": "Upload error handler writes a response, returns error, then caller emits a second error response",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "`failUploadRequest` calls `sendUploadResponse` before returning, then returns publish/IO errors via `sendErr` and `publishErr`",
+        "`HTTPUploadHandler` invokes `failUploadRequest` and, on error, logs and calls `http.Error`, which attempts to write a second status/body after one may already be committed",
+        "The code path is reachable from validation, chunk parsing, and pipeline failure handling in the same function",
+        "Tests validate that `failUploadRequest` returns publish errors but do not assert response integrity for the caller-level override path"
+      ],
+      "suggestion": "Split transport and side-channel failures: make `failUploadRequest` return a typed result (e.g., `responseWritten bool` + `err`) or a structured `error` channel so callers either write their own HTTP response once or explicitly skip secondary `http.Error` when a response was already sent.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "inconsistent_boundary_error_model"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Asynchronous error channels are not consistently translated into synchronous startup outcomes",
+      "Single helper is used both as response writer and publish-notification boundary without a clear contract for whether caller must still fail the request"
+    ],
+    "likely_symptoms": [
+      "Intermittent silent startup failures for fail-fast services",
+      "Intermittent mixed/invalid upload error responses in clients and logs"
+    ],
+    "possible_false_positives": [
+      "Fail-fast startup timeout may be intentionally tuned for startup latency",
+      "Publish transition failures during upload may be intentionally non-fatal by design"
+    ]
+  }
+}

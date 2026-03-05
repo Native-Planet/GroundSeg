@@ -33,13 +33,53 @@ type Command struct {
 type CommandValidationError struct {
 	Action  Action
 	Problem string
+	Cause   error
 }
 
 func (e CommandValidationError) Error() string {
+	if e.Problem == "" && e.Cause != nil {
+		return e.Cause.Error()
+	}
 	return e.Problem
 }
 
-// Intentionally empty: validation errors are now created per-command to avoid shared mutable templates.
+func (e CommandValidationError) Unwrap() error {
+	return e.Cause
+}
+
+func (e CommandValidationError) Is(target error) bool {
+	return target == ErrCommandValidation
+}
+
+var (
+	ErrCommandValidation          = errors.New("upload command validation failed")
+	ErrUploadContractUnavailable  = errors.New("upload action contract metadata unavailable")
+	ErrOpenEndpointRequestMissing = errors.New("open-endpoint request is required")
+	ErrResetRequestMissing        = errors.New("reset request is required")
+	ErrOpenEndpointPayloadMix     = errors.New("open-endpoint command must not include reset payload")
+	ErrResetPayloadMix            = errors.New("reset command must not include open-endpoint payload")
+	ErrUploadDispatch             = errors.New("upload command dispatch failed")
+)
+
+type DispatchError struct {
+	Action Action
+	Err    error
+}
+
+func (e DispatchError) Error() string {
+	if e.Err == nil {
+		return fmt.Sprintf("%s: %s", ErrUploadDispatch, e.Action)
+	}
+	return fmt.Sprintf("%s (%s): %v", ErrUploadDispatch, e.Action, e.Err)
+}
+
+func (e DispatchError) Unwrap() error {
+	return e.Err
+}
+
+func (e DispatchError) Is(target error) bool {
+	return target == ErrUploadDispatch
+}
 
 type Executor struct {
 	dispatcher actions.ActionDispatcher[actions.Action, Service, Command]
@@ -108,9 +148,9 @@ func openReqPointerForPayload(openReq OpenEndpointRequest, contract actions.Uplo
 }
 
 func actionContractForAction(action Action) (actions.UploadActionContract, error) {
-	contract, isSupported := actions.UploadActionContractForAction(action)
-	if !isSupported {
-		return actions.UploadActionContract{}, actions.UnsupportedActionError{Namespace: actions.NamespaceUpload, Action: action}
+	contract, err := actions.UploadActionContractForAction(action)
+	if err != nil {
+		return actions.UploadActionContract{}, err
 	}
 	return contract, nil
 }
@@ -122,7 +162,11 @@ func ValidateCommand(cmd Command) error {
 		if errors.As(err, &unsupported) {
 			return err
 		}
-		return CommandValidationError{Action: cmd.Action, Problem: err.Error()}
+		return CommandValidationError{
+			Action:  cmd.Action,
+			Problem: err.Error(),
+			Cause:   errors.Join(ErrCommandValidation, ErrUploadContractUnavailable),
+		}
 	}
 
 	openPayloadPresent := cmd.OpenEndpointRequest != nil
@@ -131,21 +175,29 @@ func ValidateCommand(cmd Command) error {
 	forbidden := contract.ForbiddenPayloads
 
 	if required.Has(actions.UploadPayloadOpenEndpoint) && !openPayloadPresent {
-		return CommandValidationError{Action: cmd.Action, Problem: openEndpointMissingError(contract.Action)}
+		return CommandValidationError{Action: cmd.Action, Problem: openEndpointMissingError(contract.Action), Cause: errors.Join(ErrCommandValidation, ErrOpenEndpointRequestMissing)}
 	}
 	if required.Has(actions.UploadPayloadReset) && !resetPayloadPresent {
-		return CommandValidationError{Action: cmd.Action, Problem: resetRequestMissingError(contract.Action)}
+		return CommandValidationError{Action: cmd.Action, Problem: resetRequestMissingError(contract.Action), Cause: errors.Join(ErrCommandValidation, ErrResetRequestMissing)}
 	}
 
 	if forbidden.Has(actions.UploadPayloadOpenEndpoint) && openPayloadPresent {
-		return CommandValidationError{Action: cmd.Action, Problem: actionUploadPayloadViolationMessage(contract.Action, actions.UploadPayloadOpenEndpoint)}
+		return CommandValidationError{
+			Action:  cmd.Action,
+			Problem: actionUploadPayloadViolationMessage(contract.Action, actions.UploadPayloadOpenEndpoint),
+			Cause:   errors.Join(ErrCommandValidation, ErrResetPayloadMix),
+		}
 	}
 	if forbidden.Has(actions.UploadPayloadReset) && resetPayloadPresent {
-		return CommandValidationError{Action: cmd.Action, Problem: actionUploadPayloadViolationMessage(contract.Action, actions.UploadPayloadReset)}
+		return CommandValidationError{
+			Action:  cmd.Action,
+			Problem: actionUploadPayloadViolationMessage(contract.Action, actions.UploadPayloadReset),
+			Cause:   errors.Join(ErrCommandValidation, ErrOpenEndpointPayloadMix),
+		}
 	}
 
 	if required.Has(actions.UploadPayloadOpenEndpoint) && required.Has(actions.UploadPayloadReset) {
-		return CommandValidationError{Action: cmd.Action, Problem: "unsupported action"}
+		return CommandValidationError{Action: cmd.Action, Problem: "unsupported action", Cause: ErrCommandValidation}
 	}
 	return nil
 }
@@ -153,7 +205,7 @@ func ValidateCommand(cmd Command) error {
 func openEndpointMissingError(action Action) string {
 	switch action {
 	case ActionUploadOpenEndpoint:
-		return "open-endpoint request is required"
+		return ErrOpenEndpointRequestMissing.Error()
 	default:
 		return fmt.Sprintf("%s action requires an open-endpoint payload", action)
 	}
@@ -162,7 +214,7 @@ func openEndpointMissingError(action Action) string {
 func resetRequestMissingError(action Action) string {
 	switch action {
 	case ActionUploadReset:
-		return "reset request is required"
+		return ErrResetRequestMissing.Error()
 	default:
 		return fmt.Sprintf("%s action requires a reset payload", action)
 	}
@@ -172,18 +224,21 @@ func actionUploadPayloadViolationMessage(action Action, forbiddenPayload actions
 	switch action {
 	case ActionUploadOpenEndpoint:
 		if forbiddenPayload == actions.UploadPayloadReset {
-			return "open-endpoint command must not include reset payload"
+			return ErrOpenEndpointPayloadMix.Error()
 		}
 	case ActionUploadReset:
 		if forbiddenPayload == actions.UploadPayloadOpenEndpoint {
-			return "reset command must not include open-endpoint payload"
+			return ErrResetPayloadMix.Error()
 		}
 	}
 	return fmt.Sprintf("%s action payload mix is invalid", action)
 }
 
 func newUploadDispatcher() (actions.ActionDispatcher[actions.Action, Service, Command], error) {
-	contracts := actions.UploadActionContractByAction()
+	contracts, err := actions.UploadActionContractByAction()
+	if err != nil {
+		return actions.ActionDispatcher[actions.Action, Service, Command]{}, err
+	}
 	actionsKeys := make([]actions.Action, 0, len(contracts))
 	for action := range contracts {
 		actionsKeys = append(actionsKeys, action)
@@ -266,7 +321,7 @@ func (e Executor) Execute(cmd Command) error {
 	if errors.As(err, &unsupported) {
 		return unsupported
 	}
-	return err
+	return DispatchError{Action: cmd.Action, Err: err}
 }
 
 func (e Executor) SupportedActions() []Action {

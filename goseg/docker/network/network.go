@@ -7,15 +7,18 @@ import (
 	"path/filepath"
 	"time"
 
+	"groundseg/docker/internal/closeutil"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	dockernetwork "github.com/docker/docker/api/types/network"
 	volumetypes "github.com/docker/docker/api/types/volume"
 	"go.uber.org/zap"
 
-	"github.com/docker/docker/client"
 	"groundseg/dockerclient"
 	"groundseg/internal/seams"
+
+	"github.com/docker/docker/client"
 )
 
 type NetworkRuntime struct {
@@ -38,12 +41,12 @@ func NewNetworkRuntimeWith(overrides NetworkRuntime) NetworkRuntime {
 	return seams.Merge(defaultNetworkRuntime, overrides)
 }
 
-func (runtime NetworkRuntime) KillContainerUsingPort(port uint16) error {
+func (runtime NetworkRuntime) KillContainerUsingPort(port uint16) (err error) {
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return fmt.Errorf("failed to create docker client for port inspection when killing %d: %w", port, err)
 	}
-	defer cli.Close()
+	defer closeutil.MergeCloseError(cli, "kill container by port", &err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
@@ -71,12 +74,12 @@ func (runtime NetworkRuntime) KillContainerUsingPort(port uint16) error {
 	return nil
 }
 
-func (runtime NetworkRuntime) GetContainerNetwork(name string) (string, error) {
+func (runtime NetworkRuntime) GetContainerNetwork(name string) (containerNetwork string, err error) {
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return "", fmt.Errorf("failed to create docker client for network lookup of %s: %w", name, err)
 	}
-	defer cli.Close()
+	defer closeutil.MergeCloseError(cli, "container network lookup", &err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
@@ -90,12 +93,12 @@ func (runtime NetworkRuntime) GetContainerNetwork(name string) (string, error) {
 	return "", fmt.Errorf("container is not attached to any network: %v", name)
 }
 
-func (runtime NetworkRuntime) CreateVolume(name string) error {
+func (runtime NetworkRuntime) CreateVolume(name string) (err error) {
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
 	}
-	defer cli.Close()
+	defer closeutil.MergeCloseError(cli, "volume creation", &err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
@@ -107,12 +110,12 @@ func (runtime NetworkRuntime) CreateVolume(name string) error {
 	return nil
 }
 
-func (runtime NetworkRuntime) DeleteVolume(name string) error {
+func (runtime NetworkRuntime) DeleteVolume(name string) (err error) {
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
 	}
-	defer cli.Close()
+	defer closeutil.MergeCloseError(cli, "volume deletion", &err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
@@ -123,12 +126,12 @@ func (runtime NetworkRuntime) DeleteVolume(name string) error {
 	return nil
 }
 
-func (runtime NetworkRuntime) WriteFileToVolume(name string, file string, content string) error {
+func (runtime NetworkRuntime) WriteFileToVolume(name string, file string, content string) (err error) {
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
 	}
-	defer cli.Close()
+	defer closeutil.MergeCloseError(cli, "write file to volume", &err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
@@ -145,12 +148,12 @@ func (runtime NetworkRuntime) WriteFileToVolume(name string, file string, conten
 	return nil
 }
 
-func (runtime NetworkRuntime) VolumeExists(volumeName string) (bool, error) {
+func (runtime NetworkRuntime) VolumeExists(volumeName string) (exists bool, err error) {
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return false, fmt.Errorf("failed to create client for volume check: %w", err)
 	}
-	defer cli.Close()
+	defer closeutil.MergeCloseError(cli, "volume existence check", &err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
@@ -166,12 +169,12 @@ func (runtime NetworkRuntime) VolumeExists(volumeName string) (bool, error) {
 	return false, nil
 }
 
-func (runtime NetworkRuntime) AddOrGetNetwork(networkName string) (string, error) {
+func (runtime NetworkRuntime) AddOrGetNetwork(networkName string) (networkID string, err error) {
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return "", fmt.Errorf("failed to create client for network lookup: %w", err)
 	}
-	defer cli.Close()
+	defer closeutil.MergeCloseError(cli, "network discovery", &err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()

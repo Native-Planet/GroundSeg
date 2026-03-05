@@ -1,0 +1,101 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 4,
+  "assessments": {
+    "package_organization": 72.0,
+    "high_level_elegance": 76.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows three large flat directories tied to this batch: goseg/config/ (41 files), goseg/shipworkflow/ (49 files), goseg/system/ (36 files), matching prior flat_dirs flags.",
+        "goseg/system/disk_shims_test.go is a top-level test shim file in package system that primarily proxies to subpackages groundseg/system/disk and groundseg/system/storage, indicating disk-related test seam logic is not colocated with the disk/storage boundaries it exercises.",
+        "In the assigned files, config/bootstrap.go (startup/bootstrap + global mutable state + filesystem/env wiring) and config/config.go (runtime context model + settings snapshots) live in one package root, reinforcing flattened placement rather than bounded subdomains."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "config package ownership is blurred in assigned files: bootstrap.go handles one-time initialization, env/argv interpretation, persistence triggers, and global readiness state, while config.go defines runtime context abstraction and many settings snapshot types.",
+        "shipworkflow/lifecycle.go presents narrow lifecycle helpers, but the directory profile for goseg/shipworkflow/ is 49 files with mixed runtime and operation concerns at one level, so decomposition at package level is not mirrored by directory ownership.",
+        "system test files depend on top-level compatibility wrappers (disk_shims_test.go) rather than clear domain test entrypoints in disk/storage subpackages, which weakens architectural readability of subsystem seams."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "flat_directory_boundaries_in_core_packages",
+      "summary": "Core directories are oversized and flat, obscuring domain boundaries.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/shipworkflow/lifecycle.go",
+        "goseg/system/disk_shims_test.go"
+      ],
+      "evidence": [
+        "Packet structure profile reports goseg/config/ (41 files), goseg/shipworkflow/ (49), goseg/system/ (36), each flagged as flat_dirs in holistic context.",
+        "Assigned files show unrelated concerns coexisting at top level (bootstrap/runtime context/models/shims) instead of foldered domain slices."
+      ],
+      "suggestion": "Staged reorg plan: (1) create target folders `goseg/config/runtime`, `goseg/config/bootstrap`, `goseg/system/storagetest`, and `goseg/shipworkflow/lifecycle`; (2) move lowest-risk files first (`shipworkflow/lifecycle*.go` into lifecycle, then `system/disk_*_test.go` into storagetest or disk/storage package tests), then split config bootstrap/runtime files; (3) update package names/imports with `goimports -w goseg/...`; (4) validate with `go test ./goseg/config ./goseg/shipworkflow ./goseg/system` and finally `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat_namespace_and_role_blur"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "test_shim_placement_breaks_disk_module_locality",
+      "summary": "Disk compatibility shims are placed in root system tests instead of disk/storage test boundaries.",
+      "related_files": [
+        "goseg/system/disk_shims_test.go",
+        "goseg/system/disk_health_test.go",
+        "goseg/system/disk_storage_test.go"
+      ],
+      "evidence": [
+        "disk_shims_test.go defines many pass-through functions (parseFstabLine, ListHardDisks, CreateGroundSegFilesystem, etc.) delegating to `system/disk` and `system/storage`.",
+        "disk_health_test.go uses those shims from package system, coupling root-level tests to subpackage internals through a compatibility layer."
+      ],
+      "suggestion": "Staged reorg plan: (1) move disk-oriented tests to subpackage targets `goseg/system/disk` and `goseg/system/storage`; (2) replace root shims with direct subpackage test helpers (`*_test.go` local helpers) and delete transitional shims last; (3) update imports via `goimports -w goseg/system/...`; (4) validate incrementally with `go test ./goseg/system/disk ./goseg/system/storage` then `go test ./goseg/system/...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_namespace_and_role_blur"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "config_package_owns_too_many_lifecycle_roles",
+      "summary": "Config package combines bootstrap orchestration and runtime context modeling in one ownership surface.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "bootstrap.go handles init sequencing, env/argv reads, persistence writes, and global readiness flags.",
+        "config.go defines runtime context core model, context mutation API, and multiple settings snapshot types in the same package scope.",
+        "Tests in bootstrap_test.go are tied to process-level concerns (env/argv), confirming mixed architectural roles under one package root."
+      ],
+      "suggestion": "Staged reorg plan: (1) split package ownership into `config/runtimectx` (RuntimeContext + setters/getters), `config/bootstrap` (Initialize/bootstrap flow), and `config/state` (global config snapshots); (2) move runtime context types/functions first, then bootstrap orchestration, then state accessors; (3) update call sites/imports with `goimports -w goseg/...` and `go test ./goseg/config/...`; (4) run `go test ./...` to confirm no boot-order regressions.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_ownership_blur"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Long-lived growth in top-level package directories without enforced subdomain folder boundaries.",
+      "Compatibility shims preserved at root package level, delaying test and ownership migration into subpackages."
+    ],
+    "likely_symptoms": [
+      "flat_directory_boundaries_in_core_packages",
+      "test_shim_placement_breaks_disk_module_locality"
+    ],
+    "possible_false_positives": []
+  }
+}

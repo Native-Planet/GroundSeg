@@ -77,33 +77,20 @@ Required checks before shipping Go backend/runtime changes:
 
 1. `cd goseg`
 2. `go test ./...`
-3. `go test -tags=integration ./broadcast ./handler ./routines ./ws` (run only in environments with Docker + runtime dependencies available)
+3. Contract conformance gate (shared ownership: protocol/contracts + uploadsvc maintainers):
+   `go test ./protocol/contracts/... ./uploadsvc/...`
+   This must keep action-fixture, family-governance, and upload payload-rule conformance tests green.
 
-Runtime boundary expectations for backend changes:
+Detailed backend checks, runtime-boundary policy, and CI contract-gate mapping:
 
-1. Preserve explicit error propagation (`%w`) at handler/service boundaries.
-2. Keep fetch-only APIs separate from state-mutating sync APIs (for example `Fetch*` vs `Sync*`).
-3. For flows that touch registration/version/upload/C2C paths, include at least one deterministic unit test in the changed package.
-4. For upload, C2C, Wi-Fi websocket command, and protocol-contract surfaces, follow package governance documents:
-   - `goseg/uploadsvc/GOVERNANCE.md`
-   - `goseg/system/wifi/README.md`
-5. For StarTram external API masking semantics, follow `goseg/startram/GOVERNANCE.md`.
-6. For protocol and error contract surfaces across all active families (upload, C2C, StarTram), define compatibility descriptors through:
-   - `goseg/protocol/contracts/contracts.go` (`ContractDescriptor`, shared registry, active/deprecated helpers)
-   - `goseg/protocol/contracts/protocol_contracts.go` (upload/C2C contract metadata and namespace bindings)
-   - `goseg/protocol/contracts/startram_contracts.go` (StarTram error contract metadata)
-   - `goseg/protocol/contracts/contracts_test.go` (explicit per-contract lifecycle-policy assertions for changed catalog entries)
-   - `goseg/protocol/actions/actions.go` (action token contract adapters over registry descriptors)
-   - `goseg/startram/errors.go` (API connection contract accessor and masking semantics)
-   - Use the typed contract APIs (`ContractID`, `ActionNamespace`, `ActionToken`, and `ActionContractBinding`) instead of raw string namespace/action lookups.
-7. Use shared boundary helpers for edge contracts:
-   dependency-injected handlers (no package-global service mutation) and shared masked-error wrappers (`goseg/errpolicy`) for outward error semantics.
+- `docs/architecture/backend-quality-gates.md`
 
-CI policy checks:
+Contract governance entrypoints:
 
-1. `Runtime Contract Gate` (`.github/workflows/upload-contract-gate.yml`) runs a path-aware check that fails if contract surfaces change without paired tests:
-   `goseg/handler/ws/upload.go`, `goseg/uploadsvc/service.go`, `goseg/startram/errors.go`, `goseg/protocol/contracts/contracts.go`, `goseg/protocol/contracts/protocol_contracts.go`, `goseg/protocol/contracts/startram_contracts.go`, `goseg/protocol/actions/actions.go`.
-2. The same gate runs targeted contract tests via `.github/scripts/check-upload-contract.sh` for upload branch matrix, upload dispatch parity, and startram masked-error semantics.
+1. Contract declarations: `goseg/protocol/contracts/familycatalog/`
+2. Governance validators: `goseg/protocol/contracts/`
+3. Conformance fixtures: `goseg/protocol/contracts/conformance/`
+4. Consumer adapter checks: `goseg/uploadsvc/` tests against contracts upload-binding specs
 
 ## Removing GroundSeg (Uninstall)
 

@@ -9,14 +9,16 @@ import (
 	"groundseg/handler/systemsvc"
 	"groundseg/structs"
 	"groundseg/system"
+	maintenanceapt "groundseg/system/maintenance/apt"
+	"groundseg/transition"
 	"os/exec"
 	"time"
 )
 
 var (
-	confForSystemHandler             = config.Conf
+	confForSystemHandler             = config.Config
 	stopContainerForSystemHandler    = orchestration.StopContainerByName
-	updateConfTypedForSystemHandler  = config.UpdateConfTyped
+	updateConfTypedForSystemHandler  = config.UpdateConfigTyped
 	withPenpaiAllowForSystemHandler  = config.WithPenpaiAllow
 	loadLlamaForSystemHandler        = orchestration.LoadLlama
 	withGracefulExitForSystemHandler = config.WithGracefulExit
@@ -25,16 +27,15 @@ var (
 	}
 	configureSwapForSystemHandler = system.ConfigureSwap
 	withSwapValForSystemHandler   = config.WithSwapVal
-	runUpgradeForSystemHandler    = system.RunUpgrade
+	runUpgradeForSystemHandler    = maintenanceapt.RunUpgrade
 	toggleDeviceForSystemHandler  = func(dev string) error {
 		return system.NewWiFiRuntimeService().ToggleDevice(dev)
 	}
 	connectToWifiForSystemHandler = func(ssid, password string) error {
-		return system.NewWiFiRuntimeService().ConnectToWifi(ssid, password)
+		return system.NewWiFiRuntimeService().ConnectToWiFi(ssid, password)
 	}
-	publishSystemTransitionForSystemHandler = func(_ context.Context, transition structs.SystemTransition) error {
-		_ = events.DefaultEventRuntime().PublishSystemTransition(context.Background(), transition)
-		return nil
+	publishSystemTransitionForSystemHandler = func(ctx context.Context, transition structs.SystemTransition) error {
+		return events.DefaultEventRuntime().PublishSystemTransition(ctx, transition)
 	}
 	sleepForSystemHandler = time.Sleep
 )
@@ -43,7 +44,7 @@ var (
 func SystemHandler(msg []byte) error {
 	return systemsvc.HandleSystem(msg, systemsvc.SystemDependencies{
 		Unmarshal:           json.Unmarshal,
-		Conf:                confForSystemHandler,
+		Config:              confForSystemHandler,
 		StopContainerByName: stopContainerForSystemHandler,
 		UpdateConfTyped:     updateConfTypedForSystemHandler,
 		WithPenpaiAllow:     withPenpaiAllowForSystemHandler,
@@ -54,11 +55,12 @@ func SystemHandler(msg []byte) error {
 		WithSwapVal:         withSwapValForSystemHandler,
 		RunUpgrade:          runUpgradeForSystemHandler,
 		ToggleDevice:        toggleDeviceForSystemHandler,
-		ConnectToWifi:       connectToWifiForSystemHandler,
-		PublishSystemTransition: func(transition structs.SystemTransition) {
-			_ = publishSystemTransitionForSystemHandler(context.Background(), transition)
+		ConnectToWiFi:       connectToWifiForSystemHandler,
+		PublishSystemTransition: func(ctx context.Context, transition structs.SystemTransition) error {
+			return publishSystemTransitionForSystemHandler(ctx, transition)
 		},
-		Sleep:       sleepForSystemHandler,
-		IsDebugMode: config.DebugMode(),
+		TransitionPublishPolicy: transition.TransitionPolicyForCriticality(transition.TransitionPublishCritical),
+		Sleep:                   sleepForSystemHandler,
+		IsDebugMode:             config.DebugMode(),
 	})
 }

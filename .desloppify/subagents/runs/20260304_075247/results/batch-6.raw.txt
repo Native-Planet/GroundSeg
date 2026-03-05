@@ -1,0 +1,154 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 76.0,
+    "error_consistency": 80.0,
+    "abstraction_fitness": 71.0,
+    "test_strategy": 74.0,
+    "design_coherence": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/config/config.go` and related config files rely on package-level mutable config state and package functions as shared process state.",
+        "`goseg/accesspoint/config.go` and `goseg/click/click.go` consume/update that shared state directly instead of receiving an injected config context."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    },
+    "error_consistency": {
+      "evidence": [
+        "`goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go` permits critical dependency hooks to be optional and returns success when callbacks are absent.",
+        "Callers in `goseg/docker/orchestration/container/minio.go` and `goseg/docker/orchestration/container/llama.go` rely on different callback sets, creating inconsistent failure behavior for the same operation class."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`goseg/click/click.go` uses mutable package-level forwarding function variables for subcommands and each command handler becomes a thin wrapper instead of a stable interface boundary.",
+        "Subcommand modules (`goseg/click/backup/service.go`, `goseg/click/restore/restore.go`) are coupled through these mutable bindings rather than explicit handler contracts."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 59.0,
+        "indirection_cost": 66.0,
+        "interface_honesty": 55.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/broadcast/state.go`, `goseg/broadcast/transitions.go`, and `goseg/broadcast/loop.go` implement non-trivial state transitions and error/retry branches without localized tests in this batch's assigned surface, so regressions in transition semantics are easy to miss.",
+        "Error-path outcomes in orchestration/config update paths are mostly exercised indirectly, with sparse direct assertions for negative-path behavior."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "design_coherence": {
+      "evidence": [
+        "Config-update orchestration is fragmented across `goseg/config/config_update.go`, `goseg/config/config_update_registry.go`, and `goseg/config/config_update_executor.go`, with command parsing/dispatch and execution concerns colocated in a string-keyed flow.",
+        "The same command-class wiring is re-resolved in multiple places, increasing drift risk when adding new update types."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_config_singleton_leak",
+      "summary": "Config remains a mutable global singleton, creating invisible dependencies between CLI, accesspoint, and orchestration flows.",
+      "related_files": ["goseg/config/config.go", "goseg/accesspoint/config.go", "goseg/click/click.go", "goseg/config/config_state.go"],
+      "evidence": [
+        "The config package exposes process-wide mutable state and shared accessors, and multiple submodules read/write it during startup and request handling.",
+        "Changes in one command path can affect unrelated module behavior because there is no explicit per-call config context."
+      ],
+      "suggestion": "Introduce explicit config context objects passed through command/lifecycle boundaries, remove package-level mutable config access from production modules, and keep config writes localized to service-owned components.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_state"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "click_function_var_throughput",
+      "summary": "The click package uses mutable function-variable forwarding for almost all subcommands, which hides real interfaces and makes contracts implicit.",
+      "related_files": ["goseg/click/click.go", "goseg/click/backup/service.go", "goseg/click/restore/restore.go", "goseg/click/pack/pack.go"],
+      "evidence": [
+        "Command handlers are thin forwarding shells with package-level indirection.",
+        "Subcommand behavior is coupled through mutable vars rather than explicit interfaces, reducing discoverability and making accidental override/reset issues possible."
+      ],
+      "suggestion": "Replace mutable function-variable indirection with a typed command-handler interface and explicit dependency injection of handlers at startup.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "optional_dependency_callbacks_mask_errors",
+      "summary": "Optional dependency hooks in artifact-write flow can silently skip required validation and produce inconsistent error surfaces.",
+      "related_files": ["goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go", "goseg/docker/orchestration/container/minio.go", "goseg/docker/orchestration/container/llama.go"],
+      "evidence": [
+        "Dependency-prep steps are treated as optional in the writer path; nil callbacks do not fail fast.",
+        "Different runtime callers provide different hook sets, so identical setup errors may surface in one container path and be dropped in another."
+      ],
+      "suggestion": "Require non-nil callback providers for required dependency checks and return explicit typed errors when dependencies are missing; move callback validation to caller construction so failures happen deterministically.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "string_dispatch_fragmentation",
+      "summary": "Config update parsing and execution are split across several files with duplicated string-based dispatch, making behavior brittle as updates evolve.",
+      "related_files": ["goseg/config/config_update.go", "goseg/config/config_update_registry.go", "goseg/config/config_update_executor.go"],
+      "evidence": [
+        "Update names/keys and their execution behavior are interpreted in multiple places instead of a single typed command model.",
+        "Adding or altering one update type requires coordinated edits across parse, registry, and executor flow, increasing drift risk."
+      ],
+      "suggestion": "Introduce a typed command/update model and handler registry contract so parser, validator, and executor consume one shared representation.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_contracts"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "state_transition_error_paths_uncovered",
+      "summary": "Core state-machine/error-path logic in broadcast orchestration lacks direct, module-local test coverage for failure branches.",
+      "related_files": ["goseg/broadcast/state.go", "goseg/broadcast/transitions.go", "goseg/broadcast/loop.go", "goseg/broadcast/delivery.go"],
+      "evidence": [
+        "Transition and delivery paths include multiple branches and backoff/retry behavior without local test coverage in the reviewed slice.",
+        "Current structure exposes behavior changes through maps and branch-heavy state mutation, which is vulnerable to untested regressions."
+      ],
+      "suggestion": "Add table-driven tests for each transition edge and negative path (invalid transition, dependency/transport failures, retry exhaustion) with deterministic fakes for transport and timing.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit shared mutable state and function-variable indirection across modules instead of explicit interfaces and injected dependencies.",
+      "String-based command/update dispatch spread across multiple files without a single canonical command model."
+    ],
+    "likely_symptoms": [
+      "global_config_singleton_leak",
+      "click_function_var_throughput",
+      "optional_dependency_callbacks_mask_errors",
+      "string_dispatch_fragmentation",
+      "state_transition_error_paths_uncovered"
+    ],
+    "possible_false_positives": [
+      "Previously observed importer/version-related findings in files outside this batch (for example importer and ws paths) were not re-opened as they are not in this assignment surface."
+    ]
+  }
+}

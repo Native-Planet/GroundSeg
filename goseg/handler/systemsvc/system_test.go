@@ -1,8 +1,10 @@
 package systemsvc
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,14 +32,14 @@ func TestHandleSystemTogglePenpaiFeature(t *testing.T) {
 	var patch *config.ConfPatch
 
 	deps := SystemDependencies{
-		Conf: func() structs.SysConfig {
+		Config: func() structs.SysConfig {
 			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiAllow: true}}
 		},
 		StopContainerByName: func(name string) error {
 			stopped = append(stopped, name)
 			return nil
 		},
-		UpdateConfTyped: func(opts ...config.ConfUpdateOption) error {
+		UpdateConfTyped: func(opts ...config.ConfigUpdateOption) error {
 			p := &config.ConfPatch{}
 			for _, opt := range opts {
 				opt(p)
@@ -60,10 +62,10 @@ func TestHandleSystemTogglePenpaiFeature(t *testing.T) {
 	}
 
 	deps = SystemDependencies{
-		Conf: func() structs.SysConfig {
+		Config: func() structs.SysConfig {
 			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiAllow: false}}
 		},
-		UpdateConfTyped: func(opts ...config.ConfUpdateOption) error {
+		UpdateConfTyped: func(opts ...config.ConfigUpdateOption) error {
 			p := &config.ConfPatch{}
 			for _, opt := range opts {
 				opt(p)
@@ -86,8 +88,8 @@ func TestHandleSystemGroundSegAndPower(t *testing.T) {
 	runCount := 0
 	updatedGraceful := 0
 	deps := SystemDependencies{
-		Conf:             func() structs.SysConfig { return structs.SysConfig{} },
-		UpdateConfTyped:  func(opts ...config.ConfUpdateOption) error { updatedGraceful++; return nil },
+		Config:           func() structs.SysConfig { return structs.SysConfig{} },
+		UpdateConfTyped:  func(opts ...config.ConfigUpdateOption) error { updatedGraceful++; return nil },
 		WithGracefulExit: config.WithGracefulExit,
 		ExecCommand: func(_ string, _ ...string) CommandRunner {
 			runCount++
@@ -99,8 +101,8 @@ func TestHandleSystemGroundSegAndPower(t *testing.T) {
 		RunUpgrade:              func() error { return nil },
 		ConfigureSwap:           func(_ string, _ int) error { return nil },
 		ToggleDevice:            func(_ string) error { return nil },
-		ConnectToWifi:           func(_, _ string) error { return nil },
-		PublishSystemTransition: func(structs.SystemTransition) {},
+		ConnectToWiFi:           func(_, _ string) error { return nil },
+		PublishSystemTransition: func(_ context.Context, _ structs.SystemTransition) error { return nil },
 		Sleep:                   func(time.Duration) {},
 	}
 
@@ -144,11 +146,11 @@ func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
 	toggleArg := ""
 	upgradeCount := 0
 	deps := SystemDependencies{
-		Conf: func() structs.SysConfig {
+		Config: func() structs.SysConfig {
 			return structs.SysConfig{Runtime: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
 		},
 		ConfigureSwap: func(_ string, value int) error { configureCalls = append(configureCalls, value); return nil },
-		UpdateConfTyped: func(opts ...config.ConfUpdateOption) error {
+		UpdateConfTyped: func(opts ...config.ConfigUpdateOption) error {
 			p := &config.ConfPatch{}
 			for _, opt := range opts {
 				opt(p)
@@ -158,16 +160,19 @@ func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
 			}
 			return nil
 		},
-		WithSwapVal:             config.WithSwapVal,
-		WithPenpaiAllow:         config.WithPenpaiAllow,
-		WithGracefulExit:        config.WithGracefulExit,
-		ExecCommand:             func(_ string, _ ...string) CommandRunner { return &fakeCommand{} },
-		IsDebugMode:             false,
-		RunUpgrade:              func() error { upgradeCount++; return nil },
-		ToggleDevice:            func(dev string) error { toggleArg = dev; return nil },
-		ConnectToWifi:           func(_, _ string) error { return nil },
-		PublishSystemTransition: func(_ structs.SystemTransition) { transitionCount++ },
-		Sleep:                   func(time.Duration) { sleepCount++ },
+		WithSwapVal:      config.WithSwapVal,
+		WithPenpaiAllow:  config.WithPenpaiAllow,
+		WithGracefulExit: config.WithGracefulExit,
+		ExecCommand:      func(_ string, _ ...string) CommandRunner { return &fakeCommand{} },
+		IsDebugMode:      false,
+		RunUpgrade:       func() error { upgradeCount++; return nil },
+		ToggleDevice:     func(dev string) error { toggleArg = dev; return nil },
+		ConnectToWiFi:    func(_, _ string) error { return nil },
+		PublishSystemTransition: func(_ context.Context, _ structs.SystemTransition) error {
+			transitionCount++
+			return nil
+		},
+		Sleep: func(time.Duration) { sleepCount++ },
 	}
 
 	deps.ConfigureSwap = func(_ string, _ int) error { return errors.New("set swap failed") }
@@ -210,7 +215,7 @@ func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
 		t.Fatalf("expected one sleep call on successful wifi-connect, got %d", sleepCount)
 	}
 
-	deps.ConnectToWifi = func(_ string, _ string) error { return errors.New("wifi failure") }
+	deps.ConnectToWiFi = func(_ string, _ string) error { return errors.New("wifi failure") }
 	transitionCount = 0
 	sleepCount = 0
 	if err := HandleSystem([]byte(`{"payload":{"action":"wifi-connect","ssid":"net","password":"pw"}}`), deps); err == nil {
@@ -224,18 +229,45 @@ func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
 	}
 }
 
+func TestHandleSystemWifiConnectSurfacesTransitionPublishFailure(t *testing.T) {
+	publishErr := errors.New("transition bus full")
+	deps := SystemDependencies{
+		Config: func() structs.SysConfig {
+			return structs.SysConfig{Runtime: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
+		},
+		ConfigureSwap:           func(_ string, value int) error { return nil },
+		UpdateConfTyped:         func(opts ...config.ConfigUpdateOption) error { return nil },
+		WithSwapVal:             config.WithSwapVal,
+		WithPenpaiAllow:         config.WithPenpaiAllow,
+		WithGracefulExit:        config.WithGracefulExit,
+		ExecCommand:             func(_ string, _ ...string) CommandRunner { return &fakeCommand{} },
+		RunUpgrade:              func() error { return nil },
+		ToggleDevice:            func(_ string) error { return nil },
+		ConnectToWiFi:           func(_, _ string) error { return nil },
+		PublishSystemTransition: func(_ context.Context, _ structs.SystemTransition) error { return publishErr },
+		Sleep:                   func(time.Duration) {},
+	}
+	err := HandleSystem([]byte(`{"payload":{"action":"wifi-connect","ssid":"net","password":"pw"}}`), deps)
+	if err == nil {
+		t.Fatal("expected wifi-connect to fail when transition publish fails")
+	}
+	if !strings.Contains(err.Error(), publishErr.Error()) {
+		t.Fatalf("expected publish error in result, got: %v", err)
+	}
+}
+
 func TestHandleSystemUnrecognizedAction(t *testing.T) {
 	deps := SystemDependencies{
-		Conf:                    func() structs.SysConfig { return structs.SysConfig{} },
-		UpdateConfTyped:         func(...config.ConfUpdateOption) error { return nil },
+		Config:                  func() structs.SysConfig { return structs.SysConfig{} },
+		UpdateConfTyped:         func(...config.ConfigUpdateOption) error { return nil },
 		WithPenpaiAllow:         config.WithPenpaiAllow,
 		WithSwapVal:             config.WithSwapVal,
 		WithGracefulExit:        config.WithGracefulExit,
 		RunUpgrade:              func() error { return nil },
 		ConfigureSwap:           func(string, int) error { return nil },
 		ToggleDevice:            func(string) error { return nil },
-		ConnectToWifi:           func(string, string) error { return nil },
-		PublishSystemTransition: func(structs.SystemTransition) {},
+		ConnectToWiFi:           func(string, string) error { return nil },
+		PublishSystemTransition: func(_ context.Context, _ structs.SystemTransition) error { return nil },
 		Sleep:                   func(time.Duration) {},
 	}
 	if err := HandleSystem([]byte(`{"payload":{"action":"unknown"}}`), deps); err == nil {
@@ -256,7 +288,7 @@ func TestHandlePenpaiToggle(t *testing.T) {
 
 	deps := PenpaiDependencies{
 		Unmarshal: json.Unmarshal,
-		Conf: func() structs.SysConfig {
+		Config: func() structs.SysConfig {
 			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 		},
 		StopContainerByName: func(name string) error {
@@ -268,7 +300,7 @@ func TestHandlePenpaiToggle(t *testing.T) {
 			return structs.ContainerState{}, nil
 		},
 		UpdateContainerState: func(string, structs.ContainerState) {},
-		UpdateConfTyped: func(opts ...config.ConfUpdateOption) error {
+		UpdateConfTyped: func(opts ...config.ConfigUpdateOption) error {
 			p := &config.ConfPatch{}
 			for _, opt := range opts {
 				opt(p)
@@ -294,7 +326,7 @@ func TestHandlePenpaiToggle(t *testing.T) {
 		t.Fatalf("expected running=false after first toggle, got %v", updatedRunning)
 	}
 
-	deps.Conf = func() structs.SysConfig {
+	deps.Config = func() structs.SysConfig {
 		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: false}}
 	}
 	if err := HandlePenpai([]byte(`{"payload":{"action":"toggle"}}`), deps); err != nil {
@@ -313,7 +345,7 @@ func TestHandlePenpaiSetModel(t *testing.T) {
 	restarts := 0
 	deps := PenpaiDependencies{
 		Unmarshal: json.Unmarshal,
-		Conf: func() structs.SysConfig {
+		Config: func() structs.SysConfig {
 			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 		},
 		StopContainerByName: func(string) error { return nil },
@@ -322,7 +354,7 @@ func TestHandlePenpaiSetModel(t *testing.T) {
 			return structs.ContainerState{}, nil
 		},
 		UpdateContainerState: func(string, structs.ContainerState) {},
-		UpdateConfTyped: func(opts ...config.ConfUpdateOption) error {
+		UpdateConfTyped: func(opts ...config.ConfigUpdateOption) error {
 			p := &config.ConfPatch{}
 			for _, opt := range opts {
 				opt(p)
@@ -346,7 +378,7 @@ func TestHandlePenpaiSetModel(t *testing.T) {
 		t.Fatalf("expected restart when model set and running, got %d", restarts)
 	}
 
-	deps.Conf = func() structs.SysConfig {
+	deps.Config = func() structs.SysConfig {
 		return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: false}}
 	}
 	restarts = 0
@@ -361,13 +393,13 @@ func TestHandlePenpaiSetModel(t *testing.T) {
 func TestHandlePenpaiSetCoresValidation(t *testing.T) {
 	deps := PenpaiDependencies{
 		Unmarshal: json.Unmarshal,
-		Conf: func() structs.SysConfig {
+		Config: func() structs.SysConfig {
 			return structs.SysConfig{Penpai: structs.PenpaiConfig{PenpaiRunning: true}}
 		},
 		StopContainerByName:  func(string) error { return nil },
 		StartContainerByName: func(_ string, _ string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
 		UpdateContainerState: func(string, structs.ContainerState) {},
-		UpdateConfTyped:      func(opts ...config.ConfUpdateOption) error { return nil },
+		UpdateConfTyped:      func(opts ...config.ConfigUpdateOption) error { return nil },
 		WithPenpaiRunning:    config.WithPenpaiRunning,
 		WithPenpaiActive:     config.WithPenpaiActive,
 		WithPenpaiCores:      config.WithPenpaiCores,
@@ -389,14 +421,14 @@ func TestHandlePenpaiSetCoresValidation(t *testing.T) {
 func TestHandlePenpaiUnrecognizedActionAndRemoveNoOp(t *testing.T) {
 	deps := PenpaiDependencies{
 		Unmarshal:           json.Unmarshal,
-		Conf:                func() structs.SysConfig { return structs.SysConfig{} },
+		Config:              func() structs.SysConfig { return structs.SysConfig{} },
 		StopContainerByName: func(string) error { t.Fatal("stop should not run for unknown action"); return nil },
 		StartContainerByName: func(_, _ string) (structs.ContainerState, error) {
 			t.Fatal("start should not run for unknown action")
 			return structs.ContainerState{}, nil
 		},
 		UpdateContainerState: func(string, structs.ContainerState) {},
-		UpdateConfTyped:      func(...config.ConfUpdateOption) error { return nil },
+		UpdateConfTyped:      func(...config.ConfigUpdateOption) error { return nil },
 		WithPenpaiRunning:    config.WithPenpaiRunning,
 		WithPenpaiActive:     config.WithPenpaiActive,
 		WithPenpaiCores:      config.WithPenpaiCores,

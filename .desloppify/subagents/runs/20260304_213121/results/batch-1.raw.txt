@@ -1,0 +1,74 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 77.4
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract identity primitives are re-declared in multiple modules: `ProtocolActionContractRoot` and upload/protocol action constants appear in both `goseg/protocol/contracts/protocolfamily/specs.go` and `goseg/uploadsvc/contractspec/specs.go` instead of flowing from one canonical boundary.",
+        "Cross-package alignment is enforced by tests (`goseg/protocol/contracts/conformance/fixtures_test.go`, `goseg/uploadsvc/contractspec/contractspec_test.go`) that compare counts and mappings across registries, indicating architectural drift risk already exists and is being caught after-the-fact.",
+        "Family spec types are fragmented (`ActionSpec`, `UploadActionSpec`, `ContractSpec`) with different fields and semantics across `protocolfamily`, `uploadsvc/contractspec`, and `startramfamily`, which weakens shared contract boundaries and makes consistency dependent on manual synchronization."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "distributed_contract_identity_sources",
+      "summary": "Protocol contract IDs/namespaces are duplicated across modules instead of owned by one boundary.",
+      "related_files": [
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/uploadsvc/contractspec/specs.go",
+        "goseg/uploadsvc/contractspec/contractspec_test.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`protocolfamily/specs.go` defines `ProtocolActionContractRoot`, namespace/action constants, and concatenated IDs locally.",
+        "`uploadsvc/contractspec/specs.go` independently defines the same root/namespace/action-ID composition pattern for upload contracts.",
+        "`contractspec_test.go` and `fixtures_test.go` perform cross-registry alignment checks, showing modules are synchronized by tests rather than by a single source-of-truth API."
+      ],
+      "suggestion": "Introduce a single canonical contract identity registry/API in `protocol/contracts` (typed IDs + binding metadata), then make `protocolfamily` and `uploadsvc/contractspec` consume it directly. Remove duplicated root/namespace/action literals from leaf modules and keep only module-specific descriptors where necessary.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_registry_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "incompatible_family_spec_models",
+      "summary": "Contract-family packages expose incompatible spec schemas, creating boundary drift between sibling modules.",
+      "related_files": [
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/startramfamily/specs.go",
+        "goseg/uploadsvc/contractspec/specs.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`protocolfamily.ActionSpec` and `uploadsvc/contractspec.UploadActionSpec` use action-binding fields (`Namespace`, `Action`, `ContractID`) while `startramfamily.ContractSpec` uses a different shape (`ID`, `Name`, `Description`, `Message`, `Owner`) with no shared contract model.",
+        "`family_specs_test.go` validates governance and family-entry behavior via `contractFamilyEntrySpec`, but those governance fields are not represented in the sibling family spec packages, so cross-module consistency is not enforced at the model boundary.",
+        "Because sibling packages define different schema contracts, any new metadata requirement must be propagated manually across modules, increasing coupling and drift risk."
+      ],
+      "suggestion": "Define a shared family-spec contract in `protocol/contracts` (core fields + optional extension points), and migrate `protocolfamily`, `startramfamily`, and `uploadsvc/contractspec` to implement/compose that shared model. Add conversion helpers in one place rather than package-specific ad hoc schemas.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_registry_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract metadata ownership is split across sibling packages instead of centralized behind a stable boundary.",
+      "Schema divergence between family spec packages creates manual synchronization points and test-only coupling guards."
+    ],
+    "likely_symptoms": [
+      "distributed_contract_identity_sources",
+      "incompatible_family_spec_models"
+    ],
+    "possible_false_positives": []
+  }
+}

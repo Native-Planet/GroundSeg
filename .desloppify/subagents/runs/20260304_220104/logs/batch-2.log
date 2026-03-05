@@ -1,0 +1,529 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_220104/results/batch-2.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/protocolfamily/specs.go
+- goseg/protocol/contracts/startramfamily/specs.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract identity primitives are defined in `goseg/protocol/actionids/actionids.go`, then re-exported in `goseg/protocol/contracts/protocolfamily/specs.go` (`ProtocolActionContractRoot`, namespace/action constants, and derived ID constants), creating more than one authoritative boundary surface.",
+        "`goseg/protocol/contracts/conformance/fixtures_test.go` validates contract fixtures against `groundseg/protocol/actions` runtime constants, while contract-family declarations in `goseg/protocol/contracts/protocolfamily/specs.go` are built from `actionids` + `familyspec`; this mixes runtime action API and contract-governance API in the conformance boundary.",
+        "`README.md` defines backend quality gate as `go test ./...` and references external docs for contract-gate mapping, while contract-governance enforcement is implemented in dedicated tests (`goseg/protocol/contracts/family_specs_test.go`, `goseg/protocol/contracts/conformance/fixtures_test.go`) that are not explicitly surfaced as a named architecture contract gate."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_contract_identity_authority",
+      "summary": "Contract IDs and action vocabulary are maintained through duplicated boundary surfaces instead of a single authoritative module.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines root, namespaces, actions, and composed contract IDs.",
+        "`protocolfamily/specs.go` re-exports these constants under new names and uses them as family declarations.",
+        "`family_specs_test.go` also constructs validation expectations through separate contract constants/metadata paths, reinforcing multiple parallel representations for the same contract vocabulary."
+      ],
+      "suggestion": "Establish one canonical contract identity source (for root/namespace/action/contract ID), make family specs consume it directly without re-export aliases, and enforce a no-duplicate-constant rule in contract packages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_identity_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "conformance_depends_on_runtime_actions_boundary",
+      "summary": "Conformance fixtures are coupled to runtime action package constants, blurring contract-governance boundaries.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/actionids/actionids.go"
+      ],
+      "evidence": [
+        "`fixtures_test.go` imports `groundseg/protocol/actions` and checks fixture keys against `actions.NamespaceC2C` and `actions.ActionC2CConnect`.",
+        "Contract family declarations in `protocolfamily/specs.go` are expressed through contract-focused types (`familyspec.ActionSpec`) and `actionids`, indicating a separate governance boundary.",
+        "This creates dependency direction where contract conformance is validated against runtime action API rather than solely against canonical contract declarations."
+      ],
+      "suggestion": "Drive conformance validation from canonical contract declarations (`actionids`/family specs) and keep runtime `actions` compatibility checks in a dedicated adapter test layer to preserve boundary direction.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_identity_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "quality_gate_contract_scope_not_explicit_in_root_policy",
+      "summary": "Repository-level quality gate policy does not explicitly name the contract conformance gate it relies on for compatibility governance.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`README.md` backend gate requires only `go test ./...` and links to external documentation for detailed contract-gate mapping.",
+        "Contract governance is enforced by specific test suites (`TestActionContractFixturesMatchCanonicalBindings`, `TestProtocolFamilyDeclarationsValidateAgainstGovernance`, `TestStartramFamilyDeclarationsValidateAgainstGovernance`) but this gate is not explicitly named in root policy text.",
+        "Without explicit top-level policy naming, architecture compatibility contracts are discoverable only by reading test internals or secondary docs."
+      ],
+      "suggestion": "Add an explicit contract-conformance gate section in `README.md` (with required command/target and ownership), and align it with the existing contract test suite naming to make boundary policy auditable at repo root.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract boundary ownership is split between runtime action APIs and contract-spec modules.",
+      "Compatibility governance is partially implicit (in tests/constants) rather than centralized as a single architectural contract surface."
+    ],
+    "likely_symptoms": [
+      "fragmented_contract_identity_authority",
+      "conformance_depends_on_runtime_actions_boundary"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cbade-f371-7c63-a3a8-c24f928797b5
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/actionids/actionids.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/protocol/contracts/family_specs_test.go
+- goseg/protocol/contracts/protocolfamily/specs.go
+- goseg/protocol/contracts/startramfamily/specs.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+Reviewing only the six assigned files plus the blind packet now, and I’ll produce a strict JSON assessment for `cross_module_architecture` with evidence-backed findings and scoped fixes.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' README.md" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/actionids/actionids.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+ succeeded in 51ms:
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+        "Cross-module coordination through shared mutable state or import-time side effects",
+        "Compatibility shim paths that persist without active external need and blur boundaries",
+        "Cross-package duplication that indicates a missing shared boundary"
+      ],
+      "skip": [
+        "Intentional facades/re-exports with clear API purpose",
+ succeeded in 51ms:
+package actionids
+
+const ProtocolActionContractRoot = "protocol.actions"
+
+const (
+	NamespaceUpload = "upload"
+	NamespaceC2C    = "c2c"
+)
+
+const (
+	UploadOpenEndpoint = "open-endpoint"
+	UploadReset        = "reset"
+	C2CConnect         = "connect"
+)
+
+const (
+	UploadOpenEndpointContractID = ProtocolActionContractRoot + "." + NamespaceUpload + "." + UploadOpenEndpoint
+	UploadResetContractID        = ProtocolActionContractRoot + "." + NamespaceUpload + "." + UploadReset
+	C2CConnectContractID         = ProtocolActionContractRoot + "." + NamespaceC2C + "." + C2CConnect
+)
+codex
+I have the packet constraints and first two files; next I’m inspecting the four contract/spec test files to validate boundary contracts and whether docs match runtime coverage.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/family_specs_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/startramfamily/specs.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/conformance/fixtures_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/protocolfamily/specs.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package protocolfamily
+
+import (
+	"groundseg/protocol/actionids"
+	"groundseg/protocol/contracts/familyspec"
+)
+
+const (
+	ProtocolActionContractRoot = actionids.ProtocolActionContractRoot
+	ActionNamespaceC2C         = actionids.NamespaceC2C
+	ActionC2CConnect           = actionids.C2CConnect
+	C2CConnectActionID         = actionids.C2CConnectContractID
+)
+
+func ActionSpecs() []familyspec.ActionSpec {
+	return []familyspec.ActionSpec{
+		{
+			Namespace:   ActionNamespaceC2C,
+			Action:      ActionC2CConnect,
+			ContractID:  C2CConnectActionID,
+ succeeded in 52ms:
+package startramfamily
+
+import "groundseg/protocol/contracts/familyspec"
+
+const (
+	ContractFamily = "startram"
+	ContractScope  = "errors"
+	APIConnSlug    = "api-connection"
+
+	APIConnectionErrorMessage     = "Unable to connect to API server"
+	APIConnectionErrorName        = "APIConnectionError"
+	APIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+)
+
+const APIConnectionErrorID = ContractFamily + "." + ContractScope + "." + APIConnSlug
+
+func ContractSpecs() []familyspec.ContractSpec {
+	return []familyspec.ContractSpec{
+		{
+			ID:          APIConnectionErrorID,
+ succeeded in 52ms:
+package contracts
+
+import (
+	"strings"
+	"testing"
+
+	"groundseg/protocol/contracts/protocolfamily"
+	"groundseg/protocol/contracts/startramfamily"
+	uploadcontractspec "groundseg/uploadsvc/contractspec"
+)
+
+func TestBuildContractFamilyEntriesFromSpecs(t *testing.T) {
+	specs := []contractFamilyEntrySpec{
+		{
+			ID:          UploadOpenEndpointAction,
+			Namespace:   ActionNamespaceUpload,
+			Action:      ActionUploadOpenEndpoint,
+			Name:        "upload open endpoint",
+			Description: "open upload endpoint contract",
+			Message:     "upload open endpoint message",
+ succeeded in 52ms:
+package conformance
+
+import (
+	"testing"
+
+	"groundseg/protocol/actions"
+	"groundseg/protocol/contracts"
+)
+
+func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+	fixtures := ActionContractFixtures()
+	if len(fixtures) == 0 {
+		t.Fatal("expected at least one action contract fixture")
+	}
+
+	foundC2C := false
+	for _, fixture := range fixtures {
+		if err := ValidateActionContractFixture(fixture); err != nil {
+			t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+		}
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract identity primitives are defined in `goseg/protocol/actionids/actionids.go`, then re-exported in `goseg/protocol/contracts/protocolfamily/specs.go` (`ProtocolActionContractRoot`, namespace/action constants, and derived ID constants), creating more than one authoritative boundary surface.",
+        "`goseg/protocol/contracts/conformance/fixtures_test.go` validates contract fixtures against `groundseg/protocol/actions` runtime constants, while contract-family declarations in `goseg/protocol/contracts/protocolfamily/specs.go` are built from `actionids` + `familyspec`; this mixes runtime action API and contract-governance API in the conformance boundary.",
+        "`README.md` defines backend quality gate as `go test ./...` and references external docs for contract-gate mapping, while contract-governance enforcement is implemented in dedicated tests (`goseg/protocol/contracts/family_specs_test.go`, `goseg/protocol/contracts/conformance/fixtures_test.go`) that are not explicitly surfaced as a named architecture contract gate."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_contract_identity_authority",
+      "summary": "Contract IDs and action vocabulary are maintained through duplicated boundary surfaces instead of a single authoritative module.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines root, namespaces, actions, and composed contract IDs.",
+        "`protocolfamily/specs.go` re-exports these constants under new names and uses them as family declarations.",
+        "`family_specs_test.go` also constructs validation expectations through separate contract constants/metadata paths, reinforcing multiple parallel representations for the same contract vocabulary."
+      ],
+      "suggestion": "Establish one canonical contract identity source (for root/namespace/action/contract ID), make family specs consume it directly without re-export aliases, and enforce a no-duplicate-constant rule in contract packages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_identity_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "conformance_depends_on_runtime_actions_boundary",
+      "summary": "Conformance fixtures are coupled to runtime action package constants, blurring contract-governance boundaries.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/protocolfamily/specs.go",
+        "goseg/protocol/actionids/actionids.go"
+      ],
+      "evidence": [
+        "`fixtures_test.go` imports `groundseg/protocol/actions` and checks fixture keys against `actions.NamespaceC2C` and `actions.ActionC2CConnect`.",
+        "Contract family declarations in `protocolfamily/specs.go` are expressed through contract-focused types (`familyspec.ActionSpec`) and `actionids`, indicating a separate governance boundary.",
+        "This creates dependency direction where contract conformance is validated against runtime action API rather than solely against canonical contract declarations."
+      ],
+      "suggestion": "Drive conformance validation from canonical contract declarations (`actionids`/family specs) and keep runtime `actions` compatibility checks in a dedicated adapter test layer to preserve boundary direction.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_identity_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "quality_gate_contract_scope_not_explicit_in_root_policy",
+      "summary": "Repository-level quality gate policy does not explicitly name the contract conformance gate it relies on for compatibility governance.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/family_specs_test.go"
+      ],
+      "evidence": [
+        "`README.md` backend gate requires only `go test ./...` and links to external documentation for detailed contract-gate mapping.",
+        "Contract governance is enforced by specific test suites (`TestActionContractFixturesMatchCanonicalBindings`, `TestProtocolFamilyDeclarationsValidateAgainstGovernance`, `TestStartramFamilyDeclarationsValidateAgainstGovernance`) but this gate is not explicitly named in root policy text.",
+        "Without explicit top-level policy naming, architecture compatibility contracts are discoverable only by reading test internals or secondary docs."
+      ],
+      "suggestion": "Add an explicit contract-conformance gate section in `README.md` (with required command/target and ownership), and align it with the existing contract test suite naming to make boundary policy auditable at repo root.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract boundary ownership is split between runtime action APIs and contract-spec modules.",
+      "Compatibility governance is partially implicit (in tests/constants) rather than centralized as a single architectural contract surface."
+    ],
+    "likely_symptoms": [
+      "fragmented_contract_identity_authority",
+      "conformance_depends_on_runtime_actions_boundary"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+13,635
+

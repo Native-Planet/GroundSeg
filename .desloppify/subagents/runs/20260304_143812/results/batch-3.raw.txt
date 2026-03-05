@@ -1,0 +1,95 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 76.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Background loops use inconsistent failure semantics: `check502Loop` logs errors and continues indefinitely, while `CheckVersionLoopWithContext` and `DockerLogStreamerWithRuntime` enforce consecutive-failure limits and return terminal errors.",
+        "Startup required/optional policy is inconsistently enforced: `runStartupSubsystem` fails required missing callbacks, but the required `configure swap` step can silently succeed when `ConfigureSwapFn` is nil.",
+        "Docker client lifecycle error handling is inconsistent: some modules aggregate close errors (`closeDockerClient`, `closeRuntimeDockerClient`), while `dockerListenerWithRuntime` creates a docker client and never closes it."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "background_loop_failure_policy_drift",
+      "summary": "Long-running subsystems apply incompatible error escalation rules, causing similar runtime failures to be either surfaced or silently tolerated depending on module.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/routines/version.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`check502Loop` logs `GetShipStatus`, `LoadUrbitConfig`, network, HTTP, and recovery errors then continues forever with no terminal condition.",
+        "`CheckVersionLoopWithContext` returns `version update failed after ... consecutive attempts` when failure threshold is crossed.",
+        "`DockerLogStreamerWithRuntime` returns `docker log stream failed after ... consecutive attempts` after repeated stream errors.",
+        "Startup health supervision (`startupBackgroundServices.health`) can observe service errors, but whether errors ever surface depends on each loop's internal policy."
+      ],
+      "suggestion": "Introduce a shared background-service error policy (retry budget + backoff + escalation contract) and apply it across all long-running loops so equivalent failure classes have predictable propagation behavior.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "background_error_policy_fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "required_callback_contract_bypassed",
+      "summary": "A required startup subsystem can silently pass without its callback, contradicting required-callback failure behavior elsewhere in startup.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "`runStartupSubsystem` returns an error when a required step has a nil callback (`initialization callback is not configured`).",
+        "In `initSubsystems`, the `configure swap` step is marked `startupSubsystemRequired` but returns `nil` when `runtime.ConfigureSwapFn == nil`, bypassing required callback enforcement.",
+        "Existing startup tests cover required failure behavior generally but do not cover this required-step bypass path."
+      ],
+      "suggestion": "Make required-step callback semantics uniform: either enforce non-nil callback for required steps (including `configure swap`) or downgrade that step policy and document it; add tests for nil `ConfigureSwapFn` with non-empty swap config.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "startup_contract_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "docker_client_close_handling_inconsistent",
+      "summary": "Docker client teardown errors are handled robustly in some modules but omitted in event listener code, creating inconsistent I/O-boundary failure handling.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/network/network.go",
+        "goseg/docker/lifecycle/client_close.go"
+      ],
+      "evidence": [
+        "`network` and `lifecycle` define close helpers that preserve close failures via joined/wrapped errors.",
+        "`dockerListenerWithRuntime` creates a Docker client via `dockerclient.New()` and uses it for `Events(...)` without any close/defer close path.",
+        "This diverges from the rest of the docker runtime code where client-close failures are explicitly accounted for."
+      ],
+      "suggestion": "Apply a consistent docker-client lifecycle pattern in subsystem listeners: defer close and fold close failures into returned errors (or explicit structured logs) using a shared helper.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "io_boundary_error_contract_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error policy decisions are distributed per subsystem instead of encoded in shared primitives.",
+      "Startup policy metadata (`required`/`optional`) is not consistently enforced by step implementations.",
+      "Resource lifecycle conventions for docker clients are duplicated and unevenly adopted."
+    ],
+    "likely_symptoms": [
+      "background_loop_failure_policy_drift",
+      "required_callback_contract_bypassed",
+      "docker_client_close_handling_inconsistent"
+    ],
+    "possible_false_positives": []
+  }
+}

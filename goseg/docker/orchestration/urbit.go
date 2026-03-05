@@ -88,24 +88,24 @@ func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (conta
 	shipConf := rt.UrbitConfFn(containerName)
 	newConf := shipConf
 	if rt.ArchitectureFn() == "amd64" {
-		if containerInfo["hash"] != shipConf.UrbitAmd64Sha256 {
-			newConf.UrbitAmd64Sha256 = containerInfo["hash"]
+		if containerInfo.Hash != shipConf.UrbitAmd64Sha256 {
+			newConf.UrbitAmd64Sha256 = containerInfo.Hash
 		}
-		if minioInfo["hash"] != shipConf.MinioAmd64Sha256 {
-			newConf.MinioAmd64Sha256 = minioInfo["hash"]
+		if minioInfo.Hash != shipConf.MinioAmd64Sha256 {
+			newConf.MinioAmd64Sha256 = minioInfo.Hash
 		}
 	} else if rt.ArchitectureFn() == "arm64" {
-		if containerInfo["hash"] != shipConf.UrbitArm64Sha256 {
-			newConf.UrbitArm64Sha256 = containerInfo["hash"]
+		if containerInfo.Hash != shipConf.UrbitArm64Sha256 {
+			newConf.UrbitArm64Sha256 = containerInfo.Hash
 		}
-		if minioInfo["hash"] != shipConf.MinioArm64Sha256 {
-			newConf.MinioArm64Sha256 = minioInfo["hash"]
+		if minioInfo.Hash != shipConf.MinioArm64Sha256 {
+			newConf.MinioArm64Sha256 = minioInfo.Hash
 		}
 	}
-	newConf.UrbitVersion = containerInfo["tag"]
-	newConf.UrbitRepo = containerInfo["repo"]
-	newConf.MinioVersion = minioInfo["tag"]
-	newConf.MinioRepo = minioInfo["repo"]
+	newConf.UrbitVersion = containerInfo.Tag
+	newConf.UrbitRepo = containerInfo.Repo
+	newConf.MinioVersion = minioInfo.Tag
+	newConf.MinioRepo = minioInfo.Repo
 	if shipConf != newConf {
 		if err := persistUrbitRuntimeConfig(containerName, rt, func(conf *structs.UrbitRuntimeConfig) error {
 			conf.UrbitVersion = newConf.UrbitVersion
@@ -129,7 +129,7 @@ func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (conta
 			zap.L().Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v", err))
 		}
 	}
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
+	desiredImage := containerInfo.Reference()
 	// reload urbit conf from disk
 	err = rt.LoadUrbitConfigFn(containerName)
 	if err != nil {
@@ -291,8 +291,14 @@ func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (conta
 }
 
 func persistUrbitRuntimeConfig(containerName string, rt UrbitRuntime, mutate func(*structs.UrbitRuntimeConfig) error) error {
-	if rt.UpdateUrbitRuntimeConfigFn != nil {
-		return rt.UpdateUrbitRuntimeConfigFn(containerName, mutate)
+	if rt.UpdateUrbitSectionFn != nil {
+		return rt.UpdateUrbitSectionFn(containerName, UrbitConfigSectionRuntime, func(section any) error {
+			runtimeConf, ok := section.(*structs.UrbitRuntimeConfig)
+			if !ok {
+				return fmt.Errorf("unsupported urbit section payload: expected *structs.UrbitRuntimeConfig, got %T", section)
+			}
+			return mutate(runtimeConf)
+		})
 	}
 	if rt.UpdateUrbitFn == nil {
 		return fmt.Errorf("urbit runtime section update callback is not configured")

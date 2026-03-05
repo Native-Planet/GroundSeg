@@ -18,7 +18,10 @@ type UploadMessageHandler struct {
 }
 
 func UploadSupportedActions() []string {
-	supportedActions := actions.SupportedUploadActions()
+	supportedActions, err := actions.SupportedActions(actions.NamespaceUpload)
+	if err != nil {
+		return nil
+	}
 	result := make([]string, 0, len(supportedActions))
 	for _, action := range supportedActions {
 		result = append(result, string(action))

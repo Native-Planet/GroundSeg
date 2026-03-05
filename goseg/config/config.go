@@ -3,18 +3,13 @@ package config
 // code for managing groundseg and container configurations
 
 import (
-	"groundseg/defaults"
-	"sync/atomic"
-	"time"
+	"groundseg/config/contextapi"
+	"groundseg/config/startramstate"
 
 	"groundseg/structs"
 )
 
-type StartramConfigSnapshot struct {
-	Value     structs.StartramRetrieve
-	UpdatedAt time.Time
-	Fresh     bool
-}
+type StartramConfigSnapshot = startramstate.Snapshot
 
 type StartramSettings struct {
 	EndpointURL          string
@@ -56,7 +51,7 @@ type ShipSettings struct {
 }
 
 type ConnectivitySettings struct {
-	C2cInterval int
+	C2CInterval int
 }
 
 type UpdateSettings struct {
@@ -73,142 +68,105 @@ type ShipRuntimeSettings struct {
 	SnapTime int
 }
 
+type ImportSettings struct {
+	Swap     SwapSettings
+	Startram StartramSettings
+}
+
+type StartupSettings struct {
+	Update   UpdateSettings
+	Startram StartramSettings
+}
+
+type C2CSettings struct {
+	Runtime      RuntimeContext
+	Connectivity ConnectivitySettings
+}
+
 type RuntimeSettings struct {
 	BasePath     string
 	Architecture string
 	DebugMode    bool
 }
 
-// RuntimeContext holds immutable process-level execution context values that
-// orchestrators and handlers can pass explicitly through seams.
-type RuntimeContext struct {
-	BasePath     string
-	Architecture string
-	DebugMode    bool
-	DockerDir    string
-}
-
-var (
-	basePathDefault     = getBasePath
-	architectureDefault = getArchitecture
-	defaultDebugMode    = func() bool { return false }
-	dockerDirDefault    = func() string { return defaults.DockerData("volumes") + "/" }
-	runtimeContextValue atomic.Pointer[RuntimeContext]
-)
+type RuntimeContext = contextapi.RuntimeContext
 
 // RuntimeContextSnapshot returns an immutable runtime context for the current
 // process state. Callers should pass this into orchestration boundaries instead
 // of reaching into package-level mutable config state.
 func RuntimeContextSnapshot() RuntimeContext {
-	ctx := runtimeContextValue.Load()
-	if ctx == nil {
-		return RuntimeContext{
-			BasePath:     basePathDefault(),
-			Architecture: architectureDefault(),
-			DebugMode:    defaultDebugMode(),
-			DockerDir:    dockerDirDefault(),
-		}
-	}
-	return *ctx
-}
-
-func applyRuntimeContext(context RuntimeContext) {
-	updated := context
-	runtimeContextValue.Store(&updated)
-}
-
-func setRuntimeContext(context RuntimeContext) {
-	applyRuntimeContext(context)
+	return contextapi.Snapshot()
 }
 
 // BasePath returns the active process base path used by config-owned filesystem paths.
 func BasePath() string {
-	ctx := RuntimeContextSnapshot()
-	return ctx.BasePath
+	return contextapi.BasePath()
 }
 
 // Architecture returns the active process architecture used by config-owned configuration.
 func Architecture() string {
-	ctx := RuntimeContextSnapshot()
-	return ctx.Architecture
+	return contextapi.Architecture()
 }
 
 // DebugMode returns whether runtime debug mode is enabled.
 func DebugMode() bool {
-	ctx := RuntimeContextSnapshot()
-	return ctx.DebugMode
+	return contextapi.DebugMode()
 }
 
 // DockerDir returns the active docker volume root used by config-owned paths.
 func DockerDir() string {
-	ctx := RuntimeContextSnapshot()
-	return ctx.DockerDir
+	return contextapi.DockerDir()
+}
+
+func ImportSettingsSnapshot() ImportSettings {
+	return ImportSettings{
+		Swap:     SwapSettingsSnapshot(),
+		Startram: StartramSettingsSnapshot(),
+	}
+}
+
+func StartupSettingsSnapshot() StartupSettings {
+	return StartupSettings{
+		Update:   UpdateSettingsSnapshot(),
+		Startram: StartramSettingsSnapshot(),
+	}
+}
+
+func C2CSettingsSnapshot() C2CSettings {
+	return C2CSettings{
+		Runtime:      RuntimeContextSnapshot(),
+		Connectivity: ConnectivitySettingsSnapshot(),
+	}
 }
 
 // SetBasePath updates process context state in one location.
 func SetBasePath(basePath string) {
-	setRuntimeContextBasePath(basePath)
+	contextapi.SetBasePath(basePath)
 }
 
 // SetArchitecture updates process context architecture in one location.
 func SetArchitecture(architecture string) {
-	current := RuntimeContextSnapshot()
-	current.Architecture = architecture
-	setRuntimeContext(current)
+	contextapi.SetArchitecture(architecture)
 }
 
 // SetDebugMode updates process context debug mode in one location.
 func SetDebugMode(debugMode bool) {
-	setRuntimeContextDebugMode(debugMode)
+	contextapi.SetDebugMode(debugMode)
 }
 
 // SetDockerDir updates process context docker directory in one location.
 func SetDockerDir(dockerDir string) {
-	current := RuntimeContextSnapshot()
-	current.DockerDir = dockerDir
-	setRuntimeContext(current)
-}
-
-func setRuntimeContextBasePath(basePath string) {
-	current := RuntimeContextSnapshot()
-	current.BasePath = basePath
-	setRuntimeContext(current)
-}
-
-func setRuntimeContextDebugMode(debugMode bool) {
-	current := RuntimeContextSnapshot()
-	current.DebugMode = debugMode
-	setRuntimeContext(current)
-}
-
-func init() {
-	setRuntimeContext(RuntimeContext{
-		BasePath:     getBasePath(),
-		Architecture: getArchitecture(),
-		DebugMode:    false,
-		DockerDir:    defaults.DockerData("volumes") + "/",
-	})
+	contextapi.SetDockerDir(dockerDir)
 }
 
 func SetStartramConfig(retrieve structs.StartramRetrieve) {
-	startramMu.Lock()
-	defer startramMu.Unlock()
-	startramConfig = retrieve
-	startramConfigUpdated = time.Now()
+	startramstate.Set(retrieve)
 }
 
 func GetStartramConfig() structs.StartramRetrieve {
-	startramMu.RLock()
-	defer startramMu.RUnlock()
-	return startramConfig
+	return startramstate.Get()
 }
 
 func GetStartramConfigSnapshot() StartramConfigSnapshot {
-	startramMu.RLock()
-	defer startramMu.RUnlock()
-	return StartramConfigSnapshot{
-		Value:     startramConfig,
-		UpdatedAt: startramConfigUpdated,
-		Fresh:     !startramConfigUpdated.IsZero(),
-	}
+	return startramstate.GetSnapshot()
 }

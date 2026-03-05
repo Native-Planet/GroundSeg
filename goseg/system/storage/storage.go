@@ -3,39 +3,40 @@ package storage
 import (
 	"bufio"
 	"encoding/json"
-	"os/exec"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"groundseg/structs"
+
 	"github.com/anatol/smart.go"
 	"github.com/google/uuid"
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
-	"groundseg/structs"
 )
 
 type DiskSeams struct {
-	RunDiskCommandFn    func(string, ...string) (string, error)
-	ListPartitionsFn    func(bool) ([]disk.PartitionStat, error)
-	CheckSataDriveFn    func(string) (bool, error)
-	CheckNvmeDriveFn    func(string) (bool, error)
-	RemoveMultipartFn   func(string) error
-	MkdirAllFn          func(string, os.FileMode) error
-	RemoveAllFn         func(string) error
-	SymlinkFn           func(string, string) error
-	LstatFn             func(string) (os.FileInfo, error)
-	MkdirFn             func(string, os.FileMode) error
-	OpenFn              func(string) (*os.File, error)
-	OpenFileFn          func(string, int, os.FileMode) (*os.File, error)
-	MountAllCommandFn   func() error
-	MkfsExt4CommandFn   func(string, string) error
-	StatFn              func(string) (os.FileInfo, error)
-	ReadDirFn           func(string) ([]os.DirEntry, error)
-	RemoveFn            func(string) error
+	RunDiskCommandFn  func(string, ...string) (string, error)
+	ListPartitionsFn  func(bool) ([]disk.PartitionStat, error)
+	CheckSataDriveFn  func(string) (bool, error)
+	CheckNvmeDriveFn  func(string) (bool, error)
+	RemoveMultipartFn func(string) error
+	MkdirAllFn        func(string, os.FileMode) error
+	RemoveAllFn       func(string) error
+	SymlinkFn         func(string, string) error
+	LstatFn           func(string) (os.FileInfo, error)
+	MkdirFn           func(string, os.FileMode) error
+	OpenFn            func(string) (*os.File, error)
+	OpenFileFn        func(string, int, os.FileMode) (*os.File, error)
+	MountAllCommandFn func() error
+	MkfsExt4CommandFn func(string, string) error
+	StatFn            func(string) (os.FileInfo, error)
+	ReadDirFn         func(string) ([]os.DirEntry, error)
+	RemoveFn          func(string) error
 }
 
 // FstabRecord represents one line in /etc/fstab.
@@ -54,23 +55,23 @@ func (record FstabRecord) Line() string {
 
 func DefaultSeams() DiskSeams {
 	return DiskSeams{
-		RunDiskCommandFn:    runDiskCommand,
-		ListPartitionsFn:    disk.Partitions,
-		CheckSataDriveFn:    CheckSataDrive,
-		CheckNvmeDriveFn:    CheckNvmeDrive,
-		RemoveMultipartFn:   func(path string) error { return RemoveMultipartFiles(path, DiskSeams{}) },
-		MkdirAllFn:          os.MkdirAll,
-		RemoveAllFn:         os.RemoveAll,
-		SymlinkFn:           os.Symlink,
-		LstatFn:             os.Lstat,
-		MkdirFn:             os.Mkdir,
-		OpenFn:              os.Open,
-		OpenFileFn:          os.OpenFile,
-		MountAllCommandFn:    func() error { return runCommand("mount", "-a") },
-		MkfsExt4CommandFn:    func(uuid, devPath string) error { return runCommand("mkfs.ext4", "-U", uuid, "-F", devPath) },
-		StatFn:              os.Stat,
-		ReadDirFn:           os.ReadDir,
-		RemoveFn:            os.Remove,
+		RunDiskCommandFn:  runDiskCommand,
+		ListPartitionsFn:  disk.Partitions,
+		CheckSataDriveFn:  CheckSataDrive,
+		CheckNvmeDriveFn:  CheckNvmeDrive,
+		RemoveMultipartFn: func(path string) error { return RemoveMultipartFiles(path, DiskSeams{}) },
+		MkdirAllFn:        os.MkdirAll,
+		RemoveAllFn:       os.RemoveAll,
+		SymlinkFn:         os.Symlink,
+		LstatFn:           os.Lstat,
+		MkdirFn:           os.Mkdir,
+		OpenFn:            os.Open,
+		OpenFileFn:        os.OpenFile,
+		MountAllCommandFn: func() error { return runCommand("mount", "-a") },
+		MkfsExt4CommandFn: func(uuid, devPath string) error { return runCommand("mkfs.ext4", "-U", uuid, "-F", devPath) },
+		StatFn:            os.Stat,
+		ReadDirFn:         os.ReadDir,
+		RemoveFn:          os.Remove,
 	}
 }
 
@@ -351,7 +352,6 @@ func ReconcileFstabLines(lines []string, desired FstabRecord) ([]string, bool) {
 		}
 		recordLine := desired.Line()
 		if record.Line() != recordLine {
-			recordLine = recordLine
 			changed = true
 		} else {
 			recordLine = line

@@ -3,15 +3,17 @@ package lifecycle
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
-	"go.uber.org/zap"
 	"groundseg/docker/network"
 	"groundseg/docker/registry"
 	"groundseg/dockerclient"
 	"groundseg/structs"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
+	"go.uber.org/zap"
 )
 
 type Runtime struct {
@@ -75,10 +77,27 @@ func WithDockerPollInterval(interval time.Duration) RuntimeOption {
 	}
 }
 
-var defaultRuntime = NewRuntime()
+var defaultRuntimeValue atomic.Pointer[Runtime]
+
+func init() {
+	defaultRuntimeValue.Store(NewRuntime())
+}
 
 func DefaultRuntime() *Runtime {
-	return defaultRuntime
+	runtime := defaultRuntimeValue.Load()
+	if runtime == nil {
+		fallback := NewRuntime()
+		defaultRuntimeValue.Store(fallback)
+		return fallback
+	}
+	return runtime
+}
+
+func SetDefaultRuntime(runtime *Runtime) {
+	if runtime == nil {
+		runtime = NewRuntime()
+	}
+	defaultRuntimeValue.Store(runtime)
 }
 
 func NewRuntime(opts ...RuntimeOption) *Runtime {
@@ -104,12 +123,12 @@ func NewRuntime(opts ...RuntimeOption) *Runtime {
 
 type containerConfigResolverFn func(string, string) (container.Config, container.HostConfig, error)
 
-type imageInfoLookupFn func(string) (map[string]string, error)
+type imageInfoLookupFn func(string) (registry.ImageDescriptor, error)
 
-type imagePullerFn func(string, map[string]string) (bool, error)
+type imagePullerFn func(string, registry.ImageDescriptor) (bool, error)
 
-func (runtime *Runtime) Initialize() error {
-	_, err := runtime.FindContainer("groundseg-webui")
+func (runtime *Runtime) Initialize() (err error) {
+	_, err = runtime.FindContainer("groundseg-webui")
 	if err == nil {
 		if err = runtime.StopContainerByName("groundseg-webui"); err != nil {
 			zap.L().Warn(fmt.Sprintf("Couldn't stop old webui container: %v", err))
@@ -123,7 +142,7 @@ func (runtime *Runtime) Initialize() error {
 	if err != nil {
 		return fmt.Errorf("error creating docker client: %w", err)
 	}
-	defer cli.Close()
+	defer closeRuntimeDockerClient(cli, "initialize lifecycle", &err)
 	version, err := cli.ServerVersion(context.TODO())
 	if err != nil {
 		return fmt.Errorf("error getting docker version: %w", err)
@@ -132,7 +151,7 @@ func (runtime *Runtime) Initialize() error {
 	return nil
 }
 
-func (runtime *Runtime) PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
+func (runtime *Runtime) PullImageIfNotExist(desiredImage string, imageInfo registry.ImageDescriptor) (bool, error) {
 	return runtime.pullImageIfNotExistFn(desiredImage, imageInfo)
 }
 

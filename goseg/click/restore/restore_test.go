@@ -7,15 +7,24 @@ import (
 )
 
 func resetRestoreSeams() {
-	executeClickCommandForRestore = executeRestoreCommand
-	restoreAgentFn = restoreAgent
+	SetRuntime(nil)
+}
+
+func withRestoreRuntime(mutator func(*restoreRuntime)) {
+	runtime := defaultRestoreRuntime()
+	if mutator != nil {
+		mutator(&runtime)
+	}
+	SetRuntime(runtime)
 }
 
 func TestRestoreAgentExecFailure(t *testing.T) {
 	t.Cleanup(resetRestoreSeams)
-	executeClickCommandForRestore = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
-		return "", errors.New("exec failed")
-	}
+	withRestoreRuntime(func(runtime *restoreRuntime) {
+		runtime.executeCommandForRestore = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+			return "", errors.New("exec failed")
+		}
+	})
 
 	err := RestoreAgent("~zod", "groups")
 	if err == nil {
@@ -28,9 +37,11 @@ func TestRestoreAgentExecFailure(t *testing.T) {
 
 func TestRestoreAgentFilterFailure(t *testing.T) {
 	t.Cleanup(resetRestoreSeams)
-	executeClickCommandForRestore = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
-		return "", errors.New("parse failed")
-	}
+	withRestoreRuntime(func(runtime *restoreRuntime) {
+		runtime.executeCommandForRestore = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+			return "", errors.New("parse failed")
+		}
+	})
 
 	err := RestoreAgent("~zod", "groups")
 	if err == nil {
@@ -43,9 +54,11 @@ func TestRestoreAgentFilterFailure(t *testing.T) {
 
 func TestRestoreAgentPokeFailure(t *testing.T) {
 	t.Cleanup(resetRestoreSeams)
-	executeClickCommandForRestore = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
-		return "", errors.New("failed poke")
-	}
+	withRestoreRuntime(func(runtime *restoreRuntime) {
+		runtime.executeCommandForRestore = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+			return "", errors.New("failed poke")
+		}
+	})
 
 	err := RestoreAgent("~zod", "groups")
 	if err == nil {
@@ -60,16 +73,18 @@ func TestRestoreAgentBuildsExpectedCommand(t *testing.T) {
 	t.Cleanup(resetRestoreSeams)
 
 	var gotPatp, gotFile, gotHoon, gotOperation string
-	executeClickCommandForRestore = func(
-		patp, file, hoon, sourcePath, successToken, operation string,
-		_clearLus func(string),
-	) (string, error) {
-		gotPatp = patp
-		gotFile = file
-		gotHoon = hoon
-		gotOperation = operation
-		return "ok", nil
-	}
+	withRestoreRuntime(func(runtime *restoreRuntime) {
+		runtime.executeCommandForRestore = func(
+			patp, file, hoon, sourcePath, successToken, operation string,
+			_clearLus func(string),
+		) (string, error) {
+			gotPatp = patp
+			gotFile = file
+			gotHoon = hoon
+			gotOperation = operation
+			return "ok", nil
+		}
+	})
 
 	if err := RestoreAgent("~nec", "profile"); err != nil {
 		t.Fatalf("expected success, got %v", err)
@@ -93,12 +108,14 @@ func TestRestoreAgentBuildsExpectedCommand(t *testing.T) {
 
 func TestRestoreTlonAggregatesErrors(t *testing.T) {
 	t.Cleanup(resetRestoreSeams)
-	restoreAgentFn = func(_ string, agent string) error {
-		if agent == "channels" || agent == "profile" {
-			return errors.New("boom")
+	withRestoreRuntime(func(runtime *restoreRuntime) {
+		runtime.executeCommandForRestore = func(_, file, _, _, _, _ string, _ func(string)) (string, error) {
+			if file == "restore-channels" || file == "restore-profile" {
+				return "", errors.New("boom")
+			}
+			return "", nil
 		}
-		return nil
-	}
+	})
 
 	err := RestoreTlon("~zod")
 	if err == nil {
@@ -108,8 +125,4 @@ func TestRestoreTlonAggregatesErrors(t *testing.T) {
 	if !strings.Contains(msg, "channels: boom") || !strings.Contains(msg, "profile: boom") {
 		t.Fatalf("unexpected error: %v", err)
 	}
-}
-
-func executeRestoreCommand(_, _, _, _, _, _ string, _ func(string)) (string, error) {
-	return "ok", nil
 }

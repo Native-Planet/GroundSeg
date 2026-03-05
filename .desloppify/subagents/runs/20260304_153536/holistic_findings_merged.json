@@ -1,0 +1,420 @@
+{
+  "assessments": {
+    "cross_module_architecture": 60.0,
+    "design_coherence": 54.6,
+    "error_consistency": 70.3,
+    "naming_quality": 68.1,
+    "test_strategy": 73.4
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/protocol_contracts.go validates bindings by namespace/action map and formula (`protocolActionContractID(...)`) while goseg/protocol/contracts/startram_contracts.go validates only prefix plus a positional `entries[0]` equality check.",
+        "Both files implement separate contract-spec builders and validators (`protocolContractCatalogSpecs`/`validateProtocolContractSpecs` vs `startramContractCatalogSpecs`/`validateStartramContractSpecs`) with different invariants, indicating fragmented boundary-governance rules inside the same contracts subsystem."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md states quality gates rely on targeted contract tests and path-aware CI checks, but protocol_contracts.go and startram_contracts.go keep validation in passive helper functions (`validateProtocolContractSpecs`, `validateStartramContractSpecs`) with no local enforcement path visible in these files.",
+        "Critical contract invariants (ID formula parity, family prefix constraints, exact entry expectations) are encoded in helper validators, so confidence depends on external test wiring rather than self-enforcing runtime/compile-time checks in the contract definition modules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": ""
+    },
+    "design_coherence": {
+      "evidence": [
+        "Configuration mutation/parsing logic is implemented through multiple string-keyed mechanisms: `UrbitDocker.UnmarshalJSON` in `goseg/structs/configs.go` has a long per-key switch, while `goseg/config/config_update_schema.go` has a separate per-key registry/parsing/apply pipeline, creating parallel abstractions for the same domain updates.",
+        "`goseg/shipworkflow/urbit_operations_runtime.go` combines command adapters, transition step assembly, config persistence, container lifecycle actions, alias validation, and MinIO link orchestration in one file, indicating mixed responsibilities in a central workflow module.",
+        "Test orchestration helpers and state-drain patterns are repeated instead of centralized (`drainImportTransitions` logic and import transition collection in both `goseg/importer/importer_test.go` and `goseg/importer/extract_test.go`), and very broad scenario tests bundle many unrelated action paths in single test functions (`goseg/handler/systemsvc/system_test.go`, `goseg/system/wifi_test.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "goseg/shipworkflow/urbit_operations_runtime.go:119 calls broadcast.BroadcastToClients() and drops its returned error, while nearby transition paths wrap/propagate errors (for example schedulePack at lines 514-520).",
+        "goseg/docker/orchestration/runtime_ops.go mixes reusable sentinel errors (errConfUpdateMissing at line 139) with ad-hoc fmt.Errorf(\"...not configured\") closures (lines 251-256), reducing predictable error classification compared with sentinel-style errors in other runtime modules (for example errEventBusFull in goseg/docker/orchestration/subsystem/subsystem_events.go:34 and errSchedulePackBusFull in goseg/broadcast/state.go:114)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "naming_quality": {
+      "evidence": [
+        "Acronym casing diverges for the same domain terms across config surfaces: EndpointURL (goseg/config/config_update_schema.go:21) vs EndpointUrl (goseg/structs/configs.go:203), GSVersion (config_update_schema.go:35) vs GsVersion (structs/configs.go:218), and mixed C2c/C2C tokens across fields and contracts.",
+        "Tests still reference legacy names in failure text after symbol renames, e.g. makeConfig/getWifiDevice/ListWiFiSSIDs/ToggleDevice strings in goseg/accesspoint/accesspoint_test.go:40,84 and goseg/system/wifi_test.go:48,104,205,249,281,298 while implementation names are buildHostapdConfig/wifiDevices/listSSIDs/toggleDevice."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_validation_invariant_drift",
+      "summary": "Contract boundary validation is inconsistent across protocol and StarTram catalogs, allowing uneven enforcement of architecture contracts.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Protocol validation enforces a complete expected binding map keyed by namespace/action and verifies formula-derived IDs for each entry.",
+        "StarTram validation enforces only ID prefix and then compares `entries[0].ID` to `APIConnectionError`, which relies on slice order and does not use keyed binding semantics."
+      ],
+      "suggestion": "Unify catalog validation behind one shared contract-governance helper that validates by stable keys (not positional index), enforces deterministic ID derivation rules, and applies the same completeness checks for every contract family.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "catalog_governance_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "missing_shared_catalog_boundary_abstraction",
+      "summary": "Per-family ad hoc catalog builders duplicate boundary logic instead of using a shared architectural abstraction.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Both files define near-parallel patterns (`<family>Contract(...)`, `<family>ContractCatalogSpecs(...)`, `validate<Family>ContractSpecs(...)`) but with diverging rule strictness and naming strategy.",
+        "The duplicated pattern suggests architecture-level policy is encoded in each family file rather than in one module-level contract registry abstraction."
+      ],
+      "suggestion": "Introduce a single contracts-registry abstraction (e.g., family descriptor + declarative entries) that centralizes ID construction, metadata defaults, and validation policy; keep family files declarative data-only to reduce coupling drift.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "catalog_governance_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_family_validation_fragmentation",
+      "summary": "Contract families duplicate validation architecture, creating drift-prone governance boundaries.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` and `startram_contracts.go` each define bespoke catalog builders and validators with similar responsibilities but different enforcement details.",
+        "Governance in README prescribes a unified compatibility surface across multiple files, yet family validation remains decentralized and manually synchronized."
+      ],
+      "suggestion": "Introduce a shared family contract-definition API in the contracts package (e.g., declarative family specs plus common invariant checks) and migrate protocol/startram files to data-only definitions to keep contract governance logic centralized.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "decentralized_contract_governance"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "validator_execution_depends_on_external_wiring",
+      "summary": "Contract invariant checks appear test-dependent instead of locally enforced.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "Invariant-heavy validation exists in unexported helper functions in both contract files, but these files do not show an intrinsic execution path for those checks.",
+        "README quality-gate language emphasizes CI and targeted tests, implying critical contract safety relies on pipeline/test discipline rather than guaranteed runtime catalog construction checks."
+      ],
+      "suggestion": "Wire validation into the canonical contract registration/build path so malformed family specs fail deterministically during package initialization or registry construction, then keep tests as regression coverage rather than the sole enforcement layer.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "decentralized_contract_governance"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_dual_update_models",
+      "summary": "Config update behavior is split across two independent string-keyed frameworks, increasing drift and maintenance risk.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`UrbitDocker.UnmarshalJSON` in `goseg/structs/configs.go` manually switches over many JSON keys and parses values field-by-field.",
+        "`goseg/config/config_update_schema.go` defines a separate key registry (`confPatchByKey`) with per-field parse/apply handlers and its own value parsers.",
+        "Both paths encode overlapping config semantics with raw string keys and duplicated primitive parsing helpers, so adding/changing fields requires synchronized edits in multiple abstractions."
+      ],
+      "suggestion": "Introduce one canonical schema/field-definition source for config keys and derive both unmarshal and patch-apply behavior from it (or retire one path), with typed section-level adapters to remove string-key duplication.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "stringly_typed_config_mutation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_workflow_god_module",
+      "summary": "Urbit operations runtime mixes orchestration, persistence, and infrastructure concerns in a single module.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "`goseg/shipworkflow/urbit_operations_runtime.go` contains transition routing (`runUrbitTransitionFromCommand`), config persistence mutations, container start/rebuild flows, alias checks, and MinIO link/unlink orchestration.",
+        "`runShipConfigTransition` centralizes persistence, cleanup, restart, and post-action policy in one generic function with multiple callback parameters, indicating high orchestration density.",
+        "Adjacent runtime seam composition in `goseg/docker/orchestration/runtime_ops.go` and broadcast publication calls from this workflow show cross-subsystem coupling concentrated in one file."
+      ],
+      "suggestion": "Split this module into focused collaborators (transition planner, config mutator, container lifecycle executor, external-link coordinator) and keep the top-level command layer as thin composition only.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "workflow_responsibility_accumulation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_access_pattern_inconsistency",
+      "summary": "State/runtime access patterns are inconsistent (global singleton fallback, nil-normalization, explicit injection), obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/state.go` uses a package-global default runtime plus variadic runtime-optional wrappers (`bootstrapBroadcastState(runtime ...*broadcastStateRuntime)`).",
+        "`goseg/docker/orchestration/subsystem/subsystem_events.go` also normalizes nil runtimes to a global default (`normalizeDockerSubsystemRuntime`) and exposes both default and runtime-specific entrypoints.",
+        "`goseg/session/logstream_session_store.go` uses explicit store receiver methods without package-level fallback, creating a different ownership/injection model than neighboring subsystems."
+      ],
+      "suggestion": "Standardize on one runtime ownership convention (prefer explicit dependency injection with constructors) and deprecate default-singleton fallbacks behind compatibility shims.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_ownership_inconsistency"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_harness_duplication_and_broad_scenarios",
+      "summary": "Tests repeatedly reimplement event/runtime harness logic and bundle multiple behaviors into broad scenario tests.",
+      "related_files": [
+        "goseg/importer/importer_test.go",
+        "goseg/importer/extract_test.go",
+        "goseg/handler/systemsvc/system_test.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "Importer tests duplicate import-transition bus draining/collection mechanics across files instead of sharing one helper utility (`drainImportTransitions` and equivalent channel-drain loops).",
+        "`goseg/handler/systemsvc/system_test.go` includes large tests that cover multiple actions and side effects in one function (for example mixed swap/wifi/update behaviors), coupling unrelated assertions.",
+        "`goseg/system/wifi_test.go` mixes nmcli parsing/runtime tests with C2C action-processing and service wiring tests in one file, blending separate concerns."
+      ],
+      "suggestion": "Extract shared test harness utilities for event channels/runtime seams and split broad scenario tests into focused per-behavior table-driven tests grouped by subsystem concern.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_structure_entropy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_broadcast_error_in_transition_path",
+      "summary": "toggleAutoReboot silently drops broadcast publish failures",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "toggleAutoReboot ends with broadcast.BroadcastToClients() and always returns nil (goseg/shipworkflow/urbit_operations_runtime.go:119-120).",
+        "BroadcastToClients is explicitly fallible and returns errors (goseg/broadcast/state.go:107-112), including nil-runtime and downstream publish errors."
+      ],
+      "suggestion": "Handle the returned error in toggleAutoReboot and apply the same transition policy used in schedulePack (e.g., wrap with context or use transition.HandleTransitionPublishError with an explicit criticality decision).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_boundary_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "missing_dependency_errors_not_normalized",
+      "summary": "Runtime seam defaults use mixed non-configured error patterns",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "runtime_ops defines errConfUpdateMissing sentinel (line 139) but defaultRuntimeStartramOps returns fresh fmt.Errorf strings for equivalent \"not configured\" conditions (lines 251-256).",
+        "Other modules expose stable sentinel-style errors (errEventBusFull, errSchedulePackBusFull) that support consistent classification and errors.Is checks."
+      ],
+      "suggestion": "Standardize seam/dependency-missing failures to package-level sentinel errors (or typed errors) and wrap those sentinels with context, so callers can reliably branch on failure class across runtime components.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_boundary_policy_drift"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "acronym_casing_drift_across_config_surfaces",
+      "summary": "Same concepts use conflicting acronym casing and token forms",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "Patch model uses EndpointURL and GSVersion (goseg/config/config_update_schema.go:21,35) while persisted config model uses EndpointUrl and GsVersion (goseg/structs/configs.go:203,218).",
+        "Tests reinforce mixed naming forms and make surface vocabulary less predictable (goseg/config/config_test.go references EndpointUrl extensively)."
+      ],
+      "suggestion": "Define and enforce one acronym convention for Go identifiers (for example URL/ID/API/C2C uppercase) and align config structs, patch structs, and tests to that vocabulary in one migration pass.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "acronym_naming_drift"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "legacy_test_labels_after_function_renames",
+      "summary": "Test failure messages use outdated function names",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "accesspoint tests call buildHostapdConfig but assert with \"makeConfig returned error\" and \"expected makeConfig validation error\" (lines 40 and 84).",
+        "wifi tests call wifiDevices/listSSIDs/toggleDevice but message strings still reference getWifiDevice/ListWiFiSSIDs/ToggleDevice (lines 48,104,205,249,281,298)."
+      ],
+      "suggestion": "Update assertion messages and test names to current symbol names so failing output maps directly to real APIs and avoids reintroducing deprecated terminology.",
+      "confidence": "high",
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "acronym_naming_drift"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 4,
+    "dimension_coverage": 0.3,
+    "evidence_density": 1.188,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 28.188,
+    "dimensions_with_findings": 5
+  },
+  "review_scope": {
+    "reviewed_files_count": 34,
+    "successful_batch_count": 4,
+    "full_sweep_included": false,
+    "total_files": 577,
+    "imported_dimensions": [
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency",
+      "naming_quality",
+      "test_strategy"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/contracts/protocol_contracts.go",
+    "goseg/protocol/contracts/startram_contracts.go",
+    "README.md",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/main_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/shipworkflow/urbit_operations_runtime.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/structs/configs.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260304_153536",
+    "created_at": "2026-03-04T15:38:36+00:00",
+    "batch_count": 4,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "09729dd052222708a9dda2d38b01493e8a054823820ef7457c84788edd666e80"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency",
+      "naming_quality",
+      "test_strategy"
+    ],
+    "imported_dimensions": [
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency",
+      "naming_quality",
+      "test_strategy"
+    ],
+    "missing_dimensions": [
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

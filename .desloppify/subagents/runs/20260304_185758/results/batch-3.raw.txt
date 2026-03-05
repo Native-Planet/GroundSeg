@@ -1,0 +1,73 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 78.4
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "`goseg/protocol/actionids/actionids.go` is a single-file package that only defines namespace/action string constants, while the same protocol boundary is also represented in `goseg/protocol/contracts/protocol_contracts.go` via `ActionNamespace*`/`Action*` aliases and in `goseg/protocol/conformance/fixtures_test.go` via `protocol/actions` constants.",
+        "`goseg/protocol/contracts/protocol_contracts.go` imports `groundseg/protocol/actionids`, but conformance checks in `goseg/protocol/conformance/fixtures_test.go` validate bindings through `groundseg/protocol/actions`, splitting the protocol contract vocabulary across three sibling packages.",
+        "`README.md` backend quality gate explicitly scopes protocol checks to `./protocol/contracts ./protocol/conformance` while protocol action identity source is in `goseg/protocol/actionids/actionids.go`, creating a package-boundary governance gap between documented gate scope and where canonical IDs live.",
+        "Structure signals show fragmented small directories around one concern (`goseg/protocol/conformance/` has 2 files; `goseg/protocol/contracts/` has 11 files), and `actionids` appears as a micro-package boundary rather than a cohesive domain package."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "protocol_identity_split_across_siblings",
+      "summary": "Protocol action identity is fragmented across `actionids`, `actions`, and `contracts` packages.",
+      "related_files": [
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`actionids.go` defines canonical tokens (`NamespaceUpload`, `UploadOpenEndpoint`, `C2CConnect`) as its own package.",
+        "`protocol_contracts.go` rebinds those values into contract-layer types and IDs, importing `protocol/actionids` directly.",
+        "`fixtures_test.go` validates fixtures against `protocol/actions` constants, not `actionids`, so one domain concept is represented across three package boundaries."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1 (target folders): move protocol identity constants into `goseg/protocol/actions/ids.go` as the single public source; keep `goseg/protocol/actionids` as a temporary compatibility shim. Stage 2 (move order): update `goseg/protocol/contracts/protocol_contracts.go` to import/use `protocol/actions`; then update conformance code to reference the same source; finally delete or internalize `goseg/protocol/actionids`. Stage 3 (import updates/validation): run `rg \"protocol/actionids|ActionNamespace|ActionUpload\" goseg/protocol`, then `go test ./goseg/protocol/actions ./goseg/protocol/contracts ./goseg/protocol/conformance` and `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "protocol_boundary_fragmentation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "quality_gate_scope_misses_protocol_identity_boundary",
+      "summary": "README quality-gate scope does not track the package where protocol IDs are actually defined.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/actionids/actionids.go",
+        "goseg/protocol/contracts/protocol_contracts.go"
+      ],
+      "evidence": [
+        "`README.md` backend gate step 2 lists `./protocol/contracts ./protocol/conformance` but not `./protocol/actionids`.",
+        "`protocol_contracts.go` depends on `protocol/actionids` for canonical contract binding tokens.",
+        "A package movement/rename in `actionids` can affect governance contracts without being explicitly represented in the documented protocol gate boundary."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1 (target folders): align governance docs to the actual protocol boundary by either (a) folding `actionids` into `protocol/actions`, or (b) explicitly including `protocol/actionids` in the protocol gate section. Stage 2 (move order): perform package move/import updates first, then update README gate commands and governance docs in `goseg/protocol/contracts/`. Stage 3 (import updates/validation): run `go test ./goseg/protocol/actionids ./goseg/protocol/actions ./goseg/protocol/contracts ./goseg/protocol/conformance`, then `go test ./...` and verify README commands match CI scripts.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "protocol_boundary_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol identity and governance metadata evolved in separate sibling packages without one declared package-of-record.",
+      "Quality-gate documentation appears scoped by historical package layout rather than current dependency ownership."
+    ],
+    "likely_symptoms": [
+      "protocol_identity_split_across_siblings",
+      "quality_gate_scope_misses_protocol_identity_boundary"
+    ],
+    "possible_false_positives": []
+  }
+}

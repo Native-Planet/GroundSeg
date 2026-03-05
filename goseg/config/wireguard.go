@@ -27,7 +27,7 @@ type wireguardRuntime struct {
 func defaultWireguardRuntime() wireguardRuntime {
 	return wireguardRuntime{
 		loadWGSpecs: func() (structs.SysConfig, structs.Channel) {
-			return Conf(), GetVersionChannel()
+			return Config(), GetVersionChannel()
 		},
 		generateWgKeypair: WgKeyGen,
 		applyWgKeys: func(pub, priv string) error {
@@ -62,7 +62,7 @@ func CreateDefaultWGConf() error {
 }
 
 func createDefaultWGConf(runtime wireguardRuntime) error {
-	defaultConfig := defaults.WgConfig
+	defaultConfig := defaults.DefaultWgConfig()
 	path := runtime.wgConfigPath()
 	if err := runtime.configStore.EnsureDir(filepath.Dir(path)); err != nil {
 		return fmt.Errorf("failed to create WireGuard settings directory %s: %w", filepath.Dir(path), err)

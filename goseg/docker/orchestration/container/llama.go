@@ -54,7 +54,7 @@ func LoadLlamaWithRuntime(rt LlamaRuntime) error {
 	}
 	info, err := rt.StartContainerFn("llama-gpt-api", "llama-api")
 	if err != nil {
-		return fmt.Errorf("Error starting Llama API: %v", err)
+		return fmt.Errorf("start llama API container: %w", err)
 	}
 	if rt.UpdateContainerStateFn != nil {
 		rt.UpdateContainerStateFn("llama-api", info)
@@ -99,11 +99,11 @@ func LlamaContainerConfWithRuntime(rt LlamaRuntime) (container.Config, container
 	}
 	llamaNet, err := rt.AddOrGetNetworkFn("llama")
 	if err != nil {
-		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v", err)
+		return containerConfig, hostConfig, fmt.Errorf("create or get llama network: %w", err)
 	}
 	scriptPath := filepath.Join(rt.DockerDirFn(), apiContainerName+"_api", "_data", "run.sh")
 	if err := rt.WriteFileFn(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
-		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
+		return containerConfig, hostConfig, fmt.Errorf("write llama startup script: %w", err)
 	}
 	var found *structs.Penpai
 	for _, item := range penpaiSettings.Models {

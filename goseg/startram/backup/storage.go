@@ -10,8 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	systemdisk "groundseg/system/disk"
+
 	"github.com/klauspost/compress/zstd"
-	"groundseg/system"
 )
 
 const (
@@ -21,7 +22,7 @@ const (
 
 // ResolveLocalBackupPath resolves a backup file path for local retrieval.
 func ResolveLocalBackupPath(basePath, ship, bakType string, timestamp int) string {
-	mmc, _ := system.IsMountedMMC(basePath)
+	mmc, _ := systemdisk.IsMountedMMC(basePath)
 	if mmc {
 		basePath = "/media/data/backup"
 	} else {

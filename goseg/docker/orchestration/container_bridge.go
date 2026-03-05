@@ -7,18 +7,18 @@ import (
 
 	"groundseg/internal/seams"
 	"groundseg/structs"
-	
-	"groundseg/config"
-)
 
-import "groundseg/docker/orchestration/container"
+	"groundseg/config"
+	"groundseg/docker/orchestration/container"
+	"groundseg/docker/registry"
+)
 
 type netdataRuntimeOps = container.NetdataRuntime
 
 type dockerContainerRuntimeInputs struct {
-	shipSettingsSnapshotFn       func() config.ShipSettings
-	startramSettingsSnapshotFn   func() config.StartramSettings
-	penpaiSettingsSnapshotFn     func() config.PenpaiSettings
+	shipSettingsSnapshotFn      func() config.ShipSettings
+	startramSettingsSnapshotFn  func() config.StartramSettings
+	penpaiSettingsSnapshotFn    func() config.PenpaiSettings
 	basePathFn                  func() string
 	dockerDirFn                 func() string
 	openFn                      func(string) (*os.File, error)
@@ -28,7 +28,7 @@ type dockerContainerRuntimeInputs struct {
 	startContainerFn            func(string, string) (structs.ContainerState, error)
 	stopContainerByNameFn       func(string) error
 	updateContainerStateFn      func(string, structs.ContainerState)
-	getLatestContainerInfoFn    func(string) (map[string]string, error)
+	getLatestContainerInfoFn    func(string) (registry.ImageDescriptor, error)
 	getLatestContainerImageFn   func(string) (string, error)
 	getContainerRunningStatusFn func(string) (string, error)
 	addOrGetNetworkFn           func(string) (string, error)
@@ -51,12 +51,12 @@ type dockerContainerRuntimeInputs struct {
 }
 
 func collectDockerContainerRuntimeInputs(rt dockerRuntime) dockerContainerRuntimeInputs {
-		return dockerContainerRuntimeInputs{
-			shipSettingsSnapshotFn:       rt.configOps.ShipSettingsSnapshotFn,
-			startramSettingsSnapshotFn:   rt.configOps.StartramSettingsSnapshotFn,
-			penpaiSettingsSnapshotFn:     rt.configOps.PenpaiSettingsSnapshotFn,
-			basePathFn:                  rt.contextOps.BasePathFn,
-			dockerDirFn:                 rt.contextOps.DockerDirFn,
+	return dockerContainerRuntimeInputs{
+		shipSettingsSnapshotFn:      rt.configOps.ShipSettingsSnapshotFn,
+		startramSettingsSnapshotFn:  rt.configOps.StartramSettingsSnapshotFn,
+		penpaiSettingsSnapshotFn:    rt.configOps.PenpaiSettingsSnapshotFn,
+		basePathFn:                  rt.contextOps.BasePathFn,
+		dockerDirFn:                 rt.contextOps.DockerDirFn,
 		openFn:                      rt.fileOps.OpenFn,
 		readFileFn:                  rt.fileOps.ReadFileFn,
 		writeFileFn:                 rt.fileOps.WriteFileFn,
@@ -96,17 +96,17 @@ func (inputs dockerContainerRuntimeInputs) llamaRuntimeTemplate() container.Llam
 		StartramSettingsSnapshotFn: inputs.startramSettingsSnapshotFn,
 		PenpaiSettingsSnapshotFn:   inputs.penpaiSettingsSnapshotFn,
 		ShipSettingsSnapshotFn:     inputs.shipSettingsSnapshotFn,
-		StopContainerByNameFn:     inputs.stopContainerByNameFn,
-		StartContainerFn:          inputs.startContainerFn,
-		UpdateContainerStateFn:    inputs.updateContainerStateFn,
-		GetLatestContainerImageFn: inputs.getLatestContainerImageFn,
-		VolumeExistsFn:            inputs.volumeExistsFn,
-		CreateVolumeFn:            inputs.createVolumeFn,
-		AddOrGetNetworkFn:         inputs.addOrGetNetworkFn,
-		WriteFileFn:               inputs.writeFileFn,
-		VolumeDirFn:               inputs.dockerDirFn,
-		DockerDirFn:               inputs.dockerDirFn,
-		UrbitsConfigFn:            inputs.getUrbitConfAllFn,
+		StopContainerByNameFn:      inputs.stopContainerByNameFn,
+		StartContainerFn:           inputs.startContainerFn,
+		UpdateContainerStateFn:     inputs.updateContainerStateFn,
+		GetLatestContainerImageFn:  inputs.getLatestContainerImageFn,
+		VolumeExistsFn:             inputs.volumeExistsFn,
+		CreateVolumeFn:             inputs.createVolumeFn,
+		AddOrGetNetworkFn:          inputs.addOrGetNetworkFn,
+		WriteFileFn:                inputs.writeFileFn,
+		VolumeDirFn:                inputs.dockerDirFn,
+		DockerDirFn:                inputs.dockerDirFn,
+		UrbitsConfigFn:             inputs.getUrbitConfAllFn,
 	}
 }
 

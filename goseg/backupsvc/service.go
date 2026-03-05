@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"groundseg/backups"
 	"groundseg/startram"
-	"groundseg/system"
+	systemdisk "groundseg/system/disk"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,7 +19,7 @@ type LocalDirs struct {
 }
 
 var (
-	isMountedMMCFn = system.IsMountedMMC
+	isMountedMMCFn = systemdisk.IsMountedMMC
 	mkdirAllFn     = os.MkdirAll
 	readDirFn      = os.ReadDir
 	createBackupFn = backups.CreateBackup

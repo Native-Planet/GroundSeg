@@ -3,6 +3,7 @@ package artifactwriter
 import (
 	"archive/tar"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -29,7 +30,7 @@ func (plan VolumeInitializationPlan) EnsureVolumes() error {
 		return nil
 	}
 	if plan.ops.VolumeExistsFn == nil || plan.ops.CreateVolumeFn == nil {
-		return nil
+		return fmt.Errorf("volume initialization requires volume existence and create callbacks")
 	}
 	return EnsureContainerVolumes(plan.ops, plan.volumeNames...)
 }
@@ -63,8 +64,8 @@ func Write(opts WriteConfig) error {
 	}
 
 	filePath := opts.FilePath
-	err := writeFileFn(filePath, []byte(opts.Content), opts.FileMode)
-	if err == nil {
+	writeErr := writeFileFn(filePath, []byte(opts.Content), opts.FileMode)
+	if writeErr == nil {
 		return nil
 	}
 
@@ -72,22 +73,27 @@ func Write(opts WriteConfig) error {
 		opts.DirectoryMode = 0o755
 	}
 	dir := filepath.Dir(filePath)
-	if mkdirErr := mkdirAllFn(dir, opts.DirectoryMode); mkdirErr != nil {
-		return mkdirErr
+	mkdirErr := mkdirAllFn(dir, opts.DirectoryMode)
+	if mkdirErr != nil {
+		return errors.Join(writeErr, mkdirErr)
 	}
-	err = writeFileFn(filePath, []byte(opts.Content), opts.FileMode)
-	if err == nil {
+
+	writeErr = writeFileFn(filePath, []byte(opts.Content), opts.FileMode)
+	if writeErr == nil {
 		return nil
 	}
 
 	if opts.EnsureVolumesFn != nil {
+		if opts.SelectImageFn == nil && (opts.CopyToVolumeFn != nil) {
+			return fmt.Errorf("artifact write requires image selector callback when copy fallback is configured")
+		}
 		if err := opts.EnsureVolumesFn(); err != nil {
-			return fmt.Errorf("failed to initialize artifact volumes: %w", err)
+			return errors.Join(writeErr, fmt.Errorf("failed to initialize artifact volumes: %w", err))
 		}
 	}
 
 	if opts.CopyToVolumeFn == nil {
-		return err
+		return writeErr
 	}
 
 	normalize := opts.NormalizeTarget
@@ -97,9 +103,9 @@ func Write(opts WriteConfig) error {
 	targetPath := normalize(opts.TargetPath)
 	if err := opts.CopyToVolumeFn(filePath, targetPath, opts.VolumeName, opts.WriterContainerName, opts.SelectImageFn); err != nil {
 		if opts.CopyErrorPrefix != "" {
-			return fmt.Errorf("%s: %w", opts.CopyErrorPrefix, err)
+			err = fmt.Errorf("%s: %w", opts.CopyErrorPrefix, err)
 		}
-		return err
+		return errors.Join(writeErr, err)
 	}
 
 	return nil
@@ -112,13 +118,13 @@ func EnsureContainerVolumes(ops VolumeOps, volumeNames ...string) error {
 	for _, name := range volumeNames {
 		exists, err := ops.VolumeExistsFn(name)
 		if err != nil {
-			return err
+			return fmt.Errorf("check docker volume %q: %w", name, err)
 		}
 		if exists {
 			continue
 		}
 		if err := ops.CreateVolumeFn(name); err != nil {
-			return err
+			return fmt.Errorf("create docker volume %q: %w", name, err)
 		}
 	}
 	return nil
@@ -137,13 +143,13 @@ func NormalizeVolumeTargetPath(path string) string {
 func TarArchiveForSingleFile(filePath string) (io.Reader, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open artifact file %q: %w", filePath, err)
 	}
 	defer file.Close()
 
 	info, err := file.Stat()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("stat artifact file %q: %w", filePath, err)
 	}
 
 	var buffer bytes.Buffer
@@ -157,16 +163,16 @@ func TarArchiveForSingleFile(filePath string) (io.Reader, error) {
 		if closeErr := tw.Close(); closeErr != nil {
 			return nil, fmt.Errorf("close tar archive after header write failure: %w", closeErr)
 		}
-		return nil, err
+		return nil, fmt.Errorf("write tar header for %q: %w", filePath, err)
 	}
 	if _, err := io.Copy(tw, file); err != nil {
 		if closeErr := tw.Close(); closeErr != nil {
 			return nil, fmt.Errorf("close tar archive after copy failure: %w", closeErr)
 		}
-		return nil, err
+		return nil, fmt.Errorf("copy artifact file %q into tar stream: %w", filePath, err)
 	}
 	if err := tw.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("close tar writer for %q: %w", filePath, err)
 	}
 	return &buffer, nil
 }

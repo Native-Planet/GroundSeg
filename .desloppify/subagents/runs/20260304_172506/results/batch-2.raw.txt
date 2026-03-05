@@ -1,0 +1,115 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.0,
+    "dependency_health": 81.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime seams are split into many callback-bag structs and then re-wrapped repeatedly (for example `importerRuntime` -> `initRuntime/workflowRuntime/publishRuntime` plus `resolveImporterRuntimeFor*` scope resolvers in `goseg/importer/importer.go`).",
+        "`workflowRuntime` embeds multiple orchestration callback groups and still re-resolves/validates on many call paths (`newWorkflowRuntime` + `resolveWorkflowRuntime`) in `goseg/shipworkflow/operations_runtime.go`.",
+        "`StartupRuntime` and `startBackgroundServicesRuntime` expose large callback surfaces with additional spec indirection (`startBackgroundServiceSpecs`, `startupServiceSpecs`) in `goseg/startuporchestrator/startup_orchestrator.go`.",
+        "`docker/orchestration/runtime_ops.go` defines many narrowly sliced ops structs that are mostly function-field pass-throughs to existing package functions, increasing navigation cost for behavior changes."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 69.0,
+        "indirection_cost": 58.0,
+        "interface_honesty": 71.0
+      }
+    },
+    "dependency_health": {
+      "evidence": [
+        "Docker SDK types are imported directly across multiple subsystems (`docker/network`, `docker/orchestration/wireguard`, `docker/orchestration/subsystem`, `docker/lifecycle`, `routines/logstream`) instead of being contained behind one adapter boundary.",
+        "The codebase mixes a wrapper (`groundseg/dockerclient`) with direct `github.com/docker/docker/*` imports in the same reviewed slice, creating two dependency styles and a larger upgrade blast radius.",
+        "Cross-module API signatures expose external Docker SDK types (`container.Config`, `container.HostConfig`, Docker events) deep in internal runtime contracts, coupling orchestration/business modules to vendor package shapes."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_overmodeling",
+      "summary": "Runtime callback-bag layering adds high indirection with limited behavioral leverage",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "Importer introduces multiple near-identity runtime projections (`initRuntime`, `workflowRuntime`, `publishRuntime`) and scope-specific resolvers, then repeats validation by scope.",
+        "Ship workflow re-resolves the runtime in many helpers even when already resolved, adding repeated seam plumbing before doing domain work.",
+        "Startup orchestrator carries very wide callback structs plus secondary service-spec metadata indirection, making changes require edits in several abstraction layers.",
+        "Runtime ops file contains many tiny function-field containers that map almost 1:1 to package functions, increasing call-depth without policy translation."
+      ],
+      "suggestion": "Collapse runtime seams into fewer role-based interfaces (for example `ImportRuntime`, `WorkflowRuntime`, `StartupRuntime`) with explicit method sets, and resolve/validate once at subsystem entrypoints. Remove per-scope projection wrappers when they do not enforce distinct policy.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overmodeling"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "default_singleton_runtime_coupling",
+      "summary": "Process-wide default runtimes create hidden coupling and dual invocation styles",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/events/events.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`defaultBroadcastStateRuntime` and `defaultBroadcastLoopController` are package globals while the same package also supports explicit runtime injection.",
+        "`defaultDockerSubsystemRuntime` and `defaultEventRuntime` are global shared runtime instances; callers can also pass custom runtimes.",
+        "This mixed model (global singleton plus injectable runtime) creates implicit shared state paths that are hard to reason about in concurrent/test scenarios."
+      ],
+      "suggestion": "Standardize each subsystem on explicit runtime ownership (construct once in orchestrator and inject) and keep package-level defaults only as thin deprecated compatibility wrappers that delegate to an injected instance.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overmodeling"
+    },
+    {
+      "dimension": "dependency_health",
+      "identifier": "docker_sdk_dependency_diffusion",
+      "summary": "Docker SDK dependency is diffused across modules, increasing upgrade and coupling risk",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/lifecycle/planner.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "Multiple modules directly import Docker SDK packages (`api/types/container`, `api/types/events`, `client`) and embed those types in internal logic.",
+        "Some modules use `groundseg/dockerclient.New` while others still import Docker client/types directly, yielding inconsistent dependency boundaries.",
+        "Internal orchestration and lifecycle code now depends on vendor type shapes, so SDK changes propagate broadly."
+      ],
+      "suggestion": "Introduce a single internal Docker adapter package that owns SDK imports and translates SDK types into project-local DTOs/events; refactor consumer modules to depend on adapter interfaces and internal models only.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "docker_boundary_leakage"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams evolved into general runtime architecture, creating callback-bag sprawl.",
+      "External Docker SDK was not consistently isolated behind one boundary, so dependency surface leaked into many modules."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_overmodeling",
+      "default_singleton_runtime_coupling"
+    ],
+    "possible_false_positives": []
+  }
+}

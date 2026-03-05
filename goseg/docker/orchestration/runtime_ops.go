@@ -2,7 +2,6 @@ package orchestration
 
 import (
 	"errors"
-	"fmt"
 
 	"groundseg/click"
 	"groundseg/config"
@@ -52,31 +51,26 @@ type RuntimeStartramOps struct {
 }
 
 type RuntimeStartupOps struct {
-	UpdateConfTypedFn func(...config.ConfUpdateOption) error `runtime:"rectify" runtime_name:"update config callback"`
-	WithWgOnFn        func(bool) config.ConfUpdateOption
-	CycleWgKeyFn      func() error
-	BarExitFn         func(string) error
-	LoadWireguardFn   func() error
-	LoadMCFn          func() error
-	LoadMinIOsFn      func() error
-	LoadUrbitsFn      func() error
-	SvcDeleteFn       func(patp string, kind string) error
+	UpdateConfigTypedFn    func(...config.ConfigUpdateOption) error `runtime:"rectify" runtime_name:"update config callback"`
+	WithWireguardEnabledFn func(bool) config.ConfigUpdateOption
+	CycleWgKeyFn           func() error
+	BarExitFn              func(string) error
+	LoadWireguardFn        func() error
+	LoadMCFn               func() error
+	LoadMinIOsFn           func() error
+	LoadUrbitsFn           func() error
+	SvcDeleteFn            func(patp string, kind string) error
 }
 
 type RuntimeUrbitOps struct {
-	LoadUrbitConfigFn           func(string) error                                                         `runtime:"rectify" runtime_name:"load urbit config callback"`
-	UrbitConfFn                 func(string) structs.UrbitDocker                                           `runtime:"rectify" runtime_name:"urbit config callback"`
-	UrbitConfAllFn              func() map[string]structs.UrbitDocker                                      `runtime:"rectify" runtime_name:"urbit config all callback"`
-	UpdateUrbitFn               func(string, func(*structs.UrbitDocker) error) error                       `runtime:"workflow,rectify" runtime_name:"update urbit callback"`
-	UpdateUrbitRuntimeConfigFn  func(patp string, mutateFn func(*structs.UrbitRuntimeConfig) error) error  `runtime:"workflow,rectify" runtime_name:"update urbit runtime config callback"`
-	UpdateUrbitNetworkConfigFn  func(patp string, mutateFn func(*structs.UrbitNetworkConfig) error) error  `runtime:"workflow,rectify" runtime_name:"update urbit network config callback"`
-	UpdateUrbitScheduleConfigFn func(patp string, mutateFn func(*structs.UrbitScheduleConfig) error) error `runtime:"workflow,rectify" runtime_name:"update urbit schedule config callback"`
-	UpdateUrbitFeatureConfigFn  func(patp string, mutateFn func(*structs.UrbitFeatureConfig) error) error  `runtime:"workflow,rectify" runtime_name:"update urbit feature config callback"`
-	UpdateUrbitWebConfigFn      func(patp string, mutateFn func(*structs.UrbitWebConfig) error) error      `runtime:"workflow,rectify" runtime_name:"update urbit web config callback"`
-	UpdateUrbitBackupConfigFn   func(patp string, mutateFn func(*structs.UrbitBackupConfig) error) error   `runtime:"workflow,rectify" runtime_name:"update urbit backup config callback"`
-	GetContainerNetworkFn       func(string) (string, error)
-	GetLusCodeFn                func(string) (string, error) `runtime:"workflow" runtime_name:"LUS code callback"`
-	ClearLusCodeFn              func(string)
+	LoadUrbitConfigFn     func(string) error                                                            `runtime:"rectify" runtime_name:"load urbit config callback"`
+	UrbitConfFn           func(string) structs.UrbitDocker                                              `runtime:"rectify" runtime_name:"urbit config callback"`
+	UrbitConfAllFn        func() map[string]structs.UrbitDocker                                         `runtime:"rectify" runtime_name:"urbit config all callback"`
+	UpdateUrbitFn         func(string, func(*structs.UrbitDocker) error) error                          `runtime:"workflow,rectify" runtime_name:"update urbit callback"`
+	UpdateUrbitSectionFn  func(patp string, section UrbitConfigSection, mutateFn func(any) error) error `runtime:"workflow,rectify" runtime_name:"update urbit section callback"`
+	GetContainerNetworkFn func(string) (string, error)
+	GetLusCodeFn          func(string) (string, error) `runtime:"workflow" runtime_name:"LUS code callback"`
+	ClearLusCodeFn        func(string)
 }
 
 type UrbitConfigSection = config.UrbitConfigSection
@@ -100,7 +94,7 @@ type RuntimeContextOps struct {
 type RuntimeFileOps = container.RuntimeFileOps
 
 type RuntimeImageOps struct {
-	GetLatestContainerInfoFn  func(string) (map[string]string, error)
+	GetLatestContainerInfoFn  func(string) (registry.ImageDescriptor, error)
 	GetLatestContainerImageFn func(string) (string, error)
 }
 
@@ -143,22 +137,99 @@ type RuntimeMinioOps struct {
 
 var errConfUpdateMissing = errors.New("orchestration config updater is not configured")
 
+var (
+	errStartramServicesLoaderMissing = errors.New("orchestration startram service loader is not configured")
+	errStartramRegionsLoaderMissing  = errors.New("orchestration startram region loader is not configured")
+)
+
 type StartupBootstrapOps struct {
-	Initialize func() error
+	InitializeFn func() error
+	Initialize   func() error
 }
 
 type StartupImageOps struct {
-	GetLatestContainerInfo func(string) (map[string]string, error)
-	PullImageIfNotExist    func(string, map[string]string) (bool, error)
+	GetLatestContainerInfoFn func(string) (registry.ImageDescriptor, error)
+	PullImageIfNotExistFn    func(string, registry.ImageDescriptor) (bool, error)
+	GetLatestContainerInfo   func(string) (registry.ImageDescriptor, error)
+	PullImageIfNotExist      func(string, registry.ImageDescriptor) (bool, error)
 }
 
 type StartupLoadOps struct {
-	LoadWireguard func() error
-	LoadMC        func() error
-	LoadMinIOs    func() error
-	LoadNetdata   func() error
-	LoadUrbits    func() error
-	LoadLlama     func() error
+	LoadWireguardFn func() error
+	LoadMCFn        func() error
+	LoadMinIOsFn    func() error
+	LoadNetdataFn   func() error
+	LoadUrbitsFn    func() error
+	LoadLlamaFn     func() error
+	LoadWireguard   func() error
+	LoadMC          func() error
+	LoadMinIOs      func() error
+	LoadNetdata     func() error
+	LoadUrbits      func() error
+	LoadLlama       func() error
+}
+
+func (ops StartupBootstrapOps) initializeCallback() func() error {
+	if ops.InitializeFn != nil {
+		return ops.InitializeFn
+	}
+	return ops.Initialize
+}
+
+func (ops StartupImageOps) getLatestContainerInfoCallback() func(string) (registry.ImageDescriptor, error) {
+	if ops.GetLatestContainerInfoFn != nil {
+		return ops.GetLatestContainerInfoFn
+	}
+	return ops.GetLatestContainerInfo
+}
+
+func (ops StartupImageOps) pullImageIfNotExistCallback() func(string, registry.ImageDescriptor) (bool, error) {
+	if ops.PullImageIfNotExistFn != nil {
+		return ops.PullImageIfNotExistFn
+	}
+	return ops.PullImageIfNotExist
+}
+
+func (ops StartupLoadOps) loadWireguardCallback() func() error {
+	if ops.LoadWireguardFn != nil {
+		return ops.LoadWireguardFn
+	}
+	return ops.LoadWireguard
+}
+
+func (ops StartupLoadOps) loadMCCallback() func() error {
+	if ops.LoadMCFn != nil {
+		return ops.LoadMCFn
+	}
+	return ops.LoadMC
+}
+
+func (ops StartupLoadOps) loadMinIOsCallback() func() error {
+	if ops.LoadMinIOsFn != nil {
+		return ops.LoadMinIOsFn
+	}
+	return ops.LoadMinIOs
+}
+
+func (ops StartupLoadOps) loadNetdataCallback() func() error {
+	if ops.LoadNetdataFn != nil {
+		return ops.LoadNetdataFn
+	}
+	return ops.LoadNetdata
+}
+
+func (ops StartupLoadOps) loadUrbitsCallback() func() error {
+	if ops.LoadUrbitsFn != nil {
+		return ops.LoadUrbitsFn
+	}
+	return ops.LoadUrbits
+}
+
+func (ops StartupLoadOps) loadLlamaCallback() func() error {
+	if ops.LoadLlamaFn != nil {
+		return ops.LoadLlamaFn
+	}
+	return ops.LoadLlama
 }
 
 type runtimeSeamRegistry struct {
@@ -254,10 +325,10 @@ func runtimeVolumeOps(networkRuntime interface {
 func defaultRuntimeStartramOps() RuntimeStartramOps {
 	return RuntimeStartramOps{
 		GetStartramServicesFn: func() error {
-			return fmt.Errorf("orchestration startram service loader is not configured")
+			return errStartramServicesLoaderMissing
 		},
 		LoadStartramRegionsFn: func() error {
-			return fmt.Errorf("orchestration startram region loader is not configured")
+			return errStartramRegionsLoaderMissing
 		},
 	}
 }
@@ -272,15 +343,15 @@ func defaultRuntimeHealthOps() RuntimeHealthOps {
 func defaultRuntimeStartupOps() RuntimeStartupOps {
 	wireguardRuntime := newWireguardRuntime()
 	return RuntimeStartupOps{
-		UpdateConfTypedFn: config.UpdateConfTyped,
-		WithWgOnFn:        config.WithWgOn,
-		CycleWgKeyFn:      config.CycleWgKey,
-		BarExitFn:         click.BarExit,
-		LoadWireguardFn:   wireguardRuntime.LoadWireguard,
-		LoadMCFn:          LoadMC,
-		LoadMinIOsFn:      LoadMinIOs,
-		LoadUrbitsFn:      LoadUrbits,
-		SvcDeleteFn:       startram.SvcDelete,
+		UpdateConfigTypedFn:    config.UpdateConfigTyped,
+		WithWireguardEnabledFn: config.WithWgOn,
+		CycleWgKeyFn:           config.CycleWgKey,
+		BarExitFn:              click.BarExit,
+		LoadWireguardFn:        wireguardRuntime.LoadWireguard,
+		LoadMCFn:               LoadMC,
+		LoadMinIOsFn:           LoadMinIOs,
+		LoadUrbitsFn:           LoadUrbits,
+		SvcDeleteFn:            startram.SvcDelete,
 	}
 }
 
@@ -304,19 +375,14 @@ func defaultRuntimeContainerOps() RuntimeContainerOps {
 func defaultRuntimeUrbit() RuntimeUrbitOps {
 	networkRuntime := network.NewNetworkRuntime()
 	return RuntimeUrbitOps{
-		LoadUrbitConfigFn:           config.LoadUrbitConfig,
-		UrbitConfFn:                 config.UrbitConf,
-		UrbitConfAllFn:              config.UrbitConfAll,
-		UpdateUrbitFn:               config.UpdateUrbit,
-		UpdateUrbitRuntimeConfigFn:  config.UpdateUrbitRuntimeConfig,
-		UpdateUrbitNetworkConfigFn:  config.UpdateUrbitNetworkConfig,
-		UpdateUrbitScheduleConfigFn: config.UpdateUrbitScheduleConfig,
-		UpdateUrbitFeatureConfigFn:  config.UpdateUrbitFeatureConfig,
-		UpdateUrbitWebConfigFn:      config.UpdateUrbitWebConfig,
-		UpdateUrbitBackupConfigFn:   config.UpdateUrbitBackupConfig,
-		GetContainerNetworkFn:       networkRuntime.GetContainerNetwork,
-		GetLusCodeFn:                click.GetLusCode,
-		ClearLusCodeFn:              click.ClearLusCode,
+		LoadUrbitConfigFn:     config.LoadUrbitConfig,
+		UrbitConfFn:           config.UrbitConf,
+		UrbitConfAllFn:        config.UrbitConfAll,
+		UpdateUrbitFn:         config.UpdateUrbit,
+		UpdateUrbitSectionFn:  config.UpdateUrbitSection,
+		GetContainerNetworkFn: networkRuntime.GetContainerNetwork,
+		GetLusCodeFn:          click.GetLusCode,
+		ClearLusCodeFn:        click.ClearLusCode,
 	}
 }
 
@@ -333,24 +399,25 @@ func defaultRuntimeSnapshot() RuntimeSnapshotOps {
 
 func defaultStartupBootstrap() StartupBootstrapOps {
 	return StartupBootstrapOps{
-		Initialize: Initialize,
+		InitializeFn: Initialize,
 	}
 }
 
 func defaultStartupImage() StartupImageOps {
 	return StartupImageOps{
-		GetLatestContainerInfo: GetLatestContainerInfo,
-		PullImageIfNotExist:    PullImageIfNotExist,
+		GetLatestContainerInfoFn: GetLatestContainerInfo,
+		PullImageIfNotExistFn:    PullImageIfNotExist,
 	}
 }
 
 func defaultStartupLoad() StartupLoadOps {
+	loadWireguard := newWireguardRuntime().LoadWireguard
 	return StartupLoadOps{
-		LoadWireguard: newWireguardRuntime().LoadWireguard,
-		LoadMC:        LoadMC,
-		LoadMinIOs:    LoadMinIOs,
-		LoadNetdata:   LoadNetdata,
-		LoadUrbits:    LoadUrbits,
-		LoadLlama:     LoadLlama,
+		LoadWireguardFn: loadWireguard,
+		LoadMCFn:        LoadMC,
+		LoadMinIOsFn:    LoadMinIOs,
+		LoadNetdataFn:   LoadNetdata,
+		LoadUrbitsFn:    LoadUrbits,
+		LoadLlamaFn:     LoadLlama,
 	}
 }

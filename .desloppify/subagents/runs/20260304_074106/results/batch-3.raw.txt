@@ -1,0 +1,83 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 82.0,
+    "test_strategy": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README describes contract-governance enforcement as including `goseg/protocol/contracts/contracts.go` and `goseg/protocol/contracts/contracts_test.go` under contract-surface CI gating.",
+        "The runtime contract gate trigger and guard only treat `goseg/protocol/contracts/protocol_contracts.go` and `goseg/protocol/contracts/startram_contracts.go` as contract-surface changes for mandatory test pairing.",
+        "Contract compatibility metadata is centralized in separate files (`goseg/protocol/contracts/contract_metadata.go`) that affect lifecycle policy and can drift from documented governance if not part of the same enforced change boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "In `.github/workflows/upload-contract-gate.yml`, contract-gate trigger paths do not include `goseg/protocol/contracts/contracts.go` or `goseg/protocol/contracts/contract_metadata.go`.",
+        "In `.github/scripts/check-upload-contract.sh`, the gate only flags contract test requirements when `protocol_contracts.go` or `startram_contracts.go` change.",
+        "`goseg/protocol/contracts/contract_metadata.go` contains `IntroducedIn/Compatibility` for each contract ID, so lifecycle-policy changes can avoid gate execution and still affect compatibility behavior."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract-governance-surface-skew",
+      "summary": "Runtime contract governance scope in CI does not include all contract metadata surfaces referenced by documentation.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/contract_metadata.go",
+        ".github/workflows/upload-contract-gate.yml"
+      ],
+      "evidence": [
+        "README states contract-gate governance for contract surface changes includes `goseg/protocol/contracts/contracts.go` and related runtime contract surfaces.",
+        "The gate configuration paths only monitor `protocol_contracts.go` and `startram_contracts.go` and ignore central metadata definition files that govern compatibility policy."
+      ],
+      "suggestion": "Align contract-gate scope with governance docs by adding the shared contract metadata source files (including `contracts.go`/`contract_metadata.go`) to CI path triggers and ensuring the same contract scope matrix includes compatibility-policy ownership files.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_scope_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "metadata-changes-bypass-gate",
+      "summary": "Lifecycle metadata-only edits can skip contract gate enforcement and targeted coverage.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go",
+        ".github/scripts/check-upload-contract.sh",
+        "goseg/protocol/contracts/contract_metadata.go"
+      ],
+      "evidence": [
+        "Gate script currently checks contract-surface changes for `protocol_contracts.go`/`startram_contracts.go` only.",
+        "Compatibility metadata entries (`IntroducedIn`, `Compatibility`) live in a separate table that influences contract behavior and are not included in the same change-detection branch.",
+        "When only metadata changes, no contract test coupling is enforced even though README frames those changes as part of contract surface governance."
+      ],
+      "suggestion": "Treat metadata compatibility changes as first-class contract surface changes: add file-level triggers and script conditions so edits to metadata maps invoke `goseg/protocol/contracts` contract tests, then gate on a mandatory compatibility-policy assertion set for metadata-only diffs.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_scope_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance contract is documented at a different boundary than what CI enforces, creating a coverage blind spot for metadata-only compatibility changes."
+    ],
+    "likely_symptoms": [
+      "contract_governance_scope_gap",
+      "metadata-changes-bypass-gate"
+    ],
+    "possible_false_positives": [
+      "If contract_metadata.go is intentionally excluded by design, then broadened gate scope might be a process decision rather than a defect; confirm with project-specific CI policy intent."
+    ]
+  }
+}

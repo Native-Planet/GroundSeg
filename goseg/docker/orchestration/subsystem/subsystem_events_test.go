@@ -2,8 +2,11 @@ package subsystem
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
+
+	eventtypes "github.com/docker/docker/api/types/events"
 )
 
 func TestStartDockerHealthLoopsIsCancellableByContext(t *testing.T) {
@@ -47,15 +50,70 @@ func TestStartDockerHealthLoopsDeduplicatesStartCalls(t *testing.T) {
 	awaitDockerHealthLoopState(t, false)
 }
 
+type dockerEventStreamClientStub struct {
+	messages <-chan eventtypes.Message
+	errs     <-chan error
+}
+
+func (stub dockerEventStreamClientStub) Events(context.Context, eventtypes.ListOptions) (<-chan eventtypes.Message, <-chan error) {
+	return stub.messages, stub.errs
+}
+
+func (dockerEventStreamClientStub) Close() error {
+	return nil
+}
+
+func TestDockerListenerReturnsErrorWhenMessageStreamCloses(t *testing.T) {
+	messages := make(chan eventtypes.Message)
+	errs := make(chan error)
+	close(messages)
+
+	originalFactory := newDockerEventStreamClient
+	newDockerEventStreamClient = func() (dockerEventStreamClient, error) {
+		return dockerEventStreamClientStub{messages: messages, errs: errs}, nil
+	}
+	t.Cleanup(func() {
+		newDockerEventStreamClient = originalFactory
+	})
+
+	err := dockerListenerWithRuntime(newDockerSubsystemRuntime(), context.Background())
+	if err == nil {
+		t.Fatal("expected message stream closure to return an error")
+	}
+	if !strings.Contains(err.Error(), "docker event stream closed") {
+		t.Fatalf("unexpected message stream closure error: %v", err)
+	}
+}
+
+func TestDockerListenerReturnsErrorWhenErrorStreamCloses(t *testing.T) {
+	messages := make(chan eventtypes.Message)
+	errs := make(chan error)
+	close(errs)
+
+	originalFactory := newDockerEventStreamClient
+	newDockerEventStreamClient = func() (dockerEventStreamClient, error) {
+		return dockerEventStreamClientStub{messages: messages, errs: errs}, nil
+	}
+	t.Cleanup(func() {
+		newDockerEventStreamClient = originalFactory
+	})
+
+	err := dockerListenerWithRuntime(newDockerSubsystemRuntime(), context.Background())
+	if err == nil {
+		t.Fatal("expected error stream closure to return an error")
+	}
+	if !strings.Contains(err.Error(), "docker event error stream closed") {
+		t.Fatalf("unexpected error stream closure error: %v", err)
+	}
+}
+
 func awaitDockerHealthLoopState(t *testing.T, wantRunning bool) {
 	t.Helper()
 
 	const timeout = 2 * time.Second
 	deadline := time.Now().Add(timeout)
 	for {
-		dockerHealthLoopMu.Lock()
-		running := healthLoopRunning
-		dockerHealthLoopMu.Unlock()
+		running := defaultDockerSubsystemRuntime.isHealthLoopRunning()
 		if running == wantRunning {
 			return
 		}

@@ -3,6 +3,7 @@ package orchestration
 import (
 	"encoding/base64"
 	"errors"
+	"groundseg/docker/registry"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
@@ -20,9 +21,9 @@ func testWireguardRuntime(overrides ...wireguardRuntimeOption) WireguardRuntime 
 	return runtime
 }
 
-func withWireguardLatestContainerInfo(info map[string]string) wireguardRuntimeOption {
+func withWireguardLatestContainerInfo(info registry.ImageDescriptor) wireguardRuntimeOption {
 	return func(runtime *WireguardRuntime) {
-		runtime.GetLatestContainerInfoFn = func(string) (map[string]string, error) {
+		runtime.GetLatestContainerInfoFn = func(string) (registry.ImageDescriptor, error) {
 			return info, nil
 		}
 	}
@@ -121,7 +122,7 @@ func TestWgContainerConfBuildsExpectedConfig(t *testing.T) {
 	cfg := structs.WgConfig{CapAdd: []string{"NET_ADMIN", "SYS_MODULE"}}
 	cfg.Sysctls.NetIpv4ConfAllSrcValidMark = 1
 	rt := testWireguardRuntime(
-		withWireguardLatestContainerInfo(map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}),
+		withWireguardLatestContainerInfo(registry.ImageDescriptor{Repo: "repo/wg", Tag: "latest", Hash: "hash"}),
 		withWireguardWgConfig(cfg),
 	)
 
@@ -205,9 +206,11 @@ func TestWriteWgConfCreateAndUpdate(t *testing.T) {
 	}
 }
 
-func TestWriteWgConfReturnsErrorOnReadFailure(t *testing.T) {
+func TestWriteWgConfReadFallbackAttemptsWriteRecovery(t *testing.T) {
 	tmpDockerDir := t.TempDir()
 	readErr := errors.New("permission denied")
+	writeErr := errors.New("write failed")
+	writes := 0
 	rt := testWireguardRuntime(
 		withWireguardDockerDir(tmpDockerDir),
 		withWireguardWgConfBlob("privkey"),
@@ -215,13 +218,51 @@ func TestWriteWgConfReturnsErrorOnReadFailure(t *testing.T) {
 			func(string) ([]byte, error) {
 				return nil, readErr
 			},
+			func(path string, data []byte, mode os.FileMode) error {
+				writes++
+				return writeErr
+			},
+			os.MkdirAll,
+		),
+	)
+	rt.CopyFileToVolumeFn = nil
+
+	err := rt.WriteWgConf()
+	if err == nil {
+		t.Fatalf("expected writeWgConf to fail when read recovery cannot write artifact")
+	}
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("expected artifact write error to be surfaced, got: %v", err)
+	}
+	if writes != 2 {
+		t.Fatalf("expected write fallback attempt to retry twice, got %d writes", writes)
+	}
+}
+
+func TestWriteWgConfFallsBackOnReadFailure(t *testing.T) {
+	tmpDockerDir := t.TempDir()
+	rt := testWireguardRuntime(
+		withWireguardDockerDir(tmpDockerDir),
+		withWireguardWgConfBlob("privkey"),
+		withWireguardRuntimeFileOps(
+			func(string) ([]byte, error) {
+				return nil, errors.New("permission denied")
+			},
 			os.WriteFile,
 			os.MkdirAll,
 		),
 	)
 
-	if err := rt.WriteWgConf(); err == nil {
-		t.Fatalf("expected writeWgConf to fail on read error")
+	if err := rt.WriteWgConf(); err != nil {
+		t.Fatalf("writeWgConf fallback should succeed on read errors: %v", err)
+	}
+	confPath := filepath.Join(rt.DockerDirFn(), "wireguard", "_data", "wg0.conf")
+	content, err := os.ReadFile(confPath)
+	if err != nil {
+		t.Fatalf("read updated wg0.conf failed: %v", err)
+	}
+	if string(content) != "k1" {
+		t.Fatalf("unexpected wg0.conf content: %q", string(content))
 	}
 }
 
@@ -243,7 +284,7 @@ func TestWriteWgConfToFileFallbackCopy(t *testing.T) {
 		withWireguardDockerDir("/tmp/docker"),
 		withWireguardWgConfig(structs.WgConfig{}),
 		withWireguardWgPrivateKey("k1"),
-		withWireguardLatestContainerInfo(map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}),
+		withWireguardLatestContainerInfo(registry.ImageDescriptor{Repo: "repo/wg", Tag: "latest", Hash: "hash"}),
 	)
 	copyCalled := false
 	rt.CopyFileToVolumeFn = func(filePath string, targetPath string, volumeName string, _ string, _ volumeWriterImageSelector) error {

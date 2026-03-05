@@ -2,12 +2,14 @@ package chopsvc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker/events"
 	"groundseg/docker/orchestration"
-	"groundseg/shipworkflow"
+	"groundseg/shipworkflow/adapters/lifecyclebridge"
+	"groundseg/shipworkflow/lifecyclewait"
 	"groundseg/structs"
 	"strings"
 	"time"
@@ -31,21 +33,26 @@ var (
 		return WaitComplete(patp)
 	}
 	sleepFn              = time.Sleep
-	waitCompletePollerFn = shipworkflow.PollWithTimeout
+	waitCompletePollerFn = lifecyclebridge.PollWithTimeout
 )
 
 func ChopPier(patp string) error {
 	zap.L().Info(fmt.Sprintf("Chop called for %s", patp))
-	publishTransition := func(event string) {
-		publishUrbitTransitionFn(context.Background(), structs.UrbitTransition{Patp: patp, Type: "chop", Event: event})
+	publishTransition := func(event string) error {
+		return publishUrbitTransitionFn(context.Background(), structs.UrbitTransition{Patp: patp, Type: "chop", Event: event})
 	}
 	chopError := func(err error) error {
-		publishTransition("error")
-		return err
+		publishErr := publishTransition("error")
+		if publishErr == nil {
+			return err
+		}
+		return errors.Join(publishErr, err)
 	}
 	defer func() {
 		sleepFn(3 * time.Second)
-		publishTransition("")
+		if err := publishTransition(""); err != nil {
+			zap.L().Warn(fmt.Sprintf("failed to publish chop transition completion: %v", err))
+		}
 		zap.L().Info(fmt.Sprintf("Chop for %s, ran defer", patp))
 	}()
 
@@ -59,7 +66,9 @@ func ChopPier(patp string) error {
 	}
 	isRunning := strings.Contains(status, "Up")
 	if isRunning {
-		publishTransition("stopping")
+		if err := publishTransition("stopping"); err != nil {
+			return err
+		}
 		if err := barExitFn(patp); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to stop ship with |exit for chop %s: %v", patp, err))
 			if err = stopContainerByNameFn(patp); err != nil {
@@ -71,7 +80,9 @@ func ChopPier(patp string) error {
 		}
 	}
 
-	publishTransition("chopping")
+	if err := publishTransition("chopping"); err != nil {
+		return chopError(fmt.Errorf("Failed to publish chop transition for %s: %w", patp, err))
+	}
 	zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
 	if err := persistShipRuntimeConfigFn(patp, func(conf *structs.UrbitRuntimeConfig) error {
 		conf.BootStatus = "chop"
@@ -89,7 +100,9 @@ func ChopPier(patp string) error {
 	}
 
 	if isRunning {
-		publishTransition("starting")
+		if err := publishTransition("starting"); err != nil {
+			return chopError(fmt.Errorf("Failed to publish restart transition for %s: %w", patp, err))
+		}
 		if err := persistShipRuntimeConfigFn(patp, func(conf *structs.UrbitRuntimeConfig) error {
 			conf.BootStatus = "boot"
 			return nil
@@ -101,10 +114,12 @@ func ChopPier(patp string) error {
 		}
 	}
 	forceUpdateContainerStatsFn(patp)
-	publishTransition("success")
+	if err := publishTransition("success"); err != nil {
+		return err
+	}
 	return nil
 }
 
 func WaitComplete(patp string) error {
-	return shipworkflow.WaitForUrbitStop(patp, getShipStatusFn, waitCompletePollerFn)
+	return lifecyclewait.WaitForUrbitStop(patp, getShipStatusFn, waitCompletePollerFn)
 }

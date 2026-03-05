@@ -15,6 +15,7 @@ import (
 
 	"groundseg/auth/tokens"
 	"groundseg/docker/events"
+	"groundseg/internal/testruntime"
 	"groundseg/lifecycle"
 	"groundseg/orchestration"
 	"groundseg/shipworkflow"
@@ -25,11 +26,7 @@ import (
 )
 
 func importerRuntimeWith(overrides func(*importerRuntime)) importerRuntime {
-	runtime := defaultImporterRuntime()
-	if overrides != nil {
-		overrides(&runtime)
-	}
-	return runtime
+	return testruntime.Apply(defaultImporterRuntime(), overrides)
 }
 
 func drainImportTransitions() {
@@ -85,28 +82,38 @@ func authorizeTokenIDsForTest(t *testing.T, tokenIDs ...string) importerRuntime 
 	for _, tokenID := range tokenIDs {
 		authorizedTokens[tokenID] = struct{}{}
 	}
-	uploadOps.ValidateUploadSessionTokenFn = func(sessionToken structs.WsTokenStruct, providedToken structs.WsTokenStruct, _ *http.Request) tokens.UploadTokenAuthorizationResult {
+	uploadOps.ValidateUploadSessionTokenFn = func(sessionToken structs.WsTokenStruct, providedToken structs.WsTokenStruct, request *http.Request) tokens.UploadTokenAuthorizationResult {
+		tokenID := providedToken.ID
+		tokenValue := providedToken.Token
+		if request != nil {
+			if headerTokenID := strings.TrimSpace(request.Header.Get("X-Upload-Token-Id")); headerTokenID != "" {
+				tokenID = headerTokenID
+			}
+			if headerToken := strings.TrimSpace(request.Header.Get("X-Upload-Token")); headerToken != "" {
+				tokenValue = headerToken
+			}
+		}
 		if sessionToken != (structs.WsTokenStruct{}) {
-			if sessionToken.ID != providedToken.ID || sessionToken.Token != providedToken.Token {
+			if sessionToken.ID != tokenID || sessionToken.Token != tokenValue {
 				return tokens.UploadTokenAuthorizationResult{
 					Status:           tokens.UploadValidationStatusTokenContract,
-					AuthorizedToken:  providedToken.Token,
+					AuthorizedToken:  tokenValue,
 					AuthorizationErr: fmt.Errorf("upload token does not match upload session"),
 				}
 			}
 		}
 
-		if _, ok := authorizedTokens[providedToken.ID]; !ok {
+		if _, ok := authorizedTokens[tokenID]; !ok {
 			return tokens.UploadTokenAuthorizationResult{
 				Status:           tokens.UploadValidationStatusNotAuthorized,
-				AuthorizedToken:  providedToken.Token,
-				AuthorizationErr: fmt.Errorf("token id %s is not authorized", providedToken.ID),
+				AuthorizedToken:  tokenValue,
+				AuthorizationErr: fmt.Errorf("token id %s is not authorized", tokenID),
 			}
 		}
 
 		return tokens.UploadTokenAuthorizationResult{
 			Status:          tokens.UploadValidationStatusAuthorized,
-			AuthorizedToken: providedToken.Token,
+			AuthorizedToken: tokenValue,
 		}
 	}
 	return runtime
@@ -173,7 +180,11 @@ func TestFailUploadRequestPublishesFailureTransitions(t *testing.T) {
 	drainImportTransitions()
 
 	recorder := httptest.NewRecorder()
-	if err := failUploadRequest(recorder, http.StatusUnauthorized, "bad token"); err != nil {
+	written, err := failUploadRequest(recorder, http.StatusUnauthorized, "bad token")
+	if !written {
+		t.Fatal("expected failUploadRequest to write a response")
+	}
+	if err != nil {
 		t.Fatalf("failUploadRequest returned error: %v", err)
 	}
 
@@ -194,6 +205,35 @@ func TestFailUploadRequestPublishesFailureTransitions(t *testing.T) {
 	}
 	if events[1].Type != "status" || events[1].Event != "aborted" {
 		t.Fatalf("unexpected status event: %+v", events[1])
+	}
+}
+
+func TestFailUploadRequestReturnsPublishError(t *testing.T) {
+	publishErr := errors.New("publish transport failure")
+	observed := make([]structs.UploadTransition, 0, 2)
+
+	runtime := defaultImporterRuntime()
+	runtime.PublishImportTransitionFn = func(_ context.Context, uploadTransition structs.UploadTransition) error {
+		observed = append(observed, uploadTransition)
+		return publishErr
+	}
+
+	recorder := httptest.NewRecorder()
+	written, err := failUploadRequest(recorder, http.StatusInternalServerError, "failed", runtime)
+	if !written {
+		t.Fatal("expected failUploadRequest to write a response")
+	}
+	if err == nil {
+		t.Fatalf("expected failUploadRequest to return publish failure, observed=%d transitions, err=%v", len(observed), err)
+	}
+	if !errors.Is(err, publishErr) {
+		t.Fatalf("expected wrapped publish failure, got %v", err)
+	}
+	if len(observed) == 0 {
+		t.Fatal("expected publish transition to be attempted")
+	}
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("unexpected status: got %d", recorder.Code)
 	}
 }
 
@@ -231,8 +271,38 @@ func TestFailUploadRequestPropagatesWriteError(t *testing.T) {
 	writeErr := errors.New("write failed")
 	writer := &responseWriterWithWriteFailure{writeErr: writeErr}
 
-	if err := failUploadRequest(writer, http.StatusBadRequest, "oops"); err == nil || !errors.Is(err, writeErr) {
+	_, err := failUploadRequest(writer, http.StatusBadRequest, "oops")
+	if err == nil || !errors.Is(err, writeErr) {
 		t.Fatalf("expected write error to propagate, got %v", err)
+	}
+}
+
+func TestSetUploadResponseHeadersUsesTrustedRequestOrigin(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://groundseg.local/upload", nil)
+	req.Host = "groundseg.local"
+	req.Header.Set("Origin", "http://groundseg.local")
+	recorder := httptest.NewRecorder()
+
+	setUploadResponseHeaders(recorder, req)
+
+	if got := recorder.Header().Get("Access-Control-Allow-Origin"); got != "http://groundseg.local" {
+		t.Fatalf("expected allowed origin header, got %q", got)
+	}
+	if got := recorder.Header().Get("Vary"); got != "Origin" {
+		t.Fatalf("expected Vary header set to Origin, got %q", got)
+	}
+}
+
+func TestSetUploadResponseHeadersRejectsMismatchedOrigin(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://groundseg.local/upload", nil)
+	req.Host = "groundseg.local"
+	req.Header.Set("Origin", "http://evil.local")
+	recorder := httptest.NewRecorder()
+
+	setUploadResponseHeaders(recorder, req)
+
+	if got := recorder.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("expected mismatched origin to be rejected, got %q", got)
 	}
 }
 
@@ -259,6 +329,7 @@ func TestRunImportPhasesEmitsLifecycleStatuses(t *testing.T) {
 				},
 			},
 		},
+		defaultImporterRuntime(),
 	)
 	if err != nil {
 		t.Fatalf("runImportPhases returned error: %v", err)
@@ -468,8 +539,55 @@ func TestOpenUploadEndpointRejectsTokenMismatchOnExistingSession(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected token mismatch error")
 	}
-	if !strings.Contains(err.Error(), "token mismatch") {
+	if !strings.Contains(err.Error(), "upload token validation failed: upload token does not match upload session") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestOpenUploadEndpointPassesRequestHeadersToValidator(t *testing.T) {
+	resetUploadSessionsForTest(t)
+
+	var observedRequest *http.Request
+	runtime := defaultImporterRuntime()
+	runtime.ValidateUploadSessionTokenFn = func(sessionToken structs.WsTokenStruct, providedToken structs.WsTokenStruct, request *http.Request) tokens.UploadTokenAuthorizationResult {
+		observedRequest = request
+		if request == nil {
+			return tokens.UploadTokenAuthorizationResult{
+				Status:           tokens.UploadValidationStatusTokenContract,
+				AuthorizationErr: fmt.Errorf("request should not be nil"),
+			}
+		}
+		if got := request.Header.Get("X-Upload-Token-Id"); got != providedToken.ID {
+			return tokens.UploadTokenAuthorizationResult{
+				Status:           tokens.UploadValidationStatusTokenContract,
+				AuthorizationErr: fmt.Errorf("unexpected token id header %q", got),
+			}
+		}
+		if got := request.Header.Get("X-Upload-Token"); got != providedToken.Token {
+			return tokens.UploadTokenAuthorizationResult{
+				Status:           tokens.UploadValidationStatusTokenContract,
+				AuthorizationErr: fmt.Errorf("unexpected token hash header %q", got),
+			}
+		}
+		return tokens.UploadTokenAuthorizationResult{
+			Status:          tokens.UploadValidationStatusAuthorized,
+			AuthorizedToken: providedToken.Token,
+		}
+	}
+
+	err := OpenUploadEndpoint(OpenUploadEndpointCmd{
+		Endpoint: "0123456789abcdef0123456789abcdef",
+		Token: structs.WsTokenStruct{
+			ID:    "token-id",
+			Token: "token-value",
+		},
+		SelectedDrive: "system-drive",
+	}, runtime)
+	if err != nil {
+		t.Fatalf("OpenUploadEndpoint returned error: %v", err)
+	}
+	if observedRequest == nil {
+		t.Fatal("expected validator to receive a request with token headers")
 	}
 }
 
@@ -632,12 +750,12 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 	workflowCalled := false
 	postCalled := false
 	provisionOps := provisionRuntime(t, &runtime)
-	provisionOps.RunImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierWorkflowFn = func(_ importedPierContext, _ importerWorkflowRuntime) error {
 		workflowCalled = true
 		t.Logf("configure workflow called")
 		return nil
 	}
-	provisionOps.RunImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerWorkflowRuntime) error {
 		postCalled = true
 		t.Logf("post-import workflow called")
 		return nil
@@ -657,11 +775,11 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 
 	workflowCalled = false
 	postCalled = false
-	provisionOps.RunImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierWorkflowFn = func(_ importedPierContext, _ importerWorkflowRuntime) error {
 		workflowCalled = true
 		return configureErr
 	}
-	provisionOps.RunImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerWorkflowRuntime) error {
 		postCalled = false
 		return nil
 	}
@@ -678,11 +796,11 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 
 	workflowCalled = false
 	postCalled = false
-	provisionOps.RunImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierWorkflowFn = func(_ importedPierContext, _ importerWorkflowRuntime) error {
 		workflowCalled = true
 		return nil
 	}
-	provisionOps.RunImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
+	provisionOps.RunImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerWorkflowRuntime) error {
 		postCalled = true
 		return postErr
 	}

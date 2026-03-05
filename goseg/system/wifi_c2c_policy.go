@@ -3,8 +3,9 @@ package system
 import (
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type C2CModeOrchestrator interface {
@@ -46,7 +47,7 @@ var (
 func defaultC2CModeDependencies() c2cModeDependencies {
 	return c2cModeDependencies{
 		c2cModeServiceDependencies: c2cModeServiceDependencies{
-				radio:          newWiFiRadioService(NewWiFiRuntime()),
+			radio:          newWiFiRadioService(NewWiFiRuntime()),
 			accessPoint:    defaultAccessPointLifecycle,
 			getStoredSSIDs: func(ssids []string) { C2CStoredSSIDs = ssids },
 		},
@@ -55,7 +56,7 @@ func defaultC2CModeDependencies() c2cModeDependencies {
 			stopResolved:    func() error { return runSystemdResolvedForRuntime(NewWiFiRuntime(), "stop") },
 			rebootSystem:    func() error { return runRebootCommandForRuntime(NewWiFiRuntime()) },
 			pause:           func(d time.Duration) { time.Sleep(d) },
-			publishInterval: func(event string) { ConfChannel() <- event },
+			publishInterval: func(event string) { ConfigEventChannel() <- event },
 		},
 	}
 }

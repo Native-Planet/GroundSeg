@@ -13,29 +13,31 @@ type UploadPayload = actions.UploadPayload
 // UploadActionContract mirrors upload action contract metadata with ownership at this seam.
 type UploadActionContract = actions.UploadActionContract
 
-const (
+var (
 	// ActionUploadOpenEndpoint opens an upload session and provides upload endpoint metadata.
 	ActionUploadOpenEndpoint = actions.ActionUploadOpenEndpoint
 	// ActionUploadReset resets the current upload session state.
 	ActionUploadReset = actions.ActionUploadReset
+)
 
+const (
 	UploadPayloadOpenEndpoint = actions.UploadPayloadOpenEndpoint
-	UploadPayloadReset       = actions.UploadPayloadReset
+	UploadPayloadReset        = actions.UploadPayloadReset
 )
 
 // ParseUploadAction validates an upload action token using protocol contract parsing.
 func ParseUploadAction(raw string) (Action, error) {
-	return actions.ParseUploadAction(raw)
+	return actions.ParseAction(actions.NamespaceUpload, raw)
 }
 
 // SupportedUploadActions returns upload actions defined in protocol contracts.
-func SupportedUploadActions() []Action {
-	return actions.SupportedUploadActions()
+func SupportedUploadActions() ([]Action, error) {
+	return actions.SupportedActions(actions.NamespaceUpload)
 }
 
 // UploadActionContractByAction returns upload contracts keyed by action.
 //
 // This is the uploadsvc-owned contract catalog used by adapters and tests.
-func UploadActionContractByAction() map[Action]UploadActionContract {
+func UploadActionContractByAction() (map[Action]UploadActionContract, error) {
 	return actions.UploadActionContractByAction()
 }

@@ -8,7 +8,11 @@ import (
 	"groundseg/transition"
 )
 
-func applyTransitionUpdate(context string, transitionCommand broadcast.BroadcastTransition, publishPolicy transition.TransitionPublishPolicy, broadcastRuntime ...broadcast.BroadcastStore) error {
+var rectifyBroadcastRuntimeFactory = func() *broadcast.BroadcastStateRuntime {
+	return broadcast.DefaultBroadcastStateRuntime()
+}
+
+func applyTransitionUpdate(context string, transitionCommand broadcast.BroadcastTransition, publishPolicy transition.TransitionPublishPolicy, broadcastRuntime ...*broadcast.BroadcastStateRuntime) error {
 	if transitionCommand == nil {
 		return nil
 	}
@@ -23,7 +27,7 @@ func applyTransitionUpdate(context string, transitionCommand broadcast.Broadcast
 	return nil
 }
 
-func runTransitionEventLoop[T any](ctx context.Context, label string, publishPolicy transition.TransitionPublishPolicy, ch <-chan T, mapEvent func(T) broadcast.BroadcastTransition, broadcastRuntime ...broadcast.BroadcastStore) error {
+func runTransitionEventLoop[T any](ctx context.Context, label string, publishPolicy transition.TransitionPublishPolicy, ch <-chan T, mapEvent func(T) broadcast.BroadcastTransition, broadcastRuntime ...*broadcast.BroadcastStateRuntime) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -47,16 +51,16 @@ func runTransitionEventLoop[T any](ctx context.Context, label string, publishPol
 	}
 }
 
-func runtimeOption(runtimes []broadcast.BroadcastStore) broadcast.BroadcastStore {
+func runtimeOption(runtimes []*broadcast.BroadcastStateRuntime) *broadcast.BroadcastStateRuntime {
 	if len(runtimes) == 0 {
 		return nil
 	}
 	return runtimes[0]
 }
 
-func resolveBroadcastRuntime(runtime broadcast.BroadcastStore) broadcast.BroadcastStore {
+func resolveBroadcastRuntime(runtime *broadcast.BroadcastStateRuntime) *broadcast.BroadcastStateRuntime {
 	if runtime != nil {
 		return runtime
 	}
-	return broadcast.DefaultBroadcastStateRuntime()
+	return rectifyBroadcastRuntimeFactory()
 }

@@ -84,8 +84,9 @@ stateDiagram-v2
 
 Run before opening backend/runtime PRs:
 
-1. `go test ./...`
-2. `go test -tags=integration ./broadcast ./handler ./routines ./ws` (requires Docker and runtime dependencies)
+1. `go test ./protocol/contracts/... ./system/wifi/... ./startram/... ./uploadsvc/...`
+2. `go test ./...`
+3. `go test -tags=integration ./broadcast ./handler ./routines ./ws` (requires Docker and runtime dependencies)
 
 ## Websocket Action Contract (v1.0)
 

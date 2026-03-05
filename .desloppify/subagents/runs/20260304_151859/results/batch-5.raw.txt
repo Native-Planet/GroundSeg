@@ -1,0 +1,96 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Background services use conflicting failure policies: some loops escalate after repeated failures (e.g., goseg/routines/version.go and goseg/routines/logstream/logs.go), while others only log and continue indefinitely (e.g., goseg/docker/orchestration/subsystem/subsystem_health.go and goseg/leak/broadcast.go).",
+        "Several orchestration entrypoints bubble child errors with `return err` and lose boundary context (e.g., goseg/startuporchestrator/startup_orchestrator.go Bootstrap path and goseg/docker/orchestration/subsystem/subsystem_events.go worker fan-in), while sibling code in the same areas often wraps errors with operation context.",
+        "Docker client close helpers are duplicated with inconsistent defensive behavior: goseg/docker/network/network.go closes client without nil guard, while goseg/docker/lifecycle/client_close.go and goseg/docker/orchestration/subsystem/subsystem_events.go guard nil and join close errors consistently."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "inconsistent_background_failure_policy",
+      "summary": "Long-running services mix fail-fast and log-and-continue behavior without a consistent policy, causing hidden degraded states.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/leak/broadcast.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go:97-99 logs `recoverWireguardAfter502` failure and continues; no retry budget or propagated error.",
+        "goseg/leak/broadcast.go:82-92 classifies action errors and often continues after reporting, keeping listener alive in partially failed state.",
+        "goseg/routines/logstream/logs.go:89-95 and 213-216 enforce consecutive-failure limits and return terminal errors.",
+        "goseg/routines/version.go:92-109 also enforces consecutive-failure limits and returns terminal errors."
+      ],
+      "suggestion": "Define one shared error policy for background loops (e.g., classify as `transient`, `degraded`, `fatal`), add consistent failure budgets/metrics, and make all loops either propagate fatal conditions or explicitly expose degraded mode through a typed status channel.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "background_service_error_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "boundary_context_loss_on_error_return",
+      "summary": "Orchestration boundaries return raw child errors in multiple places, producing inconsistent and low-context failure messages.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "goseg/startuporchestrator/startup_orchestrator.go:825, 833, 836 returns raw errors from runtime resolution/init/start, while nearby code wraps many other failures with context.",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go:95 and 127 return raw errors from health-loop start and worker fan-in, despite worker internals adding context variably.",
+        "goseg/system/wifi_runtime_api.go returns raw `prepareForUse` errors in many public methods (e.g., lines 97, 138, 166, 184, 197, 205, 222), while downstream operation failures are often wrapped."
+      ],
+      "suggestion": "At public subsystem boundaries, always wrap propagated errors with operation-level context (e.g., `start docker subsystem`, `bootstrap startup`, `prepare wifi runtime`) and standardize this via helper wrappers or lintable conventions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_error_wrapping_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "docker_client_close_helper_inconsistency",
+      "summary": "Duplicated Docker client close helpers handle nil and close-error joining inconsistently, creating uneven failure behavior and panic risk in seam-driven paths.",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/docker/lifecycle/client_close.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "goseg/docker/network/network.go:43-57 `closeDockerClient` calls `cli.Close()` without checking `cli == nil`.",
+        "goseg/docker/lifecycle/client_close.go:11-13 and goseg/docker/orchestration/subsystem/subsystem_events.go:203-205 explicitly guard nil clients before close.",
+        "All three helpers attempt similar error-join semantics, indicating shared intent but divergent robustness."
+      ],
+      "suggestion": "Unify Docker client close behavior into one shared helper with nil-guard and error-join semantics, then replace package-local variants to guarantee consistent close-path failures.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplicated_error_helper_divergence"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Background-service reliability policy is encoded ad hoc per package rather than enforced centrally.",
+      "Error-wrapping conventions are not standardized at API boundaries.",
+      "Utility helper duplication across packages allows silent behavioral drift."
+    ],
+    "likely_symptoms": [
+      "inconsistent_background_failure_policy",
+      "boundary_context_loss_on_error_return",
+      "docker_client_close_helper_inconsistency"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "test_strategy": 84.0
+  },
+  "dimension_notes": {
+    "test_strategy": {
+      "evidence": [
+        "README.md declares contract compatibility and lifecycle assertions for protocol/StarTram surfaces and ties them to a runtime contract gate",
+        "The CI gate script invoked by that workflow (upload-contract-gate.yml) runs only a narrow named test subset in `goseg/protocol/contracts`, not all contract-definition tests present in that package"
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract-gate-test-gap",
+      "summary": "Contract gate does not execute per-contract definition regression tests, reducing deterministic contract-coverage confidence",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "The README positions contract surfaces as governance-critical and requires lifecycle-policy assertions for changed catalog entries",
+        "The contract gate path list includes `protocol_contracts.go` and `startram_contracts.go`, but the script it runs filters tests with a narrow `go test ./protocol/contracts -run` pattern"
+      ],
+      "suggestion": "Update the runtime contract gate test command set to include contract-definition regression tests for protocol and StarTram contract files (for example exact descriptor/name/message/metadata snapshots), or replace the regex with a package-level test selection that always runs deterministic per-family contract-definition tests when those contract files change.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract-governance-test-enforcement-gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance intent is documented in README, but contract-test enforcement is partially implemented via a hard-coded script test slice",
+      "Coverage policy depends on named tests instead of explicit per-contract specification, so critical contract fixtures can be under-asserted by the gate"
+    ],
+    "likely_symptoms": [
+      "contract-gate-test-enforcement-gap",
+      "contract-metadata-drift-undetected-by-gate"
+    ],
+    "possible_false_positives": [
+      "If full `go test ./...` is consistently enforced in PR checks, this is a narrower-risk gap limited to the targeted gate"
+    ]
+  }
+}

@@ -1,0 +1,614 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_172506/results/batch-4.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 4
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy, package_organization
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+- goseg/system/wifi_c2c_flow_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+9a. For package_organization, ground scoring in objective structure signals from `holistic_context.structure` (root_files fan_in/fan_out roles, directory_profiles, coupling_matrix). Prefer thresholded evidence (for example: fan_in < 5 for root stragglers, import-affinity > 60%, directories > 10 files with mixed concerns).
+9b. Suggestions must include a staged reorg plan (target folders, move order, and import-update/validation commands).
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 4,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 4,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 78.0,
+    "package_organization": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md delegates governance to multiple documents (`goseg/protocol/contracts/GOVERNANCE.md`, `goseg/uploadsvc/GOVERNANCE.md`, `goseg/system/wifi/README.md`, `goseg/startram/GOVERNANCE.md`), but assigned contract files expose only ID/name/description/message fields and local ID-prefix validation.",
+        "`goseg/protocol/contracts/protocol_contracts.go` defines protocol action literals and validates formula/prefix consistency internally, while runtime behavior in `goseg/system/wifi_c2c_flow_test.go` depends on `groundseg/protocol/actions` constants, creating cross-module synchronization by convention rather than a single authoritative contract surface.",
+        "`goseg/protocol/contracts/startram_contracts.go` validates only non-empty ID for StarTram entries, with no explicit compatibility/stability metadata to enforce policy stated in README-linked governance docs."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/system/wifi_c2c_flow_test.go` has good positive/negative unit coverage for parse/process/connect error paths, but governance compatibility is asserted indirectly through one fixture lookup and not as a broader contract/runtime matrix.",
+        "The test suite still contains literal protocol values (for example `payload.Type != \"c2c\"`) mixed with constant-based checks, which increases drift risk when contracts evolve across packages.",
+        "README.md defines backend/frontend quality gates and governance references, but the assigned tests do not verify that contract catalog semantics and runtime action parsing remain aligned across all declared protocol contract entries."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "From `holistic_context.structure.directory_profiles`, `goseg/system/` has 42 files with mixed concerns (apt, disk, maintenance, metrics, wifi, transport adapters), exceeding the >10 mixed-concern threshold and indicating flat-directory overload.",
+        "The same structure data shows dedicated subfolders already exist (`goseg/system/maintenance/`, `goseg/system/metrics/`, `goseg/system/storage/`, `goseg/system/wifi/service/`, `goseg/system/wifi/transport/`), but `wifi_c2c_flow_test.go` remains at `goseg/system/` root, signaling incomplete boundary migration.",
+        "README.md points to subsystem-specific governance docs, but physical placement of WiFi C2C governance tests in the broad `system` root weakens navigability and ownership alignment with those documented boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "governance_contract_not_executable",
+      "summary": "Governance policy is documented across modules but not enforced through a shared executable contract schema.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README references multiple governance policy files for runtime boundaries.",
+        "Protocol and StarTram contract specs validate local IDs/prefixes, but do not carry explicit compatibility fields (for example stability level, version epoch, owner module) to make governance checks machine-enforceable.",
+        "This leaves architecture contracts split between prose docs and isolated validators."
+      ],
+      "suggestion": "Add shared governance metadata to contract entries (for example `Stability`, `SinceVersion`, `OwnerModule`, `Deprecates`) and extend `validateContractFamilySpecs` to enforce required metadata plus cross-family compatibility rules; then expose one conformance entrypoint consumed by runtime modules and CI so policy and code remain in lockstep.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "action_literal_duplication_across_boundaries",
+      "summary": "Protocol action identity is duplicated across `contracts` and `actions` modules, relying on convention-level synchronization.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines `ActionC2CConnect` as a local contract verb literal and builds contract IDs from it.",
+        "`wifi_c2c_flow_test.go` exercises runtime behavior through `actions.ActionC2CConnect`, not through a single shared contract source type.",
+        "Alignment is tested, but compile-time ownership of action identity is still split."
+      ],
+      "suggestion": "Make one module authoritative for action identity (prefer `protocol/actions`), and have contract catalog builders import typed action descriptors from that source instead of redefining literals; keep conformance tests as regression checks, not primary synchronization.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "governance_conformance_tests_too_narrow",
+      "summary": "Coverage validates one C2C fixture path but lacks a full contract-to-runtime conformance matrix.",
+      "related_files": [
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`TestC2CPayloadAndContractsStayAligned` checks a single C2C connect fixture.",
+        "No assigned test enumerates all protocol contract specs and proves every declared action has runtime parse/handling coverage and expected failure semantics.",
+        "StarTram contract file defines canonical error contract, but no assigned tests assert runtime emission paths remain bound to that canonical contract."
+      ],
+      "suggestion": "Create a table-driven conformance suite that iterates the contract catalog and asserts parser acceptance/rejection, envelope type behavior, and canonical error mapping for each declared contract; fail CI on any unmapped contract entry.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "system_root_flattening_hides_wifi_boundaries",
+      "summary": "WiFi C2C tests remain in an overloaded `system` root package despite existing WiFi subpackages and documented subsystem governance.",
+      "related_files": [
+        "README.md",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "`directory_profiles` reports `goseg/system/` with 42 files and mixed responsibilities.",
+        "WiFi-specific subfolders (`goseg/system/wifi/service/`, `goseg/system/wifi/transport/`) already exist, indicating intended modularization.",
+        "`wifi_c2c_flow_test.go` is still at `goseg/system/` root, reducing ownership clarity and making WiFi governance harder to navigate."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1: create/standardize `goseg/system/wifi/flow/` (or `goseg/system/wifi/c2c/`) as the C2C runtime boundary; Stage 2: move WiFi C2C runtime files and `wifi_c2c_flow_test.go` there before moving generic adapters; Stage 3: update package declarations/imports with `goimports ./...`; Stage 4: validate with `go test ./goseg/system/...` and `go test ./goseg/protocol/...`; Stage 5: run `go test ./...` to confirm no boundary regressions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance is primarily prose-defined while executable contract metadata is minimal, so boundary guarantees rely on developer discipline and selective tests.",
+      "Package migration toward focused WiFi subdomains is partial, leaving legacy root placement that weakens ownership signals."
+    ],
+    "likely_symptoms": [
+      "action_literal_duplication_across_boundaries",
+      "governance_conformance_tests_too_narrow",
+      "system_root_flattening_hides_wifi_boundaries"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cb9e2-713e-7ef1-8d13-46951c1a7fa2
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 4
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy, package_organization
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/contracts/protocol_contracts.go
+- goseg/protocol/contracts/startram_contracts.go
+- goseg/system/wifi_c2c_flow_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+9a. For package_organization, ground scoring in objective structure signals from `holistic_context.structure` (root_files fan_in/fan_out roles, directory_profiles, coupling_matrix). Prefer thresholded evidence (for example: fan_in < 5 for root stragglers, import-affinity > 60%, directories > 10 files with mixed concerns).
+9b. Suggestions must include a staged reorg plan (target folders, move order, and import-update/validation commands).
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 4,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+Reviewing the blind packet and the four assigned files now, then I’ll produce a strict JSON-only batch assessment scoped to the three requested dimensions.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/protocol_contracts.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/system/wifi_c2c_flow_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/startram_contracts.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' README.md" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package contracts
+
+import "fmt"
+
+const (
+	// StarTram contract namespace segments.
+	startramContractFamily = "startram"
+	startramContractScope  = "errors"
+	startramAPIConnSlug    = "api-connection"
+
+	// APIConnectionErrorMessage is the canonical StarTram API connectivity contract message.
+	APIConnectionErrorMessage             = "Unable to connect to API server"
+	startramAPIConnectionErrorName        = "APIConnectionError"
+	startramAPIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+)
+
+// APIConnectionError is the canonical StarTram API connectivity contract id.
+const APIConnectionError ContractID = ContractID(startramContractFamily + "." + startramContractScope + "." + startramAPIConnSlug)
+
+var startramContractSpecs = []contractFamilyEntrySpec{
+ succeeded in 51ms:
+package contracts
+
+import "fmt"
+
+const (
+	// Protocol namespaces for websocket action contracts.
+	ActionNamespaceUpload ActionNamespace = "upload"
+	ActionNamespaceC2C    ActionNamespace = "c2c"
+
+	// Protocol action tokens.
+	ActionUploadOpenEndpoint ActionVerb = "open-endpoint"
+	ActionUploadReset        ActionVerb = "reset"
+	ActionC2CConnect         ActionVerb = "connect"
+)
+
+const (
+	protocolActionContractRoot = "protocol.actions"
+
+	// #nosec G101 -- These values are protocol action names required for contract binding, not secrets.
+	// Protocol action contract identities are immutable to preserve contract governance boundaries.
+ succeeded in 51ms:
+package system
+
+import (
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"groundseg/protocol/actions"
+	"groundseg/protocol/conformance"
+)
+
+func TestParseC2CAction(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	action, err := actions.ParseC2CAction(string(c2cActionConnect))
+	if err != nil {
+		t.Fatalf("expected connect action to parse: %v", err)
+	}
+	if action != c2cActionConnect {
+ succeeded in 51ms:
+Total output lines: 5730
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "api_surface_coherence",
+    "abstraction_fitness",
+    "convention_outlier",
+    "cross_module_architecture",
+    "dependency_health",
+    "design_coherence",
+    "error_consistency",
+    "naming_quality",
+    "package_organization",
+    "test_strategy"
+  ],
+  "dimension_prompts": {
+    "api_surface_coherence": {
+ succeeded in 51ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+codex
+I’ve loaded the packet and file contents; next I’m extracting `holistic_context.structure` metrics so the `package_organization` score is grounded in the required objective thresholds.
+exec
+/opt/homebrew/bin/zsh -lc "jq '.holistic_context.structure.root_files[]? | select(.path==\"README.md\")' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "jq '.holistic_context.structure.directory_profiles[]? | select(.directory==\"goseg/protocol/contracts\" or .directory==\"goseg/system\" or .directory==\".\")' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "jq '.holistic_context.structure' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "jq '.holistic_context.structure.coupling_matrix[]? | select((.from|test(\"goseg/protocol/contracts|goseg/system|root\")) or (.to|test(\"goseg/protocol/contracts|goseg/system|root\")))' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+
+ succeeded in 50ms:
+
+ succeeded in 51ms:
+
+ succeeded in 51ms:
+{
+  "directory_profiles": {
+    "goseg/accesspoint/": {
+      "file_count": 11,
+      "files": [
+        "accesspoint.go",
+        "accesspoint_entrypoint_test.go",
+        "accesspoint_test.go",
+        "config.go",
+        "config_test.go",
+        "lifecycle_coordinator.go",
+        "lifecycle_coordinator_test.go",
+        "parameters.go",
+        "parameters_test.go",
+        "router.go",
+        "router_test.go"
+      ],
+      "total_loc": 2770,
+      "avg_fan_in": 0.0,
+      "avg_fan_out": 0.0,
+exec
+/opt/homebrew/bin/zsh -lc "jq '.holistic_context.structure | keys' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+[
+  "directory_profiles"
+]
+codex
+I confirmed the packet only provides `directory_profiles` (no `root_files` or `coupling_matrix` entries), so I’ll base `package_organization` strictly on available structural signals plus the assigned file evidence. I’m now checking the rest of `wifi_c2c_flow_test.go` for governance and test-strategy gaps.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '320,520p' goseg/system/wifi_c2c_flow_test.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+	if !errors.Is(err, connectErr) {
+		t.Fatalf("expected connect error in chain, got %v", err)
+	}
+	if !errors.Is(err, c2cRestoreErr) {
+		t.Fatalf("expected C2C mode restore error in chain, got %v", err)
+	}
+}
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 4,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 78.0,
+    "package_organization": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md delegates governance to multiple documents (`goseg/protocol/contracts/GOVERNANCE.md`, `goseg/uploadsvc/GOVERNANCE.md`, `goseg/system/wifi/README.md`, `goseg/startram/GOVERNANCE.md`), but assigned contract files expose only ID/name/description/message fields and local ID-prefix validation.",
+        "`goseg/protocol/contracts/protocol_contracts.go` defines protocol action literals and validates formula/prefix consistency internally, while runtime behavior in `goseg/system/wifi_c2c_flow_test.go` depends on `groundseg/protocol/actions` constants, creating cross-module synchronization by convention rather than a single authoritative contract surface.",
+        "`goseg/protocol/contracts/startram_contracts.go` validates only non-empty ID for StarTram entries, with no explicit compatibility/stability metadata to enforce policy stated in README-linked governance docs."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/system/wifi_c2c_flow_test.go` has good positive/negative unit coverage for parse/process/connect error paths, but governance compatibility is asserted indirectly through one fixture lookup and not as a broader contract/runtime matrix.",
+        "The test suite still contains literal protocol values (for example `payload.Type != \"c2c\"`) mixed with constant-based checks, which increases drift risk when contracts evolve across packages.",
+        "README.md defines backend/frontend quality gates and governance references, but the assigned tests do not verify that contract catalog semantics and runtime action parsing remain aligned across all declared protocol contract entries."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "From `holistic_context.structure.directory_profiles`, `goseg/system/` has 42 files with mixed concerns (apt, disk, maintenance, metrics, wifi, transport adapters), exceeding the >10 mixed-concern threshold and indicating flat-directory overload.",
+        "The same structure data shows dedicated subfolders already exist (`goseg/system/maintenance/`, `goseg/system/metrics/`, `goseg/system/storage/`, `goseg/system/wifi/service/`, `goseg/system/wifi/transport/`), but `wifi_c2c_flow_test.go` remains at `goseg/system/` root, signaling incomplete boundary migration.",
+        "README.md points to subsystem-specific governance docs, but physical placement of WiFi C2C governance tests in the broad `system` root weakens navigability and ownership alignment with those documented boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "governance_contract_not_executable",
+      "summary": "Governance policy is documented across modules but not enforced through a shared executable contract schema.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "README references multiple governance policy files for runtime boundaries.",
+        "Protocol and StarTram contract specs validate local IDs/prefixes, but do not carry explicit compatibility fields (for example stability level, version epoch, owner module) to make governance checks machine-enforceable.",
+        "This leaves architecture contracts split between prose docs and isolated validators."
+      ],
+      "suggestion": "Add shared governance metadata to contract entries (for example `Stability`, `SinceVersion`, `OwnerModule`, `Deprecates`) and extend `validateContractFamilySpecs` to enforce required metadata plus cross-family compatibility rules; then expose one conformance entrypoint consumed by runtime modules and CI so policy and code remain in lockstep.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "action_literal_duplication_across_boundaries",
+      "summary": "Protocol action identity is duplicated across `contracts` and `actions` modules, relying on convention-level synchronization.",
+      "related_files": [
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "`protocol_contracts.go` defines `ActionC2CConnect` as a local contract verb literal and builds contract IDs from it.",
+        "`wifi_c2c_flow_test.go` exercises runtime behavior through `actions.ActionC2CConnect`, not through a single shared contract source type.",
+        "Alignment is tested, but compile-time ownership of action identity is still split."
+      ],
+      "suggestion": "Make one module authoritative for action identity (prefer `protocol/actions`), and have contract catalog builders import typed action descriptors from that source instead of redefining literals; keep conformance tests as regression checks, not primary synchronization.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "governance_conformance_tests_too_narrow",
+      "summary": "Coverage validates one C2C fixture path but lacks a full contract-to-runtime conformance matrix.",
+      "related_files": [
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/protocol/contracts/protocol_contracts.go",
+        "goseg/protocol/contracts/startram_contracts.go"
+      ],
+      "evidence": [
+        "`TestC2CPayloadAndContractsStayAligned` checks a single C2C connect fixture.",
+        "No assigned test enumerates all protocol contract specs and proves every declared action has runtime parse/handling coverage and expected failure semantics.",
+        "StarTram contract file defines canonical error contract, but no assigned tests assert runtime emission paths remain bound to that canonical contract."
+      ],
+      "suggestion": "Create a table-driven conformance suite that iterates the contract catalog and asserts parser acceptance/rejection, envelope type behavior, and canonical error mapping for each declared contract; fail CI on any unmapped contract entry.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_not_centralized"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "system_root_flattening_hides_wifi_boundaries",
+      "summary": "WiFi C2C tests remain in an overloaded `system` root package despite existing WiFi subpackages and documented subsystem governance.",
+      "related_files": [
+        "README.md",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "`directory_profiles` reports `goseg/system/` with 42 files and mixed responsibilities.",
+        "WiFi-specific subfolders (`goseg/system/wifi/service/`, `goseg/system/wifi/transport/`) already exist, indicating intended modularization.",
+        "`wifi_c2c_flow_test.go` is still at `goseg/system/` root, reducing ownership clarity and making WiFi governance harder to navigate."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1: create/standardize `goseg/system/wifi/flow/` (or `goseg/system/wifi/c2c/`) as the C2C runtime boundary; Stage 2: move WiFi C2C runtime files and `wifi_c2c_flow_test.go` there before moving generic adapters; Stage 3: update package declarations/imports with `goimports ./...`; Stage 4: validate with `go test ./goseg/system/...` and `go test ./goseg/protocol/...`; Stage 5: run `go test ./...` to confirm no boundary regressions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance is primarily prose-defined while executable contract metadata is minimal, so boundary guarantees rely on developer discipline and selective tests.",
+      "Package migration toward focused WiFi subdomains is partial, leaving legacy root placement that weakens ownership signals."
+    ],
+    "likely_symptoms": [
+      "action_literal_duplication_across_boundaries",
+      "governance_conformance_tests_too_narrow",
+      "system_root_flattening_hides_wifi_boundaries"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+36,439
+

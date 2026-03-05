@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"groundseg/structs"
+	systemdisk "groundseg/system/disk"
 )
 
 func TestOctalToAscii(t *testing.T) {
@@ -18,12 +19,12 @@ func TestOctalToAscii(t *testing.T) {
 
 func TestIsDevMounted(t *testing.T) {
 	unmounted := structs.BlockDev{Mountpoints: []string{"", ""}}
-	if IsDevMounted(unmounted) {
+	if systemdisk.IsDevMounted(unmounted) {
 		t.Fatal("expected unmounted device to return false")
 	}
 
 	mounted := structs.BlockDev{Mountpoints: []string{"", "/media/data"}}
-	if !IsDevMounted(mounted) {
+	if !systemdisk.IsDevMounted(mounted) {
 		t.Fatal("expected mounted device to return true")
 	}
 }

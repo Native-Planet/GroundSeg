@@ -1,0 +1,102 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 73.8
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Large runtime callback bags are embedded and re-embedded across modules (for example `RuntimeContainerOps`/`RuntimeUrbitOps` in `goseg/docker/orchestration/runtime_ops.go`, then embedded again in `workflowRuntime` in `goseg/shipworkflow/operations_runtime.go` and `importerProvisionRuntime` in `goseg/importer/importer.go`).",
+        "`StartupRuntime` and `startBackgroundServicesRuntime` in `goseg/startuporchestrator/startup_orchestrator.go` use very wide function-field surfaces, plus override hooks, which shifts domain behavior into wiring structs rather than cohesive service interfaces.",
+        "Several packages keep both new and legacy entrypoints/aliases (`StartConfigEventLoop*` and deprecated `StartConfEventLoop*`/`ConfChannel` in `goseg/config/config_events.go`; `OldLogsCleaner*` aliases in `goseg/routines/logstream/logs.go`; legacy startup seams in `goseg/startuporchestrator/startup_orchestrator.go`), increasing indirection cost without new behavior."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 71.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 79.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_sprawl",
+      "summary": "Runtime seam structs have grown into low-cohesion callback bags reused across unrelated workflows.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines many broad `Runtime*Ops` structs with dozens of function fields and minimal policy.",
+        "`importerProvisionRuntime` embeds orchestration ops plus importer-specific callbacks, mixing container lifecycle, publish, workflow, and file concerns in one abstraction.",
+        "`workflowRuntime` similarly embeds orchestration ops and adds transition/publish behavior, reusing the same wide seams rather than bounded domain ports.",
+        "`startBackgroundServicesRuntime` contains a long list of service-start callbacks and selector metadata, acting as a procedural registry rather than a focused abstraction."
+      ],
+      "suggestion": "Split seam structs by use-case ports (for example: `ContainerLifecyclePort`, `UrbitConfigPort`, `TransitionPublisher`, `StartupServiceRegistry`) and pass only the minimal port each workflow needs. Replace embedding of large ops bags with explicit narrow interfaces per workflow package.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overgrown_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "legacy_alias_layers_increase_indirection",
+      "summary": "Backward-compatibility aliases create parallel call paths that dilute the primary abstraction surface.",
+      "related_files": [
+        "goseg/config/config_events.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`config_events.go` keeps `StartConfigEventLoop*` plus deprecated `StartConfEventLoop*` and `ConfChannel`, all forwarding to the same behavior.",
+        "`logs.go` exposes `RunOldLogsCleanupLoop*` and alias methods `OldLogsCleaner*` with no semantic difference.",
+        "`StartupRuntime` carries explicit 'Legacy seams retained' fields and fallback logic in `startupSettings()`, expanding the interface contract for compatibility rather than behavior."
+      ],
+      "suggestion": "Create a bounded compatibility layer/package for deprecated entrypoints and keep core runtime structs on a single canonical API. Mark removals by version and delete duplicate seams once callers migrate.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "compatibility_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "singleton_fallbacks_leak_through_injected_runtimes",
+      "summary": "Global default runtimes remain active alongside injectable seams, weakening abstraction boundaries.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go",
+        "goseg/docker/events/events.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "Broadcast state and loop keep package-level defaults (`defaultBroadcastStateRuntime`, `defaultBroadcastLoopController`) while also accepting runtime injection.",
+        "`events.go` exposes `DefaultEventRuntime()` global singleton plus `NewEventRuntime(overrides...)`, enabling mixed usage patterns in callers.",
+        "`config.go` maintains process-global mutable runtime context with package-level accessors, while other modules try to pass explicit snapshots through seams."
+      ],
+      "suggestion": "Define one ownership model per subsystem: either explicit dependency injection end-to-end or explicit singleton service facade. If injection is the target, move singleton acquisition to composition roots (`main`/startup) and pass runtime dependencies explicitly through constructors.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "mixed_global_and_injected_runtime_model"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime seam growth prioritized test override flexibility over cohesive domain boundaries.",
+      "Compatibility preservation is implemented inside core abstractions instead of isolated adapters.",
+      "Subsystems mix global state/service-locator patterns with explicit injection, causing boundary inconsistency."
+    ],
+    "likely_symptoms": [
+      "runtime_callback_bag_sprawl",
+      "legacy_alias_layers_increase_indirection",
+      "singleton_fallbacks_leak_through_injected_runtimes"
+    ],
+    "possible_false_positives": []
+  }
+}

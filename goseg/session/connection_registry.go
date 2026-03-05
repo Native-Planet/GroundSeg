@@ -41,6 +41,9 @@ func (registry *ConnectionRegistry) ensureTargetsInitialized() {
 }
 
 func (registry *ConnectionRegistry) findMuConn(conn *websocket.Conn) *MuConn {
+	if conn == nil {
+		return nil
+	}
 	for _, clients := range registry.authClients {
 		for _, client := range clients {
 			if client != nil && client.Conn == conn {
@@ -59,14 +62,7 @@ func (registry *ConnectionRegistry) findMuConn(conn *websocket.Conn) *MuConn {
 }
 
 func (registry *ConnectionRegistry) hasConnInBucket(clientsByToken map[string][]*MuConn, conn *websocket.Conn) bool {
-	for _, clients := range clientsByToken {
-		for _, existing := range clients {
-			if existing != nil && existing.Conn == conn {
-				return true
-			}
-		}
-	}
-	return false
+	return hasConnInBuckets(clientsByToken, conn, func(muConn *MuConn) *websocket.Conn { return muConn.Conn })
 }
 
 func (registry *ConnectionRegistry) hasConnInAuthClientBucket(token string, conn *websocket.Conn) bool {
@@ -95,12 +91,7 @@ func (registry *ConnectionRegistry) bucket(targetAuth bool) map[string][]*MuConn
 }
 
 func (registry *ConnectionRegistry) snapshot(targetAuth bool) map[string][]*MuConn {
-	source := registry.bucket(targetAuth)
-	snapshot := make(map[string][]*MuConn, len(source))
-	for token, clients := range source {
-		snapshot[token] = append([]*MuConn(nil), clients...)
-	}
-	return snapshot
+	return snapshotBuckets(registry.bucket(targetAuth), func(muConn *MuConn) *MuConn { return muConn })
 }
 
 func (registry *ConnectionRegistry) transitionClientState(id string, client *MuConn, targetAuth bool) {
@@ -161,40 +152,8 @@ func (registry *ConnectionRegistry) removeClientFromOtherBucket(id string, conn 
 }
 
 func (registry *ConnectionRegistry) removeConnectionByConn(conn *websocket.Conn) bool {
-	removed := false
-	for key, bucketClients := range registry.authClients {
-		if len(bucketClients) == 0 {
-			delete(registry.authClients, key)
-			continue
-		}
-		filtered, bucketRemoved := removeConnFromBucket(bucketClients, conn)
-		if !bucketRemoved {
-			continue
-		}
-		removed = true
-		if len(filtered) == 0 {
-			delete(registry.authClients, key)
-			continue
-		}
-		registry.authClients[key] = filtered
-	}
-	for key, bucketClients := range registry.unauthClients {
-		if len(bucketClients) == 0 {
-			delete(registry.unauthClients, key)
-			continue
-		}
-		filtered, bucketRemoved := removeConnFromBucket(bucketClients, conn)
-		if !bucketRemoved {
-			continue
-		}
-		removed = true
-		if len(filtered) == 0 {
-			delete(registry.unauthClients, key)
-			continue
-		}
-		registry.unauthClients[key] = filtered
-	}
-	return removed
+	return removeConnFromBuckets(registry.authClients, conn, func(muConn *MuConn) *websocket.Conn { return muConn.Conn }) ||
+		removeConnFromBuckets(registry.unauthClients, conn, func(muConn *MuConn) *websocket.Conn { return muConn.Conn })
 }
 
 func (registry *ConnectionRegistry) cleanupStaleBucket(clientsByToken map[string][]*MuConn, cutoff time.Time) {
@@ -229,27 +188,9 @@ func (registry *ConnectionRegistry) hasAuthSession() bool {
 }
 
 func appendMuConnIfMissing(existingClients []*MuConn, client *MuConn) []*MuConn {
-	if client == nil || client.Conn == nil {
-		return existingClients
-	}
-	for _, existingClient := range existingClients {
-		if existingClient != nil && existingClient.Conn == client.Conn {
-			return existingClients
-		}
-	}
-	existingClients = append(existingClients, client)
-	return existingClients
+	return appendIfConnMissing(existingClients, client, func(muConn *MuConn) *websocket.Conn { return muConn.Conn })
 }
 
 func removeConnFromBucket(clients []*MuConn, conn *websocket.Conn) ([]*MuConn, bool) {
-	filtered := clients[:0]
-	removed := false
-	for _, tracked := range clients {
-		if tracked == nil || tracked.Conn != conn {
-			filtered = append(filtered, tracked)
-			continue
-		}
-		removed = true
-	}
-	return filtered, removed
+	return removeConn(clients, conn, func(muConn *MuConn) *websocket.Conn { return muConn.Conn })
 }

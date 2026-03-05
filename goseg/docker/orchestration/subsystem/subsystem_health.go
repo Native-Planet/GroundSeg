@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"groundseg/config"
 	"groundseg/internal/shipstatus"
 	"groundseg/internal/workflow"
 	"groundseg/logger"
@@ -39,71 +40,90 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 		if ctx.Err() != nil {
 			return
 		}
-		threshold := rt.recovery.check502ConsecutiveFailures
-		if threshold < 1 {
-			threshold = 1
-		}
-		settings := rt.Check502SettingsSnapshotFn()
-		settings.Piers = append([]string(nil), settings.Piers...)
-		pierStatus, err := rt.GetShipStatusFn(settings.Piers)
+		settings, threshold, pierStatus, err := check502CycleSnapshot(rt)
 		if err != nil {
-			logger.Errorf("Couldn't get pier status: %v", err)
+			logger.Errorf("couldn't get pier status: %v", err)
 			continue
 		}
 		for _, pier := range settings.Piers {
-			if ctx.Err() != nil {
+			if !processCheck502Pier(ctx, rt, settings, threshold, pier, pierStatus, status) {
 				return
-			}
-			err := rt.LoadUrbitConfigFn(pier)
-			if err != nil {
-				logger.Errorf("Error loading %s config: %v", pier, err)
-				continue
-			}
-			shipConf := rt.UrbitConfFn(pier)
-			pierNetwork, err := rt.GetContainerNetworkFn(pier)
-			if err != nil {
-				logger.Warnf("Couldn't get network for %v: %v", pier, err)
-				continue
-			}
-			turnedOn := false
-			if transition.IsContainerUpStatus(pierStatus[pier]) {
-				turnedOn = true
-			}
-			if turnedOn && pierNetwork != "default" && settings.WgOn {
-				if _, err := rt.GetLusCodeFn(pier); err != nil {
-					logger.Warnf("%v is not booted yet, skipping", pier)
-					continue
-				}
-				resp, err := rt.httpOps.getFn("https://" + shipConf.WgURL)
-				if err != nil {
-					logger.Errorf("Error remote polling %v: %v", pier, err)
-					continue
-				}
-				resp.Body.Close()
-				logger.Debugf("%v 502 check: %v", pier, resp.StatusCode)
-				if resp.StatusCode == http.StatusBadGateway {
-					logger.Warnf("Got 502 response for %v", pier)
-					status[pier]++
-					if status[pier] < threshold {
-						continue
-					}
-					if settings.Disable502 {
-						delete(status, pier)
-						continue
-					}
-					logger.Warnf("502 strike %d/%d for %v", status[pier], threshold, pier)
-					if err := rt.recovery.recoverWireguardAfter502Fn(rt, settings); err != nil {
-						logger.Errorf("Wireguard fleet recovery failed: %v", err)
-					}
-					// remove from map after recovery attempt
-					delete(status, pier)
-				} else if _, found := status[pier]; found {
-					// if not 502 and pier is in status map, remove it
-					delete(status, pier)
-				}
 			}
 		}
 	}
+}
+
+func check502CycleSnapshot(rt dockerRoutineRuntime) (config.Check502Settings, int, map[string]string, error) {
+	threshold := rt.recovery.check502ConsecutiveFailures
+	if threshold < 1 {
+		threshold = 1
+	}
+	settings := rt.Check502SettingsSnapshotFn()
+	settings.Piers = append([]string(nil), settings.Piers...)
+	pierStatus, err := rt.GetShipStatusFn(settings.Piers)
+	if err != nil {
+		return settings, threshold, nil, err
+	}
+	return settings, threshold, pierStatus, nil
+}
+
+func processCheck502Pier(
+	ctx context.Context,
+	rt dockerRoutineRuntime,
+	settings config.Check502Settings,
+	threshold int,
+	pier string,
+	pierStatus map[string]string,
+	status map[string]int,
+) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	if err := rt.LoadUrbitConfigFn(pier); err != nil {
+		logger.Errorf("error loading %s config: %v", pier, err)
+		return true
+	}
+	shipConf := rt.UrbitConfFn(pier)
+	pierNetwork, err := rt.GetContainerNetworkFn(pier)
+	if err != nil {
+		logger.Warnf("couldn't get network for %v: %v", pier, err)
+		return true
+	}
+	if !transition.IsContainerUpStatus(pierStatus[pier]) || pierNetwork == "default" || !settings.WgOn {
+		return true
+	}
+	if _, err := rt.GetLusCodeFn(pier); err != nil {
+		logger.Warnf("%v is not booted yet, skipping", pier)
+		return true
+	}
+	resp, err := rt.httpOps.getFn("https://" + shipConf.WgURL)
+	if err != nil {
+		logger.Errorf("error remote polling %v: %v", pier, err)
+		return true
+	}
+	if closeErr := resp.Body.Close(); closeErr != nil {
+		logger.Errorf("failed to close 502 check response for %v: %v", pier, closeErr)
+	}
+	logger.Debugf("%v 502 check: %v", pier, resp.StatusCode)
+	if resp.StatusCode == http.StatusBadGateway {
+		logger.Warnf("Got 502 response for %v", pier)
+		status[pier]++
+		if status[pier] < threshold {
+			return true
+		}
+		if settings.Disable502 {
+			delete(status, pier)
+			return true
+		}
+		logger.Warnf("502 strike %d/%d for %v", status[pier], threshold, pier)
+		if err := rt.recovery.recoverWireguardAfter502Fn(rt, settings); err != nil {
+			logger.Errorf("wireguard fleet recovery failed: %v", err)
+		}
+		delete(status, pier)
+		return true
+	}
+	delete(status, pier)
+	return true
 }
 
 func sleepOrContextDone(ctx context.Context, d time.Duration) bool {
@@ -135,7 +155,7 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 	getShipRunningStatus := func(patp string) (string, error) {
 		statuses, err := rt.GetShipStatusFn([]string{patp})
 		if err != nil {
-			return "", fmt.Errorf("Failed to get statuses for %s: %w", patp, err)
+			return "", fmt.Errorf("failed to get statuses for %s: %w", patp, err)
 		}
 		status, exists := statuses[patp]
 		if !exists {
@@ -147,7 +167,7 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 	piers := append([]string(nil), settings.Piers...)
 	pierStatus, err := rt.GetShipStatusFn(piers)
 	if err != nil {
-		return fmt.Errorf("Failed to retrieve ship information: %w", err)
+		return fmt.Errorf("failed to retrieve ship information: %w", err)
 	}
 	steps := []workflow.Step{}
 	for patp, status := range pierStatus {

@@ -9,10 +9,10 @@ func TestConfigMergeConfigMergeFileIsDirectlyTested(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
 	defaultCfg.Runtime.Setup = "complete"
 	defaultCfg.Runtime.GracefulExit = false
-	defaultCfg.Connectivity.EndpointUrl = "https://default.endpoint"
+	defaultCfg.Connectivity.EndpointURL = "https://default.endpoint"
 	defaultCfg.Connectivity.ApiVersion = "v1"
 	defaultCfg.Runtime.SwapVal = 64
-	defaultCfg.Connectivity.C2cInterval = 1200
+	defaultCfg.Connectivity.C2CInterval = 1200
 	defaultCfg.Penpai.PenpaiCores = 2
 	defaultCfg.Penpai.PenpaiModels = []structs.Penpai{{ModelName: "groundseg"}}
 	defaultCfg.Penpai.PenpaiActive = "groundseg"
@@ -29,14 +29,14 @@ func TestConfigMergeConfigMergeFileIsDirectlyTested(t *testing.T) {
 	if merged.AuthSession.PwHash != customCfg.AuthSession.PwHash {
 		t.Fatalf("expected custom pw hash to override, got %q", merged.AuthSession.PwHash)
 	}
-	if merged.Connectivity.EndpointUrl != defaultCfg.Connectivity.EndpointUrl {
-		t.Fatalf("expected endpoint default fallback, got %q", merged.Connectivity.EndpointUrl)
+	if merged.Connectivity.EndpointURL != defaultCfg.Connectivity.EndpointURL {
+		t.Fatalf("expected endpoint default fallback, got %q", merged.Connectivity.EndpointURL)
 	}
 }
 
 func TestMergeConfigsFallsBackToDefaultsWhenCustomMissing(t *testing.T) {
 	defaultCfg := structs.SysConfig{}
-	defaultCfg.Connectivity.EndpointUrl = "https://default.endpoint"
+	defaultCfg.Connectivity.EndpointURL = "https://default.endpoint"
 	defaultCfg.Connectivity.ApiVersion = "1.0"
 	defaultCfg.Connectivity.WgOn = true
 	defaultCfg.Connectivity.Piers = []string{"alpha"}
@@ -46,8 +46,8 @@ func TestMergeConfigsFallsBackToDefaultsWhenCustomMissing(t *testing.T) {
 	customCfg := structs.SysConfig{}
 
 	merged := MergeConfigs(defaultCfg, customCfg)
-	if merged.Connectivity.EndpointUrl != defaultCfg.Connectivity.EndpointUrl {
-		t.Fatalf("expected endpoint default fallback, got %q", merged.Connectivity.EndpointUrl)
+	if merged.Connectivity.EndpointURL != defaultCfg.Connectivity.EndpointURL {
+		t.Fatalf("expected endpoint default fallback, got %q", merged.Connectivity.EndpointURL)
 	}
 	if merged.Connectivity.ApiVersion != defaultCfg.Connectivity.ApiVersion {
 		t.Fatalf("expected version fallback, got %q", merged.Connectivity.ApiVersion)

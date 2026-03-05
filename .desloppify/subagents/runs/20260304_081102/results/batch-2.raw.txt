@@ -1,0 +1,93 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 82.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "In `goseg/accesspoint/accesspoint_test.go`, small parser/validation tests (`TestResolveAPPasswordUsesEnvOverride`, `TestCheckExtension`-style intent, process matcher tests) sit in the same file as deep command orchestration tests (`TestStartRouterWithRuntimeForwardsForwardingAndNATErrorPaths`, `TestStartRouterBuildsExpectedCommandFlow`, `TestStopRouterWithRuntimeErrorPaths`) with long shared mutable test harness state.",
+        "In `goseg/importer/importer_test.go`, runtime seaming helpers (`importerRuntimeWith`, `authorizeTokenIDsForTest`, `setUploadDirsForTest`) and broad behavior/event assertions are mixed in one module alongside transition/HTTP path tests, increasing maintenance cost without a clear behavioral boundary.",
+        "`goseg/shipworkflow/urbit_operations_runtime.go` and `goseg/docker/orchestration/runtime_ops.go` both encode orchestration patterns as large collections of tiny wrappers/registries instead of declarative specs, producing repeated boilerplate and parallel extension points."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "mixed_responsibility_test_modules_ap_importer",
+      "summary": "Large test files mix low-level parsing/validation and full workflow orchestration scenarios without clear boundaries.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "`goseg/accesspoint/accesspoint_test.go` includes helper-level validation tests (`resolveAPPassword`, `checkParametersWithContext`, matcher tests) plus detailed router lifecycle flow tests that assert long shell command sequences and per-step failure wording in the same suite.",
+        "`goseg/importer/importer_test.go` combines low-level utility helpers (`importerRuntimeWith`, `drainImportTransitions`, `readImportTransitions`, `resetUploadSessionsForTest`) with end-to-end-style transition/event assertions and HTTP/error-path behavior in a single file.",
+        "Both files are already large enough that concerns are hard to isolate and update safely as behavior evolves."
+      ],
+      "suggestion": "Split these tests into focused sub-suites (e.g., `*_validation_test.go`, `*_runtime_flow_test.go`, `*_transition_api_test.go`) and extract shared table-driven helper factories. This preserves intent, reduces accidental coupling between helper design and orchestration assertions, and makes future failures easier to localize.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_file_cohesion_regression"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplication_transition_builder_patterns",
+      "summary": "Transition orchestration is encoded via repetitive one-off wrapper chains that create structural duplication across operations.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`goseg/shipworkflow/urbit_operations_runtime.go` defines many dedicated functions that each build near-identical single-step transition slices (`buildUrbitDomainSteps`, `buildMinIODomainSteps`, `buildRebuildContainerSteps`, `buildTogglePowerSteps`, `buildToggleDevModeSteps`, etc.).",
+        "`goseg/docker/orchestration/runtime_ops.go` maintains multiple seam structs with numerous callback fields and parallel builders (`runtimeSeams`, `runtimeContextOps`, `runtimeFileOps`, `runtimeImageOps`, `runtimeWireguardOps`, etc.), each extending the same pattern manually.",
+        "This creates a duplicated pattern surface where adding/removing behavior requires touching several ad-hoc wrappers rather than one coherent transition/registry descriptor."
+      ],
+      "suggestion": "Introduce a declarative transition/seam schema (e.g., an operation descriptor with lifecycle hooks, mutation strategy, and persistence/action steps) and generate wrapper wiring from that schema in one place. This will collapse repetitive one-liner builders into reusable composition rules and reduce extension mistakes.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "callback_registry_coupling"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicate_connection_store_implementations",
+      "summary": "Connection/session bookkeeping is duplicated across two types with similar semantics but independent implementations.",
+      "related_files": [
+        "goseg/session/connection_registry.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`goseg/connection/registry` logic in `connection_registry.go` and the log session store in `logstream_session_store.go` both implement connection collection lifecycle operations (lookup, append-if-missing, snapshot/copy, remove-by-connection/token) independently.",
+        "`connection_registry.go` (`removeConnectionByConn`, `cleanupStaleBucket`, token bucket transitions) and `logstream_session_store.go` (`RemoveDockerLogSession`, `SetDockerLogSession`, `SysLogSessions` copy semantics) each manage similar edge conditions but with separate policy behavior and mutation paths.",
+        "Because these concerns are split across two hand-maintained stores, it is easy for semantics to drift (cleanup, active/inactive handling, or concurrency assumptions) without compile-time coupling."
+      ],
+      "suggestion": "Extract a shared internal connection-bucket utility for session collection operations (including staged removals, snapshotting, and concurrent mutation policy), then make both registry and logstream store call the shared helpers so behavior differences are explicit and audited.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplication_session_infrastructure"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Mixed-scope test files as a default structure for broad modules",
+      "Callback/step orchestration encoded as repetitive wrapper expansion instead of descriptors",
+      "Session storage responsibilities split into parallel bespoke implementations"
+    ],
+    "likely_symptoms": [
+      "mixed_responsibility_test_modules_ap_importer",
+      "duplication_transition_builder_patterns",
+      "duplicate_connection_store_implementations"
+    ],
+    "possible_false_positives": [
+      "Some mixed-pattern test growth may be intentional because of missing test fixtures/mocking primitives elsewhere in the suite; if a broader test convention exists in adjacent unlisted files, this could be partially deliberate."
+    ]
+  }
+}

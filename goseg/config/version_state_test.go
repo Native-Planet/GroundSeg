@@ -46,7 +46,7 @@ func TestResolveLatestChannelAndPublishVersionMetadata(t *testing.T) {
 
 	setVersionFetchPolicy(1, time.Millisecond)
 	setVersionFetchSleep(func(time.Duration) {})
-	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateURL = "https://updates.example/version"
 	setVersionHTTPClient(&stubVersionHTTPClient{
 		results: []stubVersionHTTPResult{
 			{resp: newHTTPResponse(200, `{"groundseg":{"beta":{"groundseg":{"repo":"repo-beta"}}}}`)},
@@ -91,7 +91,7 @@ func TestCheckVersionReturnsStoredChannelOnFailure(t *testing.T) {
 	store.SetState(existing, true)
 	setVersionStore(store)
 
-	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateURL = "https://updates.example/version"
 	globalConfig.Runtime.GsVersion = "1.0.0"
 	globalConfig.Connectivity.UpdateBranch = "latest"
 	setVersionFetchPolicy(1, time.Millisecond)
@@ -117,7 +117,7 @@ func TestCheckVersionWithErrorReturnsCauseOnFailure(t *testing.T) {
 	store.SetState(existing, true)
 	setVersionStore(store)
 
-	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateURL = "https://updates.example/version"
 	globalConfig.Runtime.GsVersion = "1.0.0"
 	globalConfig.Connectivity.UpdateBranch = "latest"
 	setVersionFetchPolicy(1, time.Millisecond)
@@ -148,7 +148,7 @@ func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
 	setVersionStore(newInMemoryVersionStore())
 	setVersionFetchPolicy(1, time.Millisecond)
 	setVersionFetchSleep(func(time.Duration) {})
-	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateURL = "https://updates.example/version"
 	globalConfig.Runtime.GsVersion = "1.0.0"
 	globalConfig.Connectivity.UpdateBranch = "latest"
 
@@ -193,7 +193,7 @@ func TestSyncVersionInfoWithErrorReturnsCauseOnFailure(t *testing.T) {
 	setVersionStore(newInMemoryVersionStore())
 	setVersionFetchPolicy(1, time.Millisecond)
 	setVersionFetchSleep(func(time.Duration) {})
-	globalConfig.Connectivity.UpdateUrl = "https://updates.example/version"
+	globalConfig.Connectivity.UpdateURL = "https://updates.example/version"
 	globalConfig.Runtime.GsVersion = "1.0.0"
 	globalConfig.Connectivity.UpdateBranch = "latest"
 

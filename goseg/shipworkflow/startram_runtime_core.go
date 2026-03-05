@@ -12,12 +12,16 @@ import (
 
 type startramRuntime = orchestration.StartramRuntime
 
+var startramBroadcastRuntime = func() *broadcast.BroadcastStateRuntime {
+	return broadcast.DefaultBroadcastStateRuntime()
+}
+
 func defaultStartramRuntime() startramRuntime {
 	return resolveStartramRuntime(orchestration.NewStartramRuntime(
 		orchestration.WithStartramServiceLoaders(
 			broadcast.GetStartramServices,
 			func() error {
-				return broadcast.LoadStartramRegionsWithRuntime()
+				return broadcast.LoadStartramRegionsWithRuntimeState(startramBroadcastRuntime())
 			},
 		),
 	))
@@ -76,7 +80,7 @@ func runStartramTransitionWithRuntime(runtime startramRuntime, transitionType tr
 		}
 	}
 	return runTransitionLifecycle[structs.Event](
-		defaultWorkflowRuntime(),
+		newWorkflowRuntime(),
 		func(event structs.Event) error {
 			runtime.PublishEventFn(event)
 			return nil

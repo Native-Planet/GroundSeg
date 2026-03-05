@@ -203,6 +203,7 @@ type failingConn struct{}
 func (f *failingConn) Read(_ []byte) (int, error) { return 0, io.EOF }
 
 var errWriteFailed = errors.New("write failed")
+var errCloseFailed = errors.New("close failed")
 
 func (f *failingConn) Write(_ []byte) (int, error)        { return 0, errWriteFailed }
 func (f *failingConn) Close() error                       { return nil }
@@ -346,5 +347,44 @@ func TestListenerCleansStateWhenConnectionCloses(t *testing.T) {
 	}
 	if _, exists := GetLickStatuses()["~zod"]; exists {
 		t.Fatal("expected listener cleanup to remove lick status")
+	}
+}
+
+type failingCloseConn struct {
+	failingConn
+}
+
+func (f *failingCloseConn) Close() error { return errCloseFailed }
+
+func TestListenerClosesConnectionErrorDoesNotBlockCleanup(t *testing.T) {
+	resetLeakStateForTest(t)
+	done := make(chan struct{})
+
+	go func() {
+		listener("~zod", &failingCloseConn{}, LickStatus{Auth: true})
+		close(done)
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		lickMu.Lock()
+		_, hasChan := BytesChan["~zod"]
+		lickMu.Unlock()
+		if hasChan {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("listener did not exit after close error")
+	}
+	if _, exists := GetLickChannels()["~zod"]; exists {
+		t.Fatal("expected listener close error to trigger channel cleanup")
+	}
+	if _, exists := GetLickStatuses()["~zod"]; exists {
+		t.Fatal("expected listener close error to trigger status cleanup")
 	}
 }

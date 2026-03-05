@@ -1,0 +1,117 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 76.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "`goseg/config/config_update_schema.go` re-declares almost the same config surface as `goseg/structs/configs.go` (connectivity/runtime/startram/auth/penpai fields) through separate patch structs and apply plumbing, creating a second structural model of the same domain.",
+        "`goseg/system/disk/adapter.go` mirrors `goseg/system/storage` types/functions with mostly pass-through conversions (e.g., `FstabRecord`, parse/reconcile/read/write wrappers), adding an extra boundary without clear policy or behavior.",
+        "`goseg/docker/orchestration/runtime_ops.go` and `goseg/accesspoint/accesspoint.go` both use large function-field runtime structs with many optional callbacks and normalization paths; tests like `goseg/startuporchestrator/startup_orchestrator_test.go` and `goseg/main_test.go` then need broad callback wiring maps/options to exercise behavior.",
+        "Protocol-conformance checks are spread across multiple test modules (`goseg/protocol/actions/actions_test.go`, `goseg/protocol/contracts/contracts_test.go`, `goseg/system/wifi_c2c_flow_test.go`, `goseg/uploadsvc/service_test.go`) with repeated contract/action alignment assertions rather than a shared conformance harness."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_config_model_layers",
+      "summary": "Config schema and patch logic duplicate the core config model in parallel structures, increasing drift risk and change cost.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go",
+        "goseg/config/config.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "`ConfPatch` embeds multiple section patches (`ConnectivityPatch`, `RuntimePatch`, `StartramPatch`, `PenpaiPatch`, `AuthSessionPatch`) that mirror `SysConfig` sections.",
+        "Field-level keys like `Piers/WgOn/UpdateMode/...`, runtime values, and auth/session fields exist in both patch structs and persisted config structs, requiring parallel maintenance.",
+        "The patch engine (`confPatchField`, parse/apply/merge functions) creates a second schema authority separate from `structs.SysConfig`."
+      ],
+      "suggestion": "Move to section-scoped patching derived from canonical config section types (or generated mapping metadata) so patch schema is declared once per section and reused for parse/apply/merge paths.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_domain_models"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "pass_through_boundary_adapter",
+      "summary": "The disk adapter layer is largely a pass-through facade over storage, adding indirection without distinct responsibility.",
+      "related_files": [
+        "goseg/system/disk/adapter.go",
+        "goseg/system/storage/storage_test.go"
+      ],
+      "evidence": [
+        "`system/disk/FstabRecord` duplicates storage record shape and just converts to/from `storage.FstabRecord` for `Line` and `ParseFstabLine`.",
+        "Most exported disk functions (`ReadFstabLines`, `WriteFstabLines`, `ListHardDisks`, `CreateGroundSegFilesystem`, etc.) directly call corresponding storage functions with `storage.DefaultSeams()`.",
+        "No boundary-specific policy/validation is introduced in this adapter layer."
+      ],
+      "suggestion": "Either collapse callers directly to `system/storage` or define a smaller disk boundary with explicit policy differences (not full API mirroring), then keep only behavior-adding adapters.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "indirection_without_policy"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_sprawl",
+      "summary": "Large callback-bag runtimes create mixed responsibilities and force broad test wiring, reducing cohesion of module behavior.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`Runtime*Ops` in orchestration and `AccessPointRuntime` expose many function fields spanning unrelated concerns (filesystem, network, lifecycle, process probing, config snapshots).",
+        "Normalization/defaulting logic has to fill many nil callbacks (`normalizeAccessPointRuntime`, seam bundle builders), indicating object breadth instead of focused collaborators.",
+        "Tests introduce extensive callback registration scaffolding (e.g., startup background service callback setter maps and runtime option builders) to control behavior."
+      ],
+      "suggestion": "Split runtime bags into narrower, responsibility-aligned interfaces/components (e.g., process probe, config source, lifecycle executor) and inject only what each flow needs.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "oversized_dependency_bags"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "scattered_protocol_conformance_assertions",
+      "summary": "Protocol contract/action conformance checks are duplicated across multiple test packages instead of centralized reusable suites.",
+      "related_files": [
+        "goseg/protocol/actions/actions_test.go",
+        "goseg/protocol/contracts/contracts_test.go",
+        "goseg/system/wifi_c2c_flow_test.go",
+        "goseg/uploadsvc/service_test.go"
+      ],
+      "evidence": [
+        "Multiple test files separately assert supported action sets, parse behavior, action-contract alignment, and deterministic ordering for overlapping protocol concepts.",
+        "`wifi_c2c_flow_test` and `uploadsvc/service_test` each include contract alignment checks that overlap with protocol-level tests, creating duplicated invariant enforcement paths.",
+        "When contracts evolve, these checks require synchronized edits in several modules."
+      ],
+      "suggestion": "Introduce a shared protocol conformance test harness/fixture package and have feature modules consume canonical assertions instead of re-encoding contract invariants locally.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_invariant_ownership"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Parallel modeling of the same domain (config and protocol) across runtime code and tests.",
+      "Dependency injection style favors broad callback aggregates over focused collaborator boundaries.",
+      "Boundary packages are sometimes preserved as API mirrors instead of behavior-owning modules."
+    ],
+    "likely_symptoms": [
+      "duplicated_config_model_layers",
+      "runtime_seam_sprawl",
+      "scattered_protocol_conformance_assertions"
+    ],
+    "possible_false_positives": []
+  }
+}

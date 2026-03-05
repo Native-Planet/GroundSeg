@@ -9,11 +9,11 @@ import (
 )
 
 var (
-	confForPenpai                 = config.Conf
+	confForPenpai                 = config.Config
 	stopContainerByNameForPenpai  = orchestration.StopContainerByName
 	startContainerForPenpai       = orchestration.StartContainer
 	updateContainerStateForPenpai = config.UpdateContainerState
-	updateConfTypedForPenpai      = config.UpdateConfTyped
+	updateConfTypedForPenpai      = config.UpdateConfigTyped
 	withPenpaiRunningForPenpai    = config.WithPenpaiRunning
 	withPenpaiActiveForPenpai     = config.WithPenpaiActive
 	withPenpaiCoresForPenpai      = config.WithPenpaiCores
@@ -24,7 +24,7 @@ var (
 func PenpaiHandler(msg []byte) error {
 	return systemsvc.HandlePenpai(msg, systemsvc.PenpaiDependencies{
 		Unmarshal:            json.Unmarshal,
-		Conf:                 confForPenpai,
+		Config:               confForPenpai,
 		StopContainerByName:  stopContainerByNameForPenpai,
 		StartContainerByName: startContainerForPenpai,
 		UpdateContainerState: updateContainerStateForPenpai,

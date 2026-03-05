@@ -83,7 +83,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		"id":    payload.Token.ID,
 		"token": tokenContent,
 	}
-	conf := config.Conf()
+	conf := config.Config()
 	// if in c2cmode
 	isC2C := system.IsC2CMode()
 	result := map[string]interface{}{
@@ -190,7 +190,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			MuCon.Write(resp)
 			continue
 		}
-			if authed || conf.Runtime.Setup != "complete" {
+		if authed || conf.Runtime.Setup != "complete" {
 			switch msgType.Payload.Type {
 			case "dev":
 				if err = devsvc.DevHandler(msg); err != nil {
@@ -294,7 +294,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
-				conf = config.Conf()
+				conf = config.Config()
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				zap.L().Warn(errmsg)
@@ -303,12 +303,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				ack = "nack"
 			}
-				if conf.Runtime.Setup != "complete" {
-					resp := structs.SetupBroadcast{
-						Type:      "structure",
-						AuthLevel: "setup",
-						Stage:     conf.Runtime.Setup,
-						Page:      setup.Stages[conf.Runtime.Setup],
+			if conf.Runtime.Setup != "complete" {
+				resp := structs.SetupBroadcast{
+					Type:      "structure",
+					AuthLevel: "setup",
+					Stage:     conf.Runtime.Setup,
+					Page:      setup.Stages[conf.Runtime.Setup],
 					Regions:   startram.RegionsSnapshot(),
 				}
 				respJSON, err := json.Marshal(resp)
