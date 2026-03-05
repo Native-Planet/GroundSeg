@@ -1,8 +1,0 @@
-2026-03-04T21:58:26+00:00 run-start runner=codex parallel=False max_parallel=3 timeout=1200s heartbeat=15.0s stall_warning=20s stall_kill=60s retries=1 retry_backoff=2.0s upper_bound=20m selected=[1]
-2026-03-04T21:58:26+00:00 run-path /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_215822
-2026-03-04T21:58:26+00:00 packet /Users/chuah/NP/GroundSeg/.desloppify/review_packets/holistic_packet_20260304_215822.json
-2026-03-04T21:58:26+00:00 blind-packet /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
-2026-03-04T21:58:26+00:00 batch-start batch=1 position=1/1
-2026-03-04T21:58:48+00:00 batch-done batch=1 position=1/1 code=0 elapsed=22
-2026-03-04T21:58:48+00:00 run-summary /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_215822/run_summary.json
-2026-03-04T21:58:48+00:00 run-finished successful=[1] failed=[] imported=/Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260304_215822/holistic_findings_merged.json
