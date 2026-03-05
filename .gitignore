@@ -1,2 +1,3 @@
 goseg/web/*
 .DS_Store
+.desloppify/
