@@ -1,0 +1,92 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 82.0,
+    "test_strategy": 78.0,
+    "package_organization": 87.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract ownership is modeled inconsistently across catalogs: `goseg/protocol/contracts/catalog/action/specs.go` defines a typed `OwnerModule`, while `goseg/protocol/contracts/catalog/startram/specs.go` uses an untyped string constant `OwnerStartram`.",
+        "Governance policy is split between runtime-adjacent package docs (`goseg/uploadsvc/doc.go`) and top-level process docs (`README.md`), which weakens a single architectural source of truth for contract boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/protocol/contracts/conformance/fixtures_test.go` validates action fixtures and upload payload-rule invariants, but does not exercise StarTram contract catalog invariants from `goseg/protocol/contracts/catalog/startram/specs.go`.",
+        "`goseg/uploadsvc/actions_test.go` validates upload action parsing and payload-rule enforcement, but test coverage remains action-family-centric and does not provide cross-family governance checks promised by contract governance language in `README.md`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "Directory profile shows `goseg/protocol/contracts/` as a focused domain package (`file_count`: 11) with small family-specific subpackages (`catalog/action/` and `catalog/startram/` each `file_count`: 2), which is mostly coherent.",
+        "Governance instructions are distributed across `README.md` and `goseg/uploadsvc/doc.go` rather than centered under the contracts package documentation, creating mild navigation friction for boundary ownership."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Governance/contract ownership guidance is split across root and package-local docs instead of one canonical contracts-location entrypoint."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "inconsistent_contract_owner_taxonomy",
+      "summary": "Owner-domain contracts use inconsistent types across action and startram catalogs.",
+      "related_files": [
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "`action/specs.go` introduces `type OwnerModule string` and uses `string(OwnerUploadService)` / `string(OwnerSystemWiFi)`.",
+        "`startram/specs.go` uses raw string `OwnerStartram` with no shared typed taxonomy.",
+        "Conformance tests in `fixtures_test.go` do not assert owner taxonomy validity across catalogs."
+      ],
+      "suggestion": "Create a shared owner-domain type and allowed-value registry in a common contracts package (for example under `goseg/protocol/contracts/familyspec` or `familycatalog`), migrate both catalogs to that shared type, and add a conformance test that iterates all catalog specs and fails on unknown owner values.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_fragmentation"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "startram_contracts_missing_conformance_gate",
+      "summary": "Contract conformance tests skip StarTram catalog invariants covered by governance scope.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`fixtures_test.go` includes action fixture matching, unknown-action rejection, namespace validation, and upload payload-rule checks, but no assertions over `startram.ContractSpecs()`.",
+        "`startram/specs.go` defines externally meaningful contract metadata (ID/name/message/owner) without a corresponding conformance assertion in this batch scope.",
+        "`README.md` describes a contract conformance gate and governance policy, but current tests in scope mostly validate upload/action paths."
+      ],
+      "suggestion": "Add StarTram-focused conformance tests that validate catalog IDs, ownership, descriptor/message invariants, and uniqueness against other contract families; include these in the same governance gate path used for `./protocol/contracts/...` so action and StarTram families are both enforced by CI.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_governance_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance rules are distributed across catalog code, package docs, and README without a single executable taxonomy/invariant source.",
+      "Conformance coverage is stronger for upload/action contracts than for non-action families, leaving policy asymmetry."
+    ],
+    "likely_symptoms": [
+      "inconsistent_contract_owner_taxonomy",
+      "startram_contracts_missing_conformance_gate"
+    ],
+    "possible_false_positives": []
+  }
+}

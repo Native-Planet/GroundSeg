@@ -1,0 +1,150 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 82.0,
+    "high_level_elegance": 84.0,
+    "test_strategy": 79.0,
+    "package_organization": 81.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract governance is distributed across runtime docs (`README.md` backend gate + governance references), package docs (`goseg/uploadsvc/doc.go`), catalog constants (`goseg/protocol/contracts/catalog/action/specs.go`, `goseg/protocol/contracts/catalog/startram/specs.go`), and conformance tests (`goseg/protocol/contracts/conformance/fixtures_test.go`).",
+        "Action and StarTram contract metadata are authored as hand-maintained string constants in separate catalog files, while conformance tests independently reconstruct expected maps and comparison logic.",
+        "The architecture relies on cross-file social coordination to keep docs, catalog constants, and conformance behavior aligned instead of one canonical machine-readable governance artifact."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "The ownership story for contract policy is fragmented: README explains quality gates, `uploadsvc/doc.go` explains payload policy, and conformance tests encode drift checks, forcing readers to stitch together the contract model manually.",
+        "Family catalog specs repeat similar constant+constructor patterns in separate files (`catalog/action/specs.go` and `catalog/startram/specs.go`) without a shared declaration pattern.",
+        "Conformance assertions in `fixtures_test.go` are comprehensive but encode catalog-shape knowledge procedurally, increasing cognitive load as more families are added."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/uploadsvc/actions_test.go` validates action token parsing only (known/unknown actions) and does not validate the payload-rule contract described in `goseg/uploadsvc/doc.go`.",
+        "`goseg/protocol/contracts/conformance/fixtures_test.go` focuses on fixture/catalog consistency and payload rule metadata exposure, but does not assert upload runtime behavior against those payload rules in this batch.",
+        "README declares contract conformance as a backend quality gate, but these listed tests leave a gap between declared upload payload policy and direct runtime verification in the uploadsvc test surface."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "From `holistic_context.structure.directory_profiles`, governance-related code is split across many small directories: `goseg/protocol/contracts/` (11 files), `goseg/protocol/contracts/familycatalog/` (5), `goseg/protocol/contracts/conformance/` (3), `goseg/protocol/contracts/catalog/action/` (2), `goseg/protocol/contracts/catalog/startram/` (2), plus policy text in `goseg/uploadsvc/` and root `README.md`.",
+        "This distribution creates navigation overhead for one concern (contract governance) because policy, schema constants, and quality-gate assertions are not co-located under a single discoverable governance hub.",
+        "Objective structure signals available in the packet are directory-level (file_count profiles), and they already show a highly partitioned contract area with policy split outside protocol/contracts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "governance_source_of_truth_scatter",
+      "summary": "Contract governance has no single source of truth, forcing manual synchronization across docs, catalog constants, and conformance tests.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "README defines backend contract gates and references governance docs, while `uploadsvc/doc.go` independently states payload policy constraints.",
+        "Catalog files encode contract IDs/names/messages as literals, and conformance tests rebuild expected state and compare against canonical catalog entries.",
+        "No machine-readable governance manifest is referenced by both docs and tests in these files; consistency depends on distributed updates."
+      ],
+      "suggestion": "Create a canonical governance manifest under `goseg/protocol/contracts/governance/` (owners, payload rules, quality-gate invariants), derive catalog specs and conformance fixtures from it, and generate a short policy excerpt consumed by docs. Keep conformance tests focused on manifest-to-runtime projection correctness rather than independent literal duplication.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "distributed_contract_governance"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "family_spec_pattern_duplication",
+      "summary": "Family contract spec declarations repeat bespoke patterns instead of using one domain-level declaration shape.",
+      "related_files": [
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "Action and StarTram families each hand-roll constant sets and constructor functions with similar semantic fields (ID/Name/Description/Owner/Message).",
+        "Conformance tests must carry family-specific translation logic to assert equivalence, increasing policy ceremony as families grow.",
+        "The current approach is correct but structurally repetitive and raises the cost of adding new contract families."
+      ],
+      "suggestion": "Introduce a shared family declaration schema (for example `familyspec.Declaration`) and per-family thin adapters, then refactor tests to consume the same declaration form. This keeps ownership and contract shape explicit while reducing repeated bespoke family wiring.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_contract_governance"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "upload_payload_policy_not_directly_tested_in_uploadsvc",
+      "summary": "Upload service tests cover action parsing but do not directly test the documented payload-rule behavior.",
+      "related_files": [
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/doc.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`actions_test.go` validates only known/unknown action parsing outcomes.",
+        "`doc.go` states strict payload contract requirements (reset forbids open-endpoint payload; open-endpoint requires endpoint/token).",
+        "`fixtures_test.go` validates payload-rule metadata consistency, but this file set does not include tests asserting uploadsvc runtime behavior against those rules."
+      ],
+      "suggestion": "Add table-driven uploadsvc runtime tests that exercise payload validation paths (`reset` with forbidden fields, `open-endpoint` missing required fields, valid payload success) and wire them into the documented backend contract gate command so docs and executable guarantees stay aligned.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_contract_governance"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "contract_governance_concern_spread_across_root_runtime_and_protocol_dirs",
+      "summary": "Contract governance concern is split across root docs, runtime package docs, and multiple protocol subdirectories, reducing navigability.",
+      "related_files": [
+        "README.md",
+        "goseg/uploadsvc/doc.go",
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "Directory profiles show governance logic partitioned across several small protocol/contracts directories, while key policy text lives outside that tree (`README.md`, `uploadsvc/doc.go`).",
+        "Readers must traverse root docs + runtime docs + protocol catalog + conformance tests to understand one contract policy area.",
+        "This placement pattern weakens locality of change for governance updates."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/protocol/contracts/governance/` for policy-facing docs and generated policy summaries; (2) move contract-family declarations under `goseg/protocol/contracts/families/<family>/` (move order: startram then action, then shared helpers) while keeping compatibility aliases temporarily; (3) colocate conformance specs under `goseg/protocol/contracts/governance/conformance/`; (4) update imports with `rg \"protocol/contracts/catalog|protocol/contracts/conformance|uploadsvc/doc\" -n` then `go test ./protocol/contracts/... ./uploadsvc/...`; (5) update README references to the new governance entrypoint and re-run `go test ./...` to validate no broken paths.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_contract_governance"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance knowledge is encoded in multiple artifact types (docs, constants, tests) without a single canonical declaration artifact.",
+      "Family-level contract declarations evolved as local patterns, not one shared governance abstraction."
+    ],
+    "likely_symptoms": [
+      "family_spec_pattern_duplication",
+      "upload_payload_policy_not_directly_tested_in_uploadsvc"
+    ],
+    "possible_false_positives": []
+  }
+}

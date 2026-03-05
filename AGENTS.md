@@ -32,7 +32,7 @@ desloppify status              # check scores — are we at target?
 
 The scan will tell you if subjective dimensions need review. Follow its instructions. To trigger a review manually:
 ```bash
-desloppify review --run-batches --runner codex --parallel --scan-after-import
+desloppify review --prepare    # then follow your runner's review workflow
 ```
 
 ### Phase 2: Plan — decide what to work on
@@ -125,7 +125,9 @@ Overall score = **40% mechanical** + **60% subjective**.
 
 ### Subjective reviews in detail
 
-- **Preferred**: `desloppify review --run-batches --runner codex --parallel --scan-after-import` — does everything in one command.
+- **Local runner (Codex)**: `desloppify review --run-batches --runner codex --parallel --scan-after-import` — automated end-to-end.
+- **Local runner (Claude)**: `desloppify review --prepare` → launch parallel subagents → `desloppify review --import merged.json` — see skill doc overlay for details.
+- **Cloud/external**: `desloppify review --external-start --external-runner claude` → follow session template → `--external-submit`.
 - **Manual path**: `desloppify review --prepare` → review per dimension → `desloppify review --import file.json`.
 - Import first, fix after — import creates tracked state entries for correlation.
 - Target-matching scores trigger auto-reset to prevent gaming.

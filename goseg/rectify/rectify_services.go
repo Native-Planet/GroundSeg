@@ -73,14 +73,16 @@ func (service StartramTransitionService) applyTransitionCompletion(current *stru
 }
 
 type StartramRetrieveReconciler struct {
-	runtime RectifyRuntime
-	syncer  *urbitConfigSyncService
+	runtime         RectifyRuntime
+	syncer          *urbitConfigSyncService
+	createServiceFn func(subdomain, svcType string) error
 }
 
 func NewStartramRetrieveReconciler(runtime RectifyRuntime) *StartramRetrieveReconciler {
 	return &StartramRetrieveReconciler{
-		runtime: runtime,
-		syncer:  &urbitConfigSyncService{runtime: runtime},
+		runtime:         runtime,
+		syncer:          &urbitConfigSyncService{runtime: runtime},
+		createServiceFn: startram.SvcCreate,
 	}
 }
 
@@ -141,8 +143,22 @@ func (reconciler *StartramRetrieveReconciler) reconcilePatpState(patp string, lo
 
 	if !isStartramPatpRegistered(patp, endpointRoot, subdomains) {
 		zap.L().Info(fmt.Sprintf("Registering missing StarTram service for %v", patp))
-		startram.SvcCreate(patp, "urbit")
-		startram.SvcCreate("s3."+patp, "minio")
+		createService := reconciler.createServiceFn
+		if createService == nil {
+			createService = startram.SvcCreate
+		}
+		var createErr error
+		if err := createService(patp, "urbit"); err != nil {
+			createErr = errors.Join(createErr, fmt.Errorf("create urbit service %s: %w", patp, err))
+		}
+		s3Subdomain := "s3." + patp
+		if err := createService(s3Subdomain, "minio"); err != nil {
+			createErr = errors.Join(createErr, fmt.Errorf("create minio service %s: %w", s3Subdomain, err))
+		}
+		if createErr != nil {
+			plan.serviceCreated = false
+			return plan, createErr
+		}
 	}
 
 	for _, remote := range subdomains {

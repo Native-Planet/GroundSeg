@@ -1,0 +1,99 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 77.5,
+    "test_strategy": 72.8
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract ownership metadata is represented with different boundary contracts: `goseg/protocol/contracts/catalog/action/specs.go` uses a dedicated `OwnerModule` type while `goseg/protocol/contracts/catalog/startram/specs.go` uses an untyped string constant.",
+        "Governance rules are split across README policy text (`README.md` Backend Quality Gate), package-level docs (`goseg/uploadsvc/doc.go`), and test logic (`goseg/protocol/contracts/conformance/fixtures_test.go`, `goseg/uploadsvc/actions_test.go`) rather than one executable authority."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/protocol/contracts/conformance/fixtures_test.go` validates action fixtures and upload payload-rule exposure, but it does not assert conformance for non-action contract families such as StarTram (`goseg/protocol/contracts/catalog/startram/specs.go`).",
+        "README claims the contract conformance gate covers family-governance, but tests in this batch exercise upload/action contract paths heavily (`goseg/uploadsvc/actions_test.go`) and do not provide equivalent governance checks for other catalog families."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract_gate_missing_non_action_family_conformance",
+      "summary": "Conformance tests omit non-action contract families, leaving governance gaps.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go",
+        "README.md"
+      ],
+      "evidence": [
+        "Conformance tests assert action fixture coverage and upload payload-rule consistency but contain no checks that StarTram contract specs are present/valid.",
+        "README describes a contract conformance gate including family-governance, but this batch’s conformance tests only enforce action-family behavior."
+      ],
+      "suggestion": "Add family-level conformance tests that enumerate all catalog families (including StarTram) and fail on missing/extra contract specs, then wire those tests into the same contract gate path documented in README.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_contract_governance"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "owner_metadata_contract_drift",
+      "summary": "Owner metadata contracts drift between catalog modules.",
+      "related_files": [
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go"
+      ],
+      "evidence": [
+        "Action catalog defines owner values behind `OwnerModule` typed constants and casts to string at emission time.",
+        "StarTram catalog publishes owner metadata as raw string constants with no shared typed owner contract."
+      ],
+      "suggestion": "Introduce a shared owner type/registry in the contracts layer and require all catalog modules to emit owner metadata through that shared type to prevent silent divergence.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fragmented_contract_governance"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "policy_authority_split_docs_vs_tests_vs_catalog",
+      "summary": "Contract policy authority is split across docs, comments, and tests.",
+      "related_files": [
+        "README.md",
+        "goseg/uploadsvc/doc.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "README defines required backend contract gate behavior and scope.",
+        "uploadsvc package docs define payload-rule governance location, while runtime conformance is separately encoded in tests across two packages.",
+        "No single executable policy source is referenced by both the contract catalog and all governance tests."
+      ],
+      "suggestion": "Define one machine-readable governance entrypoint in `protocol/contracts` (family registry + required invariants), generate or drive conformance tests from it, and reduce README/doc comments to pointers to that executable source.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fragmented_contract_governance"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract governance responsibilities are distributed across documentation, catalog constants, and test suites without a single executable authority.",
+      "Family-level conformance strategy is action-centric, so additional contract families can drift without failing the documented quality gate."
+    ],
+    "likely_symptoms": [
+      "owner_metadata_contract_drift",
+      "policy_authority_split_docs_vs_tests_vs_catalog"
+    ],
+    "possible_false_positives": []
+  }
+}

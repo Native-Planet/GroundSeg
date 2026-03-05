@@ -1,0 +1,96 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 4,
+  "assessments": {
+    "package_organization": 74.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows very large flat directories around these files: goseg/shipworkflow/ (55 files), goseg/config/ (41 files), and goseg/docker/orchestration/ (34 files), each above the >10 mixed-concern threshold in the rubric.",
+        "goseg/shipworkflow/newship_service.go combines transport action routing, key decoding, drive resolution, async orchestration kick-off, and patp normalization/validation tables in one package/file boundary.",
+        "goseg/config/bootstrap.go and goseg/config/config.go span bootstrapping, global runtime state, context facade wrappers, and settings snapshots, indicating ownership boundaries are split across concerns but kept in one root package.",
+        "goseg/docker/orchestration/container_bridge.go and container_config.go are adapter/build-composition files that primarily wire subcomponents (container runtimes/config builders) yet live in the same broad orchestration root package."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "shipworkflow_newship_boundary_blur",
+      "summary": "New-ship transport handling, provisioning orchestration, and patp validation logic are co-located in the same top-level package boundary.",
+      "related_files": [
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/doc.go"
+      ],
+      "evidence": [
+        "directory_profiles lists goseg/shipworkflow/ with 55 files, indicating a flat high-cardinality package.",
+        "newship_service.go includes HandleNewShip action dispatch plus low-level normalizePatp/isValidPatp implementation and lexical tables, while also invoking ProvisionShip orchestration paths.",
+        "newship.go builds provisioning runtime wiring across config/docker/network/shipcreator concerns, keeping composition logic in the same root package as request/validation logic."
+      ],
+      "suggestion": "Stage 1: create `goseg/shipworkflow/newship/` and move action handlers (`HandleNewShip`, `HandleNewShipBoot`, reset/cancel) there. Stage 2: move patp normalization/validation into `goseg/shipworkflow/validation/` (or reuse an existing shared validator package if present), then replace direct calls with that package API. Stage 3: keep runtime wiring in `goseg/shipworkflow/provisioning/` and expose a thin orchestrator entrypoint in root. Stage 4: run `goimports -w goseg/shipworkflow/**/*.go`, then `go test ./goseg/shipworkflow/...` and `go test ./...` to verify import updates and behavior.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_domain_hub_packages"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_root_concern_overload",
+      "summary": "The root config package mixes bootstrap lifecycle, mutable process state, and context facade APIs instead of separating ownership layers.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "directory_profiles lists goseg/config/ with 41 files, well above the mixed-concern split threshold.",
+        "bootstrap.go performs startup sequencing and state initialization (`Initialize`, path/debug setup, persistence interaction, global Ready/state toggles).",
+        "config.go mainly delegates to `config/contextapi` and `config/startramstate` while remaining in root, showing boundary inversion where facade and lifecycle logic share the same package surface."
+      ],
+      "suggestion": "Stage 1: create `goseg/config/bootstrap/` for initialization workflow and `goseg/config/runtime/` for process-context facade/state APIs. Stage 2: move `Initialize` flow and boot helpers into `bootstrap`, preserving stable exported wrappers in `config` temporarily. Stage 3: migrate context facade wrappers and snapshot accessors into `runtime`, then narrow root `config` to compatibility exports. Stage 4: run `goimports -w goseg/config/**/*.go`, then `go test ./goseg/config/...` and `go test ./...` to validate import rewrites and package wiring.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_domain_hub_packages"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "orchestration_adapter_placement",
+      "summary": "Container runtime/config adapter composition files are placed in the broad orchestration root package instead of a dedicated adapter/configbuilder boundary.",
+      "related_files": [
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go",
+        "goseg/docker/orchestration/container_bridge_test.go"
+      ],
+      "evidence": [
+        "directory_profiles lists goseg/docker/orchestration/ with 34 files while also having focused subfolders (`container/`, `internal/`, `subsystem/`), indicating partial but incomplete decomposition.",
+        "container_bridge.go is a wiring-heavy adapter (large callback-input struct + runtime merge templates) whose responsibility is composition, not orchestration behavior.",
+        "container_config.go is a typed dispatch map over container types plus runtime-backed builder selection, another composition concern currently mixed into the root orchestration namespace."
+      ],
+      "suggestion": "Stage 1: create `goseg/docker/orchestration/adapters/` (runtime bridges) and `goseg/docker/orchestration/configbuilder/` (type-to-config dispatch). Stage 2: move `container_bridge.go` into adapters and `container_config.go` into configbuilder; keep forwarding functions in root for backward compatibility. Stage 3: update callers (including shipworkflow provisioning paths) to import the new packages directly. Stage 4: run `goimports -w goseg/docker/orchestration/**/*.go goseg/shipworkflow/**/*.go`, then `go test ./goseg/docker/orchestration/...` and `go test ./...` to validate import/path and behavior stability.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat_domain_hub_packages"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Flat package roots grew beyond cohesive ownership boundaries before decomposition patterns were consistently applied.",
+      "Composition/wiring code and domain behavior are co-located, causing package APIs to represent multiple layers at once."
+    ],
+    "likely_symptoms": [
+      "shipworkflow_newship_boundary_blur",
+      "config_root_concern_overload",
+      "orchestration_adapter_placement"
+    ],
+    "possible_false_positives": [
+      "If compatibility constraints intentionally require root-level APIs during an active migration, some moves may need phased deprecation windows."
+    ]
+  }
+}

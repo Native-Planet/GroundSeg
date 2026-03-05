@@ -1,0 +1,72 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 82.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract governance checks are split across modules: `goseg/protocol/contracts/conformance/fixtures_test.go` validates canonical action/startram catalog bindings while `goseg/uploadsvc/actions_test.go` independently re-validates the same upload action registry and payload-rule contract.",
+        "`goseg/uploadsvc/doc.go` defines cross-package governance policy text, while canonical contract IDs/specs are defined in catalog packages (`goseg/protocol/contracts/catalog/action/specs.go`, `goseg/protocol/contracts/catalog/startram/specs.go`), leaving policy, spec, and enforcement distributed across package boundaries.",
+        "`TestStartramContractSpecsMatchCanonicalCatalog` in `goseg/protocol/contracts/conformance/fixtures_test.go` discovers ownership via string prefix filtering (`strings.HasPrefix`) against IDs built in `goseg/protocol/contracts/catalog/startram/specs.go`, coupling architecture checks to naming taxonomy instead of an explicit module boundary API."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_contract_governance_surfaces",
+      "summary": "Contract governance responsibility is split across catalog, conformance tests, and uploadsvc policy docs.",
+      "related_files": [
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "Catalog packages define canonical IDs/specs (`specs.go` files), but enforcement is duplicated in both `protocol/contracts/conformance` and `uploadsvc` tests.",
+        "`uploadsvc/doc.go` states canonical governance policy location, yet uploadsvc tests still encode cross-package registry invariants (`contracts.UploadActionBindingSpecs`, contract metadata, payload rules).",
+        "This creates multiple architectural control points for one contract boundary, increasing blast radius for any contract model change."
+      ],
+      "suggestion": "Create a single governance verification surface under `protocol/contracts` (e.g., exported conformance helpers or shared fixture assertions) and have `uploadsvc` tests consume that API for boundary checks while keeping uploadsvc-local behavior tests only for parser/validator behavior.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "distributed_contract_authority"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "string_prefix_boundary_detection",
+      "summary": "Startram boundary validation relies on string-prefix scanning instead of explicit typed membership.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go"
+      ],
+      "evidence": [
+        "`TestStartramContractSpecsMatchCanonicalCatalog` builds a prefix from family/scope constants and filters `contracts.ContractCatalogEntries()` with `strings.HasPrefix`.",
+        "The test asserts module ownership by ID text shape (`startram.errors.*`) rather than by explicit catalog grouping API, so taxonomy renames alter boundary semantics across modules."
+      ],
+      "suggestion": "Expose explicit family-scoped catalog accessors (e.g., `contracts.StartramContractEntries()` or typed family tags) and update conformance tests to validate through that boundary, removing architectural dependence on ID string format.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_contract_authority"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract boundary ownership is encoded in several places (constants, docs, conformance tests, service tests) instead of one authoritative boundary API.",
+      "Boundary identification is string-convention driven, so architectural checks depend on naming taxonomy."
+    ],
+    "likely_symptoms": [
+      "split_contract_governance_surfaces",
+      "string_prefix_boundary_detection"
+    ],
+    "possible_false_positives": []
+  }
+}

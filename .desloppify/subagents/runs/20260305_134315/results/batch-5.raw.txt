@@ -1,0 +1,92 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Broadcast runtime precondition failures are represented with mixed strategies in the same subsystem: sentinel errors (`errBroadcastLoopRuntimeRequired` in `goseg/broadcast/loop.go`) versus fresh string errors (`fmt.Errorf(\"broadcast runtime is required\")` in `runBroadcastTickWithRuntime`/`buildBroadcastTickState`, and `errors.New(\"broadcast state runtime is required to reload urbits\")` in `goseg/broadcast/state_lifecycle.go`).",
+        "Background loops use inconsistent escalation policies for repeated runtime failures: `dockerSubscriptionHandlerWithRuntime` in `goseg/docker/orchestration/subsystem/subsystem_events.go` aborts after a threshold, while `check502Loop`/`processCheck502Pier` in `goseg/docker/orchestration/subsystem/subsystem_health.go` log many operational failures and continue indefinitely.",
+        "Importer workflow error handling can replace or suppress primary failure context: `runImportPhases` can return publish-transition error instead of underlying workflow failure path, and `errorCleanup` logs publish failures but does not propagate them in `goseg/importer/importer.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast_runtime_error_type_drift",
+      "summary": "Broadcast runtime precondition failures use incompatible error identities, making failure handling non-uniform.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/loop.go` defines sentinel `errBroadcastLoopRuntimeRequired` but `runBroadcastTickWithRuntime`/`buildBroadcastTickState` return new string errors (`fmt.Errorf(\"broadcast runtime is required\")`, `fmt.Errorf(\"broadcast state runtime is required\")`).",
+        "`goseg/broadcast/state_lifecycle.go` uses another independent constructor (`errors.New(\"broadcast state runtime is required to reload urbits\")`) for the same class of nil-runtime failure.",
+        "`goseg/broadcast/state.go` already centralizes similar runtime requirements via `errBroadcastRuntimeRequired`, showing competing conventions inside one subsystem."
+      ],
+      "suggestion": "Standardize runtime precondition errors around shared sentinels per subsystem and always wrap with `%w` when adding context. Replace string-only constructors for equivalent conditions so callers can reliably use `errors.Is` across broadcast entry points.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "background_error_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "loop_escalation_policy_inconsistent",
+      "summary": "Long-running subsystem loops treat repeated operational failures inconsistently, producing unpredictable recovery behavior.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`dockerSubscriptionHandlerWithRuntime` tracks consecutive failures and returns a terminal error after `dockerTransitionFailureLimit`.",
+        "`check502Loop`/`processCheck502Pier` repeatedly log errors (`LoadUrbitConfigFn`, network lookup, remote polling, recovery failure) and continue without threshold-based escalation.",
+        "`DockerLogStreamerWithRuntime` and `RunOldLogsCleanupLoopWithContext` implement explicit consecutive-failure cutoffs, indicating another error policy in similar daemon-style loops."
+      ],
+      "suggestion": "Define a shared background-loop error policy (retry budget, backoff, and terminal criteria) and apply it consistently to docker event handling, 502 health checks, and logstream workers. Use one helper that records consecutive failure windows and returns typed terminal errors when policy is exceeded.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "background_error_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "importer_error_priority_loss",
+      "summary": "Importer workflow cleanup/publish failures can overshadow or silently drop the primary import failure context.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "In `runImportPhases`, when workflow execution fails, later publish failures can become the returned error (`import phase transition publish failed ...`) instead of preserving the original workflow error as primary context.",
+        "`errorCleanup` returns rollback errors, but transition publish failures are only logged (`failed to publish ...`) and not propagated, which can hide notification-plane failures from callers.",
+        "Event publishing in `goseg/docker/events/events.go` has typed errors (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`), but importer paths do not consistently retain these typed causes end-to-end."
+      ],
+      "suggestion": "Return joined errors that always include the original workflow failure first, then cleanup/publish failures as secondary causes. For cleanup transition publication, propagate joined publish errors (or attach them to the returned cleanup error) instead of logging-only paths.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "background_error_policy_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single enforced contract for background-loop failure semantics (retry vs fail-fast vs log-and-continue).",
+      "Sentinel-error discipline is not consistently applied at subsystem boundaries."
+    ],
+    "likely_symptoms": [
+      "broadcast_runtime_error_type_drift",
+      "loop_escalation_policy_inconsistent",
+      "importer_error_priority_loss"
+    ],
+    "possible_false_positives": []
+  }
+}

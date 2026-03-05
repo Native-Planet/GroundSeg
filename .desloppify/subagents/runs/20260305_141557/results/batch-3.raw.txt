@@ -1,0 +1,103 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 71.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/catalog/action/specs.go defines both upload and c2c action contracts in one catalog, but owner modules differ (OwnerUploadService vs OwnerSystemWiFi), indicating multiple runtime boundaries are governed from one mixed contract surface.",
+        "README.md defines the contract conformance quality gate as `go test ./protocol/contracts/... ./uploadsvc/...`, which hard-codes uploadsvc as the runtime side of governance while c2c action ownership is declared as system/wifi in the contract catalog.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go checks that C2C fixture metadata exists, but does not establish an enforced runtime-side conformance boundary for the declared C2C owner module."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "goseg/uploadsvc/doc.go states open-endpoint requires a complete endpoint/token payload, but goseg/uploadsvc/actions_test.go only tests presence/absence of OpenEndpointRequest and ResetRequest pointers, not field completeness semantics.",
+        "README.md quality gate command scopes contract conformance testing to `./protocol/contracts/... ./uploadsvc/...`; this misses runtime-side quality-gate coverage for non-upload action owners declared in goseg/protocol/contracts/catalog/action/specs.go (e.g., c2c owned by system/wifi).",
+        "goseg/protocol/contracts/conformance/fixtures_test.go validates catalog/fixture coherence and payload-rule overlap, but no assigned test verifies end-to-end consumer behavior for C2C contract usage analogous to uploadsvc runtime validation coverage."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mixed_contract_ownership_boundary",
+      "summary": "Action contract governance mixes upload and c2c ownership domains while process-level quality gates are upload-centric, creating a boundary integrity gap.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "goseg/protocol/contracts/catalog/action/specs.go defines NamespaceUpload and NamespaceC2C contracts together, with OwnerUploadService and OwnerSystemWiFi respectively.",
+        "README.md binds contract conformance gate to `./protocol/contracts/... ./uploadsvc/...`, which does not include the declared C2C runtime-owner module path.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go only asserts C2C fixture/catalog coherence, not owner-runtime behavior conformance."
+      ],
+      "suggestion": "Split governance into explicit per-owner contract families or add owner-scoped conformance suites and CI gates (e.g., include system/wifi owner runtime tests when c2c contracts exist). Keep contract catalog ownership and quality-gate scope mechanically aligned.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "owner_boundary_not_enforced_by_quality_gates"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "quality_gate_owner_coverage_gap",
+      "summary": "Contract conformance gate coverage does not include runtime modules for all declared action owners, so owner-specific regressions can pass green.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "README.md backend contract gate command only runs `./protocol/contracts/... ./uploadsvc/...`.",
+        "goseg/protocol/contracts/catalog/action/specs.go declares C2C action owner as OwnerSystemWiFi, indicating a non-upload runtime consumer.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go verifies metadata coherence for C2C but does not exercise C2C runtime owner behavior."
+      ],
+      "suggestion": "Expand the contract quality gate to include owner-runtime test targets for every action owner declared in the catalog, and add a failing guard test that detects unmapped owner modules in CI gate configuration.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "owner_boundary_not_enforced_by_quality_gates"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "open_endpoint_completeness_not_tested",
+      "summary": "Upload action tests do not validate the documented requirement that open-endpoint payload fields be complete, leaving a docs-vs-runtime contract blind spot.",
+      "related_files": [
+        "goseg/uploadsvc/doc.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "goseg/uploadsvc/doc.go states open-endpoint requires a complete endpoint/token payload.",
+        "goseg/uploadsvc/actions_test.go checks missing OpenEndpointRequest pointer and forbidden payload mixing, but has no cases for empty Endpoint, TokenID, or TokenValue fields.",
+        "The helper commandForUploadBinding always generates non-empty endpoint/token values, so current positive-path tests cannot detect acceptance of incomplete payload fields."
+      ],
+      "suggestion": "Add table-driven negative tests for open-endpoint payload field completeness (empty endpoint, empty token id, empty token value, and combinations) and assert specific validation errors to align runtime behavior with the documented contract.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "docs_runtime_contract_not_fully_enforced_in_tests"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Quality-gate ownership mapping is process-defined in docs/README rather than derived from contract-owner declarations, allowing architectural drift.",
+      "Contract documentation claims stronger runtime guarantees than what targeted tests currently prove."
+    ],
+    "likely_symptoms": [
+      "mixed_contract_ownership_boundary",
+      "quality_gate_owner_coverage_gap",
+      "open_endpoint_completeness_not_tested"
+    ],
+    "possible_false_positives": []
+  }
+}

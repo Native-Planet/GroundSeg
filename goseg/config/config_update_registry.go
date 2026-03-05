@@ -717,10 +717,7 @@ func allConfigPatchFields() []configPatchField {
 				if target == nil {
 					return nil
 				}
-				target.Runtime.LinuxUpdates = struct {
-					Value    int    `json:"value"`
-					Interval string `json:"interval"`
-				}{
+				target.Runtime.LinuxUpdates = structs.LinuxUpdatesConfig{
 					Value:    value.Value,
 					Interval: value.Interval,
 				}

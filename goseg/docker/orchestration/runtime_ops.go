@@ -144,14 +144,11 @@ var (
 
 type StartupBootstrapOps struct {
 	InitializeFn func() error
-	Initialize   func() error
 }
 
 type StartupImageOps struct {
 	GetLatestContainerInfoFn func(string) (registry.ImageDescriptor, error)
 	PullImageIfNotExistFn    func(string, registry.ImageDescriptor) (bool, error)
-	GetLatestContainerInfo   func(string) (registry.ImageDescriptor, error)
-	PullImageIfNotExist      func(string, registry.ImageDescriptor) (bool, error)
 }
 
 type StartupLoadOps struct {
@@ -161,75 +158,6 @@ type StartupLoadOps struct {
 	LoadNetdataFn   func() error
 	LoadUrbitsFn    func() error
 	LoadLlamaFn     func() error
-	LoadWireguard   func() error
-	LoadMC          func() error
-	LoadMinIOs      func() error
-	LoadNetdata     func() error
-	LoadUrbits      func() error
-	LoadLlama       func() error
-}
-
-func (ops StartupBootstrapOps) initializeCallback() func() error {
-	if ops.InitializeFn != nil {
-		return ops.InitializeFn
-	}
-	return ops.Initialize
-}
-
-func (ops StartupImageOps) getLatestContainerInfoCallback() func(string) (registry.ImageDescriptor, error) {
-	if ops.GetLatestContainerInfoFn != nil {
-		return ops.GetLatestContainerInfoFn
-	}
-	return ops.GetLatestContainerInfo
-}
-
-func (ops StartupImageOps) pullImageIfNotExistCallback() func(string, registry.ImageDescriptor) (bool, error) {
-	if ops.PullImageIfNotExistFn != nil {
-		return ops.PullImageIfNotExistFn
-	}
-	return ops.PullImageIfNotExist
-}
-
-func (ops StartupLoadOps) loadWireguardCallback() func() error {
-	if ops.LoadWireguardFn != nil {
-		return ops.LoadWireguardFn
-	}
-	return ops.LoadWireguard
-}
-
-func (ops StartupLoadOps) loadMCCallback() func() error {
-	if ops.LoadMCFn != nil {
-		return ops.LoadMCFn
-	}
-	return ops.LoadMC
-}
-
-func (ops StartupLoadOps) loadMinIOsCallback() func() error {
-	if ops.LoadMinIOsFn != nil {
-		return ops.LoadMinIOsFn
-	}
-	return ops.LoadMinIOs
-}
-
-func (ops StartupLoadOps) loadNetdataCallback() func() error {
-	if ops.LoadNetdataFn != nil {
-		return ops.LoadNetdataFn
-	}
-	return ops.LoadNetdata
-}
-
-func (ops StartupLoadOps) loadUrbitsCallback() func() error {
-	if ops.LoadUrbitsFn != nil {
-		return ops.LoadUrbitsFn
-	}
-	return ops.LoadUrbits
-}
-
-func (ops StartupLoadOps) loadLlamaCallback() func() error {
-	if ops.LoadLlamaFn != nil {
-		return ops.LoadLlamaFn
-	}
-	return ops.LoadLlama
 }
 
 type runtimeSeamRegistry struct {

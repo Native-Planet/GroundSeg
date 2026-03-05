@@ -1,0 +1,115 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 76.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Orchestration runtime composition is spread across parallel seam structs and repeated field-by-field merge/wiring paths in goseg/docker/orchestration/runtime_core.go (WithRuntimeDependencies/NewRuntimeWithDependencies/WithStartupRuntimeDependencies) and goseg/docker/orchestration/runtime_ops.go (defaultRuntime* and defaultStartup* builders).",
+        "Legacy dual callback naming (e.g., Initialize and InitializeFn, LoadWireguard and LoadWireguardFn) requires normalization shims and duplicate selector methods across goseg/docker/orchestration/runtime_core.go and goseg/docker/orchestration/runtime_ops.go.",
+        "Global mutable default runtimes are used as operational seams in production code (goseg/docker/events/events.go, goseg/broadcast/state.go) and are repeatedly saved/restored in tests (goseg/startram/backup_runtime_test.go, goseg/startram/state_sync_test.go, goseg/importer/importer_test.go), indicating hidden shared-state coupling.",
+        "Config patch schema code combines parsing, update detection, apply semantics, merge semantics, and global registry initialization in one unit in goseg/config/config_update_schema.go, while depending on wide cross-section config shapes from goseg/structs/configs.go."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "orchestration_seam_wiring_duplication",
+      "summary": "Runtime seam composition is duplicated across constructors and dependency-merging paths, creating drift-prone structural wiring.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "goseg/docker/orchestration/runtime_core.go manually merges six runtime seam groups in both WithRuntimeDependencies (lines 81-89) and NewRuntimeWithDependencies (lines 92-100), plus a parallel three-group startup merge in WithStartupRuntimeDependencies (lines 133-138).",
+        "goseg/docker/orchestration/runtime_ops.go separately defines default constructors for each seam group (defaultRuntimeContainerOps/defaultRuntimeUrbit/defaultRuntimeSnapshot/defaultRuntimeStartupOps/defaultStartup*), so behavior is distributed across many hand-kept assembly points.",
+        "This pattern means adding or renaming one seam requires synchronized edits in multiple files and functions rather than one authoritative composition boundary."
+      ],
+      "suggestion": "Introduce a single runtime seam registry/builder API that owns merge order and default wiring for both Runtime and StartupRuntime; generate or centralize composition tables so new seams are declared once and automatically included.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "orchestration_dual_callback_contract",
+      "summary": "Dual callback field conventions (legacy and Fn suffix) force normalization and duplicate dispatch logic instead of one coherent interface.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_core.go"
+      ],
+      "evidence": [
+        "goseg/docker/orchestration/runtime_ops.go defines paired callback fields in startup seams (e.g., InitializeFn + Initialize; GetLatestContainerInfoFn + GetLatestContainerInfo; LoadWireguardFn + LoadWireguard and similar pairs through line 170).",
+        "goseg/docker/orchestration/runtime_core.go contains dedicated normalization shims for each paired group (normalizeStartupBootstrapOps/normalizeStartupImageOps/normalizeStartupLoadOps, lines 166-257) with repetitive assignment fallback blocks.",
+        "goseg/docker/orchestration/runtime_ops.go also needs parallel callback selectors (initializeCallback/getLatestContainerInfoCallback/load*Callback methods, lines 172-233), indicating sustained compatibility complexity in the core runtime contract."
+      ],
+      "suggestion": "Deprecate one naming style and migrate to a single callback field per operation; provide a short-lived adapter layer at construction boundaries only, then remove normalize/callback-selector duplication.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "global_runtime_singleton_coupling",
+      "summary": "Process-wide mutable runtime singletons act as implicit dependencies, increasing cross-test and cross-module coupling.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/broadcast/state.go",
+        "goseg/startram/backup_runtime_test.go",
+        "goseg/startram/state_sync_test.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "goseg/docker/events/events.go exposes mutable global runtime state via DefaultEventRuntime/SetDefaultEventRuntime/ResetDefaultEventRuntime (lines 33-55).",
+        "goseg/broadcast/state.go follows the same global mutable runtime pattern with DefaultBroadcastStateRuntime/SetDefaultBroadcastStateRuntime/ResetDefaultBroadcastStateRuntime (lines 166-186).",
+        "Assigned tests repeatedly snapshot and restore package globals (e.g., defaultAPIClient/defaultConfigService/defaultRetrieveStateSyncer in goseg/startram/state_sync_test.go lines 59-66 and 103-110; defaultAPIClient/defaultBackupInfrastructureService in goseg/startram/backup_runtime_test.go lines 94-97 and 129-132), and importer tests consume default event runtime channels directly (goseg/importer/importer_test.go lines 32-54)."
+      ],
+      "suggestion": "Move runtime dependencies behind explicit constructors/context objects and pass brokers/stores into services and handlers; keep global defaults only as thin bootstrap wrappers, not mutable state used by core logic and tests.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_dependencies"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_engine_overloaded_unit",
+      "summary": "Config patch schema file combines too many responsibilities (field schema, parsing, applying, merging, registry lifecycle), obscuring extension boundaries.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "goseg/config/config_update_schema.go defines patch data model, generic field meta-type, parsing callbacks, apply callbacks, and merge callbacks in one file (e.g., configPatchField and newConfigPatchField at lines 105-270).",
+        "The same file owns global registry lifecycle and validation (configPatchByKey/init/buildConfigPatchByKey/validateConfigPatchFields at lines 303-334) and request parsing entrypoint (buildConfigPatch at lines 417-431).",
+        "Patch behavior depends on many domains from goseg/structs/configs.go (connectivity/runtime/startram/auth/penpai), while large test coverage in goseg/config/config_test.go indicates broad behavior surface concentrated into one implementation unit."
+      ],
+      "suggestion": "Split into explicit modules: field catalog declaration, parser/validator, applier, and merge strategy; keep a small coordinator that wires them. This preserves generic helpers while reducing responsibility mixing and simplifying future section additions.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_patch_conflated_layers"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime dependency management relies on mutable globals and multi-entrypoint seam wiring instead of a single composition boundary.",
+      "Backward-compatibility callback aliases were retained in core types, creating persistent normalization overhead.",
+      "Config patching evolved as one accumulating utility layer instead of separated parser/apply/merge components."
+    ],
+    "likely_symptoms": [
+      "orchestration_dual_callback_contract",
+      "orchestration_seam_wiring_duplication",
+      "global_runtime_singleton_coupling"
+    ],
+    "possible_false_positives": []
+  }
+}

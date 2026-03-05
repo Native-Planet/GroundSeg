@@ -2,6 +2,7 @@ package authsession
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -111,6 +112,25 @@ func TestSessionStoreAddToAuthMapRejectsBadInputs(t *testing.T) {
 	}
 	if err := store.AddToAuthMap(conn, map[string]string{"token": "v"}, true); err == nil {
 		t.Fatal("expected token without token ID to be rejected")
+	}
+}
+
+func TestSessionStoreAddToAuthMapRejectsMissingClientManager(t *testing.T) {
+	store := newSessionStore()
+	store.getClientManager = func() *session.ClientManager { return nil }
+	store.persistAuthorized = func(string, string, string) error { return nil }
+	store.persistUnauthorized = func(string, string, string) error { return nil }
+
+	err := store.AddToAuthMap(
+		&websocket.Conn{},
+		map[string]string{"id": "token-id", "token": "token-value"},
+		true,
+	)
+	if err == nil {
+		t.Fatal("expected missing client manager to be rejected")
+	}
+	if !strings.Contains(err.Error(), "client manager unavailable") {
+		t.Fatalf("unexpected missing client manager error: %v", err)
 	}
 }
 

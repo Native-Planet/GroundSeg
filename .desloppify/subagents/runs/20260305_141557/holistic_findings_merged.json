@@ -1,0 +1,466 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 47.0,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 67.0,
+        "Indirection Cost": 74.0,
+        "Interface Honesty": 72.0
+      }
+    },
+    "contract_coherence": 76.4,
+    "cross_module_architecture": 56.6,
+    "error_consistency": 65.7,
+    "test_strategy": 61.3
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Contract governance checks are split across modules: `goseg/protocol/contracts/conformance/fixtures_test.go` validates canonical action/startram catalog bindings while `goseg/uploadsvc/actions_test.go` independently re-validates the same upload action registry and payload-rule contract.",
+        "`goseg/uploadsvc/doc.go` defines cross-package governance policy text, while canonical contract IDs/specs are defined in catalog packages (`goseg/protocol/contracts/catalog/action/specs.go`, `goseg/protocol/contracts/catalog/startram/specs.go`), leaving policy, spec, and enforcement distributed across package boundaries.",
+        "`TestStartramContractSpecsMatchCanonicalCatalog` in `goseg/protocol/contracts/conformance/fixtures_test.go` discovers ownership via string prefix filtering (`strings.HasPrefix`) against IDs built in `goseg/protocol/contracts/catalog/startram/specs.go`, coupling architecture checks to naming taxonomy instead of an explicit module boundary API."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Large callback-bag runtimes are used as generic dependency containers rather than cohesive domain abstractions (e.g., `startupInitRuntime`/`StartupRuntime` in startup orchestrator, `importerRuntime` with embedded sub-runtimes, and `workflowRuntime` embedding multiple orchestration op groups).",
+        "Multiple packages expose paired default-entry and runtime-injected entrypoints with minimal behavior difference (`StartBroadcastLoop` vs `StartBroadcastLoopWithRuntime`, `runBroadcastTick` vs `runBroadcastTickWithRuntime`, `DispatchUploadImport` vs `DispatchUploadImportWithCoordinator`, `StartBackupRoutines` vs `StartBackupRoutinesWithContext`).",
+        "A pass-through delegation layer (`DelegatingEventBroker`) mirrors all `EventBroker` methods without adding policy/translation, while callers still use concrete defaults (`events.DefaultEventRuntime()`) directly."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 67.0,
+        "indirection_cost": 74.0,
+        "interface_honesty": 72.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "goseg/uploadsvc/doc.go states open-endpoint requires a complete endpoint/token payload, but goseg/uploadsvc/actions_test.go only tests presence/absence of OpenEndpointRequest and ResetRequest pointers, not field completeness semantics.",
+        "README.md quality gate command scopes contract conformance testing to `./protocol/contracts/... ./uploadsvc/...`; this misses runtime-side quality-gate coverage for non-upload action owners declared in goseg/protocol/contracts/catalog/action/specs.go (e.g., c2c owned by system/wifi).",
+        "goseg/protocol/contracts/conformance/fixtures_test.go validates catalog/fixture coherence and payload-rule overlap, but no assigned test verifies end-to-end consumer behavior for C2C contract usage analogous to uploadsvc runtime validation coverage."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "Fail-fast startup checks are time-bounded to 250ms in `waitForFailFastErrors` and return nil on timeout (`goseg/startuporchestrator/startup_orchestrator.go`), while `Bootstrap` performs a single `o.health(ctx)` call at startup end, so delayed worker failures can be missed entirely.",
+        "Wi-Fi nmcli parsers keep parse errors but only return one when no valid rows were parsed (`goseg/system/wifi_runtime_methods.go`), so malformed command output can degrade silently while API methods still return success (`goseg/system/wifi_runtime_api.go`).",
+        "Some paths preserve typed publish-policy handling (e.g. importer transition publish uses `transition.HandleTransitionPublishError`), but neighboring paths still collapse error context to plain strings for state (`AddSystemTransitionError(err.Error())` in broadcast tick flow)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "contract_coherence": {
+      "evidence": [
+        "Upload transition type semantics are encoded as raw strings (`\"status\"`, `\"patp\"`, `\"extracted\"`, `\"error\"`) in policy and publish helpers (`goseg/importer/importer.go`) instead of a shared typed contract.",
+        "Workflow transition lifecycles also emit string literals (e.g., `ErrorEvent: func(_ error) string { return \"error\" }`) in `goseg/shipworkflow/operations_runtime.go`, duplicating event vocabulary outside a single authority.",
+        "The reviewed package set mixes strongly typed transition channels (`goseg/docker/events/events.go`) with stringly-typed event values in higher-level workflow/import flows, creating contract drift risk across boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_contract_governance_surfaces",
+      "summary": "Contract governance responsibility is split across catalog, conformance tests, and uploadsvc policy docs.",
+      "related_files": [
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "Catalog packages define canonical IDs/specs (`specs.go` files), but enforcement is duplicated in both `protocol/contracts/conformance` and `uploadsvc` tests.",
+        "`uploadsvc/doc.go` states canonical governance policy location, yet uploadsvc tests still encode cross-package registry invariants (`contracts.UploadActionBindingSpecs`, contract metadata, payload rules).",
+        "This creates multiple architectural control points for one contract boundary, increasing blast radius for any contract model change."
+      ],
+      "suggestion": "Create a single governance verification surface under `protocol/contracts` (e.g., exported conformance helpers or shared fixture assertions) and have `uploadsvc` tests consume that API for boundary checks while keeping uploadsvc-local behavior tests only for parser/validator behavior.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "distributed_contract_authority"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "string_prefix_boundary_detection",
+      "summary": "Startram boundary validation relies on string-prefix scanning instead of explicit typed membership.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/protocol/contracts/catalog/startram/specs.go"
+      ],
+      "evidence": [
+        "`TestStartramContractSpecsMatchCanonicalCatalog` builds a prefix from family/scope constants and filters `contracts.ContractCatalogEntries()` with `strings.HasPrefix`.",
+        "The test asserts module ownership by ID text shape (`startram.errors.*`) rather than by explicit catalog grouping API, so taxonomy renames alter boundary semantics across modules."
+      ],
+      "suggestion": "Expose explicit family-scoped catalog accessors (e.g., `contracts.StartramContractEntries()` or typed family tags) and update conformance tests to validate through that boundary, removing architectural dependence on ID string format.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_contract_authority"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_bag_overreach",
+      "summary": "Runtime structs have grown into broad callback bags that obscure real domain boundaries and reduce abstraction leverage.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`startupInitRuntime` and `StartupRuntime` embed multiple grouped runtime structs plus many function seams, then compose long step lists with policy wrappers, indicating orchestration and dependency wiring are coupled in one abstraction.",
+        "`importerRuntime` embeds storage/upload/provision groups and carries many callbacks (validation, filesystem, workflow, transition publishing), then aliases the same bag as init/workflow/publish runtime types.",
+        "`workflowRuntime` embeds `RuntimeContainerOps`, `RuntimeUrbitOps`, and `RuntimeSnapshotOps` plus workflow-specific seams; this mixes unrelated concerns (container operations, DNS lookup, transition emission, upload orchestration) in one contract."
+      ],
+      "suggestion": "Split callback bags into narrower role-specific ports (e.g., `TransitionPublisher`, `ShipConfigStore`, `ContainerControl`, `StartupSubsystemRegistry`) and pass only the required role to each use case. Replace embedded mega-runtimes with constructor-wired services per workflow path.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "withruntime_wrapper_chain_tax",
+      "summary": "Repeated default/WithRuntime wrapper chains add call depth without adding policy or translation.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/routines/system/system.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Broadcast loop path layers through helper constructors and wrappers (`StartBroadcastLoop` -> `StartBroadcastLoopWithRuntime` -> `runBroadcastLoop` -> `runBroadcastTickWithRuntime`), while many wrappers only perform nil checks or default resolution.",
+        "State lifecycle exposes near-duplicate runtime wrappers (`LoadStartramRegionsWithRuntime` forwarding to `LoadStartramRegionsWithRuntimeState`, plus similar runtime/default split for reload).",
+        "Workflow and routine packages repeat this pattern (`DispatchUploadImport` -> `DispatchUploadImportWithCoordinator`; `StartBackupRoutines` forwarding to another package) with minimal abstraction gain."
+      ],
+      "suggestion": "Collapse wrapper layers into one explicit public path per use case: keep either default-only entrypoints or injected-runtime entrypoints, not both across all operations. Where both are required, enforce a single boundary adapter that adds concrete behavior (policy, telemetry, retries), not just forwarding.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "zero_value_delegate_interface",
+      "summary": "The event broker delegate abstraction duplicates the same contract with nearly pure pass-through methods.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`DelegatingEventBroker` implements each `EventBroker` method by nil-checking and forwarding to `delegate` without adding cross-cutting behavior.",
+        "Callers still capture concrete defaults (`events.DefaultEventRuntime()` in workflow and importer), so the delegation layer does not centralize policy or hide implementation changes.",
+        "This creates another indirection surface while concrete publish semantics are already defined by `EventRuntime` + `publishDropOnFull`."
+      ],
+      "suggestion": "Remove `DelegatingEventBroker` unless it enforces real policy (e.g., tracing/metrics/retry/backpressure translation). If policy is needed, make that policy explicit in a single decorator used by runtime constructors and stop direct default-runtime capture in downstream packages.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "low_value_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "mutable_global_runtime_singletons",
+      "summary": "Mutable package-level default runtimes leak across boundaries and undermine explicit dependency abstractions.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "Broadcast state and loop maintain mutable globals with setters/resets (`DefaultBroadcastStateRuntime`, `SetDefaultBroadcastStateRuntime`, `defaultBroadcastLoopController`, `SetDefaultBroadcastLoopController`).",
+        "Events runtime also exposes mutable process-global state (`defaultEventRuntime`, `SetDefaultEventRuntime`, `ResetDefaultEventRuntime`).",
+        "This pattern allows hidden cross-module mutation and encourages callers to bypass explicit dependency injection, reducing interface honesty and making abstraction boundaries implicit."
+      ],
+      "suggestion": "Constrain mutable globals to bootstrap-only assembly and pass immutable runtime instances down from constructors. Deprecate public `SetDefault*` APIs in favor of context/service wiring so runtime ownership is explicit.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_runtime_state"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mixed_contract_ownership_boundary",
+      "summary": "Action contract governance mixes upload and c2c ownership domains while process-level quality gates are upload-centric, creating a boundary integrity gap.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "goseg/protocol/contracts/catalog/action/specs.go defines NamespaceUpload and NamespaceC2C contracts together, with OwnerUploadService and OwnerSystemWiFi respectively.",
+        "README.md binds contract conformance gate to `./protocol/contracts/... ./uploadsvc/...`, which does not include the declared C2C runtime-owner module path.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go only asserts C2C fixture/catalog coherence, not owner-runtime behavior conformance."
+      ],
+      "suggestion": "Split governance into explicit per-owner contract families or add owner-scoped conformance suites and CI gates (e.g., include system/wifi owner runtime tests when c2c contracts exist). Keep contract catalog ownership and quality-gate scope mechanically aligned.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "owner_boundary_not_enforced_by_quality_gates"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "quality_gate_owner_coverage_gap",
+      "summary": "Contract conformance gate coverage does not include runtime modules for all declared action owners, so owner-specific regressions can pass green.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "README.md backend contract gate command only runs `./protocol/contracts/... ./uploadsvc/...`.",
+        "goseg/protocol/contracts/catalog/action/specs.go declares C2C action owner as OwnerSystemWiFi, indicating a non-upload runtime consumer.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go verifies metadata coherence for C2C but does not exercise C2C runtime owner behavior."
+      ],
+      "suggestion": "Expand the contract quality gate to include owner-runtime test targets for every action owner declared in the catalog, and add a failing guard test that detects unmapped owner modules in CI gate configuration.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "owner_boundary_not_enforced_by_quality_gates"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "open_endpoint_completeness_not_tested",
+      "summary": "Upload action tests do not validate the documented requirement that open-endpoint payload fields be complete, leaving a docs-vs-runtime contract blind spot.",
+      "related_files": [
+        "goseg/uploadsvc/doc.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "goseg/uploadsvc/doc.go states open-endpoint requires a complete endpoint/token payload.",
+        "goseg/uploadsvc/actions_test.go checks missing OpenEndpointRequest pointer and forbidden payload mixing, but has no cases for empty Endpoint, TokenID, or TokenValue fields.",
+        "The helper commandForUploadBinding always generates non-empty endpoint/token values, so current positive-path tests cannot detect acceptance of incomplete payload fields."
+      ],
+      "suggestion": "Add table-driven negative tests for open-endpoint payload field completeness (empty endpoint, empty token id, empty token value, and combinations) and assert specific validation errors to align runtime behavior with the documented contract.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "docs_runtime_contract_not_fully_enforced_in_tests"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "failfast_window_masks_delayed_startup_errors",
+      "summary": "Fail-fast startup errors are only observed in a short window, then silently ignored.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`waitForFailFastErrors` returns nil when its 250ms timeout expires even if fail-fast workers are still running and may fail later.",
+        "`Bootstrap` invokes health once (`return o.health(ctx)`), so there is no ongoing reconciliation for delayed fail-fast worker errors during normal runtime.",
+        "Tests validate near-immediate fail-fast errors (e.g., 20ms), but do not enforce behavior for failures after the timeout window."
+      ],
+      "suggestion": "Make fail-fast monitoring persistent: store terminal worker errors in shared state and have `health` report them without a fixed startup-only timeout; alternatively keep a supervisor goroutine that propagates late fail-fast errors to a shared fatal channel consumed by startup/runtime orchestration.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "startup_error_lifecycle_fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "wifi_partial_parse_hides_command_format_failures",
+      "summary": "Wi-Fi parsing tolerates malformed nmcli rows without surfacing partial-failure context.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`parseNmcliWifiDeviceRecords` and `parseNmcliWifiScanResults` collect parse errors but only return an error when no valid rows were parsed.",
+        "API calls like `ListWiFiSSIDs` treat parser success as fully valid output and return nil error, so malformed rows are silently dropped.",
+        "This yields mixed semantics: severe parser issues are strict when output is empty, but non-strict when output is partially parseable, making failures harder to diagnose."
+      ],
+      "suggestion": "Introduce a typed partial-parse error (or warning payload) that includes dropped-row count and first parse cause; propagate it through `ListWiFiSSIDs`/device resolution so callers can distinguish clean success from degraded parsing.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_error_strictness"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "stringly_typed_transition_event_contract",
+      "summary": "Transition event-type contracts are duplicated as string literals across workflow and importer paths.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "Importer publish policy and constructors branch on literal type strings (`\"status\"`, `\"patp\"`, `\"extracted\"`, `\"error\"`).",
+        "Workflow transition lifecycle emits the same semantic state using a hardcoded literal (`\"error\"`) in event planning.",
+        "In parallel, event transport uses typed transition channels, so the type contract is not enforced uniformly end-to-end."
+      ],
+      "suggestion": "Define a shared typed transition-event vocabulary (constants or dedicated type with constructors) and replace ad-hoc string literals in importer/workflow publishers; keep compile-time checked conversions at transport boundaries.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_typed_transition_contracts"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 4,
+    "dimension_coverage": 0.3,
+    "evidence_density": 1.562,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 31.084,
+    "dimensions_with_findings": 5
+  },
+  "review_scope": {
+    "reviewed_files_count": 45,
+    "successful_batch_count": 4,
+    "full_sweep_included": false,
+    "total_files": 654,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "contract_coherence",
+      "cross_module_architecture",
+      "error_consistency",
+      "test_strategy"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/contracts/catalog/action/specs.go",
+    "goseg/protocol/contracts/catalog/startram/specs.go",
+    "goseg/protocol/contracts/conformance/fixtures_test.go",
+    "goseg/uploadsvc/actions_test.go",
+    "goseg/uploadsvc/doc.go",
+    "goseg/broadcast/state_lifecycle.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/broadcast/collectors/system_info_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/broadcast/loop.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/structs/configs.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_registry.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/importer/importer.go",
+    "goseg/main.go",
+    "goseg/main_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/routines/version.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/docker/events/events.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/routines/system/system.go",
+    "goseg/docker/network/network.go",
+    "goseg/system/wifi_runtime_api.go",
+    "goseg/config/runtimecontext/context.go",
+    "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+    "README.md"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260305_141557",
+    "created_at": "2026-03-05T14:18:51+00:00",
+    "batch_count": 4,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "c592cc6fbc61c9c43a7dc734c24335dada65f2c6b6f34ceef6a97010be71c8d2"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "error_consistency",
+      "test_strategy",
+      "contract_coherence"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "contract_coherence",
+      "cross_module_architecture",
+      "error_consistency",
+      "test_strategy"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

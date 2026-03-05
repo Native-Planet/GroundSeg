@@ -1,0 +1,85 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 84.0,
+    "high_level_elegance": 82.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/catalog/action/specs.go defines both protocol-level C2C actions and upload-service actions in one catalog file (ProtocolActionSpecs, UploadActionSpecs, AllActionSpecs), creating a shared hub across unrelated ownership boundaries.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go enforces canonical binding parity by traversing fixtures and canonical bindings, indicating boundary correctness relies on cross-package test choreography rather than narrower package ownership seams.",
+        "goseg/uploadsvc/doc.go states canonical policy lives in protocol/contracts/conformance and architecture docs, which confirms governance is coordinated across multiple modules rather than encapsulated behind a single stable boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "goseg/protocol/contracts/catalog/action/specs.go mixes domain capabilities (C2C and upload) and ownership constants in one file, so top-level decomposition reflects historical aggregation rather than capability-isolated modules.",
+        "goseg/uploadsvc/doc.go encodes critical governance expectations in comments that point to tests/docs elsewhere, while goseg/uploadsvc/actions_test.go validates only parser accept/reject behavior; this split makes package responsibility less self-explanatory.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go contains broad catalog-governance assertions for upload and startram, concentrating cross-domain policy checks in a single conformance test surface."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "action_catalog_hub_coupling",
+      "summary": "A single action catalog file acts as a cross-domain hub, coupling upload-service and protocol C2C boundaries.",
+      "related_files": [
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "ProtocolActionSpecs() (C2C) and UploadActionSpecs() (uploadsvc) are co-located in goseg/protocol/contracts/catalog/action/specs.go and merged via AllActionSpecs().",
+        "The file carries multiple ownership contexts (OwnerSystemWiFi and OwnerUploadService), showing boundary aggregation in one module.",
+        "Conformance tests in goseg/protocol/contracts/conformance/fixtures_test.go must verify these mappings globally, which is consistent with a central coupling hub."
+      ],
+      "suggestion": "Split catalog definitions by capability/owner (for example, separate upload and c2c spec providers) and compose through a thin registry interface so each domain owns its own contract set with minimized cross-module blast radius.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_catalog_centralization"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "governance_responsibility_fragmented",
+      "summary": "Contract-governance responsibility is fragmented across comments, protocol conformance tests, and local parser tests, reducing top-level ownership clarity.",
+      "related_files": [
+        "goseg/uploadsvc/doc.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go"
+      ],
+      "evidence": [
+        "goseg/uploadsvc/doc.go declares strict action-contract policy but points enforcement to external conformance and architecture docs.",
+        "goseg/uploadsvc/actions_test.go only tests ParseUploadAction accept/reject paths and does not assert the documented payload-rule contract boundary.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go carries cross-domain assertions (upload bindings, payload rules, startram catalog drift), centralizing policy checks away from feature-local ownership."
+      ],
+      "suggestion": "Introduce a single authoritative contract-governance seam (e.g., package-level contract validator API consumed by uploadsvc and conformance tests) and keep feature-local tests asserting policy behavior through that seam to make ownership and decomposition explicit.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_catalog_centralization"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract definitions and governance checks are centralized by convenience, not by domain ownership boundaries.",
+      "Policy intent is partly documented narratively instead of exposed as a single executable boundary contract."
+    ],
+    "likely_symptoms": [
+      "action_catalog_hub_coupling",
+      "governance_responsibility_fragmented"
+    ],
+    "possible_false_positives": [
+      "If project intentionally uses protocol/contracts as a global anti-drift gate by design, some centralization may be acceptable but still increases coupling risk."
+    ]
+  }
+}

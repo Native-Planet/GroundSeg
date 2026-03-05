@@ -1,0 +1,112 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 78.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Broadcast runtime precondition failures use mixed contracts in the same call path: sentinel errors (`errBroadcastRuntimeRequired`, `errBroadcastLoopRuntimeRequired`) in `goseg/broadcast/state.go` and `goseg/broadcast/loop.go`, wrapped sentinel in `goseg/broadcast/state_lifecycle.go`, and ad-hoc string errors in `runBroadcastTickWithRuntime`/`buildBroadcastTickState`.",
+        "Broadcast tick error handling is path-dependent: build-state failures call `AddSystemTransitionError` before returning, but publish failures return immediately without recording transition state (`goseg/broadcast/loop.go`, `goseg/broadcast/state.go`).",
+        "Background loops use inconsistent escalation policies for repeated failures: `check502Loop` logs and continues indefinitely (`goseg/docker/orchestration/subsystem/subsystem_health.go`), while version/log cleanup/docker log loops count consecutive failures and return terminal errors (`goseg/routines/version.go`, `goseg/routines/logstream/logs.go`).",
+        "WiFi runtime methods mix `log-and-return` and `return-only` in sibling operations (`isWiFiRadioEnabled`, `connectedSSID` log before returning errors, while `wifiDevices`, `listSSIDs`, `toggleDevice` mainly return wrapped errors), then service-level wrappers add further context (`goseg/system/wifi_runtime_methods.go`, `goseg/system/wifi_runtime_api.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast_runtime_error_contract_drift",
+      "summary": "Broadcast runtime precondition failures use incompatible error contracts across sibling APIs.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "`StartBroadcastLoopWithRuntime` returns `errBroadcastLoopRuntimeRequired`, while `runBroadcastTickWithRuntime` and `buildBroadcastTickState` return plain `fmt.Errorf(\"...runtime is required\")` strings for similar precondition failures.",
+        "`bootstrapBroadcastState`/`LoadStartramRegionsWithRuntime` wrap `errBroadcastRuntimeRequired`, but `ReloadUrbitsWithRuntime` creates a fresh `errors.New(\"broadcast state runtime is required to reload urbits\")`.",
+        "Callers cannot reliably use `errors.Is`/classification for runtime-missing failures because equivalent faults are represented by different concrete errors."
+      ],
+      "suggestion": "Define one typed/sentinel runtime-missing error per subsystem and require all broadcast entry points/helpers to wrap that canonical error (`fmt.Errorf(\"<op>: %w\", errBroadcastRuntimeRequired)`), including tick helpers and reload paths.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast_tick_failure_side_effect_mismatch",
+      "summary": "Broadcast tick failures are persisted for some error paths but silently omitted for others.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/state.go"
+      ],
+      "evidence": [
+        "In `runBroadcastTickWithRuntime`, failures from `buildBroadcastTickState` call `stateRuntime.AddSystemTransitionError(err.Error())` before returning.",
+        "In the same function, `broadcastToClientsFn` failures are returned as wrapped errors without adding transition error history.",
+        "Both are tick-stage runtime failures, but only one path updates the system transition error state."
+      ],
+      "suggestion": "Centralize tick failure handling in one helper that classifies and records all non-cancellation tick failures consistently before return, so broadcast state reflects every failed tick stage.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_contract_fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "background_loop_escalation_policy_drift",
+      "summary": "Long-running subsystem loops apply incompatible retry/termination behavior for repeated errors.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/routines/version.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`check502Loop` logs recurring operational failures (`GetShipStatusFn`, HTTP polling, recovery failures) and always continues.",
+        "`runAutoVersionUpdateLoop` and logstream loops maintain consecutive-failure counters and return terminal errors after configured limits.",
+        "Equivalent background-service failure classes (repeated external I/O and recovery errors) produce different supervisor-visible outcomes."
+      ],
+      "suggestion": "Adopt a shared background-loop error policy (e.g., bounded consecutive-failure threshold + reset window + explicit non-fatal classes) and apply it across subsystem health, version, and logstream loops.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "background_error_policy_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "wifi_layer_log_and_return_inconsistency",
+      "summary": "WiFi runtime mixes log-and-return and return-only error handling, causing uneven observability and duplicate logging risk.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_runtime_api.go"
+      ],
+      "evidence": [
+        "`isWiFiRadioEnabled` and `connectedSSID` log errors and also return wrapped errors from runtime layer.",
+        "Sibling runtime methods (`wifiDevices`, `listSSIDs`, `toggleDevice`) generally return wrapped errors without logging.",
+        "Service-layer API methods wrap and bubble errors uniformly, so lower-layer selective logging creates inconsistent log provenance and potential duplicate entries when callers also log."
+      ],
+      "suggestion": "Pick one policy for WiFi stack boundaries: either runtime layer returns typed/wrapped errors without logging and outer service/handler logs once, or runtime layer logs all failures uniformly with stable categories.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error handling policy is defined per function family instead of per subsystem boundary, so sibling paths diverge over time.",
+      "Background workers lack a shared failure-contract abstraction (retry budget/escalation semantics), producing inconsistent runtime behavior."
+    ],
+    "likely_symptoms": [
+      "broadcast_runtime_error_contract_drift",
+      "broadcast_tick_failure_side_effect_mismatch",
+      "wifi_layer_log_and_return_inconsistency"
+    ],
+    "possible_false_positives": []
+  }
+}

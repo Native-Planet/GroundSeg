@@ -205,92 +205,15 @@ func TestExportHandlerMinioSuccessStreamsZip(t *testing.T) {
 }
 
 func TestExportHandlerPropagatesOpenErrorDuringArchiveAndCleansUp(t *testing.T) {
-	t.Cleanup(resetExporterState)
-	exportDir = t.TempDir()
-	volumesDir := t.TempDir()
-	dockerDataForExporter = func(string) string { return volumesDir }
-	urbitConfForExporter = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
-
-	transitionCalls := 0
-	publishUrbitTransitionForExporter = func(_ context.Context, transition structs.UrbitTransition) error {
-		transitionCalls++
-		return nil
-	}
-
-	container := "minio_~zod"
-	dataDir := filepath.Join(volumesDir, container, "_data")
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
-		t.Fatalf("mkdir data dir failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dataDir, "ok.txt"), []byte("ok"), 0o644); err != nil {
-		t.Fatalf("write ok file failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dataDir, "bad.txt"), []byte("bad"), 0o644); err != nil {
-		t.Fatalf("write bad file failed: %v", err)
-	}
-	walkForExporter = func(_ string, fn filepath.WalkFunc) error {
-		for _, name := range []string{"ok.txt", "bad.txt"} {
-			path := filepath.Join(dataDir, name)
-			info, err := os.Stat(path)
-			if err != nil {
-				return err
-			}
-			if err := fn(path, info, nil); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	openCount := 0
-	closeCount := 0
-	openForExporter = func(path string) (io.ReadCloser, error) {
-		openCount++
-		if strings.HasSuffix(path, "bad.txt") {
-			return nil, errors.New("synthetic open failure")
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			return nil, err
-		}
-		return &closeTrackingFile{
-			File:       f,
-			closeCount: &closeCount,
-		}, nil
-	}
-
-	token := structs.WsTokenStruct{ID: "1", Token: "t"}
-	if err := WhitelistContainer(container, token); err != nil {
-		t.Fatalf("whitelist failed: %v", err)
-	}
-	body, _ := json.Marshal(token)
-	req := httptest.NewRequest(http.MethodPost, "/export/"+container, bytes.NewReader(body))
-	req = mux.SetURLVars(req, map[string]string{"container": container})
-	rr := httptest.NewRecorder()
-	ExportHandler(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected bad request on open failure, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	if transitionCalls < 2 {
-		t.Fatalf("expected cleanup transitions, got %d", transitionCalls)
-	}
-	if openCount != 2 {
-		t.Fatalf("expected open attempts for two files, got %d", openCount)
-	}
-	if closeCount != 1 {
-		t.Fatalf("expected one successful file handle to be closed, got %d", closeCount)
-	}
-
-	exportMu.Lock()
-	_, exists := whitelist[container]
-	exportMu.Unlock()
-	if exists {
-		t.Fatalf("expected whitelist cleanup on open failure")
-	}
+	runArchiveFailureCase(t, "open", 1)
 }
 
 func TestExportHandlerPropagatesReadErrorDuringArchiveAndCleansUp(t *testing.T) {
+	runArchiveFailureCase(t, "read", 2)
+}
+
+func runArchiveFailureCase(t *testing.T, failureMode string, expectedCloseCount int) {
+	t.Helper()
 	t.Cleanup(resetExporterState)
 	exportDir = t.TempDir()
 	volumesDir := t.TempDir()
@@ -333,6 +256,9 @@ func TestExportHandlerPropagatesReadErrorDuringArchiveAndCleansUp(t *testing.T) 
 	openForExporter = func(path string) (io.ReadCloser, error) {
 		openCount++
 		if strings.HasSuffix(path, "bad.txt") {
+			if failureMode == "open" {
+				return nil, errors.New("synthetic open failure")
+			}
 			return &failingReadCloser{closeCount: &closeCount}, nil
 		}
 		f, err := os.Open(path)
@@ -356,7 +282,7 @@ func TestExportHandlerPropagatesReadErrorDuringArchiveAndCleansUp(t *testing.T) 
 	ExportHandler(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected bad request on read failure, got %d body=%s", rr.Code, rr.Body.String())
+		t.Fatalf("expected bad request on %s failure, got %d body=%s", failureMode, rr.Code, rr.Body.String())
 	}
 	if transitionCalls < 2 {
 		t.Fatalf("expected cleanup transitions, got %d", transitionCalls)
@@ -364,14 +290,14 @@ func TestExportHandlerPropagatesReadErrorDuringArchiveAndCleansUp(t *testing.T) 
 	if openCount != 2 {
 		t.Fatalf("expected open attempts for two files, got %d", openCount)
 	}
-	if closeCount != 2 {
-		t.Fatalf("expected all opened handles/readers to be closed, got %d", closeCount)
+	if closeCount != expectedCloseCount {
+		t.Fatalf("expected close count %d, got %d", expectedCloseCount, closeCount)
 	}
 
 	exportMu.Lock()
 	_, exists := whitelist[container]
 	exportMu.Unlock()
 	if exists {
-		t.Fatalf("expected whitelist cleanup on read failure")
+		t.Fatalf("expected whitelist cleanup on %s failure", failureMode)
 	}
 }

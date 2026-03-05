@@ -159,6 +159,36 @@ func ContractCatalogEntries() []ContractCatalogEntry {
 	return entries
 }
 
+// ContractCatalogEntriesForFamily returns a snapshot of canonical contract catalog
+// entries for a named family.
+func ContractCatalogEntriesForFamily(name string) ([]ContractCatalogEntry, bool) {
+	entries, ok := contractCatalogEntriesForFamilySnapshot(name)
+	if !ok {
+		return nil, false
+	}
+	out := make([]ContractCatalogEntry, len(entries))
+	copy(out, entries)
+	return out, true
+}
+
+// ProtocolContractCatalogEntries returns canonical protocol action contract entries.
+func ProtocolContractCatalogEntries() []ContractCatalogEntry {
+	entries, ok := ContractCatalogEntriesForFamily(contractCatalogFamilyProtocol)
+	if !ok {
+		return []ContractCatalogEntry{}
+	}
+	return entries
+}
+
+// StartramContractCatalogEntries returns canonical Startram contract entries.
+func StartramContractCatalogEntries() []ContractCatalogEntry {
+	entries, ok := ContractCatalogEntriesForFamily(contractCatalogFamilyStartram)
+	if !ok {
+		return []ContractCatalogEntry{}
+	}
+	return entries
+}
+
 func validateFamilyCatalogEntries(family string, entries []contractCatalogEntry) error {
 	if _, err := NewCatalogFromEntries(entries); err != nil {
 		return fmt.Errorf("validate %s contract catalog: %w", family, err)

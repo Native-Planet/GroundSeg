@@ -1,0 +1,31 @@
+{
+  "batch": "AI Debt & Migrations",
+  "batch_index": 3,
+  "assessments": {
+    "ai_generated_debt": 91.0
+  },
+  "dimension_notes": {
+    "ai_generated_debt": {
+      "evidence": [
+        "All five files are package-level `doc.go` comments with concise domain-oriented rationale rather than repetitive line-by-line restatements.",
+        "No deprecated markers, migration TODO stubs, or placeholder text were found in the assigned files.",
+        "`goseg/uploadsvc/doc.go` includes a concrete governance reference (`docs/architecture/contracts-governance.md`) instead of generic boilerplate."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Several docs make strong behavioral guarantees (ordering, normalization, privileged sequencing) without consistently linking to contract artifacts or migration notes, which increases future drift risk and resembles polished-but-unanchored prose.",
+      "sub_axes": {
+        "abstraction_leverage": 89.0,
+        "indirection_cost": 93.0,
+        "interface_honesty": 90.0
+      }
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [],
+    "likely_symptoms": [],
+    "possible_false_positives": []
+  }
+}

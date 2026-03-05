@@ -1,0 +1,710 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260305_142409/results/batch-4.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 4
+Batch name: Cross-cutting Sweep
+Batch dimensions: contract_coherence
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/protocol/contracts/catalog/action/specs.go
+- goseg/protocol/contracts/catalog/startram/specs.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/uploadsvc/actions_test.go
+- goseg/uploadsvc/doc.go
+- goseg/shipworkflow/doc.go
+- goseg/shipworkflow/newship.go
+- goseg/shipworkflow/newship_service.go
+- goseg/config/bootstrap.go
+- goseg/config/bootstrap_test.go
+- goseg/config/config.go
+- goseg/docker/orchestration/container_bridge.go
+- goseg/docker/orchestration/container_bridge_test.go
+- goseg/docker/orchestration/container_config.go
+- README.md
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 4,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 4,
+  "assessments": {
+    "contract_coherence": 74.0
+  },
+  "dimension_notes": {
+    "contract_coherence": {
+      "evidence": [
+        "goseg/shipworkflow/doc.go states a stable transition contract (loading -> success or error), but goseg/shipworkflow/newship_service.go emits both \"freeError\" and \"error\" event types for failure/reset paths.",
+        "goseg/shipworkflow/newship_service.go HandleNewShipBoot returns nil after spawning a goroutine, so downstream ProvisionShip failures are not represented in the function return contract even though ProvisionShip itself is error-returning in goseg/shipworkflow/newship.go.",
+        "goseg/docker/orchestration/container_config.go documents ContainerConfigForTypeString as parsing external input, but implementation only type-casts string to transition.ContainerType and defers failure to later map lookup."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "contract_coherence",
+      "identifier": "shipworkflow_async_error_contract_split",
+      "summary": "HandleNewShipBoot advertises synchronous error signaling but suppresses provisioning failures behind async event side effects.",
+      "related_files": [
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/shipworkflow/newship.go"
+      ],
+      "evidence": [
+        "HandleNewShipBoot returns error but starts ProvisionShip in a goroutine and immediately returns nil on launch success.",
+        "ProvisionShip returns error in newship.go, but async failures are only sent through PublishNewShipTransition via handleError, not the function return path."
+      ],
+      "suggestion": "Make the contract explicit and single-path: either (a) return immediately with an async job handle and no error-return promise, or (b) execute provisioning synchronously and return real failures; update callers and docs to match.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_async_contracts"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "shipworkflow_error_event_contract_drift",
+      "summary": "Ship workflow failure/reset events use inconsistent error event keys, weakening the observable transition contract.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/newship_service.go"
+      ],
+      "evidence": [
+        "Package contract in doc.go describes stable phase transitions ending in success or error.",
+        "HandleNewShipBoot publishes transition type \"freeError\" for failures, while ResetNewShip clears transition type \"error\", creating two parallel error channels."
+      ],
+      "suggestion": "Define a single canonical error transition type constant for new-ship workflow and use it consistently for emit/clear paths; add tests that assert transition type vocabulary and ordering.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_async_contracts"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "container_config_parse_doc_mismatch",
+      "summary": "ContainerConfigForTypeString documentation claims parsing semantics that the function does not implement.",
+      "related_files": [
+        "goseg/docker/orchestration/container_config.go",
+        "README.md"
+      ],
+      "evidence": [
+        "Comment says \"parses external string input and delegates to the typed API\".",
+        "Implementation performs direct cast transition.ContainerType(containerType) and relies on later lookup failure, without normalization/validation that \"parse\" implies."
+      ],
+      "suggestion": "Align behavior and contract by either implementing explicit parsing/normalization with typed errors, or rewriting the comment and external docs to state this is a thin cast+dispatch helper.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Asynchronous workflow behavior is exposed through synchronous-looking function signatures.",
+      "Contract vocabulary is not centralized as typed constants for event/action surfaces."
+    ],
+    "likely_symptoms": [
+      "shipworkflow_async_error_contract_split",
+      "shipworkflow_error_event_contract_drift"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cbe63-2854-7573-b66b-c1919019734a
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 4
+Batch name: Cross-cutting Sweep
+Batch dimensions: contract_coherence
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/protocol/contracts/catalog/action/specs.go
+- goseg/protocol/contracts/catalog/startram/specs.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/uploadsvc/actions_test.go
+- goseg/uploadsvc/doc.go
+- goseg/shipworkflow/doc.go
+- goseg/shipworkflow/newship.go
+- goseg/shipworkflow/newship_service.go
+- goseg/config/bootstrap.go
+- goseg/config/bootstrap_test.go
+- goseg/config/config.go
+- goseg/docker/orchestration/container_bridge.go
+- goseg/docker/orchestration/container_bridge_test.go
+- goseg/docker/orchestration/container_config.go
+- README.md
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 4,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll run a read-only pass over the blind packet and the assigned files, then produce the required JSON assessment for `contract_coherence` only. I’m starting by loading the packet `system_prompt` constraints and then verifying each file for concrete cross-file contract issues.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,240p' goseg/protocol/contracts/catalog/startram/specs.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,240p' goseg/protocol/contracts/catalog/action/specs.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package startram
+
+import (
+	"groundseg/protocol/contracts/catalog/common"
+	"groundseg/protocol/contracts/familyspec"
+)
+
+const (
+	StartramContractFamily = "startram"
+	StartramContractScope  = "errors"
+	StartramAPIConnSlug    = "api-connection"
+
+	OwnerStartram common.OwnerModule = common.OwnerStartram
+
+	StartramAPIConnectionErrorID          = StartramContractFamily + "." + StartramContractScope + "." + StartramAPIConnSlug
+	StartramAPIConnectionErrorMessage     = "Unable to connect to API server"
+	StartramAPIConnectionErrorName        = "APIConnectionError"
+	StartramAPIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+)
+
+ succeeded in 51ms:
+package action
+
+import (
+	"groundseg/protocol/contracts/catalog/common"
+	"groundseg/protocol/contracts/familyspec"
+)
+
+const (
+	ProtocolActionContractRoot = "protocol.actions"
+
+	NamespaceUpload = "upload"
+	NamespaceC2C    = "c2c"
+
+	ActionUploadOpenEndpoint = "open-endpoint"
+	ActionUploadReset        = "reset"
+	ActionC2CConnect         = "connect"
+
+	UploadOpenEndpointContractID = ProtocolActionContractRoot + "." + NamespaceUpload + "." + ActionUploadOpenEndpoint
+	UploadResetContractID        = ProtocolActionContractRoot + "." + NamespaceUpload + "." + ActionUploadReset
+	C2CConnectContractID         = ProtocolActionContractRoot + "." + NamespaceC2C + "." + ActionC2CConnect
+ succeeded in 50ms:
+Total output lines: 6880
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture",
+    "high_level_elegance",
+    "package_organization",
+    "test_strategy",
+    "contract_coherence"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+codex
+I have the packet constraints and first contract files loaded. Next I’m reading the rest of the assigned files to validate whether the declared contracts in docs/specs/tests line up with runtime behavior.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,200p' goseg/uploadsvc/doc.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/conformance/fixtures_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/uploadsvc/actions_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,280p' goseg/shipworkflow/newship.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/shipworkflow/doc.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+// Package uploadsvc parses websocket upload actions and dispatches validated
+// commands to upload backends.
+//
+// Validation is strict by action contract: reset must never carry open-endpoint
+// payload fields, and open-endpoint requires a complete endpoint/token payload.
+// Canonical cross-package conformance assertions live in
+// goseg/protocol/contracts/conformance, with policy details in
+// docs/architecture/contracts-governance.md.
+package uploadsvc
+ succeeded in 51ms:
+package conformance
+
+import (
+	"testing"
+
+	"groundseg/protocol/contracts"
+	"groundseg/protocol/contracts/familycatalog"
+)
+
+func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+	fixtures := ActionContractFixtures()
+	if len(fixtures) == 0 {
+		t.Fatal("expected at least one action contract fixture")
+	}
+
+	foundC2C := false
+	for _, fixture := range fixtures {
+		if err := ValidateActionContractFixture(fixture); err != nil {
+			t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+		}
+ succeeded in 51ms:
+package uploadsvc
+
+import (
+	"testing"
+)
+
+func TestParseUploadActionAcceptsKnownActions(t *testing.T) {
+	t.Parallel()
+
+	gotOpen, err := ParseUploadAction(string(ActionUploadOpenEndpoint))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(open-endpoint) returned error: %v", err)
+	}
+	if gotOpen != ActionUploadOpenEndpoint {
+		t.Fatalf("unexpected parsed open-endpoint action: %q", gotOpen)
+	}
+
+	gotReset, err := ParseUploadAction(string(ActionUploadReset))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(reset) returned error: %v", err)
+ succeeded in 51ms:
+// Package shipworkflow orchestrates ship lifecycle phases (create, recover,
+// register, import) and emits urbit transition events for each phase.
+//
+// Workflow operations must preserve transition ordering (loading -> success or
+// error) so clients never observe phase regressions during long-running tasks.
+package shipworkflow
+ succeeded in 51ms:
+package shipworkflow
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"groundseg/config"
+	"groundseg/docker/events"
+	"groundseg/docker/network"
+	"groundseg/docker/orchestration"
+	"groundseg/shipcleanup"
+	"groundseg/shipcreator"
+	"groundseg/shipworkflow/provisioning"
+	"groundseg/startram"
+	"groundseg/structs"
+
+	"go.uber.org/zap"
+)
+
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,340p' goseg/config/config.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/config/bootstrap_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/config/bootstrap.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/shipworkflow/newship_service.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestInitializePathsUsesEnvBasePath(t *testing.T) {
+	originalBasePath := BasePath()
+	t.Cleanup(func() {
+		SetBasePath(originalBasePath)
+	})
+
+	expectedBasePath := filepath.Join(t.TempDir(), "groundseg")
+	t.Setenv("GS_BASE_PATH", expectedBasePath)
+
+	initializePaths()
+
+	if got := BasePath(); got != expectedBasePath {
+ succeeded in 51ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"fmt"
+	"groundseg/config/runtimecontext"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	// global settings config (accessed via funcs)
+	globalConfig structs.SysConfig
+ succeeded in 51ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"groundseg/config/contextapi"
+	"groundseg/config/startramstate"
+
+	"groundseg/structs"
+)
+
+type StartramConfigSnapshot = startramstate.Snapshot
+
+type StartramSettings struct {
+	EndpointURL          string
+	Pubkey               string
+	RemoteBackupPassword string
+	WgRegistered         bool
+	WgOn                 bool
+	Piers                []string
+ succeeded in 51ms:
+package shipworkflow
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/Native-Planet/perigee/libprg"
+
+	"groundseg/docker/events"
+	"groundseg/driveresolver"
+	"groundseg/structs"
+)
+
+var (
+	decodeMasterTicketFn = libprg.Keyfile
+	resolveDriveFn       = driveresolver.Resolve
+codex
+I’ve finished the config and shipworkflow pass. I’m now checking the docker bridge/config files plus README for any documented-vs-implemented contract drift and inconsistent error/behavior contracts across these modules.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/docker/orchestration/container_bridge.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/docker/orchestration/container_config.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' README.md" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/docker/orchestration/container_bridge_test.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+ succeeded in 51ms:
+package orchestration
+
+import (
+	"fmt"
+
+	"groundseg/transition"
+
+	"github.com/docker/docker/api/types/container"
+)
+
+type containerConfigBuilder func(dockerRuntime, string) (container.Config, container.HostConfig, error)
+
+var containerConfigBuilders = map[transition.ContainerType]containerConfigBuilder{
+	transition.ContainerTypeVere:      urbitContainerConfigBuilder,
+	transition.ContainerTypeNetdata:   netdataContainerConfigBuilder,
+	transition.ContainerTypeMinio:     minioContainerConfigBuilder,
+	transition.ContainerTypeMinioMC:   mcContainerConfigBuilder,
+	transition.ContainerTypeWireguard: wgContainerConfigBuilder,
+	transition.ContainerTypeLlamaAPI:  llamaApiContainerConfigBuilder,
+}
+ succeeded in 51ms:
+package orchestration
+
+import "testing"
+
+func TestDockerContainerBridgeBuildsLlamaRuntime(t *testing.T) {
+	rt := llamaRuntimeFromDocker(newDockerRuntime())
+	if rt.StartContainerFn == nil {
+		t.Fatal("expected llama runtime start container callback")
+	}
+	if rt.StopContainerByNameFn == nil {
+		t.Fatal("expected llama runtime stop container callback")
+	}
+	if rt.PenpaiSettingsSnapshotFn == nil {
+		t.Fatal("expected llama runtime penpai settings snapshot callback")
+	}
+	if rt.ShipSettingsSnapshotFn == nil {
+		t.Fatal("expected llama runtime ship settings snapshot callback")
+	}
+	if rt.DockerDirFn == nil {
+		t.Fatal("expected llama runtime docker dir callback")
+ succeeded in 51ms:
+package orchestration
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"groundseg/internal/seams"
+	"groundseg/structs"
+
+	"groundseg/config"
+	"groundseg/docker/orchestration/container"
+	"groundseg/docker/registry"
+)
+
+type netdataRuntimeOps = container.NetdataRuntime
+
+type dockerContainerRuntimeInputs struct {
+	shipSettingsSnapshotFn      func() config.ShipSettings
+	startramSettingsSnapshotFn  func() config.StartramSettings
+codex
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 4,
+  "assessments": {
+    "contract_coherence": 74.0
+  },
+  "dimension_notes": {
+    "contract_coherence": {
+      "evidence": [
+        "goseg/shipworkflow/doc.go states a stable transition contract (loading -> success or error), but goseg/shipworkflow/newship_service.go emits both \"freeError\" and \"error\" event types for failure/reset paths.",
+        "goseg/shipworkflow/newship_service.go HandleNewShipBoot returns nil after spawning a goroutine, so downstream ProvisionShip failures are not represented in the function return contract even though ProvisionShip itself is error-returning in goseg/shipworkflow/newship.go.",
+        "goseg/docker/orchestration/container_config.go documents ContainerConfigForTypeString as parsing external input, but implementation only type-casts string to transition.ContainerType and defers failure to later map lookup."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "contract_coherence",
+      "identifier": "shipworkflow_async_error_contract_split",
+      "summary": "HandleNewShipBoot advertises synchronous error signaling but suppresses provisioning failures behind async event side effects.",
+      "related_files": [
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/shipworkflow/newship.go"
+      ],
+      "evidence": [
+        "HandleNewShipBoot returns error but starts ProvisionShip in a goroutine and immediately returns nil on launch success.",
+        "ProvisionShip returns error in newship.go, but async failures are only sent through PublishNewShipTransition via handleError, not the function return path."
+      ],
+      "suggestion": "Make the contract explicit and single-path: either (a) return immediately with an async job handle and no error-return promise, or (b) execute provisioning synchronously and return real failures; update callers and docs to match.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_async_contracts"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "shipworkflow_error_event_contract_drift",
+      "summary": "Ship workflow failure/reset events use inconsistent error event keys, weakening the observable transition contract.",
+      "related_files": [
+        "goseg/shipworkflow/doc.go",
+        "goseg/shipworkflow/newship_service.go"
+      ],
+      "evidence": [
+        "Package contract in doc.go describes stable phase transitions ending in success or error.",
+        "HandleNewShipBoot publishes transition type \"freeError\" for failures, while ResetNewShip clears transition type \"error\", creating two parallel error channels."
+      ],
+      "suggestion": "Define a single canonical error transition type constant for new-ship workflow and use it consistently for emit/clear paths; add tests that assert transition type vocabulary and ordering.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_async_contracts"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "container_config_parse_doc_mismatch",
+      "summary": "ContainerConfigForTypeString documentation claims parsing semantics that the function does not implement.",
+      "related_files": [
+        "goseg/docker/orchestration/container_config.go",
+        "README.md"
+      ],
+      "evidence": [
+        "Comment says \"parses external string input and delegates to the typed API\".",
+        "Implementation performs direct cast transition.ContainerType(containerType) and relies on later lookup failure, without normalization/validation that \"parse\" implies."
+      ],
+      "suggestion": "Align behavior and contract by either implementing explicit parsing/normalization with typed errors, or rewriting the comment and external docs to state this is a thin cast+dispatch helper.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Asynchronous workflow behavior is exposed through synchronous-looking function signatures.",
+      "Contract vocabulary is not centralized as typed constants for event/action surfaces."
+    ],
+    "likely_symptoms": [
+      "shipworkflow_async_error_contract_split",
+      "shipworkflow_error_event_contract_drift"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+30,385
+

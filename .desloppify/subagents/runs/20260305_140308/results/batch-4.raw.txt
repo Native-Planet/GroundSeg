@@ -1,0 +1,102 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 4,
+  "assessments": {
+    "package_organization": 72.0,
+    "high_level_elegance": 76.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "Assigned directories are large (`goseg/shipworkflow` 58 files, `goseg/config` 49, `goseg/docker/orchestration` 37), and the reviewed files in each directory mix distinct concerns (transport parsing, infra runtime wiring, filesystem bootstrap, context façade).",
+        "`goseg/docker/orchestration/container_bridge.go` is primarily container-runtime composition logic (imports `docker/orchestration/container`, `docker/registry`, `config`) but remains in the broad orchestration root instead of a focused container wiring package.",
+        "`goseg/config/config.go` is a context/state façade over `config/contextapi` and `config/startramstate`, while `goseg/config/bootstrap.go` handles startup filesystem/config persistence; both are placed in the same flat package despite different ownership boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "`goseg/shipworkflow/newship.go` composes low-level infrastructure callbacks (docker orchestration, volumes, container lifecycle, config mutation, event publication) inside a ship-domain workflow entrypoint, blurring domain and infrastructure ownership.",
+        "`goseg/shipworkflow/newship_service.go` combines message action dispatch, drive resolution, patp validation, event-side effects, and async provisioning kickoff in one package surface, making top-level role boundaries harder to explain.",
+        "`goseg/docker/orchestration/container_config.go` and `container_bridge.go` together act as a container platform adapter layer but are exposed as generic orchestration package responsibilities."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "orchestration_container_wiring_scatter",
+      "summary": "Container runtime wiring and type dispatch are misplaced in orchestration root",
+      "related_files": [
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go"
+      ],
+      "evidence": [
+        "`container_bridge.go` defines `dockerContainerRuntimeInputs` and runtime assembly for Llama/Netdata/Minio, centered on container runtime composition.",
+        "`container_config.go` holds container-type-to-builder dispatch (`containerConfigBuilders`) and delegates to container-specific builders; concern affinity is container wiring, not generic orchestration."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/docker/orchestration/containerwiring/` for runtime bridge + config dispatch APIs; (2) move `container_bridge.go` first, then `container_config.go`, keeping exported wrappers in `orchestration` temporarily for compatibility; (3) update imports/usages via `rg -n \"llamaRuntimeFromDocker|netdataRuntimeFromDocker|minioRuntimeFromDocker|ContainerConfigForType\" goseg`; (4) validate with `go test ./goseg/docker/orchestration/...` and `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "infra_runtime_wiring_scatter"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "shipworkflow_boundary_blur",
+      "summary": "Ship workflow package owns both domain flow and infrastructure adapter composition",
+      "related_files": [
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/docker/orchestration/container_bridge.go"
+      ],
+      "evidence": [
+        "`newShipProvisioningRuntime()` wires infra dependencies directly (docker/network/config/event functions), effectively acting as an infrastructure composition root within a domain workflow package.",
+        "`HandleNewShipBoot` performs transport/action handling and emits websocket transition events while also launching provisioning, indicating mixed API/transport/domain orchestration responsibilities.",
+        "Parallel runtime-composition patterns exist in orchestration bridge files, reinforcing a repeated architectural split where composition roots are not centralized."
+      ],
+      "suggestion": "Staged reorg plan: (1) add `goseg/shipworkflow/adapters/` (infra/runtime assembly) and `goseg/shipworkflow/transport/` (message/action handlers); (2) move runtime-builder logic from `newship.go` into adapters first, then move action-dispatch/boot handler logic from `newship_service.go` into transport; (3) keep thin compatibility wrappers in `shipworkflow` package during migration; (4) update imports using `rg -n \"HandleNewShip|HandleNewShipBoot|ProvisionShip|newShipProvisioningRuntime\" goseg`; (5) validate with `go test ./goseg/shipworkflow/... ./goseg/docker/orchestration/...` and `go test ./...`.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "composition_root_fragmentation"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "config_package_mixed_ownership",
+      "summary": "Config package mixes runtime context façade and bootstrap persistence responsibilities",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/bootstrap.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "`config.go` primarily proxies to `config/contextapi`/`config/startramstate` (runtime context and state façade APIs).",
+        "`bootstrap.go` manages startup lifecycle, config file creation/loading/persistence, and session-key setup.",
+        "The same package surface combines process-context mutation (`SetBasePath`, `SetDebugMode`) and bootstrapping I/O logic, which are distinct ownership boundaries."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/config/runtime/` for context façade APIs and `goseg/config/bootstrap/` for startup initialization flow; (2) move façade functions from `config.go` first and adapt callsites, then move initialization flow from `bootstrap.go` with tests; (3) leave temporary forwarding functions in `config` to reduce migration risk; (4) run import updates with `rg -n \"SetBasePath|DebugMode|Initialize\\(|ConfigFilePath|SessionKeyPath\" goseg`; (5) validate via `go test ./goseg/config/...` then `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_boundary_flattening"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Composition-root responsibilities are distributed across domain and infrastructure packages instead of one explicit wiring layer.",
+      "Large flat top-level packages accumulate mixed concerns without subpackage boundary enforcement."
+    ],
+    "likely_symptoms": [
+      "shipworkflow_boundary_blur",
+      "orchestration_container_wiring_scatter",
+      "config_package_mixed_ownership"
+    ],
+    "possible_false_positives": []
+  }
+}

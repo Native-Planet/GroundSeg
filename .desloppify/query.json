@@ -1,3058 +1,38 @@
 {
-  "command": "scan",
-  "overall_score": 80.4,
-  "objective_score": 97.5,
-  "strict_score": 80.4,
-  "verified_strict_score": 97.5,
-  "prev_overall_score": 80.4,
-  "prev_objective_score": 97.4,
-  "prev_strict_score": 80.4,
-  "prev_verified_strict_score": 97.4,
-  "profile": "full",
-  "noise_budget": 0,
-  "noise_global_budget": 0,
-  "hidden_by_detector": {},
-  "hidden_total": 0,
-  "diff": {
-    "new": 0,
-    "auto_resolved": 2,
-    "reopened": 0,
-    "total_current": 569,
-    "suspect_detectors": [],
-    "chronic_reopeners": [
-      {
-        "id": "subjective_review::goseg/structs/broadcast.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/structs/broadcast.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 284
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T08:51:33+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/structs/click.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/structs/click.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 22
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T08:51:33+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/structs/startram.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/structs/startram.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 153
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T08:51:33+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/structs/structs.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/structs/structs.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 60
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T08:51:33+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/structs/version.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/structs/version.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 32
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T08:51:33+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/swap.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/system/swap.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 128
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T08:51:33+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/ws/logs.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/ws/logs.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 89
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T08:51:33+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/ws/ws.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/ws/ws.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 387
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T08:51:33+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/version.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/version.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 371
-        },
-        "status": "open",
-        "note": "Reopened (\u00d79) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T09:08:45+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 9,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/accesspoint/accesspoint.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/accesspoint/accesspoint.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 356
-        },
-        "status": "open",
-        "note": "Reopened (\u00d711) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 11,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/broadcast/loop.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/broadcast/loop.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 278
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/config.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/config.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 172
-        },
-        "status": "open",
-        "note": "Reopened (\u00d718) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 18,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/mc.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/mc.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 44
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/netdata.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/netdata.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 80
-        },
-        "status": "open",
-        "note": "Reopened (\u00d74) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 4,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/wireguard.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/wireguard.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 114
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/exporter/exporter.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/exporter/exporter.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 282
-        },
-        "status": "open",
-        "note": "Reopened (\u00d74) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 4,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/importer/extract.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/importer/extract.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 460
-        },
-        "status": "open",
-        "note": "Reopened (\u00d74) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 4,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/leak/leak.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/leak/leak.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 177
-        },
-        "status": "open",
-        "note": "Reopened (\u00d72) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 2,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/logger/logger.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/logger/logger.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 445
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/rectify/rectify.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/rectify/rectify.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 181
-        },
-        "status": "open",
-        "note": "Reopened (\u00d729) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 29,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/commands.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/commands.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 89
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/config_service.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/config_service.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 45
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/region_store.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/region_store.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 55
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/registration_service.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/registration_service.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 78
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T13:21:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/workflow.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/workflow.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 99
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T14:11:36+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/orchestration/runner.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/orchestration/runner.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 58
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T14:50:16+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipcleanup/cleanup.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipcleanup/cleanup.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 58
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T14:50:16+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/uploadsvc/service.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/uploadsvc/service.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 337
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T14:50:16+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/wifi_radio_service.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/system/wifi_radio_service.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 99
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T15:34:11+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/uploadsvc/importeradapter/service.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/uploadsvc/importeradapter/service.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 31
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T15:34:11+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/routines/runtime_seams.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/routines/runtime_seams.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 97
-        },
-        "status": "open",
-        "note": "Reopened (\u00d715) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T15:42:30+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 15,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/transition/contracts.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/transition/contracts.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 212
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T15:48:08+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/chopsvc/service.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/chopsvc/service.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 125
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T16:01:43+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/urbit_operations_adapters.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/urbit_operations_adapters.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 115
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T16:01:43+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "unused::goseg/docker/network/network.go::unused_import::15",
-        "detector": "unused",
-        "file": "goseg/docker/network/network.go",
-        "tier": 3,
-        "confidence": "medium",
-        "summary": "Unused import: com/docker/docker/api/types/volume",
-        "detail": {},
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T17:05:03+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/routines/backup/backup.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/routines/backup/backup.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 147
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T17:05:03+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/routines/chop/chop.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/routines/chop/chop.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 70
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T17:05:03+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/wifi/transport/captive_transport_adapter.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/system/wifi/transport/captive_transport_adapter.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 134
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T17:05:03+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/wifi/service/c2c_service.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/system/wifi/service/c2c_service.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 106
-        },
-        "status": "open",
-        "note": "Reopened (\u00d73) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T17:14:20+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 3,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/routines/registry.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/routines/registry.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 35
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T17:23:36+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/click/internal/runtime/runtime.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/click/internal/runtime/runtime.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 149
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T18:01:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/handler/system/support.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/handler/system/support.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 744
-        },
-        "status": "open",
-        "note": "Reopened (\u00d79) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T18:03:55+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 9,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/urbit.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/urbit.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 309
-        },
-        "status": "open",
-        "note": "Reopened (\u00d75) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T18:16:23+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 5,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/handler/ship/backup.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/handler/ship/backup.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 289
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T18:16:23+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/handler/ship/urbit.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/handler/ship/urbit.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 145
-        },
-        "status": "open",
-        "note": "Reopened (\u00d72) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T18:16:23+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 2,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/lifecycle/lifecycle.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/lifecycle/lifecycle.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 165
-        },
-        "status": "open",
-        "note": "Reopened (\u00d713) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T18:35:30+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 13,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/protocol/actions/registry.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/protocol/actions/registry.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 57
-        },
-        "status": "open",
-        "note": "Reopened (\u00d713) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T18:35:30+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 13,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/orchestration.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/orchestration.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 249
-        },
-        "status": "open",
-        "note": "Reopened (\u00d75) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T18:48:22+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 5,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "flat_dirs::goseg/docker/orchestration",
-        "detector": "flat_dirs",
-        "file": "goseg/docker/orchestration",
-        "tier": 3,
-        "confidence": "medium",
-        "summary": "Flat directory: 34 files \u2014 consider grouping by domain",
-        "detail": {
-          "file_count": 34
-        },
-        "status": "open",
-        "note": "Reopened (\u00d72) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T19:00:04+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 2,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/orchestration/structured.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/orchestration/structured.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 67
-        },
-        "status": "open",
-        "note": "Reopened (\u00d713) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T20:37:13+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 13,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/handler/authsvc/auth.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/handler/authsvc/auth.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 230
-        },
-        "status": "open",
-        "note": "Reopened (\u00d72) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T21:22:18+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 2,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/operations_runtime.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/operations_runtime.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 470
-        },
-        "status": "open",
-        "note": "Reopened (\u00d740) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T21:22:18+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 40,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/protocol/actions/actions.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/protocol/actions/actions.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 368
-        },
-        "status": "open",
-        "note": "Reopened (\u00d713) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T21:50:30+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 13,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/volume_writer.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/volume_writer.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 67
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T22:23:22+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/main_routes.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/main_routes.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 82
-        },
-        "status": "open",
-        "note": "Reopened (\u00d711) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T23:03:52+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 11,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/recovery.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/recovery.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 137
-        },
-        "status": "open",
-        "note": "Reopened (\u00d72) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-01T23:49:29+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 2,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/backup_transport.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/backup_transport.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 27
-        },
-        "status": "open",
-        "note": "Reopened (\u00d711) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T00:38:10+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 11,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/container/netdata.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/container/netdata.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 276
-        },
-        "status": "open",
-        "note": "Reopened (\u00d79) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T00:55:08+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 9,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/backup_restore_runtime.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/backup_restore_runtime.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 113
-        },
-        "status": "open",
-        "note": "Reopened (\u00d72) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T01:43:28+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 2,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/container/llama.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/container/llama.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 185
-        },
-        "status": "open",
-        "note": "Reopened (\u00d75) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T02:12:48+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 5,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/container/minio.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/container/minio.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 348
-        },
-        "status": "open",
-        "note": "Reopened (\u00d75) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T02:28:17+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 5,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/workflow_helpers.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/workflow_helpers.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 84
-        },
-        "status": "open",
-        "note": "Reopened (\u00d710) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T02:28:17+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 10,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/backup/storage.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/backup/storage.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 117
-        },
-        "status": "open",
-        "note": "Reopened (\u00d710) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T02:28:17+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 10,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/backup/transport.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/backup/transport.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 28
-        },
-        "status": "open",
-        "note": "Reopened (\u00d710) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T02:28:17+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 10,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/config_update.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/config_update.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 38
-        },
-        "status": "open",
-        "note": "Reopened (\u00d74) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T05:25:52+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 4,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/container_bridge.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/container_bridge.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 196
-        },
-        "status": "open",
-        "note": "Reopened (\u00d710) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T05:25:52+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 10,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/errors.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/errors.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 60
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T06:04:48+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startupdeps/bootstrap.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startupdeps/bootstrap.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 22
-        },
-        "status": "open",
-        "note": "Reopened (\u00d79) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T06:04:48+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 9,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/config_events.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/config_events.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 80
-        },
-        "status": "open",
-        "note": "Reopened (\u00d79) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T06:58:46+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 9,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/config_view.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/config_view.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 103
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T06:58:46+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/structs/ws_payload.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/structs/ws_payload.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 281
-        },
-        "status": "open",
-        "note": "Reopened (\u00d79) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T08:01:37+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 9,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/authsession/session.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/authsession/session.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 144
-        },
-        "status": "open",
-        "note": "Reopened (\u00d73) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T09:22:02+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 3,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/logger/logfiles.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/logger/logfiles.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 63
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T10:44:07+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/internal/transitionlifecycle/engine.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/internal/transitionlifecycle/engine.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 103
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T11:00:14+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/wifi_captive_api.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/system/wifi_captive_api.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 29
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T11:09:32+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/transition_templates.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/transition_templates.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 70
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T12:35:12+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/urbit_operations_desk.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/urbit_operations_desk.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 123
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T12:35:12+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/urbit_operations_pack.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/urbit_operations_pack.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 316
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T12:35:12+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/urbit_operations_ship.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/urbit_operations_ship.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 136
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T12:35:12+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/urbit_operations_startram.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/urbit_operations_startram.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 53
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T12:35:12+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/urbit_operations_runtime.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/urbit_operations_runtime.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 66
-        },
-        "status": "open",
-        "note": "Reopened (\u00d716) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T12:52:41+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 16,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startupdeps/coverage_imports_bridge.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startupdeps/coverage_imports_bridge.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 36
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T13:24:33+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/internal/seams/seams.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/internal/seams/seams.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 78
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T13:51:28+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/internal_check/main.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/internal_check/main.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 25
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T13:51:28+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/broadcast/state.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/broadcast/state.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 235
-        },
-        "status": "open",
-        "note": "Reopened (\u00d717) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T14:49:47+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 17,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/subsystem/subsystem_recovery.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/subsystem/subsystem_recovery.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 36
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T15:58:40+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/subsystem/subsystem_transitions.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/subsystem/subsystem_transitions.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 164
-        },
-        "status": "open",
-        "note": "Reopened (\u00d78) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T15:58:40+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 8,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/runtime_docker.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/runtime_docker.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 160
-        },
-        "status": "open",
-        "note": "Reopened (\u00d75) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T17:27:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 5,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/orchestration/runtime_ops.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/orchestration/runtime_ops.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 423
-        },
-        "status": "open",
-        "note": "Reopened (\u00d724) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T17:27:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 24,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/events/events.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/events/events.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 200
-        },
-        "status": "open",
-        "note": "Reopened (\u00d79) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T19:40:13+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 9,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/protocol/contracts/contracts.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/protocol/contracts/contracts.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 620
-        },
-        "status": "open",
-        "note": "Reopened (\u00d73) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T19:40:13+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 3,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/urbit_transition_registry.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/urbit_transition_registry.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 327
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T20:14:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/config_update_executor.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/config_update_executor.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 51
-        },
-        "status": "open",
-        "note": "Reopened (\u00d74) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T21:26:38+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 4,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/protocol/contracts/protocol_contracts.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/protocol/contracts/protocol_contracts.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 152
-        },
-        "status": "open",
-        "note": "Reopened (\u00d719) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T21:49:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 19,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/protocol/contracts/startram_contracts.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/protocol/contracts/startram_contracts.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 59
-        },
-        "status": "open",
-        "note": "Reopened (\u00d714) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T21:49:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 14,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/leak/handler_dispatch.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/leak/handler_dispatch.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 84
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T22:45:06+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/leak/handler_session.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/leak/handler_session.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 78
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-02T22:45:06+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/broadcast/collectors/collectors_runtime.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/broadcast/collectors/collectors_runtime.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 169
-        },
-        "status": "open",
-        "note": "Reopened (\u00d73) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T00:35:46+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 3,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/disk_vars.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/system/disk_vars.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 53
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T00:35:46+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/system_metrics.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/system/system_metrics.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 40
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T00:35:46+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/wifi_state.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/system/wifi_state.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 141
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T00:35:46+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/maintenance/maintenance.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/system/maintenance/maintenance.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 94
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T00:39:49+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/storage/storage.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/system/storage/storage.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 539
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T00:39:49+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/system/wifi_c2c_policy.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/system/wifi_c2c_policy.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 213
-        },
-        "status": "open",
-        "note": "Reopened (\u00d73) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T01:26:19+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 3,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/session/mu_conn.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/session/mu_conn.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 46
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T06:10:47+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/session/session_runtime.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/session/session_runtime.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 77
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T06:10:47+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/session/connection_registry.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/session/connection_registry.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 196
-        },
-        "status": "open",
-        "note": "Reopened (\u00d72) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T07:04:13+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 2,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/transition/publish_policy.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/transition/publish_policy.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 36
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T09:42:25+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/internal/seams/runtime_dependency.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/internal/seams/runtime_dependency.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 31
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T11:46:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/internal/testseams/overrides.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/internal/testseams/overrides.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 21
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T11:46:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/rectify/rectify_event_loop.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/rectify/rectify_event_loop.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 66
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T11:46:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/rectify/rectify_workflow.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/rectify/rectify_workflow.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 260
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T11:46:34+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/uploadsvc/actions.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/uploadsvc/actions.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 43
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T12:32:31+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/backup/crypto/crypto.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/backup/crypto/crypto.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 64
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T13:10:59+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/backup/restore/restore.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/backup/restore/restore.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 131
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T13:10:59+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/startram/backup/transport/transport.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/startram/backup/transport/transport.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 142
-        },
-        "status": "open",
-        "note": "Reopened (\u00d77) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T13:10:59+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 7,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/startram_backup_runtime.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/startram_backup_runtime.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 54
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T14:24:44+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/startram_registration_runtime.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/startram_registration_runtime.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 70
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T14:24:44+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/startram_runtime_core.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/startram_runtime_core.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 91
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T14:24:44+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/shipworkflow/startram_services_runtime.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/shipworkflow/startram_services_runtime.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 23
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T14:24:44+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/internal/resource/close.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/internal/resource/close.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 22
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T18:30:50+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/config/config_merge.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/config/config_merge.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 46
-        },
-        "status": "open",
-        "note": "Reopened (\u00d73) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T18:50:02+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 3,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/testutil/disktest/disktest.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/testutil/disktest/disktest.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 100
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T19:18:02+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/internal/seams/callback_requirements.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/internal/seams/callback_requirements.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 31
-        },
-        "status": "open",
-        "note": "Reopened (\u00d76) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T19:50:37+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 6,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/internal/seams/runtime_requirements.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/internal/seams/runtime_requirements.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 104
-        },
-        "status": "open",
-        "note": "Reopened (\u00d75) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-03T20:19:58+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 5,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "unused::goseg/importer/importer.go::unused_import::36",
-        "detector": "unused",
-        "file": "goseg/importer/importer.go",
-        "tier": 3,
-        "confidence": "medium",
-        "summary": "Unused import: com/docker/docker/errdefs",
-        "detail": {},
-        "status": "open",
-        "note": "Reopened (\u00d73) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-04T07:07:26+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 3,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/docker/lifecycle/containers.go::changed",
-        "detector": "subjective_review",
-        "file": "goseg/docker/lifecycle/containers.go",
-        "tier": 4,
-        "confidence": "medium",
-        "summary": "File changed since last review \u2014 re-review recommended",
-        "detail": {
-          "reason": "changed",
-          "loc": 167
-        },
-        "status": "open",
-        "note": "Reopened (\u00d72) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-04T07:07:27+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 2,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "subjective_review::goseg/session/connection_bucket.go::unreviewed",
-        "detector": "subjective_review",
-        "file": "goseg/session/connection_bucket.go",
-        "tier": 4,
-        "confidence": "low",
-        "summary": "No design review on record \u2014 run `desloppify review --prepare`",
-        "detail": {
-          "reason": "unreviewed",
-          "loc": 102
-        },
-        "status": "open",
-        "note": "Reopened (\u00d74) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-04T08:22:37+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 4,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      },
-      {
-        "id": "unused::goseg/docker/orchestration/subsystem/subsystem_events.go::unused_import::16",
-        "detector": "unused",
-        "file": "goseg/docker/orchestration/subsystem/subsystem_events.go",
-        "tier": 3,
-        "confidence": "medium",
-        "summary": "Unused import: com/docker/docker/api/types/events",
-        "detail": {},
-        "status": "open",
-        "note": "Reopened (\u00d72) \u2014 reappeared in scan (was auto_resolved)",
-        "first_seen": "2026-03-04T15:15:24+00:00",
-        "last_seen": "2026-03-05T06:24:06+00:00",
-        "resolved_at": null,
-        "reopen_count": 2,
-        "lang": "go",
-        "zone": "production",
-        "suppressed": false,
-        "suppressed_at": null,
-        "suppression_pattern": null
-      }
-    ],
-    "skipped_other_lang": 0,
-    "skipped_out_of_scope": 0,
-    "ignored": 0,
-    "ignore_patterns": 0,
-    "raw_findings": 569,
-    "suppressed_pct": 0.0
-  },
-  "stats": {
-    "total": 3886,
-    "open": 326,
-    "fixed": 0,
-    "auto_resolved": 3317,
-    "wontfix": 0,
-    "false_positive": 243,
-    "by_tier": {
-      "2": {
-        "open": 0,
-        "fixed": 0,
-        "auto_resolved": 97,
-        "wontfix": 0,
-        "false_positive": 0
-      },
-      "3": {
-        "open": 144,
-        "fixed": 0,
-        "auto_resolved": 2852,
-        "wontfix": 0,
-        "false_positive": 243
-      },
-      "4": {
-        "open": 182,
-        "fixed": 0,
-        "auto_resolved": 368,
-        "wontfix": 0,
-        "false_positive": 0
-      }
-    }
-  },
-  "open_scope": {
-    "in_scope": 326,
-    "out_of_scope": 0,
-    "global": 326
-  },
-  "warnings": [
-    "\u27f3 129 chronic reopeners (reopened 2+ times). These keep bouncing \u2014 fix properly or wontfix. Run: `desloppify show --chronic` to see them."
-  ],
+  "command": "status",
+  "overall_score": 77.6,
+  "objective_score": 98.0,
+  "strict_score": 77.6,
+  "verified_strict_score": 98.0,
   "dimension_scores": {
     "File health": {
-      "score": 97.4,
-      "strict_score": 97.4,
-      "verified_strict_score": 97.4,
-      "checks": 299,
+      "score": 97.5,
+      "strict_score": 97.5,
+      "verified_strict_score": 97.5,
+      "checks": 304,
       "issues": 11,
       "tier": 3,
       "detectors": {
         "structural": {
-          "potential": 299,
-          "pass_rate": 0.974247491638796,
+          "potential": 304,
+          "pass_rate": 0.9746710526315789,
           "issues": 11,
           "weighted_failures": 7.700000000000001
         }
       },
-      "strict": 97.4
+      "strict": 97.5
     },
     "Code quality": {
-      "score": 93.5,
-      "strict_score": 93.5,
-      "verified_strict_score": 93.5,
-      "checks": 150,
+      "score": 93.6,
+      "strict_score": 93.6,
+      "verified_strict_score": 93.6,
+      "checks": 153,
       "issues": 14,
       "tier": 3,
       "detectors": {
         "flat_dirs": {
-          "potential": 119,
-          "pass_rate": 0.9647058823529412,
+          "potential": 122,
+          "pass_rate": 0.9655737704918033,
           "issues": 6,
           "weighted_failures": 4.2
         },
@@ -3063,18 +43,18 @@
           "weighted_failures": 5.6000000000000005
         }
       },
-      "strict": 93.5
+      "strict": 93.6
     },
     "Duplication": {
       "score": 100.0,
       "strict_score": 100.0,
       "verified_strict_score": 100.0,
-      "checks": 3655,
+      "checks": 3685,
       "issues": 0,
       "tier": 3,
       "detectors": {
         "dupes": {
-          "potential": 3655,
+          "potential": 3685,
           "pass_rate": 1.0,
           "issues": 0,
           "weighted_failures": 0.0
@@ -3083,38 +63,38 @@
       "strict": 100.0
     },
     "Test health": {
-      "score": 95.5,
-      "strict_score": 95.5,
-      "verified_strict_score": 95.5,
-      "checks": 3287,
-      "issues": 187,
+      "score": 98.4,
+      "strict_score": 98.4,
+      "verified_strict_score": 98.4,
+      "checks": 3309,
+      "issues": 171,
       "tier": 4,
       "detectors": {
         "test_coverage": {
-          "potential": 3020,
-          "pass_rate": 0.9810946398470374,
-          "issues": 5,
-          "weighted_failures": 57.094187661947416
+          "potential": 3039,
+          "pass_rate": 1.0,
+          "issues": 0,
+          "weighted_failures": 0.0
         },
         "subjective_review": {
-          "potential": 267,
-          "pass_rate": 0.6621722846441948,
-          "issues": 182,
-          "weighted_failures": 90.19999999999999
+          "potential": 270,
+          "pass_rate": 0.8055555555555556,
+          "issues": 171,
+          "weighted_failures": 52.5
         }
       },
-      "strict": 95.5
+      "strict": 98.4
     },
     "Security": {
       "score": 100.0,
       "strict_score": 100.0,
       "verified_strict_score": 100.0,
-      "checks": 299,
+      "checks": 304,
       "issues": 0,
       "tier": 4,
       "detectors": {
         "security": {
-          "potential": 299,
+          "potential": 304,
           "pass_rate": 1.0,
           "issues": 0,
           "weighted_failures": 0.0
@@ -3123,41 +103,41 @@
       "strict": 100.0
     },
     "Error consistency": {
-      "score": 72.5,
-      "strict_score": 72.5,
-      "verified_strict_score": 72.5,
+      "score": 65.7,
+      "strict_score": 65.7,
+      "verified_strict_score": 65.7,
       "checks": 10,
-      "issues": 0,
+      "issues": 2,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.725,
-          "issues": 0,
-          "weighted_failures": 2.75,
-          "assessment_score": 72.5,
+          "pass_rate": 0.657,
+          "issues": 2,
+          "weighted_failures": 3.43,
+          "assessment_score": 65.7,
           "placeholder": false,
           "dimension_key": "error_consistency",
           "configured_weight": 3.0,
           "components": []
         }
       },
-      "strict": 72.5
+      "strict": 65.7
     },
     "Abstraction fit": {
-      "score": 54.4,
-      "strict_score": 54.4,
-      "verified_strict_score": 54.4,
+      "score": 47.0,
+      "strict_score": 47.0,
+      "verified_strict_score": 47.0,
       "checks": 10,
-      "issues": 0,
+      "issues": 4,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.544,
-          "issues": 0,
-          "weighted_failures": 4.56,
-          "assessment_score": 54.4,
+          "pass_rate": 0.47,
+          "issues": 4,
+          "weighted_failures": 5.3,
+          "assessment_score": 47.0,
           "placeholder": false,
           "dimension_key": "abstraction_fitness",
           "configured_weight": 8.0,
@@ -3167,615 +147,1048 @@
             "Interface Honesty"
           ],
           "component_scores": {
-            "Abstraction Leverage": 74.0,
-            "Indirection Cost": 71.5,
-            "Interface Honesty": 83.0
+            "Abstraction Leverage": 67.0,
+            "Indirection Cost": 74.0,
+            "Interface Honesty": 72.0
           }
         }
       },
-      "strict": 54.4
+      "strict": 47.0
     },
     "Cross-module arch": {
-      "score": 55.2,
-      "strict_score": 55.2,
-      "verified_strict_score": 55.2,
+      "score": 69.0,
+      "strict_score": 69.0,
+      "verified_strict_score": 69.0,
       "checks": 10,
-      "issues": 0,
+      "issues": 2,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.552,
-          "issues": 0,
-          "weighted_failures": 4.48,
-          "assessment_score": 55.2,
+          "pass_rate": 0.69,
+          "issues": 2,
+          "weighted_failures": 3.1,
+          "assessment_score": 69.0,
           "placeholder": false,
           "dimension_key": "cross_module_architecture",
           "configured_weight": 1.0,
           "components": []
         }
       },
-      "strict": 55.2
+      "strict": 69.0
     },
     "Test strategy": {
-      "score": 65.5,
-      "strict_score": 65.5,
-      "verified_strict_score": 65.5,
+      "score": 74.5,
+      "strict_score": 74.5,
+      "verified_strict_score": 74.5,
       "checks": 10,
-      "issues": 0,
+      "issues": 1,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.655,
-          "issues": 0,
-          "weighted_failures": 3.45,
-          "assessment_score": 65.5,
+          "pass_rate": 0.745,
+          "issues": 1,
+          "weighted_failures": 2.55,
+          "assessment_score": 74.5,
           "placeholder": false,
           "dimension_key": "test_strategy",
           "configured_weight": 1.0,
           "components": []
         }
       },
-      "strict": 65.5
+      "strict": 74.5
     },
     "Design coherence": {
-      "score": 47.0,
-      "strict_score": 47.0,
-      "verified_strict_score": 47.0,
+      "score": 48.9,
+      "strict_score": 48.9,
+      "verified_strict_score": 48.9,
       "checks": 10,
-      "issues": 0,
+      "issues": 5,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.47,
-          "issues": 0,
-          "weighted_failures": 5.3,
-          "assessment_score": 47.0,
+          "pass_rate": 0.489,
+          "issues": 5,
+          "weighted_failures": 5.11,
+          "assessment_score": 48.9,
           "placeholder": false,
           "dimension_key": "design_coherence",
           "configured_weight": 10.0,
           "components": []
         }
       },
-      "strict": 47.0
-    },
-    "API coherence": {
-      "score": 73.5,
-      "strict_score": 73.5,
-      "verified_strict_score": 73.5,
-      "checks": 10,
-      "issues": 0,
-      "tier": 4,
-      "detectors": {
-        "subjective_assessment": {
-          "potential": 10,
-          "pass_rate": 0.735,
-          "issues": 0,
-          "weighted_failures": 2.65,
-          "assessment_score": 73.5,
-          "placeholder": false,
-          "dimension_key": "api_surface_coherence",
-          "configured_weight": 1.0,
-          "components": []
-        }
-      },
-      "strict": 73.5
+      "strict": 48.9
     },
     "AI generated debt": {
-      "score": 81.3,
-      "strict_score": 81.3,
-      "verified_strict_score": 81.3,
+      "score": 92.0,
+      "strict_score": 92.0,
+      "verified_strict_score": 92.0,
       "checks": 10,
       "issues": 0,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.813,
+          "pass_rate": 0.92,
           "issues": 0,
-          "weighted_failures": 1.87,
-          "assessment_score": 81.3,
+          "weighted_failures": 0.8,
+          "assessment_score": 92.0,
           "placeholder": false,
           "dimension_key": "ai_generated_debt",
           "configured_weight": 1.0,
           "components": []
         }
       },
-      "strict": 81.3
-    },
-    "Auth consistency": {
-      "score": 89.0,
-      "strict_score": 89.0,
-      "verified_strict_score": 89.0,
-      "checks": 10,
-      "issues": 0,
-      "tier": 4,
-      "detectors": {
-        "subjective_assessment": {
-          "potential": 10,
-          "pass_rate": 0.89,
-          "issues": 0,
-          "weighted_failures": 1.1,
-          "assessment_score": 89.0,
-          "placeholder": false,
-          "dimension_key": "authorization_consistency",
-          "configured_weight": 1.0,
-          "components": []
-        }
-      },
-      "strict": 89.0
+      "strict": 92.0
     },
     "Contracts": {
-      "score": 72.5,
-      "strict_score": 72.5,
-      "verified_strict_score": 72.5,
+      "score": 57.9,
+      "strict_score": 57.9,
+      "verified_strict_score": 57.9,
       "checks": 10,
-      "issues": 0,
+      "issues": 3,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.725,
-          "issues": 0,
-          "weighted_failures": 2.75,
-          "assessment_score": 72.5,
+          "pass_rate": 0.579,
+          "issues": 3,
+          "weighted_failures": 4.21,
+          "assessment_score": 57.9,
           "placeholder": false,
           "dimension_key": "contract_coherence",
           "configured_weight": 12.0,
           "components": []
         }
       },
-      "strict": 72.5
-    },
-    "Convention drift": {
-      "score": 67.1,
-      "strict_score": 67.1,
-      "verified_strict_score": 67.1,
-      "checks": 10,
-      "issues": 0,
-      "tier": 4,
-      "detectors": {
-        "subjective_assessment": {
-          "potential": 10,
-          "pass_rate": 0.671,
-          "issues": 0,
-          "weighted_failures": 3.29,
-          "assessment_score": 67.1,
-          "placeholder": false,
-          "dimension_key": "convention_outlier",
-          "configured_weight": 1.0,
-          "components": []
-        }
-      },
-      "strict": 67.1
-    },
-    "Dep health": {
-      "score": 74.5,
-      "strict_score": 74.5,
-      "verified_strict_score": 74.5,
-      "checks": 10,
-      "issues": 0,
-      "tier": 4,
-      "detectors": {
-        "subjective_assessment": {
-          "potential": 10,
-          "pass_rate": 0.745,
-          "issues": 0,
-          "weighted_failures": 2.55,
-          "assessment_score": 74.5,
-          "placeholder": false,
-          "dimension_key": "dependency_health",
-          "configured_weight": 1.0,
-          "components": []
-        }
-      },
-      "strict": 74.5
+      "strict": 57.9
     },
     "High elegance": {
-      "score": 53.7,
-      "strict_score": 53.7,
-      "verified_strict_score": 53.7,
+      "score": 56.4,
+      "strict_score": 56.4,
+      "verified_strict_score": 56.4,
       "checks": 10,
-      "issues": 0,
+      "issues": 4,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.537,
-          "issues": 0,
-          "weighted_failures": 4.63,
-          "assessment_score": 53.7,
+          "pass_rate": 0.564,
+          "issues": 4,
+          "weighted_failures": 4.36,
+          "assessment_score": 56.4,
           "placeholder": false,
           "dimension_key": "high_level_elegance",
           "configured_weight": 22.0,
           "components": []
         }
       },
-      "strict": 53.7
-    },
-    "Stale migration": {
-      "score": 93.0,
-      "strict_score": 93.0,
-      "verified_strict_score": 93.0,
-      "checks": 10,
-      "issues": 0,
-      "tier": 4,
-      "detectors": {
-        "subjective_assessment": {
-          "potential": 10,
-          "pass_rate": 0.93,
-          "issues": 0,
-          "weighted_failures": 0.7,
-          "assessment_score": 93.0,
-          "placeholder": false,
-          "dimension_key": "incomplete_migration",
-          "configured_weight": 1.0,
-          "components": []
-        }
-      },
-      "strict": 93.0
-    },
-    "Init coupling": {
-      "score": 63.0,
-      "strict_score": 63.0,
-      "verified_strict_score": 63.0,
-      "checks": 10,
-      "issues": 0,
-      "tier": 4,
-      "detectors": {
-        "subjective_assessment": {
-          "potential": 10,
-          "pass_rate": 0.63,
-          "issues": 0,
-          "weighted_failures": 3.7,
-          "assessment_score": 63.0,
-          "placeholder": false,
-          "dimension_key": "initialization_coupling",
-          "configured_weight": 1.0,
-          "components": []
-        }
-      },
-      "strict": 63.0
+      "strict": 56.4
     },
     "Logic clarity": {
-      "score": 86.0,
-      "strict_score": 86.0,
-      "verified_strict_score": 86.0,
+      "score": 87.6,
+      "strict_score": 87.6,
+      "verified_strict_score": 87.6,
       "checks": 10,
       "issues": 0,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.86,
+          "pass_rate": 0.876,
           "issues": 0,
-          "weighted_failures": 1.4,
-          "assessment_score": 86.0,
+          "weighted_failures": 1.24,
+          "assessment_score": 87.6,
           "placeholder": false,
           "dimension_key": "logic_clarity",
           "configured_weight": 6.0,
           "components": []
         }
       },
-      "strict": 86.0
+      "strict": 87.6
     },
     "Low elegance": {
-      "score": 88.9,
-      "strict_score": 88.9,
-      "verified_strict_score": 88.9,
+      "score": 71.0,
+      "strict_score": 71.0,
+      "verified_strict_score": 71.0,
       "checks": 10,
-      "issues": 0,
+      "issues": 2,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.889,
-          "issues": 0,
-          "weighted_failures": 1.11,
-          "assessment_score": 88.9,
+          "pass_rate": 0.71,
+          "issues": 2,
+          "weighted_failures": 2.9,
+          "assessment_score": 71.0,
           "placeholder": false,
           "dimension_key": "low_level_elegance",
           "configured_weight": 12.0,
           "components": []
         }
       },
-      "strict": 88.9
+      "strict": 71.0
     },
     "Mid elegance": {
-      "score": 73.0,
-      "strict_score": 73.0,
-      "verified_strict_score": 73.0,
+      "score": 54.8,
+      "strict_score": 54.8,
+      "verified_strict_score": 54.8,
       "checks": 10,
-      "issues": 0,
+      "issues": 2,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.73,
-          "issues": 0,
-          "weighted_failures": 2.7,
-          "assessment_score": 73.0,
+          "pass_rate": 0.548,
+          "issues": 2,
+          "weighted_failures": 4.52,
+          "assessment_score": 54.8,
           "placeholder": false,
           "dimension_key": "mid_level_elegance",
           "configured_weight": 22.0,
           "components": []
         }
       },
-      "strict": 73.0
+      "strict": 54.8
     },
     "Naming quality": {
-      "score": 70.5,
-      "strict_score": 70.5,
-      "verified_strict_score": 70.5,
+      "score": 88.4,
+      "strict_score": 88.4,
+      "verified_strict_score": 88.4,
       "checks": 10,
       "issues": 0,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.705,
+          "pass_rate": 0.884,
           "issues": 0,
-          "weighted_failures": 2.95,
-          "assessment_score": 70.5,
+          "weighted_failures": 1.16,
+          "assessment_score": 88.4,
           "placeholder": false,
           "dimension_key": "naming_quality",
           "configured_weight": 2.0,
           "components": []
         }
       },
-      "strict": 70.5
+      "strict": 88.4
     },
     "Structure nav": {
-      "score": 54.0,
-      "strict_score": 54.0,
-      "verified_strict_score": 54.0,
+      "score": 57.0,
+      "strict_score": 57.0,
+      "verified_strict_score": 57.0,
       "checks": 10,
-      "issues": 0,
+      "issues": 3,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.54,
-          "issues": 0,
-          "weighted_failures": 4.6,
-          "assessment_score": 54.0,
+          "pass_rate": 0.57,
+          "issues": 3,
+          "weighted_failures": 4.3,
+          "assessment_score": 57.0,
           "placeholder": false,
           "dimension_key": "package_organization",
           "configured_weight": 5.0,
           "components": []
         }
       },
-      "strict": 54.0
+      "strict": 57.0
     },
     "Type safety": {
-      "score": 88.0,
-      "strict_score": 88.0,
-      "verified_strict_score": 88.0,
+      "score": 90.2,
+      "strict_score": 90.2,
+      "verified_strict_score": 90.2,
       "checks": 10,
       "issues": 0,
       "tier": 4,
       "detectors": {
         "subjective_assessment": {
           "potential": 10,
-          "pass_rate": 0.88,
+          "pass_rate": 0.902,
           "issues": 0,
-          "weighted_failures": 1.2,
-          "assessment_score": 88.0,
+          "weighted_failures": 0.98,
+          "assessment_score": 90.2,
           "placeholder": false,
           "dimension_key": "type_safety",
           "configured_weight": 12.0,
           "components": []
         }
       },
-      "strict": 88.0
+      "strict": 90.2
+    },
+    "API coherence": {
+      "score": 73.4,
+      "strict_score": 73.4,
+      "verified_strict_score": 73.4,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.734,
+          "issues": 1,
+          "weighted_failures": 2.66,
+          "assessment_score": 73.4,
+          "placeholder": false,
+          "dimension_key": "api_surface_coherence",
+          "configured_weight": 1.0,
+          "components": []
+        }
+      },
+      "strict": 73.4
+    },
+    "Auth consistency": {
+      "score": 91.3,
+      "strict_score": 91.3,
+      "verified_strict_score": 91.3,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.913,
+          "issues": 0,
+          "weighted_failures": 0.87,
+          "assessment_score": 91.3,
+          "placeholder": false,
+          "dimension_key": "authorization_consistency",
+          "configured_weight": 1.0,
+          "components": []
+        }
+      },
+      "strict": 91.3
+    },
+    "Convention drift": {
+      "score": 81.0,
+      "strict_score": 81.0,
+      "verified_strict_score": 81.0,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.81,
+          "issues": 1,
+          "weighted_failures": 1.9,
+          "assessment_score": 81.0,
+          "placeholder": false,
+          "dimension_key": "convention_outlier",
+          "configured_weight": 1.0,
+          "components": []
+        }
+      },
+      "strict": 81.0
+    },
+    "Dep health": {
+      "score": 87.4,
+      "strict_score": 87.4,
+      "verified_strict_score": 87.4,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.874,
+          "issues": 0,
+          "weighted_failures": 1.26,
+          "assessment_score": 87.4,
+          "placeholder": false,
+          "dimension_key": "dependency_health",
+          "configured_weight": 1.0,
+          "components": []
+        }
+      },
+      "strict": 87.4
+    },
+    "Stale migration": {
+      "score": 95.0,
+      "strict_score": 95.0,
+      "verified_strict_score": 95.0,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.95,
+          "issues": 0,
+          "weighted_failures": 0.5,
+          "assessment_score": 95.0,
+          "placeholder": false,
+          "dimension_key": "incomplete_migration",
+          "configured_weight": 1.0,
+          "components": []
+        }
+      },
+      "strict": 95.0
+    },
+    "Init coupling": {
+      "score": 74.2,
+      "strict_score": 74.2,
+      "verified_strict_score": 74.2,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "detectors": {
+        "subjective_assessment": {
+          "potential": 10,
+          "pass_rate": 0.742,
+          "issues": 1,
+          "weighted_failures": 2.58,
+          "assessment_score": 74.2,
+          "placeholder": false,
+          "dimension_key": "initialization_coupling",
+          "configured_weight": 1.0,
+          "components": []
+        }
+      },
+      "strict": 74.2
     }
   },
+  "scorecard_dimensions": [
+    {
+      "name": "File health",
+      "score": 97.5,
+      "strict": 97.5,
+      "checks": 304,
+      "issues": 11,
+      "tier": 3,
+      "subjective": false
+    },
+    {
+      "name": "AI generated debt",
+      "score": 92.0,
+      "strict": 92.0,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "ai_generated_debt"
+      ]
+    },
+    {
+      "name": "API coherence",
+      "score": 73.4,
+      "strict": 73.4,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "api_surface_coherence"
+      ]
+    },
+    {
+      "name": "Abstraction fit",
+      "score": 47.0,
+      "strict": 47.0,
+      "checks": 10,
+      "issues": 4,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "abstraction_fitness"
+      ]
+    },
+    {
+      "name": "Auth consistency",
+      "score": 91.3,
+      "strict": 91.3,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "authorization_consistency"
+      ]
+    },
+    {
+      "name": "Code quality",
+      "score": 93.6,
+      "strict": 93.6,
+      "checks": 153,
+      "issues": 14,
+      "tier": 3,
+      "subjective": false
+    },
+    {
+      "name": "Convention drift",
+      "score": 81.0,
+      "strict": 81.0,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "convention_outlier"
+      ]
+    },
+    {
+      "name": "Cross-module arch",
+      "score": 69.0,
+      "strict": 69.0,
+      "checks": 10,
+      "issues": 2,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "cross_module_architecture"
+      ]
+    },
+    {
+      "name": "Dep health",
+      "score": 87.4,
+      "strict": 87.4,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "dependency_health"
+      ]
+    },
+    {
+      "name": "Design coherence",
+      "score": 48.9,
+      "strict": 48.9,
+      "checks": 10,
+      "issues": 5,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "design_coherence"
+      ]
+    },
+    {
+      "name": "Duplication",
+      "score": 100.0,
+      "strict": 100.0,
+      "checks": 3685,
+      "issues": 0,
+      "tier": 3,
+      "subjective": false
+    },
+    {
+      "name": "Elegance",
+      "score": 60.7,
+      "strict": 60.7,
+      "checks": 30,
+      "issues": 8,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "high_level_elegance",
+        "low_level_elegance",
+        "mid_level_elegance"
+      ]
+    },
+    {
+      "name": "Error consistency",
+      "score": 65.7,
+      "strict": 65.7,
+      "checks": 10,
+      "issues": 2,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "error_consistency"
+      ]
+    },
+    {
+      "name": "Init coupling",
+      "score": 74.2,
+      "strict": 74.2,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "initialization_coupling"
+      ]
+    },
+    {
+      "name": "Naming quality",
+      "score": 88.4,
+      "strict": 88.4,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "naming_quality"
+      ]
+    },
+    {
+      "name": "Security",
+      "score": 100.0,
+      "strict": 100.0,
+      "checks": 304,
+      "issues": 0,
+      "tier": 4,
+      "subjective": false
+    },
+    {
+      "name": "Stale migration",
+      "score": 95.0,
+      "strict": 95.0,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "incomplete_migration"
+      ]
+    },
+    {
+      "name": "Structure nav",
+      "score": 57.0,
+      "strict": 57.0,
+      "checks": 10,
+      "issues": 3,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "package_organization"
+      ]
+    },
+    {
+      "name": "Test health",
+      "score": 98.4,
+      "strict": 98.4,
+      "checks": 3309,
+      "issues": 171,
+      "tier": 4,
+      "subjective": false
+    },
+    {
+      "name": "Test strategy",
+      "score": 74.5,
+      "strict": 74.5,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "test_strategy"
+      ]
+    }
+  ],
+  "subjective_measures": [
+    {
+      "name": "AI generated debt",
+      "score": 92.0,
+      "strict": 92.0,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "ai_generated_debt"
+      ]
+    },
+    {
+      "name": "API coherence",
+      "score": 73.4,
+      "strict": 73.4,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "api_surface_coherence"
+      ]
+    },
+    {
+      "name": "Abstraction fit",
+      "score": 47.0,
+      "strict": 47.0,
+      "checks": 10,
+      "issues": 4,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "abstraction_fitness"
+      ]
+    },
+    {
+      "name": "Auth consistency",
+      "score": 91.3,
+      "strict": 91.3,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "authorization_consistency"
+      ]
+    },
+    {
+      "name": "Convention drift",
+      "score": 81.0,
+      "strict": 81.0,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "convention_outlier"
+      ]
+    },
+    {
+      "name": "Cross-module arch",
+      "score": 69.0,
+      "strict": 69.0,
+      "checks": 10,
+      "issues": 2,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "cross_module_architecture"
+      ]
+    },
+    {
+      "name": "Dep health",
+      "score": 87.4,
+      "strict": 87.4,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "dependency_health"
+      ]
+    },
+    {
+      "name": "Design coherence",
+      "score": 48.9,
+      "strict": 48.9,
+      "checks": 10,
+      "issues": 5,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "design_coherence"
+      ]
+    },
+    {
+      "name": "Elegance",
+      "score": 60.7,
+      "strict": 60.7,
+      "checks": 30,
+      "issues": 8,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "high_level_elegance",
+        "low_level_elegance",
+        "mid_level_elegance"
+      ]
+    },
+    {
+      "name": "Error consistency",
+      "score": 65.7,
+      "strict": 65.7,
+      "checks": 10,
+      "issues": 2,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "error_consistency"
+      ]
+    },
+    {
+      "name": "Init coupling",
+      "score": 74.2,
+      "strict": 74.2,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "initialization_coupling"
+      ]
+    },
+    {
+      "name": "Naming quality",
+      "score": 88.4,
+      "strict": 88.4,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "naming_quality"
+      ]
+    },
+    {
+      "name": "Stale migration",
+      "score": 95.0,
+      "strict": 95.0,
+      "checks": 10,
+      "issues": 0,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "incomplete_migration"
+      ]
+    },
+    {
+      "name": "Structure nav",
+      "score": 57.0,
+      "strict": 57.0,
+      "checks": 10,
+      "issues": 3,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "package_organization"
+      ]
+    },
+    {
+      "name": "Test strategy",
+      "score": 74.5,
+      "strict": 74.5,
+      "checks": 10,
+      "issues": 1,
+      "tier": 4,
+      "subjective": true,
+      "placeholder": false,
+      "cli_keys": [
+        "test_strategy"
+      ]
+    }
+  ],
+  "stats": {
+    "total": 760,
+    "open": 586,
+    "fixed": 13,
+    "auto_resolved": 161,
+    "wontfix": 0,
+    "false_positive": 0,
+    "by_tier": {
+      "3": {
+        "open": 415,
+        "fixed": 13,
+        "auto_resolved": 52,
+        "wontfix": 0,
+        "false_positive": 0
+      },
+      "4": {
+        "open": 171,
+        "fixed": 0,
+        "auto_resolved": 109,
+        "wontfix": 0,
+        "false_positive": 0
+      }
+    }
+  },
+  "scan_count": 10,
+  "last_scan": "2026-03-05T14:25:52+00:00",
+  "by_tier": {
+    "3": {
+      "open": 415,
+      "fixed": 13,
+      "auto_resolved": 52,
+      "wontfix": 0,
+      "false_positive": 0
+    },
+    "4": {
+      "open": 171,
+      "fixed": 0,
+      "auto_resolved": 109,
+      "wontfix": 0,
+      "false_positive": 0
+    }
+  },
+  "ignores": [],
+  "suppression": {
+    "last_ignored": 0,
+    "last_raw_findings": 13,
+    "last_suppressed_pct": 0.0,
+    "last_ignore_patterns": 0,
+    "recent_scans": 5,
+    "recent_ignored": 0,
+    "recent_raw_findings": 1156,
+    "recent_suppressed_pct": 0.0
+  },
+  "potentials": {
+    "go": {
+      "structural": 304,
+      "flat_dirs": 122,
+      "responsibility_cohesion": 31,
+      "unused_imports": 294,
+      "signature": 34,
+      "test_coverage": 3039,
+      "security": 304,
+      "subjective_review": 270,
+      "boilerplate_duplication": 0,
+      "dupes": 3685,
+      "stale_wontfix": 0,
+      "review": 10
+    }
+  },
+  "codebase_metrics": {
+    "go": {
+      "total_files": 655,
+      "total_loc": 74265,
+      "total_directories": 122
+    }
+  },
+  "open_scope": {
+    "in_scope": 586,
+    "out_of_scope": 0,
+    "global": 586
+  },
   "score_breakdown": {
-    "overall_score": 80.4,
+    "overall_score": 77.6,
     "mechanical_fraction": 0.4,
     "subjective_fraction": 0.6,
-    "mechanical_avg": 97.46521739130434,
-    "subjective_avg": 69.04065040650407,
+    "mechanical_avg": 98.00589765828273,
+    "subjective_avg": 63.9260162601626,
     "entries": [
       {
         "name": "File health",
         "pool": "mechanical",
-        "score": 97.4,
-        "checks": 299.0,
+        "score": 97.5,
+        "checks": 304.0,
         "sample_factor": 1.0,
         "configured_weight": 2.0,
         "effective_weight": 2.0,
-        "pool_share": 0.34782608695652173,
-        "overall_per_point": 0.1391304347826087,
-        "overall_contribution": 13.551304347826088,
-        "overall_drag": 0.36173913043478184
+        "pool_share": 0.3469210754553339,
+        "overall_per_point": 0.13876843018213356,
+        "overall_contribution": 13.529921942758023,
+        "overall_drag": 0.3469210754553339
       },
       {
         "name": "Code quality",
         "pool": "mechanical",
-        "score": 93.5,
-        "checks": 150.0,
-        "sample_factor": 0.75,
+        "score": 93.6,
+        "checks": 153.0,
+        "sample_factor": 0.765,
         "configured_weight": 1.0,
-        "effective_weight": 0.75,
-        "pool_share": 0.13043478260869565,
-        "overall_per_point": 0.052173913043478265,
-        "overall_contribution": 4.878260869565218,
-        "overall_drag": 0.33913043478260874
+        "effective_weight": 0.765,
+        "pool_share": 0.1326973113616652,
+        "overall_per_point": 0.05307892454466609,
+        "overall_contribution": 4.968187337380746,
+        "overall_drag": 0.33970511708586326
       },
       {
         "name": "Duplication",
         "pool": "mechanical",
         "score": 100.0,
-        "checks": 3655.0,
+        "checks": 3685.0,
         "sample_factor": 1.0,
         "configured_weight": 1.0,
         "effective_weight": 1.0,
-        "pool_share": 0.17391304347826086,
-        "overall_per_point": 0.06956521739130435,
-        "overall_contribution": 6.956521739130435,
+        "pool_share": 0.17346053772766695,
+        "overall_per_point": 0.06938421509106678,
+        "overall_contribution": 6.938421509106678,
         "overall_drag": 0.0
       },
       {
         "name": "Test health",
         "pool": "mechanical",
-        "score": 95.5,
-        "checks": 3287.0,
+        "score": 98.4,
+        "checks": 3309.0,
         "sample_factor": 1.0,
         "configured_weight": 1.0,
         "effective_weight": 1.0,
-        "pool_share": 0.17391304347826086,
-        "overall_per_point": 0.06956521739130435,
-        "overall_contribution": 6.643478260869565,
-        "overall_drag": 0.3130434782608696
+        "pool_share": 0.17346053772766695,
+        "overall_per_point": 0.06938421509106678,
+        "overall_contribution": 6.827406764960972,
+        "overall_drag": 0.11101474414570645
       },
       {
         "name": "Security",
         "pool": "mechanical",
         "score": 100.0,
-        "checks": 299.0,
+        "checks": 304.0,
         "sample_factor": 1.0,
         "configured_weight": 1.0,
         "effective_weight": 1.0,
-        "pool_share": 0.17391304347826086,
-        "overall_per_point": 0.06956521739130435,
-        "overall_contribution": 6.956521739130435,
+        "pool_share": 0.17346053772766695,
+        "overall_per_point": 0.06938421509106678,
+        "overall_contribution": 6.938421509106678,
         "overall_drag": 0.0
       },
       {
         "name": "Error consistency",
         "pool": "subjective",
-        "score": 72.5,
+        "score": 65.7,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 3.0,
         "effective_weight": 3.0,
         "pool_share": 0.024390243902439025,
         "overall_per_point": 0.014634146341463414,
-        "overall_contribution": 1.0609756097560974,
-        "overall_drag": 0.40243902439024387
+        "overall_contribution": 0.9614634146341463,
+        "overall_drag": 0.501951219512195
       },
       {
         "name": "Abstraction fit",
         "pool": "subjective",
-        "score": 54.4,
+        "score": 47.0,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 8.0,
         "effective_weight": 8.0,
         "pool_share": 0.06504065040650407,
         "overall_per_point": 0.03902439024390244,
-        "overall_contribution": 2.122926829268293,
-        "overall_drag": 1.7795121951219512
+        "overall_contribution": 1.8341463414634147,
+        "overall_drag": 2.0682926829268293
       },
       {
         "name": "Cross-module arch",
         "pool": "subjective",
-        "score": 55.2,
+        "score": 69.0,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 1.0,
         "effective_weight": 1.0,
         "pool_share": 0.008130081300813009,
         "overall_per_point": 0.004878048780487805,
-        "overall_contribution": 0.26926829268292685,
-        "overall_drag": 0.21853658536585366
+        "overall_contribution": 0.33658536585365856,
+        "overall_drag": 0.15121951219512195
       },
       {
         "name": "Test strategy",
-        "pool": "subjective",
-        "score": 65.5,
-        "checks": 0.0,
-        "sample_factor": 1.0,
-        "configured_weight": 1.0,
-        "effective_weight": 1.0,
-        "pool_share": 0.008130081300813009,
-        "overall_per_point": 0.004878048780487805,
-        "overall_contribution": 0.3195121951219512,
-        "overall_drag": 0.16829268292682928
-      },
-      {
-        "name": "Design coherence",
-        "pool": "subjective",
-        "score": 47.0,
-        "checks": 0.0,
-        "sample_factor": 1.0,
-        "configured_weight": 10.0,
-        "effective_weight": 10.0,
-        "pool_share": 0.08130081300813008,
-        "overall_per_point": 0.048780487804878044,
-        "overall_contribution": 2.292682926829268,
-        "overall_drag": 2.585365853658536
-      },
-      {
-        "name": "API coherence",
-        "pool": "subjective",
-        "score": 73.5,
-        "checks": 0.0,
-        "sample_factor": 1.0,
-        "configured_weight": 1.0,
-        "effective_weight": 1.0,
-        "pool_share": 0.008130081300813009,
-        "overall_per_point": 0.004878048780487805,
-        "overall_contribution": 0.35853658536585364,
-        "overall_drag": 0.12926829268292683
-      },
-      {
-        "name": "AI generated debt",
-        "pool": "subjective",
-        "score": 81.3,
-        "checks": 0.0,
-        "sample_factor": 1.0,
-        "configured_weight": 1.0,
-        "effective_weight": 1.0,
-        "pool_share": 0.008130081300813009,
-        "overall_per_point": 0.004878048780487805,
-        "overall_contribution": 0.3965853658536585,
-        "overall_drag": 0.09121951219512196
-      },
-      {
-        "name": "Auth consistency",
-        "pool": "subjective",
-        "score": 89.0,
-        "checks": 0.0,
-        "sample_factor": 1.0,
-        "configured_weight": 1.0,
-        "effective_weight": 1.0,
-        "pool_share": 0.008130081300813009,
-        "overall_per_point": 0.004878048780487805,
-        "overall_contribution": 0.43414634146341463,
-        "overall_drag": 0.05365853658536585
-      },
-      {
-        "name": "Contracts",
-        "pool": "subjective",
-        "score": 72.5,
-        "checks": 0.0,
-        "sample_factor": 1.0,
-        "configured_weight": 12.0,
-        "effective_weight": 12.0,
-        "pool_share": 0.0975609756097561,
-        "overall_per_point": 0.058536585365853655,
-        "overall_contribution": 4.24390243902439,
-        "overall_drag": 1.6097560975609755
-      },
-      {
-        "name": "Convention drift",
-        "pool": "subjective",
-        "score": 67.1,
-        "checks": 0.0,
-        "sample_factor": 1.0,
-        "configured_weight": 1.0,
-        "effective_weight": 1.0,
-        "pool_share": 0.008130081300813009,
-        "overall_per_point": 0.004878048780487805,
-        "overall_contribution": 0.32731707317073166,
-        "overall_drag": 0.1604878048780488
-      },
-      {
-        "name": "Dep health",
         "pool": "subjective",
         "score": 74.5,
         "checks": 0.0,
@@ -3788,201 +1201,241 @@
         "overall_drag": 0.12439024390243902
       },
       {
+        "name": "Design coherence",
+        "pool": "subjective",
+        "score": 48.9,
+        "checks": 0.0,
+        "sample_factor": 1.0,
+        "configured_weight": 10.0,
+        "effective_weight": 10.0,
+        "pool_share": 0.08130081300813008,
+        "overall_per_point": 0.048780487804878044,
+        "overall_contribution": 2.385365853658536,
+        "overall_drag": 2.4926829268292683
+      },
+      {
+        "name": "AI generated debt",
+        "pool": "subjective",
+        "score": 92.0,
+        "checks": 0.0,
+        "sample_factor": 1.0,
+        "configured_weight": 1.0,
+        "effective_weight": 1.0,
+        "pool_share": 0.008130081300813009,
+        "overall_per_point": 0.004878048780487805,
+        "overall_contribution": 0.44878048780487806,
+        "overall_drag": 0.03902439024390244
+      },
+      {
+        "name": "Contracts",
+        "pool": "subjective",
+        "score": 57.9,
+        "checks": 0.0,
+        "sample_factor": 1.0,
+        "configured_weight": 12.0,
+        "effective_weight": 12.0,
+        "pool_share": 0.0975609756097561,
+        "overall_per_point": 0.058536585365853655,
+        "overall_contribution": 3.3892682926829267,
+        "overall_drag": 2.464390243902439
+      },
+      {
         "name": "High elegance",
         "pool": "subjective",
-        "score": 53.7,
+        "score": 56.4,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 22.0,
         "effective_weight": 22.0,
         "pool_share": 0.17886178861788618,
         "overall_per_point": 0.1073170731707317,
-        "overall_contribution": 5.7629268292682925,
-        "overall_drag": 4.968780487804878
-      },
-      {
-        "name": "Stale migration",
-        "pool": "subjective",
-        "score": 93.0,
-        "checks": 0.0,
-        "sample_factor": 1.0,
-        "configured_weight": 1.0,
-        "effective_weight": 1.0,
-        "pool_share": 0.008130081300813009,
-        "overall_per_point": 0.004878048780487805,
-        "overall_contribution": 0.45365853658536587,
-        "overall_drag": 0.03414634146341464
-      },
-      {
-        "name": "Init coupling",
-        "pool": "subjective",
-        "score": 63.0,
-        "checks": 0.0,
-        "sample_factor": 1.0,
-        "configured_weight": 1.0,
-        "effective_weight": 1.0,
-        "pool_share": 0.008130081300813009,
-        "overall_per_point": 0.004878048780487805,
-        "overall_contribution": 0.3073170731707317,
-        "overall_drag": 0.18048780487804877
+        "overall_contribution": 6.052682926829268,
+        "overall_drag": 4.679024390243902
       },
       {
         "name": "Logic clarity",
         "pool": "subjective",
-        "score": 86.0,
+        "score": 87.6,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 6.0,
         "effective_weight": 6.0,
         "pool_share": 0.04878048780487805,
         "overall_per_point": 0.029268292682926828,
-        "overall_contribution": 2.5170731707317073,
-        "overall_drag": 0.4097560975609756
+        "overall_contribution": 2.56390243902439,
+        "overall_drag": 0.36292682926829284
       },
       {
         "name": "Low elegance",
         "pool": "subjective",
-        "score": 88.9,
+        "score": 71.0,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 12.0,
         "effective_weight": 12.0,
         "pool_share": 0.0975609756097561,
         "overall_per_point": 0.058536585365853655,
-        "overall_contribution": 5.20390243902439,
-        "overall_drag": 0.6497560975609752
+        "overall_contribution": 4.15609756097561,
+        "overall_drag": 1.697560975609756
       },
       {
         "name": "Mid elegance",
         "pool": "subjective",
-        "score": 73.0,
+        "score": 54.8,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 22.0,
         "effective_weight": 22.0,
         "pool_share": 0.17886178861788618,
         "overall_per_point": 0.1073170731707317,
-        "overall_contribution": 7.8341463414634145,
-        "overall_drag": 2.897560975609756
+        "overall_contribution": 5.8809756097560975,
+        "overall_drag": 4.850731707317073
       },
       {
         "name": "Naming quality",
         "pool": "subjective",
-        "score": 70.5,
+        "score": 88.4,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 2.0,
         "effective_weight": 2.0,
         "pool_share": 0.016260162601626018,
         "overall_per_point": 0.00975609756097561,
-        "overall_contribution": 0.6878048780487804,
-        "overall_drag": 0.28780487804878047
+        "overall_contribution": 0.862439024390244,
+        "overall_drag": 0.11317073170731702
       },
       {
         "name": "Structure nav",
         "pool": "subjective",
-        "score": 54.0,
+        "score": 57.0,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 5.0,
         "effective_weight": 5.0,
         "pool_share": 0.04065040650406504,
         "overall_per_point": 0.024390243902439022,
-        "overall_contribution": 1.3170731707317072,
-        "overall_drag": 1.121951219512195
+        "overall_contribution": 1.3902439024390243,
+        "overall_drag": 1.0487804878048779
       },
       {
         "name": "Type safety",
         "pool": "subjective",
-        "score": 88.0,
+        "score": 90.2,
         "checks": 0.0,
         "sample_factor": 1.0,
         "configured_weight": 12.0,
         "effective_weight": 12.0,
         "pool_share": 0.0975609756097561,
         "overall_per_point": 0.058536585365853655,
-        "overall_contribution": 5.151219512195121,
-        "overall_drag": 0.7024390243902439
+        "overall_contribution": 5.28,
+        "overall_drag": 0.5736585365853657
+      },
+      {
+        "name": "API coherence",
+        "pool": "subjective",
+        "score": 73.4,
+        "checks": 0.0,
+        "sample_factor": 1.0,
+        "configured_weight": 1.0,
+        "effective_weight": 1.0,
+        "pool_share": 0.008130081300813009,
+        "overall_per_point": 0.004878048780487805,
+        "overall_contribution": 0.3580487804878049,
+        "overall_drag": 0.1297560975609756
+      },
+      {
+        "name": "Auth consistency",
+        "pool": "subjective",
+        "score": 91.3,
+        "checks": 0.0,
+        "sample_factor": 1.0,
+        "configured_weight": 1.0,
+        "effective_weight": 1.0,
+        "pool_share": 0.008130081300813009,
+        "overall_per_point": 0.004878048780487805,
+        "overall_contribution": 0.4453658536585366,
+        "overall_drag": 0.04243902439024392
+      },
+      {
+        "name": "Convention drift",
+        "pool": "subjective",
+        "score": 81.0,
+        "checks": 0.0,
+        "sample_factor": 1.0,
+        "configured_weight": 1.0,
+        "effective_weight": 1.0,
+        "pool_share": 0.008130081300813009,
+        "overall_per_point": 0.004878048780487805,
+        "overall_contribution": 0.3951219512195122,
+        "overall_drag": 0.09268292682926829
+      },
+      {
+        "name": "Dep health",
+        "pool": "subjective",
+        "score": 87.4,
+        "checks": 0.0,
+        "sample_factor": 1.0,
+        "configured_weight": 1.0,
+        "effective_weight": 1.0,
+        "pool_share": 0.008130081300813009,
+        "overall_per_point": 0.004878048780487805,
+        "overall_contribution": 0.4263414634146342,
+        "overall_drag": 0.06146341463414631
+      },
+      {
+        "name": "Stale migration",
+        "pool": "subjective",
+        "score": 95.0,
+        "checks": 0.0,
+        "sample_factor": 1.0,
+        "configured_weight": 1.0,
+        "effective_weight": 1.0,
+        "pool_share": 0.008130081300813009,
+        "overall_per_point": 0.004878048780487805,
+        "overall_contribution": 0.4634146341463415,
+        "overall_drag": 0.024390243902439025
+      },
+      {
+        "name": "Init coupling",
+        "pool": "subjective",
+        "score": 74.2,
+        "checks": 0.0,
+        "sample_factor": 1.0,
+        "configured_weight": 1.0,
+        "effective_weight": 1.0,
+        "pool_share": 0.008130081300813009,
+        "overall_per_point": 0.004878048780487805,
+        "overall_contribution": 0.3619512195121951,
+        "overall_drag": 0.12585365853658534
       }
     ]
   },
-  "subjective_integrity": {
-    "status": "pass",
-    "target_score": 95.0,
-    "matched_count": 0,
-    "matched_dimensions": [],
-    "reset_dimensions": []
-  },
-  "score_confidence": {
-    "status": "full",
-    "confidence": 1.0,
-    "detectors": [],
-    "dimensions": []
-  },
-  "potentials": {
-    "go": {
-      "structural": 299,
-      "flat_dirs": 119,
-      "responsibility_cohesion": 31,
-      "unused_imports": 292,
-      "signature": 33,
-      "test_coverage": 3020,
-      "security": 299,
-      "subjective_review": 267,
-      "boilerplate_duplication": 0,
-      "dupes": 3655,
-      "stale_wontfix": 0
-    }
-  },
-  "scan_coverage": {
-    "go": {
-      "status": "full",
-      "confidence": 1.0,
-      "detectors": {
-        "security": {
-          "detector": "security",
-          "status": "full",
-          "confidence": 1.0,
-          "summary": "Security coverage complete for enabled detectors.",
-          "impact": "",
-          "remediation": "",
-          "tool": "",
-          "reason": ""
-        }
-      },
-      "warnings": [],
-      "updated_at": "2026-03-05T06:24:06+00:00"
-    }
-  },
-  "zone_distribution": {
-    "test": 342,
-    "production": 299
-  },
+  "next_command": "desloppify issues",
   "narrative": {
-    "phase": "stagnation",
-    "headline": "All T1 and T2 items cleared!",
+    "phase": "regression",
+    "headline": "Score shifted 0.6 pts \u2014 this is normal after structural changes. Rescan after your next fix to see the real trend. (31 review findings \u2014 run `desloppify issues`)",
     "dimensions": {
       "lowest_dimensions": [
         {
-          "name": "Design coherence",
+          "name": "Abstraction fit",
           "strict": 47.0,
-          "issues": 0,
+          "issues": 4,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
         },
         {
-          "name": "High elegance",
-          "strict": 53.7,
-          "issues": 0,
+          "name": "Design coherence",
+          "strict": 48.9,
+          "issues": 5,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
         },
         {
-          "name": "Structure nav",
-          "strict": 54.0,
-          "issues": 0,
+          "name": "Mid elegance",
+          "strict": 54.8,
+          "issues": 2,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
@@ -3992,7 +1445,12 @@
       "stagnant_dimensions": [
         {
           "name": "File health",
-          "strict": 97.4,
+          "strict": 97.5,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Code quality",
+          "strict": 93.6,
           "stuck_scans": 5
         },
         {
@@ -4001,113 +1459,94 @@
           "stuck_scans": 5
         },
         {
+          "name": "Test health",
+          "strict": 98.4,
+          "stuck_scans": 5
+        },
+        {
           "name": "Security",
           "strict": 100.0,
           "stuck_scans": 5
         },
         {
-          "name": "Error consistency",
-          "strict": 72.5,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Abstraction fit",
-          "strict": 54.4,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Cross-module arch",
-          "strict": 55.2,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Test strategy",
-          "strict": 65.5,
-          "stuck_scans": 5
-        },
-        {
           "name": "Design coherence",
-          "strict": 47.0,
-          "stuck_scans": 5
-        },
-        {
-          "name": "API coherence",
-          "strict": 73.5,
+          "strict": 48.9,
           "stuck_scans": 5
         },
         {
           "name": "AI generated debt",
-          "strict": 81.3,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Auth consistency",
-          "strict": 89.0,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Contracts",
-          "strict": 72.5,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Convention drift",
-          "strict": 67.1,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Dep health",
-          "strict": 74.5,
-          "stuck_scans": 5
-        },
-        {
-          "name": "High elegance",
-          "strict": 53.7,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Stale migration",
-          "strict": 93.0,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Init coupling",
-          "strict": 63.0,
+          "strict": 92.0,
           "stuck_scans": 5
         },
         {
           "name": "Logic clarity",
-          "strict": 86.0,
+          "strict": 87.6,
           "stuck_scans": 5
         },
         {
           "name": "Low elegance",
-          "strict": 88.9,
+          "strict": 71.0,
           "stuck_scans": 5
         },
         {
           "name": "Mid elegance",
-          "strict": 73.0,
+          "strict": 54.8,
           "stuck_scans": 5
         },
         {
           "name": "Naming quality",
-          "strict": 70.5,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Structure nav",
-          "strict": 54.0,
+          "strict": 88.4,
           "stuck_scans": 5
         },
         {
           "name": "Type safety",
-          "strict": 88.0,
+          "strict": 90.2,
+          "stuck_scans": 5
+        },
+        {
+          "name": "API coherence",
+          "strict": 73.4,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Auth consistency",
+          "strict": 91.3,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Convention drift",
+          "strict": 81.0,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Dep health",
+          "strict": 87.4,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Stale migration",
+          "strict": 95.0,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Init coupling",
+          "strict": 74.2,
           "stuck_scans": 5
         }
       ]
     },
     "actions": [
+      {
+        "type": "issue_queue",
+        "detector": "review",
+        "count": 31,
+        "description": "31 review findings need investigation \u2014 run `desloppify issues` to see the work queue",
+        "command": "desloppify issues",
+        "impact": 0.0,
+        "dimension": "Unknown",
+        "priority": 1,
+        "lane": "refactor_0"
+      },
       {
         "type": "reorganize",
         "detector": "flat_dirs",
@@ -4116,7 +1555,7 @@
         "command": "desloppify show flat_dirs --status open",
         "impact": 0.0,
         "dimension": "Code quality",
-        "priority": 1,
+        "priority": 2,
         "lane": "restructure"
       },
       {
@@ -4127,41 +1566,19 @@
         "command": "desloppify show structural --status open",
         "impact": 0.0,
         "dimension": "File health",
-        "priority": 2,
-        "lane": "refactor"
-      },
-      {
-        "type": "refactor",
-        "detector": "dupes",
-        "count": 1,
-        "description": "1 dupes findings \u2014 extract shared utility or consolidate duplicates",
-        "command": "desloppify show dupes --status open",
-        "impact": 0.0,
-        "dimension": "Duplication",
         "priority": 3,
-        "lane": "refactor"
-      },
-      {
-        "type": "refactor",
-        "detector": "test_coverage",
-        "count": 5,
-        "description": "5 test_coverage findings \u2014 add tests for untested production modules \u2014 prioritize by import count",
-        "command": "desloppify show test_coverage --status open",
-        "impact": 0.0,
-        "dimension": "Test health",
-        "priority": 4,
-        "lane": "test_coverage"
+        "lane": "refactor_1"
       },
       {
         "type": "refactor",
         "detector": "signature",
-        "count": 33,
-        "description": "33 signature findings \u2014 consolidate inconsistent function signatures",
+        "count": 34,
+        "description": "34 signature findings \u2014 consolidate inconsistent function signatures",
         "command": "desloppify show signature --status open",
         "impact": 0.0,
         "dimension": "Unknown",
-        "priority": 5,
-        "lane": "refactor"
+        "priority": 4,
+        "lane": "refactor_1"
       },
       {
         "type": "refactor",
@@ -4171,36 +1588,36 @@
         "command": "desloppify show responsibility_cohesion --status open",
         "impact": 0.0,
         "dimension": "Code quality",
-        "priority": 6,
-        "lane": "refactor"
+        "priority": 5,
+        "lane": "refactor_1"
       },
       {
         "type": "manual_fix",
         "detector": "unused",
-        "count": 49,
-        "description": "49 unused findings \u2014 inspect with `desloppify next` and fix manually",
+        "count": 294,
+        "description": "294 unused findings \u2014 inspect with `desloppify next` and fix manually",
         "command": "desloppify show unused --status open",
         "impact": 0.0,
         "dimension": "Code quality",
-        "priority": 7,
-        "lane": "refactor"
+        "priority": 6,
+        "lane": "refactor_1"
       },
       {
         "type": "manual_fix",
         "detector": "subjective_review",
-        "count": 182,
-        "description": "182 files need design review \u2014 run design review with dimension templates",
+        "count": 171,
+        "description": "171 files need design review \u2014 run design review with dimension templates",
         "command": "desloppify fix review",
         "impact": 0.0,
         "dimension": "Test health",
-        "priority": 8,
-        "lane": "refactor"
+        "priority": 7,
+        "lane": "refactor_1"
       }
     ],
     "strategy": {
       "fixer_leverage": {
         "auto_fixable_count": 0,
-        "total_count": 326,
+        "total_count": 648,
         "coverage": 0.0,
         "impact_ratio": 0.0,
         "recommendation": "none"
@@ -4208,39 +1625,38 @@
       "lanes": {
         "restructure": {
           "actions": [
-            1
+            2
           ],
           "file_count": 6,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
         },
-        "refactor": {
+        "refactor_0": {
           "actions": [
-            2,
-            3,
-            5,
-            6,
-            7,
-            8
+            1
           ],
-          "file_count": 240,
+          "file_count": 1,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
         },
-        "test_coverage": {
+        "refactor_1": {
           "actions": [
-            4
+            3,
+            4,
+            5,
+            6,
+            7
           ],
-          "file_count": 5,
+          "file_count": 324,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
         }
       },
       "can_parallelize": true,
-      "hint": "3 independent workstreams, safe to parallelize. Rescan after each phase to verify."
+      "hint": "3 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 31 finding(s) \u2014 `desloppify issues`."
     },
     "tools": {
       "fixers": [],
@@ -4268,12 +1684,12 @@
       "worst_gap": 0.0,
       "trend": "stable"
     },
-    "milestone": "All T1 and T2 items cleared!",
+    "milestone": null,
     "primary_action": {
-      "command": "desloppify show flat_dirs --status open",
-      "description": "6 flat_dirs findings \u2014 create subdirectories and use `desloppify move`"
+      "command": "desloppify issues",
+      "description": "31 review findings need investigation \u2014 run `desloppify issues` to see the work queue"
     },
-    "why_now": "3 independent workstreams, safe to parallelize. Rescan after each phase to verify.",
+    "why_now": "3 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 31 finding(s) \u2014 `desloppify issues`.",
     "verification_step": {
       "command": "desloppify scan",
       "reason": "revalidate after changes"
@@ -4281,29 +1697,18 @@
     "risk_flags": [],
     "strict_target": {
       "target": 95.0,
-      "current": 80.4,
-      "gap": 14.6,
+      "current": 77.6,
+      "gap": 17.4,
       "state": "below",
       "warning": null
     },
-    "reminders": [
-      {
-        "type": "report_scores",
-        "message": "ALWAYS share ALL scores with the user: overall, objective, and strict, plus every dimension score (lenient + strict), including subjective dimensions. The goal is to maximize strict scores.",
-        "command": null,
-        "no_decay": true,
-        "priority": 3,
-        "severity": "low"
-      }
-    ],
+    "reminders": [],
     "reminder_history": {
-      "report_scores": 498,
-      "feedback_nudge": 3,
-      "stagnant_nudge": 8,
       "zone_classification": 3,
+      "report_scores": 4,
       "review_findings_pending": 3,
-      "fp_calibration_unused_production": 3,
-      "fp_calibration_unused_test": 3
+      "stagnant_nudge": 4,
+      "feedback_nudge": 3
     }
   },
   "config": {

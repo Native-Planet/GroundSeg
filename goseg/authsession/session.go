@@ -28,6 +28,13 @@ type sessionStore struct {
 	getClientManager    func() *structs.ClientManager
 }
 
+func (store *sessionStore) clientManager() *structs.ClientManager {
+	if store == nil || store.getClientManager == nil {
+		return nil
+	}
+	return store.getClientManager()
+}
+
 func defaultSessionBoundary() SessionBoundary {
 	return &sessionStore{
 		now:                 func() time.Time { return time.Now() },
@@ -72,6 +79,10 @@ func (store *sessionStore) AddToAuthMap(conn *websocket.Conn, token map[string]s
 	if tokenStr == "" || tokenID == "" {
 		return fmt.Errorf("add token to authmap: token id or value is empty")
 	}
+	clientManager := store.clientManager()
+	if clientManager == nil {
+		return fmt.Errorf("add token to authmap: client manager unavailable")
+	}
 
 	hashed := store.hashToken(tokenStr)
 	now := store.now().Format("2006-01-02_15:04:05")
@@ -87,10 +98,10 @@ func (store *sessionStore) AddToAuthMap(conn *websocket.Conn, token map[string]s
 
 	muConn := &structs.MuConn{Conn: conn, Active: true}
 	if authed {
-		store.getClientManager().AddAuthClient(tokenID, muConn)
+		clientManager.AddAuthClient(tokenID, muConn)
 		zap.L().Info(fmt.Sprintf("%s added to auth", tokenID))
 	} else {
-		store.getClientManager().AddUnauthClient(tokenID, muConn)
+		clientManager.AddUnauthClient(tokenID, muConn)
 		zap.L().Info(fmt.Sprintf("%s added to unauth", tokenID))
 	}
 
@@ -98,7 +109,10 @@ func (store *sessionStore) AddToAuthMap(conn *websocket.Conn, token map[string]s
 }
 
 func (store *sessionStore) RemoveFromAuthMap(tokenID string, fromAuthorized bool) {
-	cm := store.getClientManager()
+	cm := store.clientManager()
+	if cm == nil {
+		return
+	}
 	if fromAuthorized {
 		cm.RemoveAuthorizedToken(tokenID)
 		return

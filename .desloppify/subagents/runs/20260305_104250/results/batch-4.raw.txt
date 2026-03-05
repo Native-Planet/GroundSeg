@@ -1,0 +1,90 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 4,
+  "assessments": {
+    "high_level_elegance": 72.0
+  },
+  "dimension_notes": {
+    "high_level_elegance": {
+      "evidence": [
+        "goseg/shipworkflow/newship_service.go combines websocket message decoding (`structs.WsNewShipPayload`), UI transition publishing (`events.DefaultEventRuntime().PublishNewShipTransition`), and asynchronous provisioning kickoff (`go func() { ProvisionShip(...) }`) in one service surface.",
+        "goseg/config/config.go mixes process context state wrappers (`SetBasePath`, `SetArchitecture`, `SetDebugMode`) with domain snapshot types (`StartramSettings`, `PenpaiSettings`, `AuthSettings`) and is initialized alongside persisted config lifecycle in goseg/config/bootstrap.go.",
+        "goseg/docker/orchestration/container_bridge.go defines a large runtime input bag with many cross-subsystem callbacks, while goseg/docker/orchestration/container_config.go keeps container-type builder registry in the same top-level package, concentrating composition details rather than isolating adapter ownership."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "shipworkflow_transport_domain_blur",
+      "summary": "Ship workflow package boundary is blurred by mixing transport payload handling and domain provisioning orchestration.",
+      "related_files": [
+        "goseg/shipworkflow/newship_service.go",
+        "goseg/shipworkflow/newship.go",
+        "goseg/shipworkflow/doc.go"
+      ],
+      "evidence": [
+        "HandleNewShip and HandleNewShipBoot process websocket-specific payload/action strings while also driving lifecycle orchestration and transition-event side effects.",
+        "newShipProvisioningRuntime wires infra collaborators directly from multiple packages into workflow runtime assembly, so transport-triggered entrypoints and provisioning composition share the same package surface."
+      ],
+      "suggestion": "Split shipworkflow into explicit boundary layers: move websocket payload/action parsing into a transport adapter package and keep shipworkflow focused on typed domain commands plus orchestration contracts.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_ownership_drift"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "config_package_catch_all",
+      "summary": "Config package acts as a catch-all for runtime context control and persisted settings ownership, weakening directory boundary clarity.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/bootstrap.go",
+        "goseg/config/bootstrap_test.go"
+      ],
+      "evidence": [
+        "config.go exposes context mutation APIs (SetBasePath/SetDebugMode/etc.) and context snapshots in the same package that defines multiple domain settings DTOs.",
+        "bootstrap.go performs disk/config bootstrap and global config state initialization while relying on the same package-level context APIs, combining process-context concerns with config persistence lifecycle."
+      ],
+      "suggestion": "Separate process runtime-context management from persisted system-config management into distinct packages (for example `config/runtimecontext` facade as sole owner of context mutators, `config/store` for disk-backed config lifecycle), then keep `config` as a narrow integration facade.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_ownership_drift"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "orchestration_root_overloaded_with_adapter_wiring",
+      "summary": "Top-level orchestration package is overloaded with container adapter wiring details, creating unstable ownership boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container_config.go",
+        "goseg/docker/orchestration/container_bridge_test.go"
+      ],
+      "evidence": [
+        "container_bridge.go defines a large callback bag and mapping logic for multiple container runtimes (llama, netdata, minio), indicating detailed adapter composition lives in the root orchestration layer.",
+        "container_config.go keeps builder registry and container-type dispatch in the same package, so adding/changing container wiring requires edits in central orchestration files rather than container-local modules."
+      ],
+      "suggestion": "Move runtime-bridge and per-container config builders into container-scoped subpackages (or an internal adapters layer) and keep root orchestration focused on high-level lifecycle operations plus minimal dispatch interfaces.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_ownership_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Boundary ownership drift: top-level packages are accumulating both policy/orchestration and adapter/transport concerns.",
+      "Centralized wiring patterns are implemented in domain-root files instead of being localized to boundary-specific modules."
+    ],
+    "likely_symptoms": [
+      "shipworkflow_transport_domain_blur",
+      "config_package_catch_all",
+      "orchestration_root_overloaded_with_adapter_wiring"
+    ],
+    "possible_false_positives": []
+  }
+}

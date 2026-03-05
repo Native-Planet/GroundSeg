@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"groundseg/protocol/actions"
 )
@@ -52,13 +53,16 @@ func (e CommandValidationError) Is(target error) bool {
 }
 
 var (
-	ErrCommandValidation          = errors.New("upload command validation failed")
-	ErrUploadContractUnavailable  = errors.New("upload action contract metadata unavailable")
-	ErrOpenEndpointRequestMissing = errors.New("open-endpoint request is required")
-	ErrResetRequestMissing        = errors.New("reset request is required")
-	ErrOpenEndpointPayloadMix     = errors.New("open-endpoint command must not include reset payload")
-	ErrResetPayloadMix            = errors.New("reset command must not include open-endpoint payload")
-	ErrUploadDispatch             = errors.New("upload command dispatch failed")
+	ErrCommandValidation             = errors.New("upload command validation failed")
+	ErrUploadContractUnavailable     = errors.New("upload action contract metadata unavailable")
+	ErrOpenEndpointRequestMissing    = errors.New("open-endpoint request is required")
+	ErrResetRequestMissing           = errors.New("reset request is required")
+	ErrOpenEndpointEndpointMissing   = errors.New("open-endpoint endpoint is required")
+	ErrOpenEndpointTokenIDMissing    = errors.New("open-endpoint token id is required")
+	ErrOpenEndpointTokenValueMissing = errors.New("open-endpoint token value is required")
+	ErrOpenEndpointPayloadMix        = errors.New("open-endpoint command must not include reset payload")
+	ErrResetPayloadMix               = errors.New("reset command must not include open-endpoint payload")
+	ErrUploadDispatch                = errors.New("upload command dispatch failed")
 )
 
 type DispatchError struct {
@@ -177,6 +181,11 @@ func ValidateCommand(cmd Command) error {
 	if required.Has(actions.UploadPayloadOpenEndpoint) && !openPayloadPresent {
 		return CommandValidationError{Action: cmd.Action, Problem: openEndpointMissingError(contract.Action), Cause: errors.Join(ErrCommandValidation, ErrOpenEndpointRequestMissing)}
 	}
+	if required.Has(actions.UploadPayloadOpenEndpoint) {
+		if err := validateRequiredOpenEndpointPayload(cmd.Action, cmd.OpenEndpointRequest); err != nil {
+			return err
+		}
+	}
 	if required.Has(actions.UploadPayloadReset) && !resetPayloadPresent {
 		return CommandValidationError{Action: cmd.Action, Problem: resetRequestMissingError(contract.Action), Cause: errors.Join(ErrCommandValidation, ErrResetRequestMissing)}
 	}
@@ -198,6 +207,34 @@ func ValidateCommand(cmd Command) error {
 
 	if required.Has(actions.UploadPayloadOpenEndpoint) && required.Has(actions.UploadPayloadReset) {
 		return CommandValidationError{Action: cmd.Action, Problem: "unsupported action", Cause: ErrCommandValidation}
+	}
+	return nil
+}
+
+func validateRequiredOpenEndpointPayload(action Action, request *OpenEndpointRequest) error {
+	if request == nil {
+		return nil
+	}
+	if strings.TrimSpace(request.Endpoint) == "" {
+		return CommandValidationError{
+			Action:  action,
+			Problem: ErrOpenEndpointEndpointMissing.Error(),
+			Cause:   errors.Join(ErrCommandValidation, ErrOpenEndpointEndpointMissing),
+		}
+	}
+	if strings.TrimSpace(request.TokenID) == "" {
+		return CommandValidationError{
+			Action:  action,
+			Problem: ErrOpenEndpointTokenIDMissing.Error(),
+			Cause:   errors.Join(ErrCommandValidation, ErrOpenEndpointTokenIDMissing),
+		}
+	}
+	if strings.TrimSpace(request.TokenValue) == "" {
+		return CommandValidationError{
+			Action:  action,
+			Problem: ErrOpenEndpointTokenValueMissing.Error(),
+			Cause:   errors.Join(ErrCommandValidation, ErrOpenEndpointTokenValueMissing),
+		}
 	}
 	return nil
 }

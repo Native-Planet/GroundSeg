@@ -1,0 +1,1166 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260305_134733/results/batch-6.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 6
+Batch name: Cross-cutting Sweep
+Batch dimensions: naming_quality, logic_clarity, type_safety, contract_coherence, initialization_coupling, convention_outlier, api_surface_coherence, authorization_consistency
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/protocol/contracts/catalog/action/specs.go
+- goseg/protocol/contracts/catalog/startram/specs.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/uploadsvc/actions_test.go
+- goseg/uploadsvc/doc.go
+- goseg/broadcast/state_lifecycle.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/state.go
+- goseg/broadcast/loop_test.go
+- goseg/broadcast/collectors/system_info_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/rectify/rectify_test.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/importer/importer.go
+- goseg/main.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/routines/version.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/system/wifi_runtime_api.go
+- goseg/config/runtimecontext/context.go
+- goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go
+- goseg/protocol/contracts/familycatalog/catalog.go
+- goseg/shipworkflow/doc.go
+- goseg/startram/doc.go
+- goseg/system/doc.go
+- goseg/shipworkflow/newship.go
+- goseg/shipworkflow/newship_service.go
+- goseg/config/bootstrap.go
+- goseg/config/bootstrap_test.go
+- goseg/config/config.go
+- goseg/docker/orchestration/container_bridge.go
+- goseg/docker/orchestration/container_bridge_test.go
+- goseg/docker/orchestration/container_config.go
+- README.md
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 6,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{"batch":"Cross-cutting Sweep","batch_index":6,"assessments":{"naming_quality":82.0,"logic_clarity":89.0,"type_safety":78.0,"contract_coherence":83.0,"initialization_coupling":72.0,"convention_outlier":86.0,"api_surface_coherence":87.0,"authorization_consistency":79.0},"dimension_notes":{"naming_quality":{"evidence":["`goseg/system/wifi_runtime_api.go` uses `WiFi` acronym casing in exported API (`WiFiRuntimeService`, `IsWiFiEnabled`, `StartWiFiInfoLoop`).","`goseg/system/wifi_runtime_methods.go` mixes `WiFi` and `Wifi` in the same runtime surface (`NewWifiClient`, `WifiInfoTicker`, `wifiNmcli*`), creating naming drift inside one subsystem."],"impact_scope":"module","fix_scope":"multi_file_refactor","confidence":"high"},"logic_clarity":{"evidence":["`goseg/routines/system/system.go` has clear cancellation-aware loops (`runRoutineWithContext`, `runChopWithContext`) with explicit `ctx.Done()` exits.","`goseg/system/wifi_runtime_api.go` short-circuits `connectInfoLoop` when a loop is already running (`wifiInfoLoopStop != nil`) without exposing whether refresh ownership changed, which can hide caller intent."],"impact_scope":"module","fix_scope":"single_edit","confidence":"medium","issues_preventing_higher_score":"Some control-flow branches intentionally no-op (already-running loop path) but provide no explicit status to callers, reducing operational clarity."},"type_safety":{"evidence":["`goseg/docker/orchestration/runtime_ops.go` exposes `UpdateUrbitSectionFn` as `func(any) error`, erasing section type information at the runtime boundary.","`goseg/shipworkflow/operations_runtime.go` persists section updates through `persistShipUrbitSection(... mutateFn func(any) error ...)`, so wrong section/mutator pairing is only caught at runtime."],"impact_scope":"subsystem","fix_scope":"multi_file_refactor","confidence":"high"},"contract_coherence":{"evidence":["`README.md` states websocket action canonical constants live in `groundseg/protocol/actions` and references `groundseg/protocol/actions.ActionC2CConnect`.","Current contract code/tests use `groundseg/protocol/contracts/...` (`goseg/protocol/contracts/catalog/action/specs.go`, `goseg/uploadsvc/actions_test.go`, `goseg/protocol/contracts/conformance/fixtures_test.go`), indicating documentation-to-runtime contract drift."],"impact_scope":"subsystem","fix_scope":"single_edit","confidence":"high"},"initialization_coupling":{"evidence":["`goseg/config/bootstrap.go` relies on package-global mutable state (`globalConfig`, `Ready`, `GSContainers`, `initOnce`), making behavior dependent on prior process init sequence.","`goseg/importer/importer.go` stores request-critical runtime state in globals (`uploadSessions`, `uploadDir`, `tempDir`) initialized out-of-band by `Initialize`.","`goseg/broadcast/state.go` and `goseg/docker/events/events.go` both maintain mutable process-wide default runtimes via `SetDefault...`/`ResetDefault...`, coupling test/runtime order across packages."],"impact_scope":"codebase","fix_scope":"architectural_change","confidence":"high"},"convention_outlier":{"evidence":["Most reviewed packages use lowercase-wrapped error text, but `goseg/shipworkflow/newship_service.go` emits capitalized messages (`\"Couldn't ...\"`, `\"Unknown NewShip action\"`) that diverge from prevailing error style.","The same subsystem uses both acronym styles (`WiFi` vs `Wifi`) across adjacent files (`goseg/system/wifi_runtime_api.go`, `goseg/system/wifi_runtime_methods.go`)."],"impact_scope":"module","fix_scope":"multi_file_refactor","confidence":"high","issues_preventing_higher_score":"Style and naming conventions are mostly consistent globally, but there are localized style islands in wifi/newship flows."},"api_surface_coherence":{"evidence":["`goseg/docker/orchestration/container_config.go` exposes both typed (`ContainerConfigForType`) and string-cast (`ContainerConfigForTypeString`) entrypoints for the same API, creating dual call patterns.","`goseg/shipworkflow/operations_runtime.go` keeps typed generic helpers (`persistShipUrbitSectionConfig[T]`) but still routes through untyped `func(any) error` seams, indicating partially coherent API boundaries."],"impact_scope":"subsystem","fix_scope":"multi_file_refactor","confidence":"high","issues_preventing_higher_score":"API direction is generally improving toward typed seams, but legacy untyped/string adapters remain on public paths."},"authorization_consistency":{"evidence":["`goseg/importer/importer.go` enforces upload authorization with token headers plus `ValidateUploadSessionTokenFn` checks in `validateUploadRequest` and `setUploadSessionWithRuntime`.","`goseg/shipworkflow/newship_service.go` exported action handlers (`HandleNewShip`, `HandleNewShipBoot`, `CancelNewShip`) execute provisioning/deletion paths without an explicit auth context or token parameter at this boundary."],"impact_scope":"subsystem","fix_scope":"multi_file_refactor","confidence":"medium"}},"findings":[{"dimension":"initialization_coupling","identifier":"global_runtime_singletons_order_dependent","summary":"Core services rely on mutable package-level singletons and init order, creating hidden boot/test coupling.","related_files":["goseg/config/bootstrap.go","goseg/importer/importer.go","goseg/broadcast/state.go","goseg/docker/events/events.go"],"evidence":["Config/bootstrap gates state through `initOnce` plus globals (`Ready`, `globalConfig`, `GSContainers`).","Importer request path depends on global `uploadDir`/`tempDir`/`uploadSessions` populated by prior `Initialize` call.","Broadcast/events each expose mutable default runtimes via `SetDefault...`, so behavior can vary by prior caller mutation."],"suggestion":"Introduce explicit application-scoped runtime structs (config state, importer session store, event broker, broadcast state) and pass them through startup wiring; keep package defaults only as thin compatibility adapters.","confidence":"high","impact_scope":"codebase","fix_scope":"architectural_change","root_cause_cluster":"mutable_process_singleton_pattern"},{"dimension":"type_safety","identifier":"urbit_section_mutation_uses_any","summary":"Urbit section update seams erase compile-time types with `any`, allowing invalid mutator/section pairings until runtime.","related_files":["goseg/docker/orchestration/runtime_ops.go","goseg/shipworkflow/operations_runtime.go"],"evidence":["Runtime contract declares `UpdateUrbitSectionFn func(patp string, section UrbitConfigSection, mutateFn func(any) error) error`.","`persistShipUrbitSection` forwards a `func(any) error`, so section-target compatibility is not enforced by the type system."],"suggestion":"Replace the untyped section mutator seam with typed per-section callbacks (or a generic typed registry keyed by section enum) so invalid section/mutator combinations fail at compile time.","confidence":"high","impact_scope":"subsystem","fix_scope":"multi_file_refactor","root_cause_cluster":"legacy_untyped_runtime_seams"},{"dimension":"contract_coherence","identifier":"readme_contract_entrypoint_drift","summary":"README contract guidance points to deprecated/incorrect action package paths, diverging from actual runtime contract modules.","related_files":["README.md","goseg/protocol/contracts/catalog/action/specs.go","goseg/uploadsvc/actions_test.go"],"evidence":["README says canonical websocket action registry is `protocol/actions` and references `groundseg/protocol/actions.ActionC2CConnect`.","Current implementation/tests consume `groundseg/protocol/contracts` action bindings and catalog specs."],"suggestion":"Update README contract section to the current `protocol/contracts` entrypoints and keep referenced constant paths synchronized with conformance tests.","confidence":"high","impact_scope":"subsystem","fix_scope":"single_edit"},{"dimension":"naming_quality","identifier":"wifi_acronym_casing_drift","summary":"Wi-Fi runtime naming alternates between `WiFi` and `Wifi`, reducing discoverability and grepability within one API family.","related_files":["goseg/system/wifi_runtime_api.go","goseg/system/wifi_runtime_methods.go"],"evidence":["API file exports `WiFiRuntimeService`, `IsWiFiEnabled`, `StartWiFiInfoLoop`.","Runtime methods file defines fields like `NewWifiClient`/`WifiInfoTicker` and `wifiNmcli*` types, mixing acronym style in the same subsystem."],"suggestion":"Normalize acronym casing to one convention (`WiFi` or `Wifi`) across the wifi runtime/service surface and update dependent call sites/tests together.","confidence":"high","impact_scope":"module","fix_scope":"multi_file_refactor","root_cause_cluster":"naming_convention_drift"},{"dimension":"authorization_consistency","identifier":"newship_boundary_missing_explicit_auth_context","summary":"High-impact new-ship operations expose handler APIs without explicit authorization context while upload flows enforce token checks at boundary.","related_files":["goseg/shipworkflow/newship_service.go","goseg/importer/importer.go"],"evidence":["`validateUploadRequest` and session setup in importer require upload token IDs/hashes and authorization results.","`HandleNewShip` / `HandleNewShipBoot` / `CancelNewShip` accept payload/action input and trigger provisioning/deletion paths without auth token/session parameters at this API boundary."],"suggestion":"Align boundary contracts by requiring an authenticated actor/session context for new-ship entrypoints (or enforce an explicit pre-authorized command type) and document that contract next to handler APIs.","confidence":"medium","impact_scope":"subsystem","fix_scope":"multi_file_refactor","root_cause_cluster":"inconsistent_boundary_auth_contracts"}],"retrospective":{"root_causes":["Long-lived package-level singleton state remains the default integration mechanism across core subsystems.","Type-hardening is partial: typed wrappers exist, but legacy untyped seams (`any` and string adapters) still define key boundaries.","Documentation governance has not fully tracked protocol package migration."],"likely_symptoms":["wifi_acronym_casing_drift","urbit_section_mutation_uses_any"],"possible_false_positives":["newship_boundary_missing_explicit_auth_context may be intentionally enforced by upstream websocket middleware not visible in this batch"]}}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cbe42-736a-7fd0-b45d-4fffe659a735
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 6
+Batch name: Cross-cutting Sweep
+Batch dimensions: naming_quality, logic_clarity, type_safety, contract_coherence, initialization_coupling, convention_outlier, api_surface_coherence, authorization_consistency
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/protocol/contracts/catalog/action/specs.go
+- goseg/protocol/contracts/catalog/startram/specs.go
+- goseg/protocol/contracts/conformance/fixtures_test.go
+- goseg/uploadsvc/actions_test.go
+- goseg/uploadsvc/doc.go
+- goseg/broadcast/state_lifecycle.go
+- goseg/broadcast/state_test.go
+- goseg/broadcast/state.go
+- goseg/broadcast/loop_test.go
+- goseg/broadcast/collectors/system_info_test.go
+- goseg/rectify/rectify_services.go
+- goseg/defaults/defaults.go
+- goseg/rectify/rectify_test.go
+- goseg/broadcast/loop.go
+- goseg/leak/broadcast_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/system/wifi_runtime_methods.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/config/config_test.go
+- goseg/config/config_update_registry.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/importer/importer.go
+- goseg/main.go
+- goseg/main_test.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/routines/version.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/docker/events/events.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/subsystem/subsystem_health.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/system/wifi_runtime_api.go
+- goseg/config/runtimecontext/context.go
+- goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go
+- goseg/protocol/contracts/familycatalog/catalog.go
+- goseg/shipworkflow/doc.go
+- goseg/startram/doc.go
+- goseg/system/doc.go
+- goseg/shipworkflow/newship.go
+- goseg/shipworkflow/newship_service.go
+- goseg/config/bootstrap.go
+- goseg/config/bootstrap_test.go
+- goseg/config/config.go
+- goseg/docker/orchestration/container_bridge.go
+- goseg/docker/orchestration/container_bridge_test.go
+- goseg/docker/orchestration/container_config.go
+- README.md
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 6,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+Reviewing the blind packet and the assigned files now, then I’ll produce a strict JSON assessment for only the requested dimensions and evidence.
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg --files goseg/protocol/contracts/catalog/action/specs.go goseg/protocol/contracts/catalog/startram/specs.go goseg/protocol/contracts/conformance/fixtures_test.go goseg/uploadsvc/actions_test.go goseg/uploadsvc/doc.go goseg/broadcast/state_lifecycle.go goseg/broadcast/state_test.go goseg/broadcast/state.go goseg/broadcast/loop_test.go goseg/broadcast/collectors/system_info_test.go goseg/rectify/rectify_services.go goseg/defaults/defaults.go goseg/rectify/rectify_test.go goseg/broadcast/loop.go goseg/leak/broadcast_test.go goseg/docker/orchestration/subsystem/docker_test.go goseg/leak/broadcast.go goseg/docker/orchestration/wireguard.go goseg/docker/orchestration/wireguard_test.go goseg/system/wifi_runtime_methods.go goseg/leak/leak_test.go goseg/broadcast/transitions.go goseg/structs/configs.go goseg/config/config_test.go goseg/config/config_update_registry.go goseg/startuporchestrator/startup_orchestrator.go goseg/importer/importer.go goseg/main.go goseg/main_test.go goseg/handler/systemsvc/system_test.go goseg/docker/orchestration/subsystem/subsystem_events.go goseg/routines/version.go goseg/startuporchestrator/startup_orchestrator_test.go goseg/docker/orchestration/runtime_ops.go goseg/docker/events/events.go goseg/routines/logstream/logs.go goseg/docker/orchestration/subsystem/subsystem_health.go goseg/shipworkflow/operations_runtime.go goseg/docker/lifecycle/planner.go goseg/routines/system/system.go goseg/docker/network/network.go goseg/system/wifi_runtime_api.go goseg/config/runtimecontext/context.go goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go goseg/protocol/contracts/familycatalog/catalog.go goseg/shipworkflow/doc.go goseg/startram/doc.go goseg/system/doc.go goseg/shipworkflow/newship.go goseg/shipworkflow/newship_service.go goseg/config/bootstrap.go goseg/config/bootstrap_test.go goseg/config/config.go goseg/docker/orchestration/container_bridge.go goseg/docker/orchestration/container_bridge_test.go goseg/docker/orchestration/container_config.go README.md' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+Total output lines: 7137
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "naming_quality",
+    "logic_clarity",
+    "type_safety",
+    "contract_coherence",
+    "ai_generated_debt",
+    "high_level_elegance",
+    "mid_level_elegance",
+    "low_level_elegance",
+    "initialization_coupling",
+    "convention_outlier",
+    "dependency_health",
+    "api_surface_coherence",
+    "authorization_consistency",
+ succeeded in 52ms:
+goseg/broadcast/state.go
+goseg/broadcast/loop_test.go
+goseg/uploadsvc/doc.go
+goseg/leak/broadcast.go
+goseg/main_test.go
+goseg/docker/network/network.go
+goseg/config/config.go
+goseg/broadcast/state_lifecycle.go
+goseg/docker/orchestration/wireguard.go
+goseg/handler/systemsvc/system_test.go
+goseg/system/wifi_runtime_api.go
+goseg/docker/orchestration/container_bridge.go
+goseg/broadcast/state_test.go
+goseg/docker/orchestration/wireguard_test.go
+goseg/docker/orchestration/subsystem/subsystem_events.go
+goseg/config/runtimecontext/context.go
+goseg/docker/orchestration/container_bridge_test.go
+goseg/system/wifi_runtime_methods.go
+goseg/routines/version.go
+goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go
+codex
+I’ve loaded the packet and confirmed scope. Next I’m sampling each assigned module for cross-cutting defects (contracts, API shape, init coupling, auth consistency) and will anchor findings to concrete code evidence.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,220p' goseg/main.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/config/config.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/config/bootstrap.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/startuporchestrator/startup_orchestrator.go" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"fmt"
+	"groundseg/config/runtimecontext"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	// global settings config (accessed via funcs)
+	globalConfig structs.SysConfig
+ succeeded in 50ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"groundseg/config/contextapi"
+	"groundseg/config/startramstate"
+
+	"groundseg/structs"
+)
+
+type StartramConfigSnapshot = startramstate.Snapshot
+
+type StartramSettings struct {
+	EndpointURL          string
+	Pubkey               string
+	RemoteBackupPassword string
+	WgRegistered         bool
+	WgOn                 bool
+	Piers                []string
+ succeeded in 50ms:
+package main
+
+// NativePlanet GroundSeg: Go Edition (goseg)
+// 🄯 2023 ~nallux-dozryl & ~sitful-hatred
+// This is a Golang rewrite of GroundSeg that serves the v2 json
+// object via websocket.
+// The v2 rewrite decouples the frontend and backend, which makes it
+// straightforward to implement alternative backends.
+//
+// Under development: reimplementing all pyseg functionality.
+// Advantages:
+// - Really, really fast
+// - Event-driven
+// - First-class support for concurrent operations
+// - Very good golang Docker libraries
+
+import (
+	"context"
+	"embed"
+	"errors"
+ succeeded in 51ms:
+package startuporchestrator
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/config"
+	"groundseg/docker/orchestration/subsystem"
+	"groundseg/exporter"
+	"groundseg/handler/router"
+	groundSystem "groundseg/handler/system"
+	"groundseg/importer"
+	"groundseg/internal/seams"
+	"groundseg/leak"
+	"groundseg/logger"
+	"groundseg/rectify"
+	"groundseg/routines"
+	"groundseg/routines/logstream"
+	"groundseg/session"
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/broadcast/loop.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/broadcast/transitions.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/broadcast/state_lifecycle.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/broadcast/state.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package broadcast
+
+import (
+	"errors"
+	"fmt"
+
+	"groundseg/structs"
+
+	"go.uber.org/zap"
+)
+
+// take in config file and addt'l info to initialize broadcast
+func bootstrapBroadcastState(runtime *broadcastStateRuntime) error {
+	if runtime == nil {
+		return fmt.Errorf("bootstrap broadcast state: %w", errBroadcastRuntimeRequired)
+	}
+	return bootstrapBroadcastStateWithRuntime(runtime)
+}
+
+func bootstrapBroadcastStateWithRuntime(resolved *broadcastStateRuntime) error {
+ succeeded in 51ms:
+package broadcast
+
+import (
+	"errors"
+	"fmt"
+
+	"groundseg/structs"
+	"groundseg/transition"
+)
+
+type BroadcastStateRuntime = broadcastStateRuntime
+
+// BroadcastTransition describes a single, typed transition applied to broadcast state.
+// Mutations must be scoped to the transition contract implemented by the transition type.
+type BroadcastTransition interface {
+	Apply(*structs.AuthBroadcast) error
+}
+
+// ApplyBroadcastTransition applies a typed transition to the current broadcast state.
+// If `notify` is true, it refreshes connected websocket clients afterward.
+ succeeded in 51ms:
+package broadcast
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"groundseg/broadcast/collectors"
+	"groundseg/structs"
+	"groundseg/transition"
+	"maps"
+	"sync"
+	"time"
+)
+
+var (
+	defaultBroadcastStateRuntimeMu sync.RWMutex
+	defaultBroadcastStateRuntime   = NewBroadcastStateRuntime()
+	errBroadcastRuntimeRequired    = errors.New("broadcast state runtime is required")
+)
+
+ succeeded in 51ms:
+package broadcast
+
+import (
+	"errors"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/leak"
+	"groundseg/structs"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var broadcastInterval = 1 * time.Second
+
+var (
+	errBroadcastLoopRuntimeRequired = errors.New("broadcast loop runtime is required")
+	errBroadcastLoopAlreadyRunning  = errors.New("broadcast loop is already running")
+)
+codex
+I’m now checking the runtime/API boundary files for contract and naming drift, plus auth/permission handling consistency where these modules expose operations.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,320p' goseg/system/wifi_runtime_methods.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/shipworkflow/newship_service.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/system/wifi_runtime_api.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/shipworkflow/operations_runtime.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package shipworkflow
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/Native-Planet/perigee/libprg"
+
+	"groundseg/docker/events"
+	"groundseg/driveresolver"
+	"groundseg/structs"
+)
+
+var (
+	decodeMasterTicketFn = libprg.Keyfile
+	resolveDriveFn       = driveresolver.Resolve
+ succeeded in 52ms:
+package system
+
+import (
+	"fmt"
+	"os/exec"
+	"strings"
+	"time"
+
+	"groundseg/internal/resource"
+	"groundseg/internal/seams"
+
+	"github.com/mdlayher/wifi"
+	"go.uber.org/zap"
+)
+
+type wifiRuntime struct {
+	ExecCommand        func(string, ...string) *exec.Cmd
+	RunCommand         func(string, ...string) (string, error)
+	RunNmcliFn         func(args ...string) (string, error)
+	NewWifiClient      func() (*wifi.Client, error)
+ succeeded in 52ms:
+package shipworkflow
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker/events"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/internal/seams"
+	"groundseg/internal/shipstatus"
+	"groundseg/internal/transitionlifecycle"
+	"groundseg/lifecycle"
+	"groundseg/shipworkflow/adapters/lifecyclebridge"
+	"groundseg/shipworkflow/lifecyclewait"
+	"groundseg/structs"
+	"groundseg/transition"
+	"net"
+	"strings"
+ succeeded in 52ms:
+package system
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/internal/seams"
+	"os/exec"
+	"strings"
+)
+
+var ErrWiFiInterfaceNotFound = errors.New("wifi interface not found")
+
+type WiFiRuntimeService struct {
+	runtime         wifiRuntime
+	state           *wifiRuntimeState
+	prepareErr      error
+	runtimePrepared bool
+}
+
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,320p' goseg/docker/orchestration/container_config.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,280p' goseg/docker/orchestration/runtime_ops.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,300p' goseg/docker/orchestration/wireguard.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,320p' goseg/docker/orchestration/container_bridge.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package orchestration
+
+import (
+	"fmt"
+
+	"groundseg/transition"
+
+	"github.com/docker/docker/api/types/container"
+)
+
+type containerConfigBuilder func(dockerRuntime, string) (container.Config, container.HostConfig, error)
+
+var containerConfigBuilders = map[transition.ContainerType]containerConfigBuilder{
+	transition.ContainerTypeVere:      urbitContainerConfigBuilder,
+	transition.ContainerTypeNetdata:   netdataContainerConfigBuilder,
+	transition.ContainerTypeMinio:     minioContainerConfigBuilder,
+	transition.ContainerTypeMinioMC:   mcContainerConfigBuilder,
+	transition.ContainerTypeWireguard: wgContainerConfigBuilder,
+	transition.ContainerTypeLlamaAPI:  llamaApiContainerConfigBuilder,
+}
+ succeeded in 52ms:
+package orchestration
+
+import (
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"groundseg/docker/orchestration/container"
+	"groundseg/docker/orchestration/internal/artifactwriter"
+	"groundseg/internal/seams"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	dockerc "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"go.uber.org/zap"
+)
+
+func (rt WireguardRuntime) LoadWireguard() error {
+ succeeded in 51ms:
+package orchestration
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"groundseg/internal/seams"
+	"groundseg/structs"
+
+	"groundseg/config"
+	"groundseg/docker/orchestration/container"
+	"groundseg/docker/registry"
+)
+
+type netdataRuntimeOps = container.NetdataRuntime
+
+type dockerContainerRuntimeInputs struct {
+	shipSettingsSnapshotFn      func() config.ShipSettings
+	startramSettingsSnapshotFn  func() config.StartramSettings
+ succeeded in 52ms:
+package orchestration
+
+import (
+	"errors"
+
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker/network"
+	"groundseg/docker/orchestration/container"
+	"groundseg/docker/registry"
+	"groundseg/startram"
+	"groundseg/structs"
+	"os"
+	"time"
+)
+
+type RuntimeContainerOps struct {
+	StartContainerFn            func(name string, ctype string) (structs.ContainerState, error) `runtime:"importer-provision,workflow,rectify" runtime_name:"start container callback"`
+	StopContainerByNameFn       func(name string) error                                         `runtime:"workflow" runtime_name:"stop container callback"`
+	CreateContainerFn           func(name string, ctype string) (structs.ContainerState, error)
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/config/runtimecontext/context.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/defaults/defaults.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/importer/importer.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package runtimecontext
+
+import (
+	"os"
+	"runtime"
+	"sync"
+	"sync/atomic"
+
+	"groundseg/defaults"
+)
+
+// RuntimeContext holds immutable process-level execution context values.
+type RuntimeContext struct {
+	BasePath     string
+	Architecture string
+	DebugMode    bool
+	DockerDir    string
+}
+
+var (
+ succeeded in 52ms:
+package defaults
+
+// default config json structs
+// these get written to disk in absence of version server
+
+import (
+	"groundseg/structs"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+var (
+	defaultUrbitConfig = structs.UrbitDocker{
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName:         "",
+			HTTPPort:         0,
+			AmesPort:         0,
+			LoomSize:         31,
+			UrbitVersion:     "v2.11",
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/routines/logstream/logs.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package importer
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/auth/tokens"
+	"groundseg/click/acme"
+	"groundseg/config"
+	"groundseg/docker/events"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/driveresolver"
+	"groundseg/internal/resource"
+	"groundseg/internal/seams"
+	"groundseg/lifecycle"
+	"groundseg/logger"
+	workflowOrchestration "groundseg/orchestration"
+	"groundseg/shipcleanup"
+	"groundseg/shipcreator"
+ succeeded in 51ms:
+package logstream
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"groundseg/dockerclient"
+	"groundseg/internal/resource"
+	"groundseg/logger"
+	"groundseg/session"
+	"io"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync/atomic"
+	"time"
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,220p' goseg/protocol/contracts/catalog/action/specs.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,220p' goseg/protocol/contracts/catalog/startram/specs.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,220p' goseg/uploadsvc/doc.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/contracts/familycatalog/catalog.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package startram
+
+import "groundseg/protocol/contracts/familyspec"
+
+const (
+	StartramContractFamily = "startram"
+	StartramContractScope  = "errors"
+	StartramAPIConnSlug    = "api-connection"
+
+	OwnerStartram = "startram-domain"
+
+	StartramAPIConnectionErrorID          = StartramContractFamily + "." + StartramContractScope + "." + StartramAPIConnSlug
+	StartramAPIConnectionErrorMessage     = "Unable to connect to API server"
+	StartramAPIConnectionErrorName        = "APIConnectionError"
+	StartramAPIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+)
+
+func ContractSpecs() []familyspec.ContractSpec {
+	return []familyspec.ContractSpec{
+		{
+ succeeded in 51ms:
+package action
+
+import "groundseg/protocol/contracts/familyspec"
+
+const (
+	ProtocolActionContractRoot = "protocol.actions"
+
+	NamespaceUpload = "upload"
+	NamespaceC2C    = "c2c"
+
+	ActionUploadOpenEndpoint = "open-endpoint"
+	ActionUploadReset        = "reset"
+	ActionC2CConnect         = "connect"
+
+	UploadOpenEndpointContractID = ProtocolActionContractRoot + "." + NamespaceUpload + "." + ActionUploadOpenEndpoint
+	UploadResetContractID        = ProtocolActionContractRoot + "." + NamespaceUpload + "." + ActionUploadReset
+	C2CConnectContractID         = ProtocolActionContractRoot + "." + NamespaceC2C + "." + ActionC2CConnect
+
+	C2CConnectActionName        = "C2CConnectAction"
+	C2CConnectActionDescription = "connect c2c client"
+ succeeded in 51ms:
+// Package familycatalog contains protocol contract family declarations grouped by domain.
+package familycatalog
+ succeeded in 51ms:
+// Package uploadsvc parses websocket upload actions and dispatches validated
+// commands to upload backends.
+//
+// Validation is strict by action contract: reset must never carry open-endpoint
+// payload fields, and open-endpoint requires a complete endpoint/token payload.
+// Canonical cross-package governance policy lives in
+// docs/architecture/contracts-governance.md.
+package uploadsvc
+codex
+I’m drilling into config/update registries and state structs next to confirm whether API contracts and naming conventions stay coherent across modules.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,320p' goseg/structs/configs.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,280p' goseg/config/config_update_registry.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/routines/system/system.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,280p' goseg/docker/events/events.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package structs
+
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
+
+type DiskWarning struct {
+	// true if warning has been sent
+	// resets to false when disk goes below 80% usage
+	// 95% will send a recurring warning
+	Eighty     bool      `json:"eighty"`
+	Ninety     bool      `json:"ninety"`
+	NinetyFive time.Time `json:"ninetyFive"`
+}
+
+// system.json config struct grouped by domain
+type SysConfig struct {
+	Connectivity ConnectivityConfig `json:"-"`
+ succeeded in 52ms:
+package config
+
+import (
+	"fmt"
+	"groundseg/structs"
+	"strings"
+)
+
+type configPatchConfigFieldRef[T any] func(*structs.SysConfig) *T
+
+type configPatchFieldBinding[T any] struct {
+	key         string
+	patchField  string
+	parse       configPatchValueParser[T]
+	target      configPatchValueRef[T]
+	configField configPatchConfigFieldRef[T]
+	apply       configPatchApplyValueFn[T]
+	hasUpdates  func(T) bool
+	merge       configPatchMergeFn
+}
+ succeeded in 52ms:
+package system
+
+import (
+	"context"
+	"time"
+
+	"groundseg/routines/backup"
+	"groundseg/routines/chop"
+)
+
+var (
+	remoteBackupSleep = time.Sleep
+	localBackupSleep  = time.Sleep
+	sleepForChop      = time.Sleep
+)
+
+func StartBackupRoutines() error {
+	return backup.StartBackupRoutines()
+}
+
+ succeeded in 52ms:
+package events
+
+import (
+	"context"
+	"errors"
+	"sync"
+
+	"groundseg/structs"
+)
+
+var (
+	ErrTransitionPublishTimeout = errors.New("transition publish cancelled before enqueue")
+	ErrTransitionBusFull        = errors.New("transition event bus is full")
+	errTransitionBusNotDefined  = errors.New("transition broker is not defined")
+)
+
+var (
+	defaultEventRuntimeMu sync.RWMutex
+	defaultEventRuntime   = NewEventRuntime()
+)
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg -n \"UpdateUrbitSectionFn|func\\(any\\)|any\\) error|interface\\{\\}\" goseg/docker/orchestration/runtime_ops.go goseg/shipworkflow/operations_runtime.go goseg/importer/importer.go goseg/config/config_update_registry.go goseg/config/config.go goseg/structs/configs.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/docker/orchestration/runtime_ops.go:70:	UpdateUrbitSectionFn  func(patp string, section UrbitConfigSection, mutateFn func(any) error) error `runtime:"workflow,rectify" runtime_name:"update urbit section callback"`
+goseg/docker/orchestration/runtime_ops.go:310:		UpdateUrbitSectionFn:  config.UpdateUrbitSection,
+goseg/shipworkflow/operations_runtime.go:338:func persistShipUrbitSection(patp string, section dockerOrchestration.UrbitConfigSection, mutateFn func(any) error, runtime ...workflowRuntime) error {
+goseg/shipworkflow/operations_runtime.go:343:	if err := resolvedRuntime.UpdateUrbitSectionFn(patp, section, mutateFn); err != nil {
+goseg/config/config_update_registry.go:43:	return func(value interface{}) (string, error) {
+goseg/config/config_update_registry.go:49:	return func(value interface{}) (bool, error) {
+goseg/config/config_update_registry.go:55:	return func(value interface{}) (int, error) {
+goseg/config/config_update_registry.go:61:	return func(value interface{}) ([]string, error) {
+goseg/config/config_update_registry.go:555:			parse: func(value interface{}) (map[string]structs.DiskWarning, error) {
+goseg/config/config_update_registry.go:713:			parse: func(value interface{}) (linuxUpdatesPatch, error) {
+goseg/config/config_update_registry.go:927:			parse: func(value interface{}) ([]structs.Penpai, error) {
+goseg/config/config_update_registry.go:990:			parse: func(value interface{}) (map[string]structs.SessionInfo, error) {
+goseg/config/config_update_registry.go:1009:			parse: func(value interface{}) (map[string]structs.SessionInfo, error) {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '300,390p' goseg/shipworkflow/operations_runtime.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+			return emitWorkflowTransitionResolved(runtime, patp, transitionType, event)
+		},
+		transitionPlan[string]{
+			SuccessEvent: successEvent,
+			EmitSuccess:  successEvent != "",
+			ErrorEvent:   func(_ error) string { return "error" },
+			ClearEvent:   "",
+			ClearDelay:   clearDelay,
+		},
+		phaseSteps...,
+	)
+}
+
+func WaitComplete(patp string) error {
+	return WaitCompleteWithRuntime(workflowRuntime{}, patp)
+}
+
+func WaitCompleteWithRuntime(runtime workflowRuntime, patp string) error {
+	runtime, err := resolveWorkflowRuntime(runtime)
+	if err != nil {
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg -n "HandleFunc|/ws|auth|Authorize|token|upload|captive" goseg/main.go goseg/system/wifi_runtime_api.go goseg/importer/importer.go goseg/shipworkflow/newship_service.go goseg/docker/events/events.go' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+goseg/importer/importer.go:7:	"groundseg/auth"
+goseg/importer/importer.go:8:	"groundseg/auth/tokens"
+goseg/importer/importer.go:50:type uploadSession struct {
+goseg/importer/importer.go:69:	uploadSessions = make(map[string]uploadSession) // todo: add checkbox data to struct
+goseg/importer/importer.go:70:	uploadDir      string
+goseg/importer/importer.go:72:	uploadMu       sync.RWMutex
+goseg/importer/importer.go:73:	uploadTTL      = 20 * time.Minute
+goseg/importer/importer.go:74:	uploadKeyRegex = regexp.MustCompile(`^[a-f0-9]{32}$`)
+goseg/importer/importer.go:80:var errImporterTokenValidationCallbackMissing = seams.MissingRuntimeDependency("importer runtime token validation callback", "")
+goseg/importer/importer.go:109:	ValidateUploadSessionTokenFn func(structs.WsTokenStruct, structs.WsTokenStruct, *http.Request) auth.UploadTokenAuthorizationResult `runtime:"importer-upload" runtime_name:"validate upload token"`
+goseg/importer/importer.go:110:	StatFn                       func(string) (os.FileInfo, error)                                                                     `runtime:"importer-upload" runtime_name:"stat"`
+goseg/importer/importer.go:111:	CloseTempFileFn              func(*os.File) error                                                                                  `runtime:"importer-upload" runtime_name:"close temp file"`
+goseg/importer/importer.go:119:	UploadCoordinatorFn                 shipworkflow.UploadImportCoordinator                     `runtime:"importer-provision" runtime_name:"upload import coordinator"`
+goseg/importer/importer.go:154:			ValidateUploadSessionTokenFn: auth.ValidateUploadSessionTokenRequest,
+goseg/importer/importer.go:190:	groups := []string{"importer-core", "importer-upload"}
+goseg/importer/importer.go:201:	if err := seams.NewCallbackRequirementsWithGroups("importer-upload").ValidateCallbacks(ops, "importer runtime"); err != nil {
+goseg/importer/importer.go:229:	errUploadImportCoordinatorUnconfigured = seams.MissingRuntimeDependency("importer runtime upload import coordinator", "")
+goseg/importer/importer.go:250:	uploadDir, err = resolvedRuntime.StoragePathForFn("uploads")
+goseg/importer/importer.go:252:		return fmt.Errorf("initialize upload directory: %w", err)
+goseg/importer/importer.go:266:			uploadDir = filepath.Join(tempPath, "uploads")
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '260,520p' goseg/system/wifi_runtime_api.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	state.wifiInfoLoopStop = cancel
+	state.stopMu.Unlock()
+	go wifiInfoLoop(ctx, device, runtime, radio)
+	return nil
+}
+
+func startWiFiInfoLoop(ctx context.Context, runtime wifiRuntime, state *wifiRuntimeState) error {
+	return startWiFiInfoLoopWithRadio(ctx, runtime, newWiFiRadioService(runtime, state), state)
+}
+
+func startWiFiInfoLoopWithRadio(ctx context.Context, runtime wifiRuntime, radio wifiRadioService, state *wifiRuntimeState) error {
+	return connectInfoLoop(ctx, runtime, radio, state)
+}
+
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/config/bootstrap.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,240p' goseg/startuporchestrator/startup_orchestrator_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,220p' goseg/README.md 2>/dev/null || true" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,220p' goseg/main_test.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"fmt"
+	"groundseg/config/runtimecontext"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	// global settings config (accessed via funcs)
+	globalConfig structs.SysConfig
+ succeeded in 52ms:
+package startuporchestrator
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"groundseg/config"
+	"groundseg/internal/testruntime"
+	"groundseg/structs"
+)
+
+func withStartupRuntimeDefaults(overrides ...func(*StartupRuntime)) StartupRuntime {
+	return testruntime.Apply(defaultStartupRuntime(), overrides...)
+}
+ succeeded in 51ms:
+## GroundSeg API Golang rewrite (`goseg`)
+
+```mermaid
+stateDiagram-v2
+    direction TB
+    accTitle: groundseg package diagram
+    accDescr: Interactions between packages in Groundseg Go rewrite
+    classDef bcase fill:#f00,color:white,font-weight:bold,stroke-width:2px,stroke:yellow
+    Broadcast-->WS_mux: broadcast latest update
+    Broadcast-->Urbit_traffic: broadcast latest update
+    Static-->Operations: imported
+    Static-->Routines: imported
+    state Internals {
+        state Static {
+            Structs
+            Defaults
+            Logger
+        }
+        state Routines {
+            Docker_rectifier
+ succeeded in 51ms:
+package main
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"groundseg/startuporchestrator"
+
+	"groundseg/config"
+)
+
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' README.md" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' goseg/protocol/contracts/conformance/fixtures_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,280p' goseg/uploadsvc/actions_test.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package uploadsvc
+
+import (
+	"errors"
+	"testing"
+
+	"groundseg/protocol/contracts"
+)
+
+func TestParseUploadActionAcceptsKnownActions(t *testing.T) {
+	t.Parallel()
+
+	gotOpen, err := ParseUploadAction(string(ActionUploadOpenEndpoint))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(open-endpoint) returned error: %v", err)
+	}
+	if gotOpen != ActionUploadOpenEndpoint {
+		t.Fatalf("unexpected parsed open-endpoint action: %q", gotOpen)
+	}
+
+ succeeded in 52ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+ succeeded in 52ms:
+package conformance
+
+import (
+	"testing"
+
+	"groundseg/protocol/contracts"
+	"groundseg/protocol/contracts/familycatalog"
+)
+
+func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+	fixtures := ActionContractFixtures()
+	if len(fixtures) == 0 {
+		t.Fatal("expected at least one action contract fixture")
+	}
+
+	foundC2C := false
+	for _, fixture := range fixtures {
+		if err := ValidateActionContractFixture(fixture); err != nil {
+			t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+		}
+codex
+{"batch":"Cross-cutting Sweep","batch_index":6,"assessments":{"naming_quality":82.0,"logic_clarity":89.0,"type_safety":78.0,"contract_coherence":83.0,"initialization_coupling":72.0,"convention_outlier":86.0,"api_surface_coherence":87.0,"authorization_consistency":79.0},"dimension_notes":{"naming_quality":{"evidence":["`goseg/system/wifi_runtime_api.go` uses `WiFi` acronym casing in exported API (`WiFiRuntimeService`, `IsWiFiEnabled`, `StartWiFiInfoLoop`).","`goseg/system/wifi_runtime_methods.go` mixes `WiFi` and `Wifi` in the same runtime surface (`NewWifiClient`, `WifiInfoTicker`, `wifiNmcli*`), creating naming drift inside one subsystem."],"impact_scope":"module","fix_scope":"multi_file_refactor","confidence":"high"},"logic_clarity":{"evidence":["`goseg/routines/system/system.go` has clear cancellation-aware loops (`runRoutineWithContext`, `runChopWithContext`) with explicit `ctx.Done()` exits.","`goseg/system/wifi_runtime_api.go` short-circuits `connectInfoLoop` when a loop is already running (`wifiInfoLoopStop != nil`) without exposing whether refresh ownership changed, which can hide caller intent."],"impact_scope":"module","fix_scope":"single_edit","confidence":"medium","issues_preventing_higher_score":"Some control-flow branches intentionally no-op (already-running loop path) but provide no explicit status to callers, reducing operational clarity."},"type_safety":{"evidence":["`goseg/docker/orchestration/runtime_ops.go` exposes `UpdateUrbitSectionFn` as `func(any) error`, erasing section type information at the runtime boundary.","`goseg/shipworkflow/operations_runtime.go` persists section updates through `persistShipUrbitSection(... mutateFn func(any) error ...)`, so wrong section/mutator pairing is only caught at runtime."],"impact_scope":"subsystem","fix_scope":"multi_file_refactor","confidence":"high"},"contract_coherence":{"evidence":["`README.md` states websocket action canonical constants live in `groundseg/protocol/actions` and references `groundseg/protocol/actions.ActionC2CConnect`.","Current contract code/tests use `groundseg/protocol/contracts/...` (`goseg/protocol/contracts/catalog/action/specs.go`, `goseg/uploadsvc/actions_test.go`, `goseg/protocol/contracts/conformance/fixtures_test.go`), indicating documentation-to-runtime contract drift."],"impact_scope":"subsystem","fix_scope":"single_edit","confidence":"high"},"initialization_coupling":{"evidence":["`goseg/config/bootstrap.go` relies on package-global mutable state (`globalConfig`, `Ready`, `GSContainers`, `initOnce`), making behavior dependent on prior process init sequence.","`goseg/importer/importer.go` stores request-critical runtime state in globals (`uploadSessions`, `uploadDir`, `tempDir`) initialized out-of-band by `Initialize`.","`goseg/broadcast/state.go` and `goseg/docker/events/events.go` both maintain mutable process-wide default runtimes via `SetDefault...`/`ResetDefault...`, coupling test/runtime order across packages."],"impact_scope":"codebase","fix_scope":"architectural_change","confidence":"high"},"convention_outlier":{"evidence":["Most reviewed packages use lowercase-wrapped error text, but `goseg/shipworkflow/newship_service.go` emits capitalized messages (`\"Couldn't ...\"`, `\"Unknown NewShip action\"`) that diverge from prevailing error style.","The same subsystem uses both acronym styles (`WiFi` vs `Wifi`) across adjacent files (`goseg/system/wifi_runtime_api.go`, `goseg/system/wifi_runtime_methods.go`)."],"impact_scope":"module","fix_scope":"multi_file_refactor","confidence":"high","issues_preventing_higher_score":"Style and naming conventions are mostly consistent globally, but there are localized style islands in wifi/newship flows."},"api_surface_coherence":{"evidence":["`goseg/docker/orchestration/container_config.go` exposes both typed (`ContainerConfigForType`) and string-cast (`ContainerConfigForTypeString`) entrypoints for the same API, creating dual call patterns.","`goseg/shipworkflow/operations_runtime.go` keeps typed generic helpers (`persistShipUrbitSectionConfig[T]`) but still routes through untyped `func(any) error` seams, indicating partially coherent API boundaries."],"impact_scope":"subsystem","fix_scope":"multi_file_refactor","confidence":"high","issues_preventing_higher_score":"API direction is generally improving toward typed seams, but legacy untyped/string adapters remain on public paths."},"authorization_consistency":{"evidence":["`goseg/importer/importer.go` enforces upload authorization with token headers plus `ValidateUploadSessionTokenFn` checks in `validateUploadRequest` and `setUploadSessionWithRuntime`.","`goseg/shipworkflow/newship_service.go` exported action handlers (`HandleNewShip`, `HandleNewShipBoot`, `CancelNewShip`) execute provisioning/deletion paths without an explicit auth context or token parameter at this boundary."],"impact_scope":"subsystem","fix_scope":"multi_file_refactor","confidence":"medium"}},"findings":[{"dimension":"initialization_coupling","identifier":"global_runtime_singletons_order_dependent","summary":"Core services rely on mutable package-level singletons and init order, creating hidden boot/test coupling.","related_files":["goseg/config/bootstrap.go","goseg/importer/importer.go","goseg/broadcast/state.go","goseg/docker/events/events.go"],"evidence":["Config/bootstrap gates state through `initOnce` plus globals (`Ready`, `globalConfig`, `GSContainers`).","Importer request path depends on global `uploadDir`/`tempDir`/`uploadSessions` populated by prior `Initialize` call.","Broadcast/events each expose mutable default runtimes via `SetDefault...`, so behavior can vary by prior caller mutation."],"suggestion":"Introduce explicit application-scoped runtime structs (config state, importer session store, event broker, broadcast state) and pass them through startup wiring; keep package defaults only as thin compatibility adapters.","confidence":"high","impact_scope":"codebase","fix_scope":"architectural_change","root_cause_cluster":"mutable_process_singleton_pattern"},{"dimension":"type_safety","identifier":"urbit_section_mutation_uses_any","summary":"Urbit section update seams erase compile-time types with `any`, allowing invalid mutator/section pairings until runtime.","related_files":["goseg/docker/orchestration/runtime_ops.go","goseg/shipworkflow/operations_runtime.go"],"evidence":["Runtime contract declares `UpdateUrbitSectionFn func(patp string, section UrbitConfigSection, mutateFn func(any) error) error`.","`persistShipUrbitSection` forwards a `func(any) error`, so section-target compatibility is not enforced by the type system."],"suggestion":"Replace the untyped section mutator seam with typed per-section callbacks (or a generic typed registry keyed by section enum) so invalid section/mutator combinations fail at compile time.","confidence":"high","impact_scope":"subsystem","fix_scope":"multi_file_refactor","root_cause_cluster":"legacy_untyped_runtime_seams"},{"dimension":"contract_coherence","identifier":"readme_contract_entrypoint_drift","summary":"README contract guidance points to deprecated/incorrect action package paths, diverging from actual runtime contract modules.","related_files":["README.md","goseg/protocol/contracts/catalog/action/specs.go","goseg/uploadsvc/actions_test.go"],"evidence":["README says canonical websocket action registry is `protocol/actions` and references `groundseg/protocol/actions.ActionC2CConnect`.","Current implementation/tests consume `groundseg/protocol/contracts` action bindings and catalog specs."],"suggestion":"Update README contract section to the current `protocol/contracts` entrypoints and keep referenced constant paths synchronized with conformance tests.","confidence":"high","impact_scope":"subsystem","fix_scope":"single_edit"},{"dimension":"naming_quality","identifier":"wifi_acronym_casing_drift","summary":"Wi-Fi runtime naming alternates between `WiFi` and `Wifi`, reducing discoverability and grepability within one API family.","related_files":["goseg/system/wifi_runtime_api.go","goseg/system/wifi_runtime_methods.go"],"evidence":["API file exports `WiFiRuntimeService`, `IsWiFiEnabled`, `StartWiFiInfoLoop`.","Runtime methods file defines fields like `NewWifiClient`/`WifiInfoTicker` and `wifiNmcli*` types, mixing acronym style in the same subsystem."],"suggestion":"Normalize acronym casing to one convention (`WiFi` or `Wifi`) across the wifi runtime/service surface and update dependent call sites/tests together.","confidence":"high","impact_scope":"module","fix_scope":"multi_file_refactor","root_cause_cluster":"naming_convention_drift"},{"dimension":"authorization_consistency","identifier":"newship_boundary_missing_explicit_auth_context","summary":"High-impact new-ship operations expose handler APIs without explicit authorization context while upload flows enforce token checks at boundary.","related_files":["goseg/shipworkflow/newship_service.go","goseg/importer/importer.go"],"evidence":["`validateUploadRequest` and session setup in importer require upload token IDs/hashes and authorization results.","`HandleNewShip` / `HandleNewShipBoot` / `CancelNewShip` accept payload/action input and trigger provisioning/deletion paths without auth token/session parameters at this API boundary."],"suggestion":"Align boundary contracts by requiring an authenticated actor/session context for new-ship entrypoints (or enforce an explicit pre-authorized command type) and document that contract next to handler APIs.","confidence":"medium","impact_scope":"subsystem","fix_scope":"multi_file_refactor","root_cause_cluster":"inconsistent_boundary_auth_contracts"}],"retrospective":{"root_causes":["Long-lived package-level singleton state remains the default integration mechanism across core subsystems.","Type-hardening is partial: typed wrappers exist, but legacy untyped seams (`any` and string adapters) still define key boundaries.","Documentation governance has not fully tracked protocol package migration."],"likely_symptoms":["wifi_acronym_casing_drift","urbit_section_mutation_uses_any"],"possible_false_positives":["newship_boundary_missing_explicit_auth_context may be intentionally enforced by upstream websocket middleware not visible in this batch"]}}
+tokens used
+88,538
+

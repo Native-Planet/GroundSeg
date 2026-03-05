@@ -68,7 +68,11 @@ func runAuthCleanupLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			session.GetClientManager().CleanupStaleSessions(authStaleTimeout)
+			clientManager := session.GetClientManager()
+			if clientManager == nil {
+				continue
+			}
+			clientManager.CleanupStaleSessions(authStaleTimeout)
 		}
 	}
 }

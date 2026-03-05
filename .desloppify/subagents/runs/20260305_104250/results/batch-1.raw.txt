@@ -1,0 +1,51 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "high_level_elegance": 82.0
+  },
+  "dimension_notes": {
+    "high_level_elegance": {
+      "evidence": [
+        "goseg/protocol/contracts/catalog/action/specs.go defines action identity, ownership, and upload payload constraints in code-level constants and constructors.",
+        "goseg/uploadsvc/doc.go separately states the same upload payload governance policy as prose documentation.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go and goseg/uploadsvc/actions_test.go both enforce overlapping registry/payload invariants from different package perspectives, indicating policy enforcement is distributed rather than centralized."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "distributed_contract_source_of_truth",
+      "summary": "Action-contract governance is split across catalog code, service docs, and duplicated cross-package tests, so ownership is non-local and changes require ripple edits.",
+      "related_files": [
+        "goseg/protocol/contracts/catalog/action/specs.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "Upload payload rules are encoded in UploadActionSpecs() (RequiredPayloads/ForbiddenPayloads) in the protocol catalog.",
+        "The same behavioral policy is repeated textually in uploadsvc/doc.go instead of being generated from the canonical spec.",
+        "Both conformance and uploadsvc tests independently assert contract alignment and payload-rule behavior, creating parallel enforcement paths tied to the same policy."
+      ],
+      "suggestion": "Promote a single canonical manifest API for action contracts (identity, ownership, payload rules) and generate dependent artifacts from it (service-facing docs, fixture expectations, and shared test helpers) so policy changes are authored once and consumed everywhere.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "distributed_contract_governance"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract policy is represented in multiple forms (code constants, prose docs, and package-specific tests) without a single generated source chain."
+    ],
+    "likely_symptoms": [
+      "distributed_contract_source_of_truth"
+    ],
+    "possible_false_positives": []
+  }
+}

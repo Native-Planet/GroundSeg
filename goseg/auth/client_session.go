@@ -39,35 +39,55 @@ func GetMuConn(conn *websocket.Conn, tokenId string) *structs.MuConn {
 	if conn == nil || tokenId == "" {
 		return nil
 	}
-	return GetClientManager().GetMuConn(conn, tokenId)
+	clientManager := GetClientManager()
+	if clientManager == nil {
+		return nil
+	}
+	return clientManager.GetMuConn(conn, tokenId)
 }
 
 func ReadMuConn(muConn *structs.MuConn) (int, []byte, error) {
 	if muConn == nil {
 		return 0, nil, fmt.Errorf("invalid websocket session")
 	}
-	return muConn.Read(GetClientManager())
+	clientManager := GetClientManager()
+	if clientManager == nil {
+		return 0, nil, fmt.Errorf("invalid websocket session")
+	}
+	return muConn.Read(clientManager)
 }
 
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
 	if conn == nil || strings.TrimSpace(token) == "" {
 		return false
 	}
-	return GetClientManager().HasAuthConnection(token, conn)
+	clientManager := GetClientManager()
+	if clientManager == nil {
+		return false
+	}
+	return clientManager.HasAuthConnection(token, conn)
 }
 
 func WsAuthCheck(conn *websocket.Conn) bool {
 	if conn == nil {
 		return false
 	}
-	return GetClientManager().HasAnyAuthConnection(conn)
+	clientManager := GetClientManager()
+	if clientManager == nil {
+		return false
+	}
+	return clientManager.HasAnyAuthConnection(conn)
 }
 
 func WsNilSession(conn *websocket.Conn) error {
 	if conn == nil {
 		return fmt.Errorf("invalid session")
 	}
-	if GetClientManager().DeactivateConnection(conn) {
+	clientManager := GetClientManager()
+	if clientManager == nil {
+		return fmt.Errorf("session manager unavailable")
+	}
+	if clientManager.DeactivateConnection(conn) {
 		return nil
 	}
 	return fmt.Errorf("Session not in client manager")

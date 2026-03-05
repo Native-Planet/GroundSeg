@@ -1,0 +1,139 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "dependency_health": 87.4,
+    "mid_level_elegance": 71.8,
+    "low_level_elegance": 78.6
+  },
+  "dimension_notes": {
+    "dependency_health": {
+      "evidence": [
+        "The reviewed files mostly rely on shared internal packages rather than introducing overlapping third-party libraries for the same concern.",
+        "Docker interactions are routed through project-local seams/runtime bundles in `goseg/docker/orchestration/runtime_ops.go` and `goseg/docker/network/network.go`, reducing direct package-level fan-out from callers.",
+        "Global mutable default runtimes (`DefaultEventRuntime`, default broadcast runtime/controller, default docker subsystem runtime) create implicit runtime coupling even when compile-time imports are clean."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Runtime wiring still depends on mutable package-level singletons, which increases hidden coupling and complicates dependency reasoning under tests and long-lived processes."
+    },
+    "mid_level_elegance": {
+      "evidence": [
+        "`goseg/importer/importer.go` and `goseg/startuporchestrator/startup_orchestrator.go` define very large callback-bag runtimes split across many embedded structs; integration behavior is spread across many function fields and validation groups.",
+        "`goseg/shipworkflow/operations_runtime.go` and `goseg/importer/importer.go` both capture `events.DefaultEventRuntime()` during runtime construction, coupling orchestration seams to mutable global event brokers.",
+        "`goseg/docker/events/events.go` allows swapping the default runtime at runtime (`SetDefaultEventRuntime`), so producers/consumers created at different times can silently target different channels."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "`goseg/defaults/defaults.go` uses a stringly-typed selector (`DockerData(pathType string)`) with branch-on-literal behavior; invalid values silently fall into the non-volume branch.",
+        "Callers in `goseg/defaults/defaults.go` and `goseg/config/runtimecontext/context.go` pass hardcoded selector literals (`\"basePath\"`, `\"volumes\"`), which makes correctness depend on exact ad-hoc strings.",
+        "`goseg/docker/events/events.go` and `goseg/broadcast/state.go` use fixed-size channels with default-case publish behavior; this low-level pattern can drop work under pressure rather than making backpressure policy explicit at call sites."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "runtime_singleton_split_brain",
+      "summary": "Mutable default event/runtime singletons can split producers and consumers onto different buses over process lifetime.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`DefaultEventRuntime()` returns the current runtime value, while `SetDefaultEventRuntime()` can replace channel sets later.",
+        "`newWorkflowRuntime()` captures `events.DefaultEventRuntime()` and builds a closure around it for transition publishing.",
+        "`defaultImporterRuntime()` wires `PublishImportTransitionFn` from `events.DefaultEventRuntime()` at construction time, so later default swaps do not rebind existing runtimes."
+      ],
+      "suggestion": "Make `EventBroker` an explicit dependency passed from a composition root and remove mutable global default swapping in runtime code paths; reserve global defaults for tests only behind explicit test helpers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_mutable_runtime_wiring"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "callback_bag_seam_entropy",
+      "summary": "Oversized callback-bag runtimes create high seam entropy and obscure ownership of cross-module behavior.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "Runtime structs contain large numbers of function fields and embedded groups (importer has multiple runtime group structs; startup orchestrator has layered init/background runtime groups; orchestration runtime ops expose broad mixed concerns).",
+        "Multiple `validate...Runtime` functions are needed per module to guard missing callbacks, indicating integration contracts are fragmented across many loosely related seams.",
+        "Cross-package orchestration depends on selecting and forwarding many callbacks instead of composing smaller role-focused collaborators."
+      ],
+      "suggestion": "Refactor callback bags into narrower role interfaces (for example: image selection, container lifecycle, transition publishing, config persistence) and inject only the collaborators each workflow step actually needs.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_mutable_runtime_wiring"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "string_selector_runtime_path",
+      "summary": "String-based selector APIs for runtime paths introduce brittle control flow and hidden invalid-state behavior.",
+      "related_files": [
+        "goseg/defaults/defaults.go",
+        "goseg/config/runtimecontext/context.go"
+      ],
+      "evidence": [
+        "`DockerData(pathType string)` checks `pathType == \"volumes\"` and uses an implicit else branch for all other values.",
+        "Callers use literal selector strings (`\"basePath\"` and `\"volumes\"`), so typo or drift changes behavior silently rather than failing fast.",
+        "`dockerDirDefault` in runtime context builds on this selector and appends `/`, coupling low-level path correctness to ad-hoc string conventions."
+      ],
+      "suggestion": "Replace `DockerData(string)` with explicit typed APIs (for example `DockerVolumesDir()` and `DockerBaseDir()`), and fail explicitly when runtime path discovery is unavailable.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_typed_runtime_contracts"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "lossy_default_case_publishers",
+      "summary": "Fixed-capacity channel publishers use immediate default-fail semantics, making overload behavior implicit and inconsistent across subsystems.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/broadcast/state.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "`publishDropOnFull` returns `ErrTransitionBusFull` via a non-blocking `default` case; events are dropped under transient backpressure.",
+        "`PublishSchedulePack` in broadcast runtime also uses a non-blocking send with `errSchedulePackBusFull`.",
+        "Docker subsystem listener returns an error when its event channel is saturated, turning pressure spikes into subsystem-level failures."
+      ],
+      "suggestion": "Define a shared backpressure policy (bounded wait with context, priority lanes for critical transitions, and overflow metrics) and apply it consistently across event and broadcast buses.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_backpressure_policy"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Heavy reliance on mutable package-level default runtimes instead of explicit composition-root injection.",
+      "Seam design favors broad callback bags over small cohesive interfaces.",
+      "Backpressure and runtime-selection policies are encoded as low-level ad-hoc patterns instead of shared contracts."
+    ],
+    "likely_symptoms": [
+      "runtime_singleton_split_brain",
+      "callback_bag_seam_entropy",
+      "lossy_default_case_publishers"
+    ],
+    "possible_false_positives": [
+      "Some default-case drop behavior may be intentionally best-effort for non-critical events, but current code does not make that criticality explicit at all call sites."
+    ]
+  }
+}

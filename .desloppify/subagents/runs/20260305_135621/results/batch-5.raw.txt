@@ -1,0 +1,93 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/rectify/rectify_services.go calls startram service creation in reconciliation (lines 144-145) without checking returned errors, while nearby persistence paths aggregate and return errors.",
+        "goseg/broadcast/loop.go records failures by storing err.Error() into state via AddSystemTransitionError (line 212), and goseg/broadcast/state.go stores only strings, dropping typed error identity and cause chains.",
+        "Long-running loops use inconsistent escalation policies: goseg/broadcast/loop.go keeps running after every tick failure, but goseg/docker/orchestration/subsystem/subsystem_events.go escalates after thresholded consecutive failures."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "rectify_startram_create_errors_dropped",
+      "summary": "Startram reconciliation silently ignores service-creation failures and can continue with inconsistent state.",
+      "related_files": [
+        "goseg/rectify/rectify_services.go",
+        "goseg/rectify/rectify_test.go"
+      ],
+      "evidence": [
+        "In reconcilePatpState, startram.SvcCreate(patp, \"urbit\") and startram.SvcCreate(\"s3.\"+patp, \"minio\") are invoked without error checks (rectify_services.go:144-145).",
+        "The same file otherwise treats reconciliation/persistence failures as first-class errors using errors.Join and returned errors (e.g., lines 103-123, 173-188), so these unchecked calls are inconsistent with the local strategy.",
+        "Existing tests in rectify_test.go cover transition application but do not assert behavior when service-creation fails, leaving this inconsistency unguarded."
+      ],
+      "suggestion": "Capture both SvcCreate errors, aggregate with errors.Join, and propagate through reconcilePatpState/Reconcile; add tests that inject SvcCreate failures and assert returned error plus non-success transition behavior.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "startram_reconcile_error_loss"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast_error_context_flattened",
+      "summary": "Broadcast state stores only error strings, losing typed causes and preventing consistent downstream handling.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/state_test.go"
+      ],
+      "evidence": [
+        "runBroadcastTickWithRuntime appends failures with AddSystemTransitionError(err.Error()) (broadcast/loop.go:212), flattening wrapped/sentinel errors to plain text.",
+        "AddSystemTransitionError in broadcast/state.go stores []string only (lines 66-77), so callers cannot use errors.Is/errors.As or preserve causal chains.",
+        "Tests assert string equality against gotErr.Error() (broadcast/state_test.go:202-204, 248-249), codifying string-only semantics rather than structured error propagation."
+      ],
+      "suggestion": "Introduce a structured transition error payload (code, message, cause class) and preserve original error identity internally; adapt AddSystemTransitionError and tests to validate structured fields instead of raw error strings.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "error_identity_erasure"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "background_loop_failure_policy_divergence",
+      "summary": "Background workers apply incompatible retry/escalation rules, creating unpredictable failure behavior across subsystems.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "broadcast.runBroadcastLoop keeps looping indefinitely on repeated tick errors and only invokes tickErrorFn (broadcast/loop.go:184-188) without any built-in fail threshold.",
+        "dockerSubscriptionHandlerWithRuntime tracks consecutive failures and returns fatal after a configured limit (subsystem_events.go:235-261).",
+        "Startup supervision in startup_orchestrator.go relies on worker errors for health decisions (e.g., waitForFailFastErrors), so divergent per-loop policies produce inconsistent startup/runtime failure observability."
+      ],
+      "suggestion": "Standardize a shared background-worker error policy (budget, backoff, escalation) and apply it to broadcast and docker loops so repeated failures are handled consistently and surfaced predictably to startup health checks.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "no_shared_loop_error_policy"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error handling strategy is not centralized for long-running background workers.",
+      "Several pathways optimize for forward progress by logging and continuing, but without consistent escalation contracts.",
+      "Structured domain state currently models transition errors as display text rather than typed failure data."
+    ],
+    "likely_symptoms": [
+      "rectify_startram_create_errors_dropped",
+      "broadcast_error_context_flattened",
+      "background_loop_failure_policy_divergence"
+    ],
+    "possible_false_positives": []
+  }
+}

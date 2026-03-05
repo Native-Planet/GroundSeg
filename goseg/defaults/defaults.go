@@ -195,10 +195,7 @@ func SysConfig(basePath string) structs.SysConfig {
 			SwapVal:       16,
 			SwapFile:      filepath.Join(basePath, "swapfile"),
 			CfgDir:        basePath,
-			LinuxUpdates: struct {
-				Value    int    `json:"value"`
-				Interval string `json:"interval"`
-			}{
+			LinuxUpdates: structs.LinuxUpdatesConfig{
 				Value:    1,
 				Interval: "month",
 			},

@@ -20,7 +20,7 @@ type startupBootstrapTestOps struct {
 
 func (ops startupBootstrapTestOps) runtimeOps() StartupBootstrapOps {
 	return StartupBootstrapOps{
-		Initialize: func() error {
+		InitializeFn: func() error {
 			if ops.initializeFn == nil {
 				return nil
 			}
@@ -36,8 +36,8 @@ type startupImageTestOps struct {
 
 func (ops startupImageTestOps) runtimeOps() StartupImageOps {
 	return StartupImageOps{
-		GetLatestContainerInfo: ops.getLatestContainerInfoFn,
-		PullImageIfNotExist:    ops.pullImageIfNotExistFn,
+		GetLatestContainerInfoFn: ops.getLatestContainerInfoFn,
+		PullImageIfNotExistFn:    ops.pullImageIfNotExistFn,
 	}
 }
 
@@ -52,37 +52,37 @@ type startupLoadTestOps struct {
 
 func (ops startupLoadTestOps) runtimeOps() StartupLoadOps {
 	return StartupLoadOps{
-		LoadWireguard: func() error {
+		LoadWireguardFn: func() error {
 			if ops.loadWireguardFn == nil {
 				return nil
 			}
 			return ops.loadWireguardFn()
 		},
-		LoadMC: func() error {
+		LoadMCFn: func() error {
 			if ops.loadMCFn == nil {
 				return nil
 			}
 			return ops.loadMCFn()
 		},
-		LoadMinIOs: func() error {
+		LoadMinIOsFn: func() error {
 			if ops.loadMinIOsFn == nil {
 				return nil
 			}
 			return ops.loadMinIOsFn()
 		},
-		LoadNetdata: func() error {
+		LoadNetdataFn: func() error {
 			if ops.loadNetdataFn == nil {
 				return nil
 			}
 			return ops.loadNetdataFn()
 		},
-		LoadUrbits: func() error {
+		LoadUrbitsFn: func() error {
 			if ops.loadUrbitsFn == nil {
 				return nil
 			}
 			return ops.loadUrbitsFn()
 		},
-		LoadLlama: func() error {
+		LoadLlamaFn: func() error {
 			if ops.loadLlamaFn == nil {
 				return nil
 			}

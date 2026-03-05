@@ -1,0 +1,94 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 6,
+  "assessments": {
+    "design_coherence": 73.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Runtime seam layers rely on repeated hand-written delegator methods with per-method nil guarding in both `goseg/docker/events/events.go` (`DelegatingEventBroker` publish/read methods) and `goseg/docker/orchestration/runtime_core.go` (`StartupRuntime` and `Runtime` wrapper methods).",
+        "Large test modules repeatedly build bespoke runtime/config fixtures instead of reusing shared builders: `goseg/config/config_test.go` has long inline `defaultCfg/customCfg` field-by-field setup, while `goseg/importer/importer_test.go`, `goseg/main_test.go`, and `goseg/startuporchestrator/startup_orchestrator_test.go` each define local runtime-option DSLs.",
+        "Global seam/state reset patterns are repeated heavily in tests (`goseg/accesspoint/accesspoint_test.go` repeated reset helpers, `goseg/system/wifi_test.go` repeated `resetWifiSeamsForTest` + runtime construction), indicating mixed test concerns (state hygiene + behavior specification) in single files."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_delegate_boilerplate_sprawl",
+      "summary": "Runtime/delegate APIs are implemented via repetitive hand-written forwarding patterns, increasing structural drift risk.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`DelegatingEventBroker` re-implements near-identical nil-check + forward logic for each event type method in `events.go`.",
+        "`Runtime`/`StartupRuntime` in `runtime_core.go` repeat many `if fn == nil { default/error } else forward` methods.",
+        "`runtime_ops.go` defines a very wide callback-surface with many function-pointer fields, which amplifies the amount of boilerplate adapters needed in surrounding runtime wrappers."
+      ],
+      "suggestion": "Introduce a smaller set of cohesive capability interfaces (for example grouped by event stream or startup phase) and centralize nil/default handling in shared helper adapters so per-method forwarding code is generated or reduced to table-driven registration.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_fixture_builder_fragmentation",
+      "summary": "Test runtime/config fixture construction is duplicated across modules instead of using shared composable builders.",
+      "related_files": [
+        "goseg/config/config_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/main_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "`config_test.go` repeatedly sets dozens of `defaultCfg`/`customCfg` fields inline across multiple tests, embedding fixture assembly into each scenario.",
+        "`importer_test.go` defines custom runtime helpers (`importerRuntimeWith`, `authorizeTokenIDsForTest`, `init/upload/provisionRuntime`) that duplicate builder responsibilities seen elsewhere.",
+        "`main_test.go` (`c2cTestRuntime`/`withC2CState`) and `startup_orchestrator_test.go` (`withStartBackgroundServicesRuntime`/callback options) each create separate ad-hoc option DSLs for similar seam wiring."
+      ],
+      "suggestion": "Extract shared test-fixture packages for common config/runtime seams (e.g., `internal/testfixtures/config` and `internal/testfixtures/runtime`) with preset builders and scenario overlays; keep per-test files focused on assertions rather than object graph assembly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_harness_divergence"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "state_reset_and_behavior_mixed_in_test_files",
+      "summary": "Several test files mix global-state lifecycle management with behavior specs, creating multi-responsibility test modules.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/system/wifi_test.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "`accesspoint_test.go` contains many tests that repeatedly invoke global reset helpers (`resetRouterGlobalsForTest` / parameter resets), coupling scenario logic to mutable global seam maintenance.",
+        "`wifi_test.go` repeatedly calls `resetWifiSeamsForTest` and redefines runtime seams per test; the reset helper itself is empty, indicating state/reset behavior is not consistently encapsulated.",
+        "`importer_test.go` carries upload-session global map reset/copy helpers and event draining helpers in the same file as action-level behavioral assertions."
+      ],
+      "suggestion": "Move mutable global seam/session lifecycle into dedicated test harness utilities with explicit setup/teardown contracts, and keep behavior tests table-driven over immutable fixture inputs.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_harness_divergence"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Heavy function-pointer seam style led to broad runtime surfaces that require repetitive forwarding/default logic.",
+      "No shared cross-package test-fixture layer, so each module evolved its own runtime/config builder idioms.",
+      "Global mutable seam/state patterns in tests force files to own both behavior verification and state orchestration."
+    ],
+    "likely_symptoms": [
+      "runtime_delegate_boilerplate_sprawl",
+      "state_reset_and_behavior_mixed_in_test_files"
+    ],
+    "possible_false_positives": []
+  }
+}

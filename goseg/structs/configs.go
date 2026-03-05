@@ -180,23 +180,25 @@ type ConnectivityConfig struct {
 	ApiVersion           string                 `json:"apiVersion"`
 }
 
+type LinuxUpdatesConfig struct {
+	Value    int    `json:"value"`
+	Interval string `json:"interval"`
+}
+
 type RuntimeConfig struct {
-	GracefulExit  bool   `json:"gracefulExit"`
-	LastKnownMDNS string `json:"lastKnownMDNS"`
-	Setup         string `json:"setup"`
-	SwapVal       int    `json:"swapVal"`
-	SwapFile      string `json:"swapFile"`
-	LinuxUpdates  struct {
-		Value    int    `json:"value"`
-		Interval string `json:"interval"`
-	} `json:"linuxUpdates"`
-	DockerData     string `json:"dockerData"`
-	GsVersion      string `json:"gsVersion"`
-	CfgDir         string `json:"CFG_DIR"`
-	UpdateInterval int    `json:"updateInterval"`
-	BinHash        string `json:"binHash"`
-	Disable502     bool   `json:"disable502"`
-	SnapTime       int    `json:"snapTime"`
+	GracefulExit   bool               `json:"gracefulExit"`
+	LastKnownMDNS  string             `json:"lastKnownMDNS"`
+	Setup          string             `json:"setup"`
+	SwapVal        int                `json:"swapVal"`
+	SwapFile       string             `json:"swapFile"`
+	LinuxUpdates   LinuxUpdatesConfig `json:"linuxUpdates"`
+	DockerData     string             `json:"dockerData"`
+	GsVersion      string             `json:"gsVersion"`
+	CfgDir         string             `json:"CFG_DIR"`
+	UpdateInterval int                `json:"updateInterval"`
+	BinHash        string             `json:"binHash"`
+	Disable502     bool               `json:"disable502"`
+	SnapTime       int                `json:"snapTime"`
 }
 
 type StartramConfig struct {
