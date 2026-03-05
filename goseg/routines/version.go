@@ -27,9 +27,11 @@ import (
 const maxVersionUpdateConsecutiveFailures = 3
 
 var artifactVerifier slsa.ArtifactVerifier = slsa.CLIArtifactVerifier{}
+var runVersionSubsystemWithContextFn = RunVersionSubsystemWithContext
 
+// StartVersionSubsystem starts the version worker and returns immediately.
 func StartVersionSubsystem() error {
-	return RunVersionSubsystemWithContext(context.Background())
+	return StartVersionSubsystemWithContext(context.Background())
 }
 
 // RunVersionSubsystem blocks until context cancellation or worker failure.
@@ -37,8 +39,23 @@ func RunVersionSubsystem() error {
 	return RunVersionSubsystemWithContext(context.Background())
 }
 
+// StartVersionSubsystemWithContext starts the version worker and returns immediately.
 func StartVersionSubsystemWithContext(ctx context.Context) error {
-	return RunVersionSubsystemWithContext(ctx)
+	_, err := StartVersionSubsystemWithContextHandle(ctx)
+	return err
+}
+
+// StartVersionSubsystemWithContextHandle starts the version worker and returns a handle
+// for observing terminal worker errors.
+func StartVersionSubsystemWithContextHandle(ctx context.Context) (*workflow.AsyncRunHandle, error) {
+	handle := workflow.StartAsync(ctx, func(runCtx context.Context) error {
+		err := runVersionSubsystemWithContextFn(runCtx)
+		if err != nil && runCtx.Err() == nil {
+			zap.L().Warn(fmt.Sprintf("version subsystem stopped with error: %v", err))
+		}
+		return err
+	})
+	return handle, nil
 }
 
 // RunVersionSubsystemWithContext blocks until context cancellation or worker failure.

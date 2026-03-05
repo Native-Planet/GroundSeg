@@ -138,57 +138,67 @@ func TestHandleSystemGroundSegAndPower(t *testing.T) {
 	}
 }
 
-func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
-	configureCalls := []int{}
-	updatedSwaps := []int{}
-	transitionCount := 0
-	sleepCount := 0
-	toggleArg := ""
-	upgradeCount := 0
+func TestHandleSystemModifySwapFailure(t *testing.T) {
 	deps := SystemDependencies{
 		Config: func() structs.SysConfig {
 			return structs.SysConfig{Runtime: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
 		},
-		ConfigureSwap: func(_ string, value int) error { configureCalls = append(configureCalls, value); return nil },
+		ConfigureSwap:    func(_ string, _ int) error { return errors.New("set swap failed") },
+		UpdateConfTyped:  func(...config.ConfigUpdateOption) error { return nil },
+		WithSwapVal:      config.WithSwapVal,
+		WithPenpaiAllow:  config.WithPenpaiAllow,
+		WithGracefulExit: config.WithGracefulExit,
+	}
+
+	if err := HandleSystem([]byte(`{"payload":{"action":"modify-swap","value":4}}`), deps); err == nil {
+		t.Fatal("expected configure-swap failure to surface")
+	}
+}
+
+func TestHandleSystemModifySwapSuccessUpdatesConfig(t *testing.T) {
+	configureCalls := []int{}
+	updatedSwaps := []int{}
+	deps := SystemDependencies{
+		Config: func() structs.SysConfig {
+			return structs.SysConfig{Runtime: structs.RuntimeConfig{SwapFile: "/tmp/swapfile"}}
+		},
+		ConfigureSwap: func(_ string, value int) error {
+			configureCalls = append(configureCalls, value)
+			return nil
+		},
 		UpdateConfTyped: func(opts ...config.ConfigUpdateOption) error {
-			p := &config.ConfPatch{}
+			patch := &config.ConfPatch{}
 			for _, opt := range opts {
-				opt(p)
+				opt(patch)
 			}
-			if p.SwapVal != nil {
-				updatedSwaps = append(updatedSwaps, *p.SwapVal)
+			if patch.SwapVal != nil {
+				updatedSwaps = append(updatedSwaps, *patch.SwapVal)
 			}
 			return nil
 		},
 		WithSwapVal:      config.WithSwapVal,
 		WithPenpaiAllow:  config.WithPenpaiAllow,
 		WithGracefulExit: config.WithGracefulExit,
-		ExecCommand:      func(_ string, _ ...string) CommandRunner { return &fakeCommand{} },
-		IsDebugMode:      false,
-		RunUpgrade:       func() error { upgradeCount++; return nil },
-		ToggleDevice:     func(dev string) error { toggleArg = dev; return nil },
-		ConnectToWiFi:    func(_, _ string) error { return nil },
-		PublishSystemTransition: func(_ context.Context, _ structs.SystemTransition) error {
-			transitionCount++
-			return nil
-		},
-		Sleep: func(time.Duration) { sleepCount++ },
 	}
 
-	deps.ConfigureSwap = func(_ string, _ int) error { return errors.New("set swap failed") }
-	if err := HandleSystem([]byte(`{"payload":{"action":"modify-swap","value":4}}`), deps); err == nil {
-		t.Fatal("expected configure-swap failure to surface")
-	}
-	if len(configureCalls) != 0 {
-		t.Fatalf("expected no successful swap configuration call for failed request, got %v", configureCalls)
-	}
-
-	deps.ConfigureSwap = func(_ string, value int) error { configureCalls = append(configureCalls, value); return nil }
 	if err := HandleSystem([]byte(`{"payload":{"action":"modify-swap","value":8}}`), deps); err != nil {
 		t.Fatalf("expected modify-swap success: %v", err)
 	}
+	if len(configureCalls) != 1 || configureCalls[0] != 8 {
+		t.Fatalf("expected one successful swap configuration call to 8, got %v", configureCalls)
+	}
 	if len(updatedSwaps) != 1 || updatedSwaps[0] != 8 {
 		t.Fatalf("expected swap val update to 8, got %v", updatedSwaps)
+	}
+}
+
+func TestHandleSystemUpdateLinuxRunsUpgrade(t *testing.T) {
+	upgradeCount := 0
+	deps := SystemDependencies{
+		RunUpgrade:       func() error { upgradeCount++; return nil },
+		WithPenpaiAllow:  config.WithPenpaiAllow,
+		WithSwapVal:      config.WithSwapVal,
+		WithGracefulExit: config.WithGracefulExit,
 	}
 
 	if err := HandleSystem([]byte(`{"payload":{"action":"update","update":"linux"}}`), deps); err != nil {
@@ -197,12 +207,38 @@ func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
 	if upgradeCount != 1 {
 		t.Fatalf("expected one upgrade run, got %d", upgradeCount)
 	}
+}
+
+func TestHandleSystemWiFiToggleUsesResolvedDevice(t *testing.T) {
+	toggleArg := ""
+	deps := SystemDependencies{
+		ToggleDevice:     func(dev string) error { toggleArg = dev; return nil },
+		WithPenpaiAllow:  config.WithPenpaiAllow,
+		WithSwapVal:      config.WithSwapVal,
+		WithGracefulExit: config.WithGracefulExit,
+	}
 
 	if err := HandleSystem([]byte(`{"payload":{"action":"wifi-toggle"}}`), deps); err != nil {
 		t.Fatalf("expected wifi-toggle to succeed: %v", err)
 	}
 	if toggleArg != system.WiFiDevice() {
 		t.Fatalf("expected toggle to use system.WiFiDevice (%s), got %s", system.WiFiDevice(), toggleArg)
+	}
+}
+
+func TestHandleSystemWiFiConnectSuccessPublishesTransitions(t *testing.T) {
+	transitionCount := 0
+	sleepCount := 0
+	deps := SystemDependencies{
+		ConnectToWiFi: func(_, _ string) error { return nil },
+		PublishSystemTransition: func(_ context.Context, _ structs.SystemTransition) error {
+			transitionCount++
+			return nil
+		},
+		Sleep:            func(time.Duration) { sleepCount++ },
+		WithPenpaiAllow:  config.WithPenpaiAllow,
+		WithSwapVal:      config.WithSwapVal,
+		WithGracefulExit: config.WithGracefulExit,
 	}
 
 	if err := HandleSystem([]byte(`{"payload":{"action":"wifi-connect","ssid":"net","password":"pw"}}`), deps); err != nil {
@@ -214,10 +250,23 @@ func TestHandleSystemSwapWifiAndUpdate(t *testing.T) {
 	if sleepCount != 1 {
 		t.Fatalf("expected one sleep call on successful wifi-connect, got %d", sleepCount)
 	}
+}
 
-	deps.ConnectToWiFi = func(_ string, _ string) error { return errors.New("wifi failure") }
-	transitionCount = 0
-	sleepCount = 0
+func TestHandleSystemWiFiConnectFailurePublishesTransitions(t *testing.T) {
+	transitionCount := 0
+	sleepCount := 0
+	deps := SystemDependencies{
+		ConnectToWiFi: func(_, _ string) error { return errors.New("wifi failure") },
+		PublishSystemTransition: func(_ context.Context, _ structs.SystemTransition) error {
+			transitionCount++
+			return nil
+		},
+		Sleep:            func(time.Duration) { sleepCount++ },
+		WithPenpaiAllow:  config.WithPenpaiAllow,
+		WithSwapVal:      config.WithSwapVal,
+		WithGracefulExit: config.WithGracefulExit,
+	}
+
 	if err := HandleSystem([]byte(`{"payload":{"action":"wifi-connect","ssid":"net","password":"pw"}}`), deps); err == nil {
 		t.Fatal("expected wifi-connect failure")
 	}

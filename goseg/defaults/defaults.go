@@ -7,7 +7,6 @@ import (
 	"groundseg/structs"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 var (
@@ -110,23 +109,41 @@ var (
 	}
 )
 
-func DockerData(pathType string) string {
-	var dockerVolDirs = []string{
-		"/media/data/docker/volumes",
-		"/var/lib/docker/volumes",
-	}
-	for _, dir := range dockerVolDirs {
+var dockerVolumeDirs = []string{
+	"/media/data/docker/volumes",
+	"/var/lib/docker/volumes",
+}
+
+// DockerVolumesDir resolves the active docker volumes directory.
+func DockerVolumesDir() string {
+	for _, dir := range dockerVolumeDirs {
 		if _, err := os.Stat(dir); err == nil {
-			if pathType == "volumes" {
-				return dir
-			} else {
-				splitPath := strings.Split(dir, "/")
-				basePath := "/" + strings.Join(splitPath[:len(splitPath)-1], "/")
-				return basePath
-			}
+			return dir
 		}
 	}
 	return ""
+}
+
+// DockerBaseDir resolves the docker base directory that contains "volumes".
+func DockerBaseDir() string {
+	volumesDir := DockerVolumesDir()
+	if volumesDir == "" {
+		return ""
+	}
+	return filepath.Dir(volumesDir)
+}
+
+// DockerData is kept for compatibility with existing call sites that still
+// pass selector strings.
+func DockerData(pathType string) string {
+	switch pathType {
+	case "volumes":
+		return DockerVolumesDir()
+	case "basePath", "base", "root":
+		return DockerBaseDir()
+	default:
+		return ""
+	}
 }
 
 func DefaultUrbitConfig() structs.UrbitDocker {
@@ -199,7 +216,7 @@ func SysConfig(basePath string) structs.SysConfig {
 				Value:    1,
 				Interval: "month",
 			},
-			DockerData:     DockerData("basePath"),
+			DockerData:     DockerBaseDir(),
 			GsVersion:      "v2.0.0",
 			UpdateInterval: 3600,
 			BinHash:        "",

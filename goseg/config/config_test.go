@@ -184,7 +184,7 @@ func TestMergeConfigsMigrationUsesDefaultsAndGeneratedSaltWhenMissing(t *testing
 	}
 }
 
-func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
+func mergeConfigsCustomOverrideFixture() (structs.SysConfig, structs.SysConfig, structs.SysConfig) {
 	defaultCfg := structs.SysConfig{}
 	defaultCfg.Runtime.GracefulExit = true
 	defaultCfg.Runtime.LastKnownMDNS = "default-mdns"
@@ -290,7 +290,11 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	customCfg.Connectivity.RemoteBackupPassword = "rpw"
 
 	merged := MergeConfigs(defaultCfg, customCfg)
+	return defaultCfg, customCfg, merged
+}
 
+func TestMergeConfigsCustomOverridesScalarAndSliceFields(t *testing.T) {
+	_, customCfg, merged := mergeConfigsCustomOverrideFixture()
 	if !merged.Runtime.GracefulExit {
 		t.Fatal("expected merged graceful exit from custom false or default true to be true")
 	}
@@ -303,6 +307,10 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	if merged.Runtime.SwapVal != customCfg.Runtime.SwapVal || merged.Runtime.SwapFile != customCfg.Runtime.SwapFile {
 		t.Fatalf("expected custom swap fields to override defaults")
 	}
+}
+
+func TestMergeConfigsCustomOverridesSessionAndRuntimeNestedFields(t *testing.T) {
+	defaultCfg, customCfg, merged := mergeConfigsCustomOverrideFixture()
 	if merged.Startram.StartramSetReminder != defaultCfg.Startram.StartramSetReminder {
 		t.Fatal("expected startram reminders to keep default false/true semantics with fallback")
 	}
@@ -312,6 +320,10 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	if !reflect.DeepEqual(merged.Runtime.LinuxUpdates, customCfg.Runtime.LinuxUpdates) {
 		t.Fatalf("expected custom linux update settings to override defaults")
 	}
+}
+
+func TestMergeConfigsCustomOverridesPenpaiModelSelection(t *testing.T) {
+	defaultCfg, customCfg, merged := mergeConfigsCustomOverrideFixture()
 	if merged.Penpai.PenpaiCores != customCfg.Penpai.PenpaiCores {
 		t.Fatalf("expected non-zero custom penpai cores to override default")
 	}
@@ -321,6 +333,10 @@ func TestMergeConfigsCustomOverridesAndValidModelSelection(t *testing.T) {
 	if merged.Penpai.PenpaiActive != customCfg.Penpai.PenpaiActive {
 		t.Fatalf("expected valid custom active penpai model to be selected")
 	}
+}
+
+func TestMergeConfigsCustomOverridesAdditionalScalarFields(t *testing.T) {
+	_, customCfg, merged := mergeConfigsCustomOverrideFixture()
 	if merged.AuthSession.PwHash != customCfg.AuthSession.PwHash || merged.Runtime.CfgDir != customCfg.Runtime.CfgDir {
 		t.Fatalf("expected custom scalar overrides to propagate")
 	}

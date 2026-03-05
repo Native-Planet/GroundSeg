@@ -3,6 +3,7 @@ package broadcast
 import (
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -249,5 +250,29 @@ func TestAddSystemTransitionErrorCullsOldErrors(t *testing.T) {
 		if got[i] != want {
 			t.Fatalf("unexpected transition error index %d: got %q want %q", i, got[i], want)
 		}
+	}
+}
+
+func TestBroadcastRuntimeNilReceiverPolicy(t *testing.T) {
+	var runtime *broadcastStateRuntime
+
+	if got := runtime.GetState(); !reflect.DeepEqual(got, structs.AuthBroadcast{}) {
+		t.Fatalf("expected zero-value state for nil runtime, got %#v", got)
+	}
+	if err := runtime.UpdateBroadcast(structs.AuthBroadcast{}); !errors.Is(err, ErrBroadcastRuntimeRequired) {
+		t.Fatalf("expected ErrBroadcastRuntimeRequired from UpdateBroadcast(nil), got %v", err)
+	}
+	if err := runtime.AddSystemTransitionError("boom"); !errors.Is(err, ErrBroadcastRuntimeRequired) {
+		t.Fatalf("expected ErrBroadcastRuntimeRequired from AddSystemTransitionError(nil), got %v", err)
+	}
+	if err := runtime.PublishSchedulePack("tick"); !errors.Is(err, ErrBroadcastRuntimeRequired) {
+		t.Fatalf("expected ErrBroadcastRuntimeRequired from PublishSchedulePack(nil), got %v", err)
+	}
+}
+
+func TestAddSystemTransitionErrorEmptyMessageIsNoop(t *testing.T) {
+	runtime := NewBroadcastStateRuntime()
+	if err := runtime.AddSystemTransitionError(""); err != nil {
+		t.Fatalf("expected empty message update to no-op, got %v", err)
 	}
 }

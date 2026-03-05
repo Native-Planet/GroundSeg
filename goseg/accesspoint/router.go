@@ -1,6 +1,7 @@
 package accesspoint
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -120,56 +121,38 @@ func startRouterWithRuntime(rt AccessPointRuntime) error {
 
 // stopRouter stops the router
 func stopRouterWithRuntime(rt AccessPointRuntime) error {
-	// Bring down the interface
-	if err := executeRouterCommand("ip", "link", "set", rt.Wlan, "down"); err != nil {
-		return fmt.Errorf("stop wlan interface: %w", err)
+	var cleanupErrs []error
+	record := func(step string, err error) {
+		if err == nil {
+			return
+		}
+		cleanupErrs = append(cleanupErrs, fmt.Errorf("%s: %w", step, err))
 	}
 
-	// Stop hostapd
+	record("stop wlan interface", executeRouterCommand("ip", "link", "set", rt.Wlan, "down"))
+
 	log.Println("stopping hostapd")
-	if err := executeRouterCommand("pkill", "hostapd"); err != nil {
-		return fmt.Errorf("stop hostapd: %w", err)
-	}
+	record("stop hostapd", executeRouterCommand("pkill", "hostapd"))
 
-	// Stop dnsmasq
 	log.Println("stopping dnsmasq")
-	if err := executeRouterCommand("killall", "dnsmasq"); err != nil {
-		return fmt.Errorf("stop dnsmasq: %w", err)
-	}
+	record("stop dnsmasq", executeRouterCommand("killall", "dnsmasq"))
 
-	// Disable forwarding in iptables
 	log.Println("disabling forward rules in iptables.")
-	if err := executeRouterCommand("iptables", "-P", "FORWARD", "DROP"); err != nil {
-		return fmt.Errorf("drop forward policy: %w", err)
-	}
+	record("drop forward policy", executeRouterCommand("iptables", "-P", "FORWARD", "DROP"))
 
-	// Delete iptables rules that were added for wlan traffic
 	if rt.Wlan != "" {
-		if err := executeRouterCommand("iptables", "-D", "OUTPUT", "--out-interface", rt.Wlan, "-j", "ACCEPT"); err != nil {
-			return fmt.Errorf("remove output firewall rule: %w", err)
-		}
-		if err := executeRouterCommand("iptables", "-D", "INPUT", "--in-interface", rt.Wlan, "-j", "ACCEPT"); err != nil {
-			return fmt.Errorf("remove input firewall rule: %w", err)
-		}
+		record("remove output firewall rule", executeRouterCommand("iptables", "-D", "OUTPUT", "--out-interface", rt.Wlan, "-j", "ACCEPT"))
+		record("remove input firewall rule", executeRouterCommand("iptables", "-D", "INPUT", "--in-interface", rt.Wlan, "-j", "ACCEPT"))
 	}
-	if err := executeRouterCommand("iptables", "--table", "nat", "--delete-chain"); err != nil {
-		return fmt.Errorf("remove nat chain: %w", err)
-	}
-	if err := executeRouterCommand("iptables", "--table", "nat", "-F"); err != nil {
-		return fmt.Errorf("flush nat table: %w", err)
-	}
-	if err := executeRouterCommand("iptables", "--table", "nat", "-X"); err != nil {
-		return fmt.Errorf("delete nat table: %w", err)
-	}
+	record("remove nat chain", executeRouterCommand("iptables", "--table", "nat", "--delete-chain"))
+	record("flush nat table", executeRouterCommand("iptables", "--table", "nat", "-F"))
+	record("delete nat table", executeRouterCommand("iptables", "--table", "nat", "-X"))
 
-	// Disable forwarding in sysctl
 	log.Println("disabling forward in sysctl.")
-	if err := executeRouterCommand("sysctl", "-w", "net.ipv4.ip_forward=0"); err != nil {
-		return fmt.Errorf("disable ipv4 forwarding: %w", err)
-	}
+	record("disable ipv4 forwarding", executeRouterCommand("sysctl", "-w", "net.ipv4.ip_forward=0"))
 
 	log.Println("hotspot has stopped.")
-	return nil
+	return errors.Join(cleanupErrs...)
 }
 
 func preStart() error {

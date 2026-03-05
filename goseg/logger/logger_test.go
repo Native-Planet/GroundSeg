@@ -19,8 +19,17 @@ type testSystemLogSink struct {
 	ch chan []byte
 }
 
-func (sink *testSystemLogSink) PublishSystemLog(payload []byte) {
+func (sink *testSystemLogSink) PublishSystemLog(payload []byte) error {
 	sink.ch <- payload
+	return nil
+}
+
+type testSystemLogErrorSink struct {
+	err error
+}
+
+func (sink *testSystemLogErrorSink) PublishSystemLog([]byte) error {
+	return sink.err
 }
 
 func resetSystemLogSinkForTest(t *testing.T, ch chan []byte) {
@@ -72,6 +81,20 @@ func TestChanWriterWritePublishesBytes(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for system log sink write")
+	}
+}
+
+func TestChanWriterWritePropagatesSinkErrors(t *testing.T) {
+	expected := errors.New("sink full")
+	previous := getLogstreamSink()
+	setLogstreamSink(&testSystemLogErrorSink{err: expected})
+	t.Cleanup(func() {
+		setLogstreamSink(previous)
+	})
+
+	writer := ChanWriter{}
+	if _, err := writer.Write([]byte(`{"msg":"hello"}`)); !errors.Is(err, expected) {
+		t.Fatalf("expected sink error %v, got %v", expected, err)
 	}
 }
 

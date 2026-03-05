@@ -37,7 +37,7 @@ func newRectifyRuntime(stateRuntime *broadcast.BroadcastStateRuntime) RectifyRun
 	}
 	orchestrationRuntime := dockerOrchestration.NewRuntime()
 	return RectifyRuntime{
-		EventRuntime:        events.DefaultEventRuntime(),
+		EventRuntime:        events.NewRuntimeBoundBroker(events.DefaultEventRuntime()),
 		StateRuntime:        stateRuntime,
 		RuntimeContainerOps: orchestrationRuntime.RuntimeContainerOps,
 		RuntimeUrbitOps:     orchestrationRuntime.RuntimeUrbitOps,

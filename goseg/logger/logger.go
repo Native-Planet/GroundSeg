@@ -98,10 +98,10 @@ func sanitizeLoggerRuntime(runtime loggerRuntime) loggerRuntime {
 
 type logStreamNoopSink struct{}
 
-func (logStreamNoopSink) PublishSystemLog(_ []byte) {}
+func (logStreamNoopSink) PublishSystemLog(_ []byte) error { return nil }
 
 type logStreamSink interface {
-	PublishSystemLog([]byte)
+	PublishSystemLog([]byte) error
 }
 
 type loggerInitLifecycle uint8
@@ -275,7 +275,9 @@ type ChanWriter struct{}
 
 func (cw ChanWriter) Write(p []byte) (n int, err error) {
 	sink := getLogstreamSink()
-	sink.PublishSystemLog(p)
+	if err := sink.PublishSystemLog(p); err != nil {
+		return 0, err
+	}
 	return len(p), nil
 }
 

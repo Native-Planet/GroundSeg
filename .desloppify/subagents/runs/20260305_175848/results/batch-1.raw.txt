@@ -1,0 +1,72 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Upload action contract semantics are asserted in multiple layers: governance declarations in `goseg/protocol/contracts/governance/upload_manifest.go`, service-side policy behavior in `goseg/uploadsvc/actions_test.go`, and governance-to-service mapping checks in `goseg/uploadsvc/governance_contracts_test.go`.",
+        "The upload service uses package-level cached governance contract state evidenced by test-only reset of globals (`uploadGovernanceContractsByAction`, `uploadGovernanceContractsByActionErr`, `uploadGovernanceContractsByActionInit`) in `goseg/uploadsvc/governance_contracts_test.go`, indicating hidden mutable module state.",
+        "Cross-package conformance is enforced from a separate test hub (`goseg/protocol/contracts/conformance/fixtures_action_test.go`) rather than through a single consumed contract source, increasing change coordination overhead across modules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_contract_policy_duplication",
+      "summary": "Upload contract policy is duplicated across governance declarations and upload service validation tests, signaling a weak boundary contract.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/upload_manifest.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/governance_contracts_test.go"
+      ],
+      "evidence": [
+        "`upload_manifest.go` declares required/forbidden payload rules per action.",
+        "`actions_test.go` independently encodes the same action/payload policy matrix via table tests for reset/open-endpoint combinations.",
+        "`governance_contracts_test.go` separately validates mapping from upload actions to governance contract IDs and payload requirements, creating three maintenance points for one policy."
+      ],
+      "suggestion": "Introduce one canonical exported upload action contract table (or contract provider) consumed directly by upload service validation and mapping logic; keep a single conformance test at the boundary instead of re-encoding policy in multiple modules.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_single_source_contract_boundary"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_governance_global_cache_coupling",
+      "summary": "Package-level governance contract cache creates hidden mutable state and cross-test/module coupling.",
+      "related_files": [
+        "goseg/uploadsvc/governance_contracts_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "`governance_contracts_test.go` must reset package globals and `sync.Once` to isolate tests, showing module behavior depends on hidden singleton state.",
+        "`actions_test.go` runs parallel validation tests, which increases sensitivity to shared package state patterns when behavior is initialized globally.",
+        "`doc.go` describes strict contract-driven validation, but the implementation shape implied by global cache reset introduces stateful indirection instead of an explicit injected contract dependency."
+      ],
+      "suggestion": "Replace package-global cache with an explicit immutable contract map/provider injected into upload service construction (or lazily built per service instance), so module boundaries are explicit and test isolation does not require mutating internals.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_single_source_contract_boundary"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract metadata and enforcement responsibilities are split across governance and service layers without a single consumed boundary object.",
+      "Singleton-style package state is used where explicit dependency wiring would reduce coupling."
+    ],
+    "likely_symptoms": [
+      "upload_contract_policy_duplication",
+      "upload_governance_global_cache_coupling"
+    ],
+    "possible_false_positives": []
+  }
+}

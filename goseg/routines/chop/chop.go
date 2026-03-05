@@ -1,6 +1,7 @@
 package chop
 
 import (
+	"errors"
 	"fmt"
 	"groundseg/chopsvc"
 	"groundseg/config"
@@ -21,8 +22,8 @@ var (
 	sleepForChop          = time.Sleep
 )
 
-func RunAtLimitPass() {
-	RunAtLimitPassWithDependencies(
+func RunAtLimitPass() error {
+	return RunAtLimitPassWithDependencies(
 		ConfForChop,
 		UrbitConfForChop,
 		ContainerStatsForChop,
@@ -37,8 +38,9 @@ func RunAtLimitPassWithDependencies(
 	getContainerStatsForChop func(string) structs.ContainerStats,
 	chopPierForChop func(string) error,
 	bytesPerGiB int64,
-) {
+) error {
 	conf := confForChop()
+	var passErrs []error
 	for _, patp := range conf.Connectivity.Piers {
 		urbConf := urbitConfForChop(patp)
 		if urbConf.SizeLimit == 0 {
@@ -48,14 +50,19 @@ func RunAtLimitPassWithDependencies(
 		zap.L().Info(fmt.Sprintf("Auto chop: Checking if %s requires a chop. Limit: %v GB, Current Size (rounded) %v GB", patp, urbConf.SizeLimit, currentSize))
 		if int64(urbConf.SizeLimit) <= currentSize {
 			zap.L().Info(fmt.Sprintf("Auto chop: Attempting to chop %s", patp))
-			go chopPierForChop(patp)
+			if err := chopPierForChop(patp); err != nil {
+				passErrs = append(passErrs, fmt.Errorf("chop %s: %w", patp, err))
+			}
 		}
 	}
+	return errors.Join(passErrs...)
 }
 
 func StartLoop(sleep func(time.Duration)) {
 	for {
-		RunAtLimitPass()
+		if err := RunAtLimitPass(); err != nil {
+			zap.L().Error(fmt.Sprintf("auto chop pass failed: %v", err))
+		}
 		sleep(30 * time.Minute)
 	}
 }

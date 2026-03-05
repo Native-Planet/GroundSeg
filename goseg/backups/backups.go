@@ -3,6 +3,7 @@ package backups
 import (
 	"archive/tar"
 	"bytes"
+	"errors"
 	"fmt"
 	backupdomain "groundseg/click/backup"
 	"io"
@@ -168,11 +169,13 @@ func pruneBackups(backupDir string, keep int) error {
 		}
 		return iTime > jTime
 	})
+	var removeErrs []error
 	for i := keep; i < len(files); i++ {
 		oldBackup := filepath.Join(backupDir, files[i].Name())
 		if err := os.Remove(oldBackup); err != nil {
 			zap.L().Warn("Failed to remove old backup", zap.String("file", oldBackup), zap.Error(err))
+			removeErrs = append(removeErrs, fmt.Errorf("remove %s: %w", oldBackup, err))
 		}
 	}
-	return nil
+	return errors.Join(removeErrs...)
 }

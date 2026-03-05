@@ -1,5 +1,12 @@
 package session
 
+import "errors"
+
+var (
+	ErrSystemLogBusNotDefined = errors.New("system log bus is not defined")
+	ErrSystemLogBusFull       = errors.New("system log bus is full")
+)
+
 type systemLogMessageBus struct {
 	channel chan []byte
 }
@@ -20,9 +27,14 @@ func (bus *systemLogMessageBus) Messages() <-chan []byte {
 	return bus.channel
 }
 
-func (bus *systemLogMessageBus) Publish(payload []byte) {
+func (bus *systemLogMessageBus) Publish(payload []byte) error {
 	if bus == nil || bus.channel == nil {
-		return
+		return ErrSystemLogBusNotDefined
 	}
-	bus.channel <- payload
+	select {
+	case bus.channel <- payload:
+		return nil
+	default:
+		return ErrSystemLogBusFull
+	}
 }

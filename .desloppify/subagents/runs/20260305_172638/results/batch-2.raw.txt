@@ -1,0 +1,103 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 74.8
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Process-global runtime defaults are still active: `events.NewGlobalDefaultBroker()` routes every call through mutable `DefaultEventRuntime()`, and both `shipworkflow.newWorkflowRuntime()` and `importer.defaultImporterRuntime()` bind to that global broker instead of explicit injected broker instances.",
+        "Large callback-bag runtimes are pervasive across modules (`startuporchestrator.StartupRuntime`/`startupInitRuntime`, `importer.importerRuntime`, `docker/orchestration.Runtime*Ops`, `shipworkflow.workflowRuntime`) with many function fields and group-based validation, which increases indirection and weakens domain boundaries.",
+        "The runtime-context abstraction is not a single seam in practice: `config/runtimecontext` defines immutable context snapshot APIs, but orchestration runtime context still reads via `config.BasePath/Architecture/DebugMode/DockerDir`, leaving multiple parallel access paths."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 71.0,
+        "indirection_cost": 66.5,
+        "interface_honesty": 79.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_runtime_broker_coupling",
+      "summary": "Event broker abstraction leaks through mutable process-global defaults across subsystems.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`events.NewGlobalDefaultBroker()` returns a broker that resolves against `DefaultEventRuntime()` on each call.",
+        "`shipworkflow.newWorkflowRuntime()` wires `EventRuntime` and transition publishing to `events.NewGlobalDefaultBroker()` rather than a scoped broker instance.",
+        "`importer.defaultImporterRuntime()` publishes import transitions through `events.NewGlobalDefaultBroker()`.",
+        "Startup wiring starts many long-lived subsystems, so shared mutable defaults become hidden cross-subsystem coupling instead of explicit dependency wiring."
+      ],
+      "suggestion": "Promote `events.EventBroker` to an explicit startup dependency and thread it through startup orchestrator into importer/workflow constructors. Keep `NewGlobalDefaultBroker` only as a compatibility adapter at process edge, and make core paths depend on injected broker instances.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "mutable_process_default_runtimes"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_runtime_sprawl",
+      "summary": "Runtime callback bags have grown into low-cohesion facades that add indirection without strong domain seams.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`startuporchestrator` defines layered runtime structs with many callback fields and tag-driven validation groups; behavior is selected indirectly through large runtime objects.",
+        "`importerRuntime` embeds three grouped runtime structs with many function pointers plus multiple validator paths, forcing readers to trace callback wiring instead of domain operations.",
+        "`docker/orchestration/runtime_ops.go` fragments dependencies into many `Runtime*Ops` structs and bundle constructors, increasing seam count and lookup depth.",
+        "`shipworkflow.workflowRuntime` embeds multiple ops groups plus custom callbacks, creating a broad dependency surface for single workflows."
+      ],
+      "suggestion": "Replace broad callback bags with narrower role interfaces per use-case (for example, `TransitionPublisher`, `ContainerProvisioner`, `UrbitConfigStore`, `StartupServiceRunner`), then assemble explicit adapters once at composition root. Collapse validation to constructor-time checks on these narrow interfaces.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "callback_bag_over_abstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "parallel_runtime_context_seams",
+      "summary": "Runtime-context abstraction is split across parallel access paths, weakening interface honesty.",
+      "related_files": [
+        "goseg/config/runtimecontext/context.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`config/runtimecontext/context.go` defines an immutable snapshot-oriented runtime context API (`Snapshot`, `Set`, and field accessors).",
+        "`docker/orchestration/runtime_ops.go` builds `RuntimeContextOps` from `config.BasePath`, `config.Architecture`, `config.DebugMode`, and `config.DockerDir` instead of the dedicated runtimecontext API.",
+        "`main.go` imports `config/runtimecontext` while other paths still consume context through `config` wrappers, leaving two competing abstractions for the same domain state."
+      ],
+      "suggestion": "Unify on one runtime-context interface (prefer the `runtimecontext` package contract), then refactor runtime ops constructors and bootstrap code to consume that interface directly. Leave temporary `config` wrappers as deprecated forwarding shims with a removal plan.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mutable_process_default_runtimes"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams were implemented primarily as large function-pointer bags, which scaled into production architecture rather than staying at boundaries.",
+      "Global default runtime conveniences were kept as first-class APIs, so dependency wiring remained implicit.",
+      "Runtime context migration appears partial, leaving dual abstractions instead of a single authoritative boundary."
+    ],
+    "likely_symptoms": [
+      "global_runtime_broker_coupling",
+      "callback_bag_runtime_sprawl",
+      "parallel_runtime_context_seams"
+    ],
+    "possible_false_positives": []
+  }
+}

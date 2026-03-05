@@ -21,7 +21,7 @@ func defaultStartramRuntime() startramRuntime {
 		orchestration.WithStartramServiceLoaders(
 			broadcast.GetStartramServices,
 			func() error {
-				return broadcast.LoadStartramRegionsWithRuntimeState(startramBroadcastRuntime())
+				return broadcast.LoadStartramRegionsWithRuntime(startramBroadcastRuntime())
 			},
 		),
 	))

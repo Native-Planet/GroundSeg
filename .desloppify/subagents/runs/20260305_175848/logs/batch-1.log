@@ -1,0 +1,530 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260305_175848/results/batch-1.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/protocol/contracts/conformance/fixtures_action_test.go
+- goseg/protocol/contracts/governance/c2c_manifest.go
+- goseg/protocol/contracts/governance/startram_manifest.go
+- goseg/protocol/contracts/governance/upload_manifest.go
+- goseg/protocol/contracts/governance/upload_manifest_test.go
+- goseg/uploadsvc/actions_test.go
+- goseg/uploadsvc/doc.go
+- goseg/uploadsvc/governance_contracts_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Upload action contract semantics are asserted in multiple layers: governance declarations in `goseg/protocol/contracts/governance/upload_manifest.go`, service-side policy behavior in `goseg/uploadsvc/actions_test.go`, and governance-to-service mapping checks in `goseg/uploadsvc/governance_contracts_test.go`.",
+        "The upload service uses package-level cached governance contract state evidenced by test-only reset of globals (`uploadGovernanceContractsByAction`, `uploadGovernanceContractsByActionErr`, `uploadGovernanceContractsByActionInit`) in `goseg/uploadsvc/governance_contracts_test.go`, indicating hidden mutable module state.",
+        "Cross-package conformance is enforced from a separate test hub (`goseg/protocol/contracts/conformance/fixtures_action_test.go`) rather than through a single consumed contract source, increasing change coordination overhead across modules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_contract_policy_duplication",
+      "summary": "Upload contract policy is duplicated across governance declarations and upload service validation tests, signaling a weak boundary contract.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/upload_manifest.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/governance_contracts_test.go"
+      ],
+      "evidence": [
+        "`upload_manifest.go` declares required/forbidden payload rules per action.",
+        "`actions_test.go` independently encodes the same action/payload policy matrix via table tests for reset/open-endpoint combinations.",
+        "`governance_contracts_test.go` separately validates mapping from upload actions to governance contract IDs and payload requirements, creating three maintenance points for one policy."
+      ],
+      "suggestion": "Introduce one canonical exported upload action contract table (or contract provider) consumed directly by upload service validation and mapping logic; keep a single conformance test at the boundary instead of re-encoding policy in multiple modules.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_single_source_contract_boundary"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_governance_global_cache_coupling",
+      "summary": "Package-level governance contract cache creates hidden mutable state and cross-test/module coupling.",
+      "related_files": [
+        "goseg/uploadsvc/governance_contracts_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "`governance_contracts_test.go` must reset package globals and `sync.Once` to isolate tests, showing module behavior depends on hidden singleton state.",
+        "`actions_test.go` runs parallel validation tests, which increases sensitivity to shared package state patterns when behavior is initialized globally.",
+        "`doc.go` describes strict contract-driven validation, but the implementation shape implied by global cache reset introduces stateful indirection instead of an explicit injected contract dependency."
+      ],
+      "suggestion": "Replace package-global cache with an explicit immutable contract map/provider injected into upload service construction (or lazily built per service instance), so module boundaries are explicit and test isolation does not require mutating internals.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_single_source_contract_boundary"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract metadata and enforcement responsibilities are split across governance and service layers without a single consumed boundary object.",
+      "Singleton-style package state is used where explicit dependency wiring would reduce coupling."
+    ],
+    "likely_symptoms": [
+      "upload_contract_policy_duplication",
+      "upload_governance_global_cache_coupling"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.107.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cbf26-fe0a-7083-ae9a-7bdbe8113ff2
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/protocol/contracts/conformance/fixtures_action_test.go
+- goseg/protocol/contracts/governance/c2c_manifest.go
+- goseg/protocol/contracts/governance/startram_manifest.go
+- goseg/protocol/contracts/governance/upload_manifest.go
+- goseg/protocol/contracts/governance/upload_manifest_test.go
+- goseg/uploadsvc/actions_test.go
+- goseg/uploadsvc/doc.go
+- goseg/uploadsvc/governance_contracts_test.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I will read the blind review packet first, then inspect only the eight assigned files for architecture/coupling issues and produce a strict JSON assessment for `cross_module_architecture` without editing code.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/governance/c2c_manifest.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,240p' goseg/protocol/contracts/conformance/fixtures_action_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/governance/startram_manifest.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+package governance
+
+import "groundseg/protocol/contracts/catalog/common"
+
+const (
+	StartramContractFamily = "startram"
+	StartramContractScope  = "errors"
+	StartramAPIConnSlug    = "api-connection"
+
+	StartramAPIConnectionErrorID          = StartramContractFamily + "." + StartramContractScope + "." + StartramAPIConnSlug
+	StartramAPIConnectionErrorMessage     = "Unable to connect to API server"
+	StartramAPIConnectionErrorName        = "APIConnectionError"
+	StartramAPIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+)
+
+func startramContractDeclarations() []ContractDeclaration {
+	return []ContractDeclaration{
+		{
+			ID:          StartramAPIConnectionErrorID,
+			Name:        StartramAPIConnectionErrorName,
+ succeeded in 53ms:
+package governance
+
+import "groundseg/protocol/contracts/catalog/common"
+
+const (
+	ActionC2CConnect = "connect"
+
+	C2CConnectContractID = ProtocolActionContractRoot + "." + NamespaceC2C + "." + ActionC2CConnect
+
+	C2CConnectActionName        = "C2CConnectAction"
+	C2CConnectActionDescription = "connect c2c client"
+)
+
+func c2cActionDeclarations() []ActionDeclaration {
+	return []ActionDeclaration{
+		{
+			Namespace:         NamespaceC2C,
+			Action:            ActionC2CConnect,
+			ContractID:        C2CConnectContractID,
+			Name:              C2CConnectActionName,
+ succeeded in 53ms:
+package conformance
+
+import (
+	"testing"
+
+	"groundseg/protocol/contracts"
+	"groundseg/protocol/contracts/familycatalog"
+	"groundseg/protocol/contracts/governance"
+)
+
+func TestActionContractFixturesCoverCanonicalBindings(t *testing.T) {
+	fixtures := ActionContractFixtures()
+	if len(fixtures) == 0 {
+		t.Fatal("expected at least one action contract fixture")
+	}
+
+	foundC2C := false
+	for _, fixture := range fixtures {
+		if err := ValidateActionContractFixture(fixture); err != nil {
+			t.Fatalf("fixture validation failed for %s:%s: %v", fixture.Namespace, fixture.Action, err)
+ succeeded in 52ms:
+Total output lines: 6872
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture",
+    "error_consistency",
+    "abstraction_fitness",
+    "test_strategy",
+    "design_coherence"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+codex
+I’ve loaded the packet and first four files; next I’ll read the remaining assigned files and then map concrete coupling defects to the required JSON fields.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/uploadsvc/actions_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/uploadsvc/governance_contracts_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,200p' goseg/uploadsvc/doc.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/protocol/contracts/governance/upload_manifest_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/contracts/governance/upload_manifest.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package uploadsvc
+
+import (
+	"errors"
+	"testing"
+)
+
+func TestParseUploadActionAcceptsKnownActions(t *testing.T) {
+	t.Parallel()
+
+	gotOpen, err := ParseUploadAction(string(ActionUploadOpenEndpoint))
+	if err != nil {
+		t.Fatalf("ParseUploadAction(open-endpoint) returned error: %v", err)
+	}
+	if gotOpen != ActionUploadOpenEndpoint {
+		t.Fatalf("unexpected parsed open-endpoint action: %q", gotOpen)
+	}
+
+	gotReset, err := ParseUploadAction(string(ActionUploadReset))
+	if err != nil {
+ succeeded in 51ms:
+package uploadsvc
+
+import (
+	"errors"
+	"sync"
+	"testing"
+
+	"groundseg/protocol/actions"
+	"groundseg/protocol/contracts/governance"
+)
+
+func resetUploadGovernanceCacheForTest(t *testing.T) {
+	t.Helper()
+	uploadGovernanceContractsByAction = nil
+	uploadGovernanceContractsByActionErr = nil
+	uploadGovernanceContractsByActionInit = sync.Once{}
+}
+
+func TestBuildUploadGovernanceContractsByActionMapsPolicies(t *testing.T) {
+	contracts, err := buildUploadGovernanceContractsByAction()
+ succeeded in 51ms:
+// Package uploadsvc parses websocket upload actions and dispatches validated
+// commands to upload backends.
+//
+// Validation is strict by action contract: reset must never carry open-endpoint
+// payload fields, and open-endpoint requires a complete endpoint/token payload.
+// Canonical cross-package conformance assertions live in
+// goseg/protocol/contracts/conformance. Canonical upload contract declarations
+// live in goseg/protocol/contracts/governance/upload_manifest.go, with shared
+// governance composition in goseg/protocol/contracts/governance/manifest.go and policy details in
+// docs/architecture/contracts-governance.md.
+package uploadsvc
+ succeeded in 51ms:
+package governance
+
+import (
+	"testing"
+
+	"groundseg/protocol/contracts/catalog/common"
+)
+
+func TestUploadActionDeclarationsExposeOpenAndResetContracts(t *testing.T) {
+	declarations := uploadActionDeclarations()
+	if len(declarations) != 2 {
+		t.Fatalf("expected two upload action declarations, got %d", len(declarations))
+	}
+
+	openDecl := declarations[0]
+	if openDecl.Action != ActionUploadOpenEndpoint {
+		t.Fatalf("unexpected open endpoint action token: %s", openDecl.Action)
+	}
+	if openDecl.ContractID != UploadOpenEndpointContractID {
+		t.Fatalf("unexpected open endpoint contract id: %s", openDecl.ContractID)
+ succeeded in 50ms:
+package governance
+
+import "groundseg/protocol/contracts/catalog/common"
+
+const (
+	ActionUploadOpenEndpoint = "open-endpoint"
+	ActionUploadReset        = "reset"
+
+	UploadOpenEndpointContractID = ProtocolActionContractRoot + "." + NamespaceUpload + "." + ActionUploadOpenEndpoint
+	UploadResetContractID        = ProtocolActionContractRoot + "." + NamespaceUpload + "." + ActionUploadReset
+
+	UploadOpenEndpointActionName        = "UploadOpenEndpointAction"
+	UploadOpenEndpointActionDescription = "open upload endpoint"
+	UploadResetActionName               = "UploadResetAction"
+	UploadResetActionDescription        = "reset upload session"
+)
+
+func uploadActionDeclarations() []ActionDeclaration {
+	return []ActionDeclaration{
+		{
+codex
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Upload action contract semantics are asserted in multiple layers: governance declarations in `goseg/protocol/contracts/governance/upload_manifest.go`, service-side policy behavior in `goseg/uploadsvc/actions_test.go`, and governance-to-service mapping checks in `goseg/uploadsvc/governance_contracts_test.go`.",
+        "The upload service uses package-level cached governance contract state evidenced by test-only reset of globals (`uploadGovernanceContractsByAction`, `uploadGovernanceContractsByActionErr`, `uploadGovernanceContractsByActionInit`) in `goseg/uploadsvc/governance_contracts_test.go`, indicating hidden mutable module state.",
+        "Cross-package conformance is enforced from a separate test hub (`goseg/protocol/contracts/conformance/fixtures_action_test.go`) rather than through a single consumed contract source, increasing change coordination overhead across modules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_contract_policy_duplication",
+      "summary": "Upload contract policy is duplicated across governance declarations and upload service validation tests, signaling a weak boundary contract.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/upload_manifest.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/governance_contracts_test.go"
+      ],
+      "evidence": [
+        "`upload_manifest.go` declares required/forbidden payload rules per action.",
+        "`actions_test.go` independently encodes the same action/payload policy matrix via table tests for reset/open-endpoint combinations.",
+        "`governance_contracts_test.go` separately validates mapping from upload actions to governance contract IDs and payload requirements, creating three maintenance points for one policy."
+      ],
+      "suggestion": "Introduce one canonical exported upload action contract table (or contract provider) consumed directly by upload service validation and mapping logic; keep a single conformance test at the boundary instead of re-encoding policy in multiple modules.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_single_source_contract_boundary"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_governance_global_cache_coupling",
+      "summary": "Package-level governance contract cache creates hidden mutable state and cross-test/module coupling.",
+      "related_files": [
+        "goseg/uploadsvc/governance_contracts_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "`governance_contracts_test.go` must reset package globals and `sync.Once` to isolate tests, showing module behavior depends on hidden singleton state.",
+        "`actions_test.go` runs parallel validation tests, which increases sensitivity to shared package state patterns when behavior is initialized globally.",
+        "`doc.go` describes strict contract-driven validation, but the implementation shape implied by global cache reset introduces stateful indirection instead of an explicit injected contract dependency."
+      ],
+      "suggestion": "Replace package-global cache with an explicit immutable contract map/provider injected into upload service construction (or lazily built per service instance), so module boundaries are explicit and test isolation does not require mutating internals.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_single_source_contract_boundary"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract metadata and enforcement responsibilities are split across governance and service layers without a single consumed boundary object.",
+      "Singleton-style package state is used where explicit dependency wiring would reduce coupling."
+    ],
+    "likely_symptoms": [
+      "upload_contract_policy_duplication",
+      "upload_governance_global_cache_coupling"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+35,522
+

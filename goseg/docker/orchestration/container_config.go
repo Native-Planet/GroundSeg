@@ -47,9 +47,13 @@ func ContainerConfigForType(containerName string, containerType transition.Conta
 	return ContainerConfigForTypeWithRuntime(newDockerRuntime(), containerName, containerType)
 }
 
-// ContainerConfigForTypeString parses external string input and delegates to the typed API.
+// ContainerConfigForTypeString parses and validates external type input before dispatching.
 func ContainerConfigForTypeString(containerName string, containerType string) (container.Config, container.HostConfig, error) {
-	return ContainerConfigForTypeWithRuntime(newDockerRuntime(), containerName, transition.ContainerType(containerType))
+	parsedType, ok := transition.ParseContainerType(containerType)
+	if !ok {
+		return container.Config{}, container.HostConfig{}, fmt.Errorf("Unrecognized container type %q", containerType)
+	}
+	return ContainerConfigForTypeWithRuntime(newDockerRuntime(), containerName, parsedType)
 }
 
 func ContainerConfigForTypeWithRuntime(rt dockerRuntime, containerName string, containerType transition.ContainerType) (container.Config, container.HostConfig, error) {

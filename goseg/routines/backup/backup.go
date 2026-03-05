@@ -3,9 +3,11 @@ package backup
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"groundseg/backupsvc"
 	"groundseg/config"
+	"groundseg/internal/workflow"
 	"math/big"
 	"time"
 
@@ -37,18 +39,19 @@ type BackupTime struct {
 
 var remoteBackupState BackupTime
 
-func RunRemoteBackupPass() {
+func RunRemoteBackupPass() error {
 	if !remoteBackupState.IsSet {
 		snapshot := GetStartramConfigSnapshotForRoutine()
 		if !snapshot.Fresh || snapshot.Value.UrlID == "" {
 			zap.L().Debug("Remote backup schedule waiting for fresh StarTram config snapshot")
 			SleepForRoutine(waitForStartramSnapshot)
-			return
+			return nil
 		}
 		remoteBackupState = BackupTime{IsSet: true, Time: GenerateTimeOfDay(snapshot.Value.UrlID)}
 		config.BackupTime = remoteBackupState.Time
 	}
 
+	var passErrs []error
 	now := NowForRoutine()
 	if now.Equal(remoteBackupState.Time) || (now.After(remoteBackupState.Time) && now.Sub(remoteBackupState.Time) <= time.Hour) {
 		conf := ConfForRoutine()
@@ -58,15 +61,18 @@ func RunRemoteBackupPass() {
 				zap.L().Info(fmt.Sprintf("Backing up %s", patp))
 				if err := UploadLatestBackupForRoutine(patp, conf.Connectivity.RemoteBackupPassword, BackupDir); err != nil {
 					zap.L().Error(fmt.Sprintf("Failed to upload backup for %v: %v", patp, err))
+					passErrs = append(passErrs, fmt.Errorf("upload backup for %s: %w", patp, err))
 				}
 			}
 		}
 	}
+	return errors.Join(passErrs...)
 }
 
-func RunLocalBackupPass() {
+func RunLocalBackupPass() error {
 	zap.L().Info("Checking local backups")
 	conf := ConfForRoutine()
+	var passErrs []error
 	for _, patp := range conf.Connectivity.Piers {
 		location := NowForRoutine().Location()
 		backupTime := time.Date(0, 1, 1, 0, 0, 0, 0, location)
@@ -78,6 +84,7 @@ func RunLocalBackupPass() {
 		mostRecentBackup, err := LatestDailyBackupForRoutine(BackupDir, patp)
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to inspect backups for %v: %v", patp, err))
+			passErrs = append(passErrs, fmt.Errorf("inspect backups for %s: %w", patp, err))
 			continue
 		}
 
@@ -87,11 +94,13 @@ func RunLocalBackupPass() {
 		if shouldCreateDailyBackup(backupTime, mostRecentBackup, now) {
 			if err := CreateLocalBackupForRoutine(patp, BackupDir); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to create backup for %v: %v", patp, err))
+				passErrs = append(passErrs, fmt.Errorf("create local backup for %s: %w", patp, err))
 			} else {
 				zap.L().Info(fmt.Sprintf("Successfully created backup for %v", patp))
 			}
 		}
 	}
+	return errors.Join(passErrs...)
 }
 
 func StartBackupRoutines() error {
@@ -102,19 +111,16 @@ func StartBackupRoutines() error {
 
 func TlonBackupRemote() {
 	remoteInterval, _ := WaitIntervals()
-	runRoutine(remoteInterval, RunRemoteBackupPass, SleepForRoutine)
+	workflow.RunForever(remoteInterval, RunRemoteBackupPass, SleepForRoutine, func(err error) {
+		zap.L().Error(fmt.Sprintf("backup routine pass failed: %v", err))
+	})
 }
 
 func TlonBackupLocal() {
 	_, localInterval := WaitIntervals()
-	runRoutine(localInterval, RunLocalBackupPass, SleepForRoutine)
-}
-
-func runRoutine(interval time.Duration, fn func(), sleep func(time.Duration)) {
-	for {
-		fn()
-		sleep(interval)
-	}
+	workflow.RunForever(localInterval, RunLocalBackupPass, SleepForRoutine, func(err error) {
+		zap.L().Error(fmt.Sprintf("backup routine pass failed: %v", err))
+	})
 }
 
 func ResetRemoteBackupStateForTest() {

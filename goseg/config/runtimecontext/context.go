@@ -18,11 +18,6 @@ type RuntimeContext struct {
 }
 
 var (
-	basePathDefault     = BasePathFromEnv
-	architectureDefault = ArchitectureFromRuntime
-	debugModeDefault    = func() bool { return false }
-	dockerDirDefault    = func() string { return defaults.DockerData("volumes") + "/" }
-
 	runtimeContextMu    sync.Mutex
 	runtimeContextValue atomic.Pointer[RuntimeContext]
 )
@@ -45,11 +40,17 @@ func Snapshot() RuntimeContext {
 }
 
 func defaultRuntimeContext() RuntimeContext {
+	return RuntimeContextFromProcessArgs(nil)
+}
+
+// RuntimeContextFromProcessArgs builds a runtime context snapshot from process
+// defaults (environment + architecture) and parsed startup args.
+func RuntimeContextFromProcessArgs(args []string) RuntimeContext {
 	return RuntimeContext{
-		BasePath:     basePathDefault(),
-		Architecture: architectureDefault(),
-		DebugMode:    debugModeDefault(),
-		DockerDir:    dockerDirDefault(),
+		BasePath:     BasePathFromEnv(),
+		Architecture: ArchitectureFromRuntime(),
+		DebugMode:    DebugModeFromArgs(args),
+		DockerDir:    DockerDirFromDefaults(),
 	}
 }
 
@@ -75,22 +76,6 @@ func Set(context RuntimeContext) {
 	applyRuntimeContext(context)
 }
 
-func BasePath() string {
-	return Snapshot().BasePath
-}
-
-func Architecture() string {
-	return Snapshot().Architecture
-}
-
-func DebugMode() bool {
-	return Snapshot().DebugMode
-}
-
-func DockerDir() string {
-	return Snapshot().DockerDir
-}
-
 func SetBasePath(basePath string) {
 	updateRuntimeContext(func(context *RuntimeContext) {
 		context.BasePath = basePath
@@ -113,6 +98,15 @@ func SetDockerDir(dockerDir string) {
 	updateRuntimeContext(func(context *RuntimeContext) {
 		context.DockerDir = dockerDir
 	})
+}
+
+// DockerDirFromDefaults resolves the default docker data directory.
+func DockerDirFromDefaults() string {
+	volumesDir := defaults.DockerVolumesDir()
+	if volumesDir == "" {
+		return ""
+	}
+	return volumesDir + "/"
 }
 
 // ArchitectureFromRuntime resolves the architecture identifier used by config.

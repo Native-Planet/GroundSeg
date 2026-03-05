@@ -37,7 +37,7 @@ type StartupRuntime struct {
 
 func (runtime StartupRuntime) Initialize() error {
 	if runtime.InitializeFn == nil {
-		return nil
+		return seams.MissingRuntimeDependency("startup initialize callback", "")
 	}
 	return runtime.InitializeFn()
 }

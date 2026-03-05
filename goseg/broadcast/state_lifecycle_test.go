@@ -53,22 +53,28 @@ func (collector testStartramCollector) LoadStartramRegions() (map[string]structs
 func TestBootstrapBroadcastStateRequiresRuntime(t *testing.T) {
 	if err := bootstrapBroadcastState(nil); err == nil {
 		t.Fatal("expected bootstrapBroadcastState to fail with nil runtime")
+	} else if !errors.Is(err, ErrBroadcastRuntimeRequired) {
+		t.Fatalf("expected ErrBroadcastRuntimeRequired, got %v", err)
 	}
 }
 
 func TestLoadStartramRegionsWithRuntimeRequiresRuntime(t *testing.T) {
 	if err := LoadStartramRegionsWithRuntime(nil); err == nil {
 		t.Fatal("expected LoadStartramRegionsWithRuntime to fail with nil runtime")
+	} else if !errors.Is(err, ErrBroadcastRuntimeRequired) {
+		t.Fatalf("expected ErrBroadcastRuntimeRequired, got %v", err)
 	}
 }
 
 func TestReloadUrbitsWithRuntimeRequiresRuntime(t *testing.T) {
 	if err := ReloadUrbitsWithRuntime(nil); err == nil {
 		t.Fatal("expected ReloadUrbitsWithRuntime to fail with nil runtime")
+	} else if !errors.Is(err, ErrBroadcastRuntimeRequired) {
+		t.Fatalf("expected ErrBroadcastRuntimeRequired, got %v", err)
 	}
 }
 
-func TestLoadStartramRegionsWithRuntimeStateUpdatesRuntimeState(t *testing.T) {
+func TestLoadStartramRegionsWithRuntimeUpdatesRuntimeState(t *testing.T) {
 	runtime := NewBroadcastStateRuntime()
 	runtime.startramCollector = testStartramCollector{
 		regions: map[string]structs.StartramRegion{
@@ -76,8 +82,8 @@ func TestLoadStartramRegionsWithRuntimeStateUpdatesRuntimeState(t *testing.T) {
 		},
 	}
 
-	if err := LoadStartramRegionsWithRuntimeState(runtime); err != nil {
-		t.Fatalf("LoadStartramRegionsWithRuntimeState returned error: %v", err)
+	if err := LoadStartramRegionsWithRuntime(runtime); err != nil {
+		t.Fatalf("LoadStartramRegionsWithRuntime returned error: %v", err)
 	}
 
 	gotRegions := runtime.GetState().Profile.Startram.Info.Regions
@@ -86,11 +92,11 @@ func TestLoadStartramRegionsWithRuntimeStateUpdatesRuntimeState(t *testing.T) {
 	}
 }
 
-func TestLoadStartramRegionsWithRuntimeStateReturnsCollectorError(t *testing.T) {
+func TestLoadStartramRegionsWithRuntimeReturnsCollectorError(t *testing.T) {
 	runtime := NewBroadcastStateRuntime()
 	runtime.startramCollector = testStartramCollector{err: errors.New("collector unavailable")}
 
-	if err := LoadStartramRegionsWithRuntimeState(runtime); err == nil {
+	if err := LoadStartramRegionsWithRuntime(runtime); err == nil {
 		t.Fatal("expected collector error to be returned")
 	}
 }

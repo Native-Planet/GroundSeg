@@ -120,11 +120,37 @@ func (service *WiFiRuntimeService) RefreshWiFiInfo(interfaceName string) error {
 }
 
 func (service *WiFiRuntimeService) ListWiFiSSIDs(interfaceName string) ([]string, error) {
+	return service.ListWiFiSSIDsBestEffort(interfaceName)
+}
+
+// ListWiFiSSIDsBestEffort returns parsed SSIDs and may include ErrWiFiPartialResult
+// when malformed nmcli rows are skipped.
+func (service *WiFiRuntimeService) ListWiFiSSIDsBestEffort(interfaceName string) ([]string, error) {
 	runtime, state, err := service.prepareForUse()
 	if err != nil {
 		return nil, fmt.Errorf("prepare wifi runtime for ListWiFiSSIDs: %w", err)
 	}
 
+	device, err := resolveInterfaceName(interfaceName, runtime, state)
+	if err != nil {
+		return nil, fmt.Errorf("resolve wifi device: %w", err)
+	}
+	ssids, err := runtime.listSSIDsBestEffort(device)
+	if err != nil {
+		if errors.Is(err, ErrWiFiPartialResult) && len(ssids) > 0 {
+			return ssids, fmt.Errorf("list wifi SSIDs for %s: %w", device, err)
+		}
+		return nil, fmt.Errorf("list wifi SSIDs for %s: %w", device, err)
+	}
+	return ssids, nil
+}
+
+// ListWiFiSSIDsStrict fails on any parse warning and only returns fully parsed results.
+func (service *WiFiRuntimeService) ListWiFiSSIDsStrict(interfaceName string) ([]string, error) {
+	runtime, state, err := service.prepareForUse()
+	if err != nil {
+		return nil, fmt.Errorf("prepare wifi runtime for ListWiFiSSIDsStrict: %w", err)
+	}
 	device, err := resolveInterfaceName(interfaceName, runtime, state)
 	if err != nil {
 		return nil, fmt.Errorf("resolve wifi device: %w", err)
@@ -241,7 +267,11 @@ func resolveInterfaceName(interfaceName string, runtime wifiRuntime, state *wifi
 	if WiFiDevice(state) != "" {
 		return WiFiDevice(state), nil
 	}
-	return runtime.primaryWifiDevice()
+	device, err := runtime.primaryWifiDevice()
+	if errors.Is(err, ErrWiFiPartialResult) && device != "" {
+		return device, nil
+	}
+	return device, err
 }
 
 func connectInfoLoop(ctx context.Context, runtime wifiRuntime, radio wifiRadioService, state *wifiRuntimeState) error {
@@ -270,11 +300,7 @@ func connectInfoLoop(ctx context.Context, runtime wifiRuntime, radio wifiRadioSe
 }
 
 func startWiFiInfoLoop(ctx context.Context, runtime wifiRuntime, state *wifiRuntimeState) error {
-	return startWiFiInfoLoopWithRadio(ctx, runtime, newWiFiRadioService(runtime, state), state)
-}
-
-func startWiFiInfoLoopWithRadio(ctx context.Context, runtime wifiRuntime, radio wifiRadioService, state *wifiRuntimeState) error {
-	return connectInfoLoop(ctx, runtime, radio, state)
+	return connectInfoLoop(ctx, runtime, newWiFiRadioService(runtime, state), state)
 }
 
 func wifiInfoLoop(ctx context.Context, interfaceName string, runtime wifiRuntime, radio wifiRadioService) {

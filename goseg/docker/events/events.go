@@ -3,55 +3,29 @@ package events
 import (
 	"context"
 	"errors"
-	"sync"
+	"time"
 
 	"groundseg/structs"
 )
 
 var (
-	ErrTransitionPublishTimeout = errors.New("transition publish cancelled before enqueue")
-	ErrTransitionBusFull        = errors.New("transition event bus is full")
-	errTransitionBusNotDefined  = errors.New("transition broker is not defined")
-)
+	ErrTransitionPublishCancelled = errors.New("transition publish cancelled before enqueue")
+	ErrTransitionPublishTimeout   = errors.New("transition publish timed out before enqueue")
+	ErrTransitionBusFull          = errors.New("transition event bus is full")
+	errTransitionBusNotDefined    = errors.New("transition broker is not defined")
 
-var (
-	defaultEventRuntimeMu sync.RWMutex
-	defaultEventRuntime   = NewEventRuntime()
+	defaultTransitionPublishWait = 200 * time.Millisecond
 )
 
 type EventRuntime struct {
-	urbitTransitionBus      chan structs.UrbitTransition
-	systemTransitionBus     chan structs.SystemTransition
-	newShipTransitionBus    chan structs.NewShipTransition
-	importShipTransitionBus chan structs.UploadTransition
+	urbitTransitionBus      transitionBus[structs.UrbitTransition]
+	systemTransitionBus     transitionBus[structs.SystemTransition]
+	newShipTransitionBus    transitionBus[structs.NewShipTransition]
+	importShipTransitionBus transitionBus[structs.UploadTransition]
 }
 
-type DelegatingEventBroker struct {
-	delegate EventBroker
-}
-
-func DefaultEventRuntime() EventRuntime {
-	defaultEventRuntimeMu.RLock()
-	defer defaultEventRuntimeMu.RUnlock()
-	return defaultEventRuntime
-}
-
-func SetDefaultEventRuntime(runtime EventRuntime) {
-	defaultEventRuntimeMu.Lock()
-	defer defaultEventRuntimeMu.Unlock()
-	if runtime.urbitTransitionBus == nil ||
-		runtime.systemTransitionBus == nil ||
-		runtime.newShipTransitionBus == nil ||
-		runtime.importShipTransitionBus == nil {
-		runtime = NewEventRuntime()
-	}
-	defaultEventRuntime = runtime
-}
-
-func ResetDefaultEventRuntime() EventRuntime {
-	runtime := NewEventRuntime()
-	SetDefaultEventRuntime(runtime)
-	return runtime
+type transitionBus[T any] struct {
+	ch chan T
 }
 
 func NewEventRuntime() EventRuntime {
@@ -73,13 +47,29 @@ type EventBroker interface {
 	ImportShipTransitions() <-chan structs.UploadTransition
 }
 
-func NewDelegatingEventBroker(delegate EventBroker) DelegatingEventBroker {
-	return DelegatingEventBroker{delegate: delegate}
+type defaultEventBroker struct{}
+
+// NewGlobalDefaultBroker returns an EventBroker bound to the mutable process default runtime.
+// Calls are resolved against the current default on each publish/subscribe call.
+func NewGlobalDefaultBroker() EventBroker {
+	return defaultEventBroker{}
+}
+
+// NewIsolatedRuntimeBroker returns an in-memory broker with private channels
+// that are unaffected by global default runtime swaps.
+func NewIsolatedRuntimeBroker(bufferSize int) EventBroker {
+	return NewEventRuntimeWithBuffer(bufferSize)
+}
+
+// NewDefaultEventBroker returns an EventBroker that always routes through the
+// current process default runtime snapshot at construction time.
+func NewDefaultEventBroker() EventBroker {
+	return NewRuntimeBoundBroker(DefaultEventRuntime())
 }
 
 // NewTransitionBroker returns the default in-memory transition broker implementation.
 func NewTransitionBroker(bufferSize int) EventBroker {
-	return NewEventRuntimeWithBuffer(bufferSize)
+	return NewIsolatedRuntimeBroker(bufferSize)
 }
 
 func newTransitionRuntime(bufferSize int) EventRuntime {
@@ -87,114 +77,111 @@ func newTransitionRuntime(bufferSize int) EventRuntime {
 		bufferSize = 100
 	}
 	return EventRuntime{
-		urbitTransitionBus:      make(chan structs.UrbitTransition, bufferSize),
-		systemTransitionBus:     make(chan structs.SystemTransition, bufferSize),
-		newShipTransitionBus:    make(chan structs.NewShipTransition, bufferSize),
-		importShipTransitionBus: make(chan structs.UploadTransition, bufferSize),
+		urbitTransitionBus:      newTransitionBus[structs.UrbitTransition](bufferSize),
+		systemTransitionBus:     newTransitionBus[structs.SystemTransition](bufferSize),
+		newShipTransitionBus:    newTransitionBus[structs.NewShipTransition](bufferSize),
+		importShipTransitionBus: newTransitionBus[structs.UploadTransition](bufferSize),
 	}
 }
 
-func publishDropOnFull[T any](ctx context.Context, ch chan T, event T) error {
+func newTransitionBus[T any](bufferSize int) transitionBus[T] {
+	return transitionBus[T]{ch: make(chan T, bufferSize)}
+}
+
+func (bus transitionBus[T]) defined() bool {
+	return bus.ch != nil
+}
+
+func (bus transitionBus[T]) publish(ctx context.Context, event T) error {
+	return publishWithBoundedWait(ctx, bus.ch, event, defaultTransitionPublishWait)
+}
+
+func (bus transitionBus[T]) subscribe() <-chan T {
+	return bus.ch
+}
+
+func publishWithBoundedWait[T any](ctx context.Context, ch chan T, event T, maxWait time.Duration) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if ch == nil {
 		return errTransitionBusNotDefined
 	}
+	if maxWait <= 0 {
+		maxWait = defaultTransitionPublishWait
+	}
+	timer := time.NewTimer(maxWait)
+	defer timer.Stop()
 	select {
 	case ch <- event:
 		return nil
 	case <-ctx.Done():
-		return ErrTransitionPublishTimeout
-	default:
-		return ErrTransitionBusFull
+		return errors.Join(ErrTransitionPublishCancelled, ctx.Err())
+	case <-timer.C:
+		return errors.Join(ErrTransitionPublishTimeout, ErrTransitionBusFull)
 	}
 }
 
 func (runtime EventRuntime) PublishUrbitTransition(ctx context.Context, event structs.UrbitTransition) error {
-	return publishDropOnFull(ctx, runtime.urbitTransitionBus, event)
+	return runtime.urbitTransitionBus.publish(ctx, event)
 }
 
 func (runtime EventRuntime) UrbitTransitions() <-chan structs.UrbitTransition {
-	return runtime.urbitTransitionBus
+	return runtime.urbitTransitionBus.subscribe()
 }
 
 func (runtime EventRuntime) PublishSystemTransition(ctx context.Context, event structs.SystemTransition) error {
-	return publishDropOnFull(ctx, runtime.systemTransitionBus, event)
+	return runtime.systemTransitionBus.publish(ctx, event)
 }
 
 func (runtime EventRuntime) SystemTransitions() <-chan structs.SystemTransition {
-	return runtime.systemTransitionBus
+	return runtime.systemTransitionBus.subscribe()
 }
 
 func (runtime EventRuntime) PublishNewShipTransition(ctx context.Context, event structs.NewShipTransition) error {
-	return publishDropOnFull(ctx, runtime.newShipTransitionBus, event)
+	return runtime.newShipTransitionBus.publish(ctx, event)
 }
 
 func (runtime EventRuntime) NewShipTransitions() <-chan structs.NewShipTransition {
-	return runtime.newShipTransitionBus
+	return runtime.newShipTransitionBus.subscribe()
 }
 
 func (runtime EventRuntime) PublishImportShipTransition(ctx context.Context, event structs.UploadTransition) error {
-	return publishDropOnFull(ctx, runtime.importShipTransitionBus, event)
+	return runtime.importShipTransitionBus.publish(ctx, event)
 }
 
 func (runtime EventRuntime) ImportShipTransitions() <-chan structs.UploadTransition {
-	return runtime.importShipTransitionBus
+	return runtime.importShipTransitionBus.subscribe()
 }
 
-func (runtime DelegatingEventBroker) PublishUrbitTransition(ctx context.Context, event structs.UrbitTransition) error {
-	if runtime.delegate == nil {
-		return errTransitionBusNotDefined
-	}
-	return runtime.delegate.PublishUrbitTransition(ctx, event)
+func (defaultEventBroker) PublishUrbitTransition(ctx context.Context, event structs.UrbitTransition) error {
+	return DefaultEventRuntime().PublishUrbitTransition(ctx, event)
 }
 
-func (runtime DelegatingEventBroker) UrbitTransitions() <-chan structs.UrbitTransition {
-	if runtime.delegate == nil {
-		return nil
-	}
-	return runtime.delegate.UrbitTransitions()
+func (defaultEventBroker) UrbitTransitions() <-chan structs.UrbitTransition {
+	return DefaultEventRuntime().UrbitTransitions()
 }
 
-func (runtime DelegatingEventBroker) PublishSystemTransition(ctx context.Context, event structs.SystemTransition) error {
-	if runtime.delegate == nil {
-		return errTransitionBusNotDefined
-	}
-	return runtime.delegate.PublishSystemTransition(ctx, event)
+func (defaultEventBroker) PublishSystemTransition(ctx context.Context, event structs.SystemTransition) error {
+	return DefaultEventRuntime().PublishSystemTransition(ctx, event)
 }
 
-func (runtime DelegatingEventBroker) SystemTransitions() <-chan structs.SystemTransition {
-	if runtime.delegate == nil {
-		return nil
-	}
-	return runtime.delegate.SystemTransitions()
+func (defaultEventBroker) SystemTransitions() <-chan structs.SystemTransition {
+	return DefaultEventRuntime().SystemTransitions()
 }
 
-func (runtime DelegatingEventBroker) PublishNewShipTransition(ctx context.Context, event structs.NewShipTransition) error {
-	if runtime.delegate == nil {
-		return errTransitionBusNotDefined
-	}
-	return runtime.delegate.PublishNewShipTransition(ctx, event)
+func (defaultEventBroker) PublishNewShipTransition(ctx context.Context, event structs.NewShipTransition) error {
+	return DefaultEventRuntime().PublishNewShipTransition(ctx, event)
 }
 
-func (runtime DelegatingEventBroker) NewShipTransitions() <-chan structs.NewShipTransition {
-	if runtime.delegate == nil {
-		return nil
-	}
-	return runtime.delegate.NewShipTransitions()
+func (defaultEventBroker) NewShipTransitions() <-chan structs.NewShipTransition {
+	return DefaultEventRuntime().NewShipTransitions()
 }
 
-func (runtime DelegatingEventBroker) PublishImportShipTransition(ctx context.Context, event structs.UploadTransition) error {
-	if runtime.delegate == nil {
-		return errTransitionBusNotDefined
-	}
-	return runtime.delegate.PublishImportShipTransition(ctx, event)
+func (defaultEventBroker) PublishImportShipTransition(ctx context.Context, event structs.UploadTransition) error {
+	return DefaultEventRuntime().PublishImportShipTransition(ctx, event)
 }
 
-func (runtime DelegatingEventBroker) ImportShipTransitions() <-chan structs.UploadTransition {
-	if runtime.delegate == nil {
-		return nil
-	}
-	return runtime.delegate.ImportShipTransitions()
+func (defaultEventBroker) ImportShipTransitions() <-chan structs.UploadTransition {
+	return DefaultEventRuntime().ImportShipTransitions()
 }

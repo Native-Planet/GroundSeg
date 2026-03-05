@@ -3,6 +3,10 @@
 This package is the canonical governance boundary for protocol and StarTram
 contract descriptors.
 
+Machine-readable declarations live in:
+
+- `goseg/protocol/contracts/governance/manifest.go`
+
 ## Scope
 
 - Action and error contract identity and compatibility metadata.

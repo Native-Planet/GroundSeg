@@ -35,7 +35,18 @@ var (
 
 // Initialize loads and validates configuration from disk.
 func Initialize() error {
+	return InitializeWithContext(RuntimeContextSnapshot())
+}
+
+// InitializeWithContext loads and validates configuration using an explicit
+// runtime context snapshot.
+func InitializeWithContext(context RuntimeContext) error {
 	initOnce.Do(func() {
+		normalizedContext := normalizeRuntimeContext(context)
+		SetRuntimeContext(normalizedContext)
+		if normalizedContext.DebugMode {
+			zap.L().Info("Starting GroundSeg in debug mode")
+		}
 		initErr = initializeConfig()
 	})
 	return initErr
@@ -46,8 +57,6 @@ func initializeConfig() error {
 		return fmt.Errorf("default version metadata is invalid: %w", err)
 	}
 
-	initializeDebugMode()
-	initializePaths()
 	ctx := RuntimeContextSnapshot()
 	isEMMCMachine = checkIsEMMCMachine()
 	zap.L().Info(fmt.Sprintf("Loading configs from %s", ctx.BasePath))
@@ -93,6 +102,20 @@ func initializeConfig() error {
 
 	Ready = true
 	return nil
+}
+
+func normalizeRuntimeContext(context RuntimeContext) RuntimeContext {
+	normalized := context
+	if normalized.BasePath == "" {
+		normalized.BasePath = runtimecontext.BasePathFromEnv()
+	}
+	if normalized.Architecture == "" {
+		normalized.Architecture = runtimecontext.ArchitectureFromRuntime()
+	}
+	if normalized.DockerDir == "" {
+		normalized.DockerDir = runtimecontext.DockerDirFromDefaults()
+	}
+	return normalized
 }
 
 func initializePaths() {

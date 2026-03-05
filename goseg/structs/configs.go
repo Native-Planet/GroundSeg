@@ -194,11 +194,59 @@ type RuntimeConfig struct {
 	LinuxUpdates   LinuxUpdatesConfig `json:"linuxUpdates"`
 	DockerData     string             `json:"dockerData"`
 	GsVersion      string             `json:"gsVersion"`
-	CfgDir         string             `json:"CFG_DIR"`
+	CfgDir         string             `json:"cfgDir"`
 	UpdateInterval int                `json:"updateInterval"`
 	BinHash        string             `json:"binHash"`
 	Disable502     bool               `json:"disable502"`
 	SnapTime       int                `json:"snapTime"`
+}
+
+type runtimeConfigDecodeShape struct {
+	GracefulExit   bool               `json:"gracefulExit"`
+	LastKnownMDNS  string             `json:"lastKnownMDNS"`
+	Setup          string             `json:"setup"`
+	SwapVal        int                `json:"swapVal"`
+	SwapFile       string             `json:"swapFile"`
+	LinuxUpdates   LinuxUpdatesConfig `json:"linuxUpdates"`
+	DockerData     string             `json:"dockerData"`
+	GsVersion      string             `json:"gsVersion"`
+	CfgDir         string             `json:"cfgDir"`
+	LegacyCfgDir   string             `json:"CFG_DIR"`
+	UpdateInterval int                `json:"updateInterval"`
+	BinHash        string             `json:"binHash"`
+	Disable502     bool               `json:"disable502"`
+	SnapTime       int                `json:"snapTime"`
+}
+
+// UnmarshalJSON accepts both the canonical cfgDir key and the legacy CFG_DIR key.
+func (config *RuntimeConfig) UnmarshalJSON(data []byte) error {
+	if config == nil {
+		return fmt.Errorf("runtime config target is nil")
+	}
+	var decoded runtimeConfigDecodeShape
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	cfgDir := decoded.CfgDir
+	if cfgDir == "" {
+		cfgDir = decoded.LegacyCfgDir
+	}
+	*config = RuntimeConfig{
+		GracefulExit:   decoded.GracefulExit,
+		LastKnownMDNS:  decoded.LastKnownMDNS,
+		Setup:          decoded.Setup,
+		SwapVal:        decoded.SwapVal,
+		SwapFile:       decoded.SwapFile,
+		LinuxUpdates:   decoded.LinuxUpdates,
+		DockerData:     decoded.DockerData,
+		GsVersion:      decoded.GsVersion,
+		CfgDir:         cfgDir,
+		UpdateInterval: decoded.UpdateInterval,
+		BinHash:        decoded.BinHash,
+		Disable502:     decoded.Disable502,
+		SnapTime:       decoded.SnapTime,
+	}
+	return nil
 }
 
 type StartramConfig struct {

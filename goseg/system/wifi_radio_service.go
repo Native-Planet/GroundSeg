@@ -1,6 +1,7 @@
 package system
 
 import (
+	"errors"
 	"fmt"
 
 	"groundseg/structs"
@@ -65,10 +66,15 @@ func (service nmcliWiFiRadioService) RefreshInfo(device string) {
 		info.Active = active
 	}
 
-	ssids, err := service.runtime.listSSIDs(device)
+	ssids, err := service.runtime.listSSIDsBestEffort(device)
 	if err != nil {
-		zap.L().Error(err.Error())
-		info.Networks = []string{}
+		if errors.Is(err, ErrWiFiPartialResult) && len(ssids) > 0 {
+			zap.L().Warn(err.Error())
+			info.Networks = ssids
+		} else {
+			zap.L().Error(err.Error())
+			info.Networks = []string{}
+		}
 	} else {
 		info.Networks = ssids
 	}

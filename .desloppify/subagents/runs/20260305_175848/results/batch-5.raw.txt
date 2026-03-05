@@ -1,0 +1,90 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 74.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Background routine APIs in the same subsystem mix incompatible failure contracts: `runRoutine` in `goseg/routines/system/system.go` and `goseg/routines/backup/backup.go` logs pass errors and loops forever, while sibling context-aware loops (`runRoutineWithContext`, `runChopWithContext`) return errors to callers.",
+        "Transition/event publish failures are handled inconsistently: `emitWorkflowTransitionResolved` in `goseg/shipworkflow/operations_runtime.go` propagates through `transition.HandleTransitionPublishError`, but `publishTransition` in the same file accepts a non-error callback and cannot surface publish failures at all.",
+        "Operational loops suppress several boundary failures as log-only in `goseg/docker/orchestration/subsystem/subsystem_health.go` and selected importer publish paths in `goseg/importer/importer.go` (warn-and-continue), while adjacent code paths in those modules return wrapped errors."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_background_worker_failure_contracts",
+      "summary": "Background workers mix fail-fast and log-and-continue semantics for similar failures.",
+      "related_files": [
+        "goseg/routines/system/system.go",
+        "goseg/routines/backup/backup.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`runRoutine` in `routines/system` and `routines/backup` logs errors and continues forever, so callers cannot detect persistent failure.",
+        "Sibling context-based loops (`runRoutineWithContext`, `runChopWithContext`, `RunOldLogsCleanupLoopWithContext`) return terminal errors after thresholds, creating different failure behavior for equivalent periodic tasks."
+      ],
+      "suggestion": "Standardize all long-running workers on one contract (prefer context-aware error-returning loops with retry thresholds) and keep thin legacy wrappers that call the unified path.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_unified_error_policy_for_loops"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "transition_publish_errors_dropped_by_generic_helper",
+      "summary": "Generic transition helper cannot report publish failures, unlike sibling transition paths.",
+      "related_files": [
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "`publishTransition` in `operations_runtime.go` accepts `publish func(T)` and always returns `nil` unless runtime resolution fails, so publish errors are unobservable.",
+        "In the same module, `emitWorkflowTransitionResolved` handles emitter errors via `transition.HandleTransitionPublishError`, and importer transition publishing also returns/handles publish errors with policy."
+      ],
+      "suggestion": "Change the helper to accept `publish func(T) error` and route failures through a shared transition error policy handler so all transition emitters have consistent observability and escalation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_unified_error_policy_for_loops"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "selective_swallowing_of_critical_publish_and_health_errors",
+      "summary": "Some publish/health errors are logged then ignored while neighboring paths propagate them.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "Importer code has warn-and-continue branches for transition publish failures (for example status/error transition emits), but other importer paths return joined/wrapped publish failures.",
+        "In `subsystem_health.go`, repeated boundary failures (`LoadUrbitConfigFn`, network lookup, health probe, wireguard recovery) are mostly log-and-continue; meanwhile `subsystem_events.go` returns worker errors to terminate/restart logic."
+      ],
+      "suggestion": "Define explicit severity tiers for loop errors (ignore/retry/escalate/terminate) and apply consistently across importer/subsystem loops; implement shared helpers so equivalent failures do not alternate between silent continuation and hard failure.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_unified_error_policy_for_loops"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single error-handling policy for long-running loops and background workers.",
+      "Transition publishing interfaces are not contract-aligned (error-returning and non-error-returning variants coexist)."
+    ],
+    "likely_symptoms": [
+      "mixed_background_worker_failure_contracts",
+      "transition_publish_errors_dropped_by_generic_helper",
+      "selective_swallowing_of_critical_publish_and_health_errors"
+    ],
+    "possible_false_positives": []
+  }
+}

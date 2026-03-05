@@ -30,10 +30,21 @@ type workflowRuntime struct {
 	Sleeper               workflowSleeperFn                  `runtime:"workflow" runtime_name:"sleeper"`
 	CNAMEResolver         workflowCNAMEResolverFn            `runtime:"workflow" runtime_name:"CNAME resolver"`
 	BarExit               workflowBarExitFn                  `runtime:"workflow" runtime_name:"bar exit callback"`
-	dockerOrchestration.RuntimeContainerOps
-	dockerOrchestration.RuntimeUrbitOps
-	dockerOrchestration.RuntimeSnapshotOps
+	workflowShipOps
+	workflowConfigOps
 	UploadImportCoordinator workflowUploadImportCoordinatorFn `runtime:"workflow" runtime_name:"upload import coordinator"`
+}
+
+type workflowShipOps struct {
+	GetShipStatusFn       func([]string) (map[string]string, error) `runtime:"workflow" runtime_name:"get ship status callback"`
+	StopContainerByNameFn func(name string) error                   `runtime:"workflow" runtime_name:"stop container callback"`
+	DeleteContainerFn     func(name string) error                   `runtime:"workflow" runtime_name:"delete container callback"`
+}
+
+type workflowConfigOps struct {
+	UpdateUrbitFn        func(string, func(*structs.UrbitDocker) error) error                                              `runtime:"workflow" runtime_name:"update urbit callback"`
+	UpdateUrbitSectionFn func(patp string, section dockerOrchestration.UrbitConfigSection, mutateFn func(any) error) error `runtime:"workflow" runtime_name:"update urbit section callback"`
+	GetStartramConfigFn  func() structs.StartramRetrieve                                                                   `runtime:"workflow" runtime_name:"startram config callback"`
 }
 
 type workflowTransitionFn func(patp string, transitionType string, event string) error
@@ -89,23 +100,30 @@ func runUrbitTransition(patp string, transitionType string, plan transitionPlan[
 }
 
 func newWorkflowRuntime() workflowRuntime {
-	defaultEventRuntime := events.DefaultEventRuntime()
+	defaultEventBroker := events.NewRuntimeBoundBroker(events.DefaultEventRuntime())
 	defaultEmit := func(patp, transitionType, event string) error {
-		return defaultEventRuntime.PublishUrbitTransition(context.Background(), structs.UrbitTransition{Patp: patp, Type: transitionType, Event: event})
+		return defaultEventBroker.PublishUrbitTransition(context.Background(), structs.UrbitTransition{Patp: patp, Type: transitionType, Event: event})
 	}
 	defaultDispatch := func(ctx context.Context, cmd UploadImportCommand) error {
 		return unconfiguredUploadImportCoordinator(ctx, cmd)
 	}
 	orchestrationRuntime := dockerOrchestration.NewRuntime()
 	return workflowRuntime{
-		EventRuntime:            defaultEventRuntime,
-		TransitionEmitter:       defaultEmit,
-		TransitionErrorPolicy:   transition.TransitionPolicyForCriticality(transition.TransitionPublishCritical),
-		Sleeper:                 time.Sleep,
-		CNAMEResolver:           net.LookupCNAME,
-		RuntimeSnapshotOps:      orchestrationRuntime.RuntimeSnapshotOps,
-		RuntimeContainerOps:     orchestrationRuntime.RuntimeContainerOps,
-		RuntimeUrbitOps:         orchestrationRuntime.RuntimeUrbitOps,
+		EventRuntime:          defaultEventBroker,
+		TransitionEmitter:     defaultEmit,
+		TransitionErrorPolicy: transition.TransitionPolicyForCriticality(transition.TransitionPublishCritical),
+		Sleeper:               time.Sleep,
+		CNAMEResolver:         net.LookupCNAME,
+		workflowShipOps: workflowShipOps{
+			GetShipStatusFn:       orchestrationRuntime.GetShipStatusFn,
+			StopContainerByNameFn: orchestrationRuntime.StopContainerByNameFn,
+			DeleteContainerFn:     orchestrationRuntime.DeleteContainerFn,
+		},
+		workflowConfigOps: workflowConfigOps{
+			UpdateUrbitFn:        orchestrationRuntime.UpdateUrbitFn,
+			UpdateUrbitSectionFn: orchestrationRuntime.UpdateUrbitSectionFn,
+			GetStartramConfigFn:  orchestrationRuntime.GetStartramConfigFn,
+		},
 		BarExit:                 click.BarExit,
 		UploadImportCoordinator: defaultDispatch,
 	}
@@ -116,8 +134,42 @@ func resolveWorkflowRuntime(overrides ...workflowRuntime) (workflowRuntime, erro
 }
 
 func (runtime workflowRuntime) validate() error {
-	if err := seams.NewCallbackRequirementsWithGroups("workflow").ValidateCallbacks(runtime, "workflow runtime"); err != nil {
-		return seams.MissingRuntimeDependency("workflow runtime", err.Error())
+	missing := make([]string, 0, 8)
+	if runtime.TransitionEmitter == nil {
+		missing = append(missing, "transition emitter")
+	}
+	if runtime.Sleeper == nil {
+		missing = append(missing, "sleeper")
+	}
+	if runtime.CNAMEResolver == nil {
+		missing = append(missing, "CNAME resolver")
+	}
+	if runtime.BarExit == nil {
+		missing = append(missing, "bar exit callback")
+	}
+	if runtime.GetShipStatusFn == nil {
+		missing = append(missing, "ship status callback")
+	}
+	if runtime.StopContainerByNameFn == nil {
+		missing = append(missing, "stop container callback")
+	}
+	if runtime.DeleteContainerFn == nil {
+		missing = append(missing, "delete container callback")
+	}
+	if runtime.UpdateUrbitFn == nil {
+		missing = append(missing, "update urbit callback")
+	}
+	if runtime.UpdateUrbitSectionFn == nil {
+		missing = append(missing, "update urbit section callback")
+	}
+	if runtime.GetStartramConfigFn == nil {
+		missing = append(missing, "startram config callback")
+	}
+	if runtime.UploadImportCoordinator == nil {
+		missing = append(missing, "upload import coordinator")
+	}
+	if len(missing) > 0 {
+		return seams.MissingRuntimeDependency("workflow runtime", strings.Join(missing, ", "))
 	}
 	return nil
 }

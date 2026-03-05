@@ -1,0 +1,117 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 2,
+  "assessments": {
+    "api_surface_coherence": 78.0,
+    "contract_coherence": 81.0,
+    "error_consistency": 76.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "Start/Run API pairs expose inconsistent failure semantics across modules: `StartBackupRoutinesWithContext` and `StartChopRoutinesWithContext` launch goroutines and discard worker results (`_ = Run...`) in `goseg/routines/system/system.go`.",
+        "`StartVersionSubsystemWithContext` in `goseg/routines/version.go` also returns nil immediately and only logs worker failure, while `RunVersionSubsystemWithContext` is the only path that returns worker errors.",
+        "`StartDockerSubsystemWithRuntime` in `goseg/docker/orchestration/subsystem/subsystem_events.go` follows the same fire-and-log pattern, while synchronous startup orchestration in `goseg/startuporchestrator/startup_orchestrator.go` depends on returned errors to enforce required startup behavior."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "contract_coherence": {
+      "evidence": [
+        "`goseg/broadcast/state.go` defines and returns `errBroadcastRuntimeRequired` for missing runtime preconditions.",
+        "`goseg/broadcast/loop.go` reports the same precondition with fresh `fmt.Errorf(\"broadcast runtime is required\")` and `fmt.Errorf(\"broadcast state runtime is required\")` values instead of the shared sentinel.",
+        "`goseg/broadcast/state_lifecycle.go` mixes wrapped sentinel usage and standalone messages for similar runtime-required contract checks, creating non-uniform caller matching behavior."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "`goseg/docker/orchestration/subsystem/subsystem_health.go` swallows recovery failures in `processCheck502Pier` by logging `recoverWireguardAfter502Fn` errors and continuing, then resets the strike counter.",
+        "`goseg/startuporchestrator/startup_orchestrator.go` has `monitorBackgroundServiceHealth` log health failures and return without propagating that failure back into orchestrator state or shutdown paths.",
+        "`goseg/docker/orchestration/subsystem/subsystem_events.go` uses threshold-based escalation (`dockerTransitionFailureLimit`) and returns fatal errors from `dockerSubscriptionHandlerWithRuntime`, showing a different failure strategy for adjacent long-running loops."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "start_run_error_semantics_split",
+      "summary": "Public Start/Run pairs use inconsistent error semantics, making subsystem startup outcomes unpredictable to callers.",
+      "related_files": [
+        "goseg/routines/system/system.go",
+        "goseg/routines/version.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`StartBackupRoutinesWithContext` and `StartChopRoutinesWithContext` launch goroutines and explicitly ignore worker return values (`_ = Run...`).",
+        "`StartVersionSubsystemWithContext` and `StartDockerSubsystemWithRuntime` both return nil immediately and convert worker failures to logs instead of surfaced API errors.",
+        "Startup orchestration (`Bootstrap` task chain) expects returned errors for required phases, but these Start APIs do not provide a consistent contract for background worker startup/health failure propagation."
+      ],
+      "suggestion": "Standardize Start APIs around a single contract: either (a) return a managed handle with `Err()`/`Wait()` and cancellation, or (b) return startup validation errors plus a shared health/error channel. Apply the same shape across routines, docker subsystem, and orchestrator-invoked services.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fire_and_forget_start_api_contract"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "broadcast_runtime_error_contract_drift",
+      "summary": "Broadcast runtime precondition failures are represented inconsistently, breaking stable caller-side error matching.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/state_lifecycle.go"
+      ],
+      "evidence": [
+        "`state.go` defines `errBroadcastRuntimeRequired` and uses it across methods like `UpdateBroadcast`, `PublishSchedulePack`, and `BroadcastToClients`.",
+        "`loop.go` emits fresh string errors for equivalent missing-runtime states (`\"broadcast runtime is required\"`, `\"broadcast state runtime is required\"`) instead of wrapping the sentinel.",
+        "`state_lifecycle.go` wraps the sentinel in some paths but still introduces message-level variants, resulting in a non-uniform contract for consumers using `errors.Is`."
+      ],
+      "suggestion": "Define a single exported sentinel/typed error for broadcast runtime preconditions and require all runtime-nil checks to wrap it with `%w` plus operation context. Add tests that assert `errors.Is(err, ErrBroadcastRuntimeRequired)` across entry points.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_precondition_error_fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "background_loop_failure_policy_mismatch",
+      "summary": "Adjacent long-running services apply incompatible failure policies (escalate vs log-and-continue), causing silent degradation paths.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/subsystem_health.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`processCheck502Pier` logs wireguard recovery failures and continues operation while clearing counters, so repeated recovery failures do not propagate.",
+        "`monitorBackgroundServiceHealth` logs health failure and exits its goroutine without signaling orchestrator failure state.",
+        "`dockerSubscriptionHandlerWithRuntime` escalates after a bounded failure window and returns a hard error, indicating a different strategy inside the same subsystem area."
+      ],
+      "suggestion": "Adopt a shared background failure policy object (fatal/retriable/ignore) and route all loop failures through one reporting channel consumed by orchestrator health logic; avoid pure log-and-return paths for required services.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "background_failure_handling_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single cross-module contract for background worker lifecycle APIs (start, run, fail, health).",
+      "Error taxonomy for runtime preconditions is not centralized, leading to per-file message drift.",
+      "Background loop supervision evolved with multiple local policies instead of one shared escalation model."
+    ],
+    "likely_symptoms": [
+      "start_run_error_semantics_split",
+      "broadcast_runtime_error_contract_drift",
+      "background_loop_failure_policy_mismatch"
+    ],
+    "possible_false_positives": []
+  }
+}

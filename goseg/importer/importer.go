@@ -144,6 +144,7 @@ type importerPublishRuntime = importerRuntime
 
 func defaultImporterRuntime() importerRuntime {
 	orchestrationRuntime := dockerOrchestration.NewRuntime()
+	eventBroker := events.NewRuntimeBoundBroker(events.DefaultEventRuntime())
 	return importerRuntime{
 		importerStorageRuntime: importerStorageRuntime{
 			StoragePathForFn: config.GetStoragePath,
@@ -179,41 +180,105 @@ func defaultImporterRuntime() importerRuntime {
 			StartContainerFn:                 orchestrationRuntime.StartContainerFn,
 			UpdateContainerStateFn:           orchestrationRuntime.UpdateContainerStateFn,
 			CreateVolumeFn:                   dockerOrchestration.CreateVolume,
-			PublishImportTransitionFn:        events.DefaultEventRuntime().PublishImportShipTransition,
-			DeleteVolumeFn:                   dockerOrchestration.DeleteVolume,
-			MkdirAllFn:                       os.MkdirAll,
+			PublishImportTransitionFn: func(ctx context.Context, transition structs.UploadTransition) error {
+				return eventBroker.PublishImportShipTransition(ctx, transition)
+			},
+			DeleteVolumeFn: dockerOrchestration.DeleteVolume,
+			MkdirAllFn:     os.MkdirAll,
 		},
 	}
 }
 
 func validateImporterConfigRuntime(ops importerRuntime, requireSwapSettings bool) error {
-	groups := []string{"importer-core", "importer-upload"}
-	if requireSwapSettings {
-		groups = append(groups, "importer-config")
+	missing := make([]string, 0, 3)
+	if ops.StoragePathForFn == nil {
+		missing = append(missing, "storage path")
 	}
-	if err := seams.NewCallbackRequirementsWithGroups(groups...).ValidateCallbacks(ops, "importer runtime"); err != nil {
-		return seams.MissingRuntimeDependency("importer runtime", err.Error())
+	if ops.CreateDirFn == nil {
+		missing = append(missing, "create dir")
+	}
+	if requireSwapSettings && ops.ImportSettingsFn == nil {
+		missing = append(missing, "import settings")
+	}
+	if len(missing) > 0 {
+		return seams.MissingRuntimeDependency("importer runtime", strings.Join(missing, ", "))
 	}
 	return nil
 }
 
 func validateImporterUploadRuntime(ops importerRuntime) error {
-	if err := seams.NewCallbackRequirementsWithGroups("importer-upload").ValidateCallbacks(ops, "importer runtime"); err != nil {
-		return seams.MissingRuntimeDependency("importer runtime", err.Error())
+	missing := make([]string, 0, 3)
+	if ops.ValidateUploadSessionTokenFn == nil {
+		missing = append(missing, "validate upload token")
+	}
+	if ops.StatFn == nil {
+		missing = append(missing, "stat")
+	}
+	if ops.CloseTempFileFn == nil {
+		missing = append(missing, "close temp file")
+	}
+	if len(missing) > 0 {
+		return seams.MissingRuntimeDependency("importer runtime", strings.Join(missing, ", "))
 	}
 	return nil
 }
 
 func validateImporterProvisionRuntime(ops importerRuntime) error {
-	if err := seams.NewCallbackRequirementsWithGroups("importer-provision").ValidateCallbacks(ops, "importer runtime"); err != nil {
-		return seams.MissingRuntimeDependency("importer runtime", err.Error())
+	missing := make([]string, 0, 16)
+	if ops.ResolveImportedPierVolumePathFn == nil {
+		missing = append(missing, "volume resolution")
+	}
+	if ops.RunImportedPierWorkflowFn == nil {
+		missing = append(missing, "import workflow")
+	}
+	if ops.RunImportedPierPostImportWorkflowFn == nil {
+		missing = append(missing, "post-import workflow")
+	}
+	if ops.CleanupMultipartFn == nil {
+		missing = append(missing, "cleanup")
+	}
+	if ops.UploadCoordinatorFn == nil {
+		missing = append(missing, "upload import coordinator")
+	}
+	if ops.ShipworkflowWaitForBootCodeFn == nil {
+		missing = append(missing, "boot code wait")
+	}
+	if ops.ShipworkflowWaitForRemoteReadyFn == nil {
+		missing = append(missing, "remote ready")
+	}
+	if ops.ShipworkflowSwitchToWireguardFn == nil {
+		missing = append(missing, "wireguard switch")
+	}
+	if ops.AcmeFixFn == nil {
+		missing = append(missing, "acme fix")
+	}
+	if ops.ShipcreatorCreateUrbitConfigFn == nil {
+		missing = append(missing, "create urbit config")
+	}
+	if ops.ShipcreatorAppendSysConfigPierFn == nil {
+		missing = append(missing, "append urbit sysconfig")
+	}
+	if ops.DeleteContainerFn == nil || ops.StartContainerFn == nil || ops.UpdateContainerStateFn == nil {
+		missing = append(missing, "container provision callbacks")
+	}
+	if ops.CreateVolumeFn == nil || ops.DeleteVolumeFn == nil {
+		missing = append(missing, "volume provision callbacks")
+	}
+	if ops.MkdirAllFn == nil {
+		missing = append(missing, "mkdir")
+	}
+	if ops.PublishImportTransitionFn == nil {
+		missing = append(missing, "publish import transition callback")
+	}
+	if len(missing) > 0 {
+		return seams.MissingRuntimeDependency("importer runtime", strings.Join(missing, ", "))
 	}
 	return nil
 }
 
 func validateImporterPublishRuntime(ops importerRuntime) error {
-	if err := seams.NewCallbackRequirementsWithGroups("importer-publish").ValidateCallbacks(ops, "importer runtime"); err != nil {
-		return seams.MissingRuntimeDependency("importer runtime", err.Error())
+	if ops.PublishImportTransitionFn == nil {
+		return seams.MissingRuntimeDependency("importer runtime", "publish import transition callback")
 	}
 	return nil
 }
@@ -803,7 +868,7 @@ func runImportPhases(filename, patp, customDrive string, phases workflowOrchestr
 		return fmt.Errorf("import failed for %s: %w", patp, errors.Join(workflowErr, cleanupErr))
 	}
 	if publishErr != nil {
-		return fmt.Errorf("import phase transition publish failed for %s: %w", patp, publishErr)
+		return fmt.Errorf("import failed for %s: %w", patp, errors.Join(workflowErr, publishErr))
 	}
 	return workflowErr
 }

@@ -46,8 +46,9 @@ func newDockerSubsystemRuntime() *dockerSubsystemRuntime {
 }
 
 var (
-	DisableShipRestart = false
-	errEventBusFull    = fmt.Errorf("docker event bus is full")
+	DisableShipRestart        = false
+	errEventBusFull           = fmt.Errorf("docker event bus is full")
+	dockerEventBusEnqueueWait = 200 * time.Millisecond
 
 	dockerTransitionFailureLimit  = 5
 	dockerTransitionFailureWindow = 3 * time.Minute
@@ -102,25 +103,30 @@ func StartDockerSubsystem(ctx context.Context) error {
 	return StartDockerSubsystemWithRuntime(ctx, defaultDockerSubsystemRuntime)
 }
 
+func StartDockerSubsystemWithHandle(ctx context.Context) (*workflow.AsyncRunHandle, error) {
+	return StartDockerSubsystemWithRuntimeHandle(ctx, defaultDockerSubsystemRuntime)
+}
+
 // RunDockerSubsystem blocks until context cancellation or worker failure.
 func RunDockerSubsystem(ctx context.Context) error {
 	return RunDockerSubsystemWithRuntime(ctx, defaultDockerSubsystemRuntime)
 }
 
 func StartDockerSubsystemWithRuntime(ctx context.Context, runtime *dockerSubsystemRuntime) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if ctx.Err() != nil {
-		return nil
-	}
+	_, err := StartDockerSubsystemWithRuntimeHandle(ctx, runtime)
+	return err
+}
+
+func StartDockerSubsystemWithRuntimeHandle(ctx context.Context, runtime *dockerSubsystemRuntime) (*workflow.AsyncRunHandle, error) {
 	runtime = normalizeDockerSubsystemRuntime(runtime)
-	go func() {
-		if err := RunDockerSubsystemWithRuntime(ctx, runtime); err != nil && ctx.Err() == nil {
+	handle := workflow.StartAsync(ctx, func(runCtx context.Context) error {
+		err := RunDockerSubsystemWithRuntime(runCtx, runtime)
+		if err != nil && runCtx.Err() == nil {
 			logger.Error(fmt.Sprintf("Docker subsystem exited with error: %v", err))
 		}
-	}()
-	return nil
+		return err
+	})
+	return handle, nil
 }
 
 // RunDockerSubsystemWithRuntime blocks until context cancellation or worker failure.
@@ -197,12 +203,19 @@ func dockerListenerWithRuntime(runtime *dockerSubsystemRuntime, ctx context.Cont
 				return nil
 			}
 			// Convert the Docker event to our custom event and send it to the EventBus.
+			timer := time.NewTimer(dockerEventBusEnqueueWait)
 			select {
 			case runtime.events.channel <- structs.Event{Type: string(event.Action), Data: event}:
+				if !timer.Stop() {
+					<-timer.C
+				}
 				continue
 			case <-ctx.Done():
+				if !timer.Stop() {
+					<-timer.C
+				}
 				return nil
-			default:
+			case <-timer.C:
 				return fmt.Errorf("docker event bus saturated: %w", errEventBusFull)
 			}
 		case eventErr, ok := <-errs:

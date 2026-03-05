@@ -1,0 +1,105 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 71.4
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Process-wide mutable default runtimes are used as implicit dependencies: broadcast keeps `defaultBroadcastStateRuntime` and `defaultBroadcastLoopController` globals with setters/resets, while docker events keeps `defaultEventRuntime` with `SetDefaultEventRuntime`/`ResetDefaultEventRuntime`.",
+        "Core workflows bind to those mutable defaults instead of explicit runtime ownership (for example `shipworkflow.newWorkflowRuntime` and `importer.defaultImporterRuntime` use `events.NewGlobalDefaultBroker`).",
+        "Runtime abstraction is dominated by wide callback bags: `startuporchestrator` splits startup into multiple embedded runtime structs with many callback fields, `importerRuntime` embeds three runtime groups, and `docker/orchestration/runtime_ops.go` defines large `Runtime*Ops` families and seam bundle builders.",
+        "Tests reflect high indirection cost: startup/runtime tests construct extensive override helpers (`withStartBackgroundServiceCallback`, `testWireguardRuntime`, runtime option layers) primarily to satisfy callback-bag shapes rather than focused domain contracts."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 68.0,
+        "indirection_cost": 61.0,
+        "interface_honesty": 78.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "mutable_global_runtime_brokers",
+      "summary": "Mutable process-default runtimes create leaky, hidden dependencies across subsystems.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`events` exposes mutable global runtime state (`defaultEventRuntime`) and a broker (`NewGlobalDefaultBroker`) that resolves against that mutable default on every call.",
+        "`broadcast` similarly stores mutable process defaults (`defaultBroadcastStateRuntime`, `defaultBroadcastLoopController`) with setter/reset APIs used by runtime constructors.",
+        "Workflow/importer defaults are wired to the global broker (`events.NewGlobalDefaultBroker`), so behavior can be changed out-of-band by global runtime mutation."
+      ],
+      "suggestion": "Replace mutable process-default brokers with explicit runtime ownership per subsystem lifecycle (startup creates one broker/runtime instance and passes it down). Keep global defaults only as legacy compatibility shims behind a narrow boundary, then migrate call sites (`shipworkflow`, `importer`, `broadcast`) to constructor-injected brokers.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "ambient_runtime_singletons"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_runtime_overreach",
+      "summary": "Large callback-bag runtime structs add indirection with weak domain leverage.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/docker/orchestration/wireguard_test.go"
+      ],
+      "evidence": [
+        "`startuporchestrator` composes startup runtime from multiple embedded callback structs and maps service-name enums to callback fields, creating orchestration-by-field-name instead of stable service interfaces.",
+        "`importerRuntime` embeds storage/upload/provision callback groups with many function fields and repeated validation groups, indicating runtime shape is acting as a generic dependency bag.",
+        "`runtime_ops.go` defines many `Runtime*Ops` structs and seam builders that mostly forward package-level functions into function fields.",
+        "Tests need extensive option builders and callback overrides to exercise behavior, which indicates high abstraction ceremony and low leverage from these runtime surfaces."
+      ],
+      "suggestion": "Refactor callback bags into smaller behavior-oriented interfaces owned by use-case boundaries (for example `TransitionPublisher`, `ContainerProvisioner`, `StartupServiceRunner`). Keep only a minimal composition root that adapts concrete packages to those interfaces; remove field-by-field callback maps and service-name switch dispatch.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "callback_bag_overreach"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wrapper_chain_without_policy_gain",
+      "summary": "Several runtime wrapper layers are pass-through and increase call depth without new policy.",
+      "related_files": [
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/loop.go",
+        "goseg/system/wifi_runtime_api.go",
+        "goseg/system/wifi_runtime_methods.go"
+      ],
+      "evidence": [
+        "Broadcast lifecycle exposes paired wrappers (`LoadStartramRegionsWithRuntime` -> `LoadStartramRegionsWithRuntimeState`, `bootstrapBroadcastState` -> `bootstrapBroadcastStateWithRuntime`) that mainly re-check nil and forward.",
+        "Broadcast loop frequently reconstructs default runtime wrappers (`newBroadcastLoopRuntimeWithDefault`) for operations that immediately delegate.",
+        "WiFi runtime service repeatedly performs prepare/resolve forwarding before invoking runtime methods, while runtime methods already wrap command-level operations and defaults."
+      ],
+      "suggestion": "Collapse pass-through wrapper pairs into one canonical entry point per operation, and centralize nil/default resolution once at construction. Keep wrappers only when they enforce distinct policy (auth, retries, timeout semantics); otherwise remove redundant forwarding layers.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "callback_bag_overreach"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Reliance on ambient mutable singleton runtimes for cross-subsystem coordination.",
+      "Function-field callback bags used as universal DI mechanism instead of narrow domain interfaces.",
+      "Incremental migration left parallel wrapper entry points, increasing indirection cost."
+    ],
+    "likely_symptoms": [
+      "callback_bag_runtime_overreach",
+      "wrapper_chain_without_policy_gain"
+    ],
+    "possible_false_positives": []
+  }
+}

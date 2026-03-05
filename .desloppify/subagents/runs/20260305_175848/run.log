@@ -1,0 +1,51 @@
+2026-03-05T17:58:49+00:00 run-start runner=codex parallel=True max_parallel=3 timeout=1200s heartbeat=15.0s stall_warning=0s stall_kill=120s retries=1 retry_backoff=2.0s upper_bound=40m selected=[1, 2, 3, 4, 5, 6]
+2026-03-05T17:58:49+00:00 run-path /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260305_175848
+2026-03-05T17:58:49+00:00 packet /Users/chuah/NP/GroundSeg/.desloppify/review_packets/holistic_packet_20260305_175848.json
+2026-03-05T17:58:49+00:00 blind-packet /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+2026-03-05T17:58:49+00:00 batch-queued batch=1 position=1/6
+2026-03-05T17:58:49+00:00 batch-start batch=1 position=1/6
+2026-03-05T17:58:49+00:00 batch-queued batch=2 position=2/6
+2026-03-05T17:58:49+00:00 batch-start batch=2 position=2/6
+2026-03-05T17:58:49+00:00 batch-queued batch=3 position=3/6
+2026-03-05T17:58:49+00:00 batch-start batch=3 position=3/6
+2026-03-05T17:58:49+00:00 batch-queued batch=4 position=4/6
+2026-03-05T17:58:49+00:00 batch-queued batch=5 position=5/6
+2026-03-05T17:58:49+00:00 batch-queued batch=6 position=6/6
+2026-03-05T17:59:04+00:00 heartbeat active=[1, 2, 3] queued=[4, 5, 6] elapsed={1:15, 2:15, 3:15}
+2026-03-05T17:59:19+00:00 heartbeat active=[1, 2, 3] queued=[4, 5, 6] elapsed={1:30, 2:30, 3:30}
+2026-03-05T17:59:34+00:00 heartbeat active=[1, 2, 3] queued=[4, 5, 6] elapsed={1:45, 2:45, 3:45}
+2026-03-05T17:59:46+00:00 batch-start batch=4 position=4/6
+2026-03-05T17:59:46+00:00 batch-done batch=1 position=1/6 code=0 elapsed=57
+2026-03-05T18:00:01+00:00 heartbeat active=[2, 3, 4] queued=[5, 6] elapsed={2:72, 3:72, 4:15}
+2026-03-05T18:00:07+00:00 batch-start batch=5 position=5/6
+2026-03-05T18:00:07+00:00 batch-done batch=3 position=3/6 code=0 elapsed=78
+2026-03-05T18:00:22+00:00 heartbeat active=[2, 4, 5] queued=[6] elapsed={2:93, 4:36, 5:15}
+2026-03-05T18:00:37+00:00 heartbeat active=[2, 4, 5] queued=[6] elapsed={2:108, 4:51, 5:30}
+2026-03-05T18:00:52+00:00 heartbeat active=[2, 4, 5] queued=[6] elapsed={2:123, 4:66, 5:45}
+2026-03-05T18:01:07+00:00 heartbeat active=[2, 4, 5] queued=[6] elapsed={2:138, 4:81, 5:60}
+2026-03-05T18:01:22+00:00 heartbeat active=[2, 4, 5] queued=[6] elapsed={2:153, 4:96, 5:75}
+2026-03-05T18:01:37+00:00 batch-start batch=6 position=6/6
+2026-03-05T18:01:37+00:00 batch-done batch=4 position=4/6 code=0 elapsed=110
+2026-03-05T18:01:52+00:00 heartbeat active=[2, 5, 6] queued=[] elapsed={2:182, 5:104, 6:15}
+2026-03-05T18:02:07+00:00 heartbeat active=[2, 5, 6] queued=[] elapsed={2:197, 5:119, 6:30}
+2026-03-05T18:02:22+00:00 heartbeat active=[2, 5, 6] queued=[] elapsed={2:212, 5:134, 6:45}
+2026-03-05T18:02:25+00:00 batch-done batch=5 position=5/6 code=0 elapsed=137
+2026-03-05T18:02:40+00:00 heartbeat active=[2, 6] queued=[] elapsed={2:230, 6:63}
+2026-03-05T18:02:55+00:00 heartbeat active=[2, 6] queued=[] elapsed={2:245, 6:78}
+2026-03-05T18:03:10+00:00 heartbeat active=[2, 6] queued=[] elapsed={2:260, 6:93}
+2026-03-05T18:03:25+00:00 heartbeat active=[2, 6] queued=[] elapsed={2:275, 6:108}
+2026-03-05T18:03:40+00:00 heartbeat active=[2, 6] queued=[] elapsed={2:290, 6:123}
+2026-03-05T18:03:48+00:00 batch-done batch=6 position=6/6 code=0 elapsed=131
+2026-03-05T18:04:03+00:00 heartbeat active=[2] queued=[] elapsed={2:314}
+2026-03-05T18:04:18+00:00 heartbeat active=[2] queued=[] elapsed={2:329}
+2026-03-05T18:04:33+00:00 heartbeat active=[2] queued=[] elapsed={2:344}
+2026-03-05T18:04:48+00:00 heartbeat active=[2] queued=[] elapsed={2:359}
+2026-03-05T18:05:03+00:00 heartbeat active=[2] queued=[] elapsed={2:374}
+2026-03-05T18:05:18+00:00 heartbeat active=[2] queued=[] elapsed={2:389}
+2026-03-05T18:05:33+00:00 heartbeat active=[2] queued=[] elapsed={2:404}
+2026-03-05T18:05:48+00:00 heartbeat active=[2] queued=[] elapsed={2:419}
+2026-03-05T18:06:03+00:00 heartbeat active=[2] queued=[] elapsed={2:434}
+2026-03-05T18:06:18+00:00 heartbeat active=[2] queued=[] elapsed={2:449}
+2026-03-05T18:06:33+00:00 heartbeat active=[2] queued=[] elapsed={2:464}
+2026-03-05T18:06:48+00:00 heartbeat active=[2] queued=[] elapsed={2:479}
+2026-03-05T18:07:03+00:00 heartbeat active=[2] queued=[] elapsed={2:494}

@@ -3,8 +3,8 @@ package broadcast
 import (
 	"errors"
 	"fmt"
-	"groundseg/auth"
 	"groundseg/leak"
+	"groundseg/session"
 	"groundseg/structs"
 	"sync"
 	"time"
@@ -26,7 +26,7 @@ type broadcastLoopRuntime struct {
 	preserveSystemFn     func(structs.AuthBroadcast, structs.System) structs.System
 	preserveUrbitsFn     func(structs.AuthBroadcast, map[string]structs.Urbit) map[string]structs.Urbit
 	preserveProfileFn    func(structs.AuthBroadcast, structs.Profile) structs.Profile
-	updateBroadcastFn    func(structs.AuthBroadcast)
+	updateBroadcastFn    func(structs.AuthBroadcast) error
 	broadcastToClientsFn func() error
 	tickErrorFn          func(error)
 	tickInterval         time.Duration
@@ -77,12 +77,12 @@ func newBroadcastLoopRuntimeWithController(
 	}
 	return &broadcastLoopRuntime{
 		stateRuntime:         stateRuntime,
-		getClientManagerFn:   auth.GetClientManager,
+		getClientManagerFn:   session.GetClientManager,
 		getLickStatusesFn:    leak.GetLickStatuses,
 		preserveSystemFn:     PreserveSystemTransitions,
 		preserveUrbitsFn:     PreserveUrbitsTransitions,
 		preserveProfileFn:    PreserveProfileTransitions,
-		updateBroadcastFn:    func(next structs.AuthBroadcast) { stateRuntime.UpdateBroadcast(next) },
+		updateBroadcastFn:    func(next structs.AuthBroadcast) error { return stateRuntime.UpdateBroadcast(next) },
 		broadcastToClientsFn: BroadcastToClients,
 		tickErrorFn:          func(err error) { zap.L().Error(fmt.Sprintf("broadcast tick failed: %v", err)) },
 		tickInterval:         broadcastInterval,
@@ -94,25 +94,18 @@ func newBroadcastLoopRuntime(stateRuntime *broadcastStateRuntime) *broadcastLoop
 	return newBroadcastLoopRuntimeWithController(stateRuntime, nil)
 }
 
-func resolveBroadcastLoopRuntime(runtime *broadcastLoopRuntime) *broadcastStateRuntime {
-	if runtime != nil {
-		return runtime.stateRuntime
-	}
-	return nil
-}
-
-func newBroadcastLoopRuntimeWithDefault() *broadcastLoopRuntime {
-	return newBroadcastLoopRuntime(DefaultBroadcastStateRuntime())
+func defaultBroadcastLoopRuntime() *broadcastLoopRuntime {
+	return newBroadcastLoopRuntimeWithController(DefaultBroadcastStateRuntime(), defaultLoopController())
 }
 
 func newTestBroadcastLoopRuntime(overrides func(runtime *broadcastLoopRuntime)) *broadcastLoopRuntime {
-	rt := newBroadcastLoopRuntimeWithDefault()
+	rt := defaultBroadcastLoopRuntime()
 	overrides(rt)
 	return rt
 }
 
 func StartBroadcastLoop() error {
-	return StartBroadcastLoopWithRuntime(newBroadcastLoopRuntimeWithDefault())
+	return StartBroadcastLoopWithRuntime(defaultBroadcastLoopRuntime())
 }
 
 func StartBroadcastLoopWithRuntime(runtime *broadcastLoopRuntime) error {
@@ -140,7 +133,7 @@ func StartBroadcastLoopWithRuntime(runtime *broadcastLoopRuntime) error {
 }
 
 func StopBroadcastLoop() {
-	StopBroadcastLoopWithRuntime(newBroadcastLoopRuntimeWithDefault())
+	stopBroadcastLoop(defaultLoopController())
 }
 
 func StopBroadcastLoopWithRuntime(runtime *broadcastLoopRuntime) {
@@ -193,26 +186,27 @@ func runBroadcastLoop(runtime *broadcastLoopRuntime, stop <-chan struct{}) {
 }
 
 func runBroadcastTick() error {
-	return runBroadcastTickWithRuntime(newBroadcastLoopRuntimeWithDefault())
+	return runBroadcastTickWithRuntime(defaultBroadcastLoopRuntime())
 }
 
 func runBroadcastTickWithRuntime(rt *broadcastLoopRuntime) error {
 	if rt == nil || rt.stateRuntime == nil {
-		return fmt.Errorf("broadcast runtime is required")
+		return fmt.Errorf("run broadcast tick: %w", ErrBroadcastRuntimeRequired)
 	}
-	stateRuntime := resolveBroadcastLoopRuntime(rt)
-	if stateRuntime == nil {
-		return fmt.Errorf("broadcast state runtime is required")
-	}
+	stateRuntime := rt.stateRuntime
 	if !shouldRunBroadcastTick(rt) {
 		return nil
 	}
 	nextState, err := buildBroadcastTickState(rt, stateRuntime)
 	if err != nil {
-		stateRuntime.AddSystemTransitionError(err.Error())
+		if persistErr := stateRuntime.AddSystemTransitionError(err.Error()); persistErr != nil {
+			return errors.Join(err, fmt.Errorf("record system transition error: %w", persistErr))
+		}
 		return err
 	}
-	rt.updateBroadcastFn(nextState)
+	if err := rt.updateBroadcastFn(nextState); err != nil {
+		return fmt.Errorf("persist broadcast state: %w", err)
+	}
 	if err := rt.broadcastToClientsFn(); err != nil {
 		return fmt.Errorf("broadcast tick publish to clients: %w", err)
 	}
@@ -233,7 +227,7 @@ func shouldRunBroadcastTick(rt *broadcastLoopRuntime) bool {
 
 func buildBroadcastTickState(rt *broadcastLoopRuntime, stateRuntime *broadcastStateRuntime) (structs.AuthBroadcast, error) {
 	if rt == nil || stateRuntime == nil {
-		return structs.AuthBroadcast{}, fmt.Errorf("broadcast runtime is required")
+		return structs.AuthBroadcast{}, fmt.Errorf("build broadcast tick state: %w", ErrBroadcastRuntimeRequired)
 	}
 	currentState := stateRuntime.GetState()
 	systemInfo := stateRuntime.collectSystemInfo()

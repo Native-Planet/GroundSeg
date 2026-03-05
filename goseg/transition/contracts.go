@@ -84,6 +84,7 @@ const (
 	NewShipTransitionBootStage NewShipTransitionType = "bootStage"
 	NewShipTransitionError     NewShipTransitionType = "error"
 	NewShipTransitionPatp      NewShipTransitionType = "patp"
+	// Deprecated: kept for compatibility with older callers; use NewShipTransitionError.
 	NewShipTransitionFreeError NewShipTransitionType = "freeError"
 )
 
@@ -184,6 +185,21 @@ func ParseDockerAction(raw string) (DockerAction, bool) {
 	switch action {
 	case DockerActionStop, DockerActionStart, DockerActionDie:
 		return action, true
+	default:
+		return "", false
+	}
+}
+
+func ParseContainerType(raw string) (ContainerType, bool) {
+	containerType := ContainerType(strings.ToLower(strings.TrimSpace(raw)))
+	switch containerType {
+	case ContainerTypeWireguard,
+		ContainerTypeVere,
+		ContainerTypeNetdata,
+		ContainerTypeMinio,
+		ContainerTypeMinioMC,
+		ContainerTypeLlamaAPI:
+		return containerType, true
 	default:
 		return "", false
 	}

@@ -1,0 +1,69 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 81.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/governance/manifest.go defines upload actions, c2c actions, and startram error contracts in one shared manifest (constants and declaration slices), creating one hub module for unrelated domains.",
+        "goseg/uploadsvc/doc.go names goseg/protocol/contracts/governance/manifest.go as the canonical declaration location, coupling uploadsvc documentation and policy understanding to a specific cross-domain file rather than a stable package-level boundary.",
+        "goseg/protocol/contracts/conformance/fixtures_action_test.go and goseg/uploadsvc/actions_test.go both assert action-contract behavior from different package viewpoints, indicating cross-package contract verification logic is distributed rather than flowing through a single boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "governance_manifest_hub_module",
+      "summary": "A single governance manifest acts as a cross-domain hub for unrelated contract families, increasing change blast radius.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/manifest.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "manifest.go mixes Upload, C2C, and Startram contracts in one package-level declaration surface (`actionDeclarations`, `startramContractDeclarations`, and multiple domain constants).",
+        "uploadsvc/doc.go points directly to `contracts/governance/manifest.go` as canonical, reinforcing dependency on a broad internal hub instead of a narrower domain contract facade."
+      ],
+      "suggestion": "Split governance declarations by domain/family (for example upload, c2c, startram) behind a small composition API in governance; keep only shared schema primitives in the root manifest package so domain modules depend on narrower boundaries.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "centralized_contract_governance_hub"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "distributed_contract_conformance_assertions",
+      "summary": "Contract conformance checks are spread across package-local and cross-package tests, which weakens a single authoritative verification boundary.",
+      "related_files": [
+        "goseg/protocol/contracts/conformance/fixtures_action_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "fixtures_action_test.go validates canonical action bindings and fixture completeness at protocol level.",
+        "actions_test.go separately encodes upload action acceptance and payload-policy expectations via local test tables.",
+        "doc.go describes canonical conformance and governance locations, but tests remain split across layers, so adding/changing actions requires synchronized updates in multiple modules."
+      ],
+      "suggestion": "Define one contract-test entrypoint (shared helper or generated cases from governance declarations) that module tests consume, so package-level tests verify behavior while contract shape/rules are sourced from one authoritative boundary.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "centralized_contract_governance_hub"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance metadata and contract declarations are centralized at too broad a module boundary.",
+      "Conformance intent is documented centrally but verification ownership is not fully centralized in test architecture."
+    ],
+    "likely_symptoms": [
+      "distributed_contract_conformance_assertions"
+    ],
+    "possible_false_positives": []
+  }
+}

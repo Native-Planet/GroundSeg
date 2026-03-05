@@ -1,0 +1,84 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 82.0,
+    "high_level_elegance": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/governance/manifest.go defines action and contract declarations as package-level literal tables (`actionDeclarations`, `startramContractDeclarations`).",
+        "goseg/protocol/contracts/conformance/fixtures_test.go contains dedicated drift tests (`TestGovernanceManifestMatchesActionBindings`, `TestGovernanceManifestMatchesStartramCatalog`) that compare governance declarations against canonical catalog/bindings, indicating multiple modules must stay manually synchronized.",
+        "goseg/uploadsvc/doc.go states canonical declarations live in governance manifest while conformance checks live elsewhere, reinforcing split ownership between runtime contracts and test-time consistency checks."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "The contract system depends on parallel declarations in governance manifest and canonical binding/catalog modules, with correctness enforced by cross-package tests rather than a single compositional source.",
+        "goseg/protocol/contracts/conformance/fixtures_test.go spends significant logic reconciling declarations and bindings, which is a symptom of top-level ownership ambiguity for contract metadata.",
+        "goseg/uploadsvc/doc.go documents canonical ownership in one package but references policy and conformance in other locations, increasing architectural cognitive load for where changes should originate."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_contract_source_of_truth",
+      "summary": "Contract metadata is maintained in parallel modules and reconciled by tests, creating drift-prone cross-module coupling.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/manifest.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/doc.go"
+      ],
+      "evidence": [
+        "manifest.go defines independent declaration tables for actions/contracts.",
+        "fixtures_test.go includes explicit drift-detection tests between governance declarations and canonical bindings/catalog.",
+        "doc.go points developers to governance manifest as canonical declarations while conformance enforcement is external."
+      ],
+      "suggestion": "Promote one authoritative contract registry API (e.g., catalog-driven declarations) and generate/governance projections from it, so governance/action fixtures consume derived data instead of duplicating literals across packages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_metadata_fragmentation"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "contract_ownership_ambiguity",
+      "summary": "Top-level ownership of action-contract policy is blurred across governance, conformance tests, and service docs.",
+      "related_files": [
+        "goseg/uploadsvc/doc.go",
+        "goseg/protocol/contracts/governance/manifest.go",
+        "goseg/protocol/contracts/conformance/fixtures_test.go",
+        "goseg/uploadsvc/actions_test.go"
+      ],
+      "evidence": [
+        "uploadsvc/doc.go references governance manifest as canonical and a separate conformance package for assertions.",
+        "fixtures_test.go centralizes architecture consistency checks that are necessary because manifest declarations are hand-maintained.",
+        "actions_test.go validates upload payload policy locally, while governance manifest separately encodes required/forbidden payload rule flags for the same action family."
+      ],
+      "suggestion": "Define a single domain-level contract ownership boundary (e.g., protocol/contracts catalog as authoritative) and have governance declarations, upload policy validation metadata, and conformance fixtures read from that boundary to reduce multi-location policy narration.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_metadata_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract metadata and policy are duplicated across declaration, runtime, and test layers instead of being projected from one source.",
+      "Architecture integrity is currently guaranteed primarily by reconciliation tests, not by construction."
+    ],
+    "likely_symptoms": [
+      "split_contract_source_of_truth",
+      "contract_ownership_ambiguity"
+    ],
+    "possible_false_positives": []
+  }
+}

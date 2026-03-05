@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"groundseg/auth"
 	"groundseg/leak"
+	"groundseg/session"
 	"groundseg/structs"
 	"groundseg/transition"
 
@@ -27,7 +27,7 @@ func defaultBroadcastDeliveryRuntime() broadcastDeliveryRuntime {
 	return broadcastDeliveryRuntime{
 		publishLeakFn: publishLeakBroadcast,
 		getClientManagerFn: func() *structs.ClientManager {
-			return auth.GetClientManager()
+			return session.GetClientManager()
 		},
 		hasAuthorizedFn: func(cm *structs.ClientManager) bool {
 			return cm != nil && cm.HasAuthSession()
@@ -61,12 +61,6 @@ func publishLeakBroadcast(state structs.AuthBroadcast) error {
 	return fmt.Errorf("%w after %d attempts", ErrBroadcastLeakBackpressure, maxLeakSendAttempts)
 }
 
-type authBroadcastEnvelope struct {
-	Type      string                `json:"type"`
-	AuthLevel string                `json:"auth_level"`
-	Payload   structs.AuthBroadcast `json:"payload"`
-}
-
 // broadcast the global state to auth'd clients
 func BroadcastToClients() error {
 	return broadcastToClientsWithRuntime(DefaultBroadcastStateRuntime())
@@ -74,14 +68,14 @@ func BroadcastToClients() error {
 
 func broadcastToClientsWithRuntime(runtime *broadcastStateRuntime) error {
 	if runtime == nil {
-		return errors.New("broadcast state runtime is required")
+		return fmt.Errorf("broadcast to clients: %w", ErrBroadcastRuntimeRequired)
 	}
 	delivery := runtime.delivery
 	if delivery.publishLeakFn == nil {
 		delivery.publishLeakFn = publishLeakBroadcast
 	}
 	if delivery.getClientManagerFn == nil {
-		delivery.getClientManagerFn = func() *structs.ClientManager { return auth.GetClientManager() }
+		delivery.getClientManagerFn = func() *structs.ClientManager { return session.GetClientManager() }
 	}
 	if delivery.hasAuthorizedFn == nil {
 		delivery.hasAuthorizedFn = func(cm *structs.ClientManager) bool { return cm != nil && cm.HasAuthSession() }
@@ -117,11 +111,11 @@ func broadcastToClientsWithRuntime(runtime *broadcastStateRuntime) error {
 func UnauthBroadcast(input []byte) error {
 	runtime := DefaultBroadcastStateRuntime()
 	if runtime == nil {
-		return errors.New("broadcast state runtime is required")
+		return fmt.Errorf("unauth broadcast: %w", ErrBroadcastRuntimeRequired)
 	}
 	delivery := runtime.delivery
 	if delivery.getClientManagerFn == nil {
-		delivery.getClientManagerFn = func() *structs.ClientManager { return auth.GetClientManager() }
+		delivery.getClientManagerFn = func() *structs.ClientManager { return session.GetClientManager() }
 	}
 	if delivery.broadcastUnauthFn == nil {
 		delivery.broadcastUnauthFn = func(cm *structs.ClientManager, payload []byte) error {

@@ -1,0 +1,163 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 78.0,
+    "error_consistency": 82.0,
+    "abstraction_fitness": 76.0,
+    "test_strategy": 87.0,
+    "design_coherence": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Multiple subsystems expose mutable process-wide defaults (`SetDefault...`/`ResetDefault...`) rather than explicit dependency wiring: broadcast runtime in `goseg/broadcast/state.go`, event broker runtime in `goseg/docker/events/events.go`, docker lifecycle runtime in `goseg/docker/lifecycle/lifecycle.go`, and click runtime in `goseg/click/click.go`.",
+        "Call paths depend on implicit global state at runtime (`DefaultBroadcastStateRuntime`, `events.DefaultEventRuntime`, `DefaultRuntime`, `runtimeRuntime`) which increases boot-order/test-order sensitivity across packages.",
+        "Config is a cross-cutting hub with broad mutable state (`globalConfig`, `GSContainers`, `Ready`, `BackupTime`) accessed from many packages via snapshots/wrappers (`goseg/config/config.go`, `goseg/config/config_state.go`)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "State persistence failures are treated differently across sibling paths: `processConfigEvent` logs persistence failure but still mutates in-memory config (`goseg/config/config_events.go`), while most update paths return wrapped errors (`goseg/config/config_update_executor.go`).",
+        "Cleanup/error contracts differ for operationally similar maintenance functions: `pruneBackups` suppresses delete errors and always returns nil (`goseg/backups/backups.go`), while accesspoint teardown hard-fails on first cleanup command error (`goseg/accesspoint/router.go`).",
+        "Mixed user-facing error style/capitalization in services (`Failed ...` in `goseg/chopsvc/service.go` vs lower-case wrapped messages in many other modules) reduces predictability for callers/log consumers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Several packages add thin facade layers with minimal behavior change: auth wrapper aliases/delegations in `goseg/auth/auth.go` and `goseg/auth/client_session.go`, context passthrough in `goseg/config/contextapi/contextapi.go` to `goseg/config/runtimecontext/context.go`.",
+        "Click API introduces broad interface and one-line wrappers around function fields (`goseg/click/click.go`), adding indirection depth for most calls without policy translation.",
+        "Broadcast/runtime APIs combine interface-style seams with global default fallbacks (`goseg/broadcast/state.go`, `goseg/broadcast/loop.go`), causing both abstraction overhead and hidden runtime coupling."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 74.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 83.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "The reviewed modules have broad unit test coverage with dedicated tests for accesspoint, auth/authsession, broadcast, click services, config update/state paths, and docker lifecycle/network/events packages.",
+        "Most tests are seam-injection driven, validating local behavior but providing limited confidence for cross-subsystem contracts that rely on mutable global defaults and lifecycle ordering."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Cross-module integration tests are thin for global-runtime interactions (default runtime swaps, event loop startup/stop behavior, config-event persistence divergence), leaving systemic coupling risks under-validated."
+    },
+    "design_coherence": {
+      "evidence": [
+        "The config package remains a multi-responsibility hub containing runtime context, config persistence, container-state cache, network probing, hashing/entropy utilities, and event-loop handling across files like `config.go`, `config_state.go`, `persistence.go`, and `config_events.go`.",
+        "Broadcast state/runtime files blend state storage, scheduling queues, collector wiring, client delivery, and transition APIs in the same subsystem surface (`goseg/broadcast/state.go`, `goseg/broadcast/delivery.go`, `goseg/broadcast/transitions.go`).",
+        "Click package uses repetitive wrapper patterns per command domain (`goseg/click/click.go`, `goseg/click/backup/service.go`, `goseg/click/restore/restore.go`) that increase ceremony relative to domain logic."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_default_runtime_coupling",
+      "summary": "Subsystems depend on mutable process-wide default runtimes instead of explicit wiring",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/docker/events/events.go",
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/click/click.go"
+      ],
+      "evidence": [
+        "Each subsystem exposes mutable defaults (`SetDefault...`/`Reset...`) and resolves behavior from those globals during normal operation.",
+        "Runtime behavior can change implicitly based on prior package calls/tests, creating non-local dependency and boot-order fragility."
+      ],
+      "suggestion": "Introduce explicit runtime dependency injection at subsystem entrypoints (startup/orchestrator layer), keep global defaults only as compatibility adapters, and migrate call paths to pass runtime handles explicitly.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_singleton_runtime_pattern"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "divergent_partial_failure_policies",
+      "summary": "Similar operational flows apply inconsistent partial-failure handling contracts",
+      "related_files": [
+        "goseg/config/config_events.go",
+        "goseg/config/config_update_executor.go",
+        "goseg/backups/backups.go",
+        "goseg/accesspoint/router.go"
+      ],
+      "evidence": [
+        "`processConfigEvent` logs persistence failure and still mutates in-memory state, while main config update path returns an error for persistence failures.",
+        "`pruneBackups` suppresses file deletion failures and returns nil, but accesspoint cleanup returns immediately on first command error."
+      ],
+      "suggestion": "Define subsystem-level error policy for maintenance/update operations (strict-fail vs best-effort with aggregated errors), implement it consistently, and return structured partial-failure details when continuing after errors.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_error_contracts"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "low_leverage_wrapper_layers",
+      "summary": "Multiple wrapper layers add indirection without enough policy/value translation",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/auth/client_session.go",
+        "goseg/click/click.go",
+        "goseg/config/contextapi/contextapi.go"
+      ],
+      "evidence": [
+        "Many exported functions are one-step delegates with little transformation, while call chains still route through mutable global runtime state.",
+        "Facade layers in auth/click/contextapi increase navigation depth and maintenance surface without clearly reducing coupling."
+      ],
+      "suggestion": "Collapse purely pass-through wrappers, keep only boundaries that enforce policy/translation, and standardize one seam per subsystem (interface at boundary + concrete internal implementation).",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_singleton_runtime_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_package_mixed_responsibilities",
+      "summary": "Config subsystem mixes unrelated concerns into a high-churn god package",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/config_state.go",
+        "goseg/config/persistence.go",
+        "goseg/config/config_events.go"
+      ],
+      "evidence": [
+        "The same package owns process runtime context setup, file persistence, in-memory container state tracking, networking probes, random/hash utilities, and event handling.",
+        "This broad ownership aligns with existing structural signals (flat directory and cohesion warnings) and increases change blast radius."
+      ],
+      "suggestion": "Split config into focused subpackages (runtime context, persisted settings store, volatile runtime state/cache, event handlers) and expose a narrow orchestrated API from `config` as compatibility facade.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_singleton_runtime_pattern"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Heavy reliance on mutable package-level singleton runtimes/state as the default integration mechanism",
+      "Incremental testability refactors introduced seam interfaces/wrappers faster than consolidation of architectural boundaries",
+      "Config package accumulated operational responsibilities beyond configuration persistence"
+    ],
+    "likely_symptoms": [
+      "mutable_default_runtime_coupling",
+      "low_leverage_wrapper_layers",
+      "divergent_partial_failure_policies"
+    ],
+    "possible_false_positives": []
+  }
+}

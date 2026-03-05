@@ -3,29 +3,33 @@ package startram
 import (
 	"groundseg/protocol/contracts/catalog/common"
 	"groundseg/protocol/contracts/familyspec"
+	"groundseg/protocol/contracts/governance"
 )
 
 const (
-	StartramContractFamily = "startram"
-	StartramContractScope  = "errors"
-	StartramAPIConnSlug    = "api-connection"
+	StartramContractFamily = governance.StartramContractFamily
+	StartramContractScope  = governance.StartramContractScope
+	StartramAPIConnSlug    = governance.StartramAPIConnSlug
 
 	OwnerStartram common.OwnerModule = common.OwnerStartram
 
-	StartramAPIConnectionErrorID          = StartramContractFamily + "." + StartramContractScope + "." + StartramAPIConnSlug
-	StartramAPIConnectionErrorMessage     = "Unable to connect to API server"
-	StartramAPIConnectionErrorName        = "APIConnectionError"
-	StartramAPIConnectionErrorDescription = "Masks transport detail when the StarTram API is unavailable or unreachable."
+	StartramAPIConnectionErrorID          = governance.StartramAPIConnectionErrorID
+	StartramAPIConnectionErrorMessage     = governance.StartramAPIConnectionErrorMessage
+	StartramAPIConnectionErrorName        = governance.StartramAPIConnectionErrorName
+	StartramAPIConnectionErrorDescription = governance.StartramAPIConnectionErrorDescription
 )
 
 func ContractSpecs() []familyspec.ContractSpec {
-	return []familyspec.ContractSpec{
-		{
-			ID:          StartramAPIConnectionErrorID,
-			Name:        StartramAPIConnectionErrorName,
-			Description: StartramAPIConnectionErrorDescription,
-			Message:     StartramAPIConnectionErrorMessage,
-			Owner:       string(OwnerStartram),
-		},
+	declarations := governance.StartramContractDeclarations()
+	out := make([]familyspec.ContractSpec, 0, len(declarations))
+	for _, declaration := range declarations {
+		out = append(out, familyspec.ContractSpec{
+			ID:          declaration.ID,
+			Name:        declaration.Name,
+			Description: declaration.Description,
+			Message:     declaration.Message,
+			Owner:       declaration.Owner,
+		})
 	}
+	return out
 }

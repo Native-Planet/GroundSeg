@@ -1,24 +1,24 @@
 {
   "version": 1,
   "created": "2026-03-05T13:41:58+00:00",
-  "last_scan": "2026-03-05T14:26:04+00:00",
-  "scan_count": 7,
-  "overall_score": 77.8,
-  "objective_score": 98.0,
-  "strict_score": 77.8,
-  "verified_strict_score": 98.0,
+  "last_scan": "2026-03-05T18:13:55+00:00",
+  "scan_count": 14,
+  "overall_score": 78.5,
+  "objective_score": 99.8,
+  "strict_score": 78.5,
+  "verified_strict_score": 99.8,
   "stats": {
-    "total": 700,
-    "open": 596,
+    "total": 714,
+    "open": 583,
     "fixed": 0,
-    "auto_resolved": 104,
+    "auto_resolved": 131,
     "wontfix": 0,
     "false_positive": 0,
     "by_tier": {
       "3": {
-        "open": 419,
+        "open": 406,
         "fixed": 0,
-        "auto_resolved": 1,
+        "auto_resolved": 28,
         "wontfix": 0,
         "false_positive": 0
       },
@@ -49,17 +49,23 @@
           "11 defer"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/startuporchestrator/startup_orchestrator.go": {
       "id": "structural::goseg/startuporchestrator/startup_orchestrator.go",
@@ -77,17 +83,23 @@
           "18 for loops"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/config/config_update_registry.go": {
       "id": "structural::goseg/config/config_update_registry.go",
@@ -99,17 +111,23 @@
       "detail": {
         "loc": 1029
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/importer/importer_test.go": {
       "id": "structural::goseg/importer/importer_test.go",
@@ -125,17 +143,23 @@
           "100 if/else branches"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "test",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/accesspoint/accesspoint_test.go": {
       "id": "structural::goseg/accesspoint/accesspoint_test.go",
@@ -152,17 +176,23 @@
           "15 switch/case"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "test",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/handler/system/support.go": {
       "id": "structural::goseg/handler/system/support.go",
@@ -178,17 +208,23 @@
           "75 if/else branches"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/defaults/scripts.go": {
       "id": "structural::goseg/defaults/scripts.go",
@@ -205,17 +241,23 @@
           "19 for loops"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/docker/orchestration/runtime_seams_test.go": {
       "id": "structural::goseg/docker/orchestration/runtime_seams_test.go",
@@ -231,17 +273,23 @@
           "69 if/else branches"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "test",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/system/storage/storage_test.go": {
       "id": "structural::goseg/system/storage/storage_test.go",
@@ -257,17 +305,23 @@
           "76 if/else branches"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "test",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/config/config_test.go": {
       "id": "structural::goseg/config/config_test.go",
@@ -283,17 +337,23 @@
           "70 if/else branches"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "test",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/protocol/contracts/contracts.go": {
       "id": "structural::goseg/protocol/contracts/contracts.go",
@@ -310,17 +370,23 @@
           "27 for loops"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/main.go": {
       "id": "structural::goseg/main.go",
@@ -337,17 +403,23 @@
           "15 switch/case"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/system/storage/storage.go": {
       "id": "structural::goseg/system/storage/storage.go",
@@ -363,17 +435,23 @@
           "83 if/else branches"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/routines/version.go": {
       "id": "structural::goseg/routines/version.go",
@@ -390,17 +468,23 @@
           "23 for loops"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/protocol/actions/actions_test.go": {
       "id": "structural::goseg/protocol/actions/actions_test.go",
@@ -417,17 +501,23 @@
           "28 for loops"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "test",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/main_test.go": {
       "id": "structural::goseg/main_test.go",
@@ -444,17 +534,23 @@
           "12 switch/case"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "test",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/system/wifi_test.go": {
       "id": "structural::goseg/system/wifi_test.go",
@@ -470,17 +566,23 @@
           "60 if/else branches"
         ]
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "test",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/routines/logstream/logs.go": {
       "id": "structural::goseg/routines/logstream/logs.go",
@@ -499,17 +601,23 @@
         ],
         "loc": 472
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "structural::goseg/ws/ws.go": {
       "id": "structural::goseg/ws/ws.go",
@@ -526,17 +634,23 @@
         ],
         "loc": 387
       },
-      "status": "open",
-      "note": null,
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
       "first_seen": "2026-03-05T13:41:59+00:00",
       "last_seen": "2026-03-05T14:26:04+00:00",
-      "resolved_at": null,
+      "resolved_at": "2026-03-05T15:09:41+00:00",
       "reopen_count": 0,
       "lang": "go",
       "zone": "production",
       "suppressed": false,
       "suppressed_at": null,
-      "suppression_pattern": null
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T15:09:41+00:00",
+        "scan_verified": true
+      }
     },
     "flat_dirs::goseg/shipworkflow": {
       "id": "flat_dirs::goseg/shipworkflow",
@@ -16125,6 +16239,418 @@
       "suppressed": false,
       "suppressed_at": null,
       "suppression_pattern": null
+    },
+    "test_coverage::goseg/docker/events/runtime_defaults.go::untested_module": {
+      "id": "test_coverage::goseg/docker/events/runtime_defaults.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/docker/events/runtime_defaults.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (32 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 32,
+        "importer_count": 0,
+        "loc_weight": 5.656854249492381
+      },
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
+      "first_seen": "2026-03-05T17:28:57+00:00",
+      "last_seen": "2026-03-05T17:28:57+00:00",
+      "resolved_at": "2026-03-05T18:13:55+00:00",
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T18:13:55+00:00",
+        "scan_verified": true
+      }
+    },
+    "test_coverage::goseg/broadcast/state_defaults.go::untested_module": {
+      "id": "test_coverage::goseg/broadcast/state_defaults.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/broadcast/state_defaults.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (30 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 30,
+        "importer_count": 0,
+        "loc_weight": 5.477225575051661
+      },
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
+      "first_seen": "2026-03-05T17:28:57+00:00",
+      "last_seen": "2026-03-05T17:28:57+00:00",
+      "resolved_at": "2026-03-05T18:13:55+00:00",
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T18:13:55+00:00",
+        "scan_verified": true
+      }
+    },
+    "test_coverage::goseg/config/containerstate/state.go::untested_module": {
+      "id": "test_coverage::goseg/config/containerstate/state.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/config/containerstate/state.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (34 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 34,
+        "importer_count": 0,
+        "loc_weight": 5.830951894845301
+      },
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
+      "first_seen": "2026-03-05T17:28:57+00:00",
+      "last_seen": "2026-03-05T17:28:57+00:00",
+      "resolved_at": "2026-03-05T18:13:55+00:00",
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T18:13:55+00:00",
+        "scan_verified": true
+      }
+    },
+    "test_coverage::goseg/config/runtimeutil/runtimeutil.go::untested_module": {
+      "id": "test_coverage::goseg/config/runtimeutil/runtimeutil.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/config/runtimeutil/runtimeutil.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (61 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 61,
+        "importer_count": 0,
+        "loc_weight": 7.810249675906654
+      },
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
+      "first_seen": "2026-03-05T17:28:57+00:00",
+      "last_seen": "2026-03-05T17:28:57+00:00",
+      "resolved_at": "2026-03-05T18:13:55+00:00",
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T18:13:55+00:00",
+        "scan_verified": true
+      }
+    },
+    "test_coverage::goseg/protocol/contracts/governance/upload_manifest.go::untested_module": {
+      "id": "test_coverage::goseg/protocol/contracts/governance/upload_manifest.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/protocol/contracts/governance/upload_manifest.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (41 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 41,
+        "importer_count": 0,
+        "loc_weight": 6.4031242374328485
+      },
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
+      "first_seen": "2026-03-05T17:28:57+00:00",
+      "last_seen": "2026-03-05T17:28:57+00:00",
+      "resolved_at": "2026-03-05T18:13:55+00:00",
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T18:13:55+00:00",
+        "scan_verified": true
+      }
+    },
+    "test_coverage::goseg/protocol/contracts/governance/c2c_manifest.go::untested_module": {
+      "id": "test_coverage::goseg/protocol/contracts/governance/c2c_manifest.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/protocol/contracts/governance/c2c_manifest.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (27 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 27,
+        "importer_count": 0,
+        "loc_weight": 5.196152422706632
+      },
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
+      "first_seen": "2026-03-05T17:28:57+00:00",
+      "last_seen": "2026-03-05T17:28:57+00:00",
+      "resolved_at": "2026-03-05T18:13:55+00:00",
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T18:13:55+00:00",
+        "scan_verified": true
+      }
+    },
+    "test_coverage::goseg/config/config_update_patch_engine.go::untested_module": {
+      "id": "test_coverage::goseg/config/config_update_patch_engine.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/config/config_update_patch_engine.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (369 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 369,
+        "importer_count": 0,
+        "loc_weight": 19.209372712298546
+      },
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
+      "first_seen": "2026-03-05T17:28:57+00:00",
+      "last_seen": "2026-03-05T17:28:57+00:00",
+      "resolved_at": "2026-03-05T18:13:55+00:00",
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T18:13:55+00:00",
+        "scan_verified": true
+      }
+    },
+    "test_coverage::goseg/protocol/contracts/governance/startram_manifest.go::untested_module": {
+      "id": "test_coverage::goseg/protocol/contracts/governance/startram_manifest.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/protocol/contracts/governance/startram_manifest.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (26 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 26,
+        "importer_count": 0,
+        "loc_weight": 5.0990195135927845
+      },
+      "status": "auto_resolved",
+      "note": "Disappeared from scan \u2014 likely fixed",
+      "first_seen": "2026-03-05T17:28:57+00:00",
+      "last_seen": "2026-03-05T17:28:57+00:00",
+      "resolved_at": "2026-03-05T18:13:55+00:00",
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null,
+      "resolution_attestation": {
+        "kind": "scan_verified",
+        "text": "Disappeared from detector output",
+        "attested_at": "2026-03-05T18:13:55+00:00",
+        "scan_verified": true
+      }
+    },
+    "test_coverage::goseg/broadcast/state_collectors.go::untested_module": {
+      "id": "test_coverage::goseg/broadcast/state_collectors.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/broadcast/state_collectors.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (44 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 44,
+        "importer_count": 0,
+        "loc_weight": 6.6332495807108
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-05T18:13:44+00:00",
+      "last_seen": "2026-03-05T18:13:44+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "test_coverage::goseg/broadcast/state_presenter.go::untested_module": {
+      "id": "test_coverage::goseg/broadcast/state_presenter.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/broadcast/state_presenter.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (18 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 18,
+        "importer_count": 0,
+        "loc_weight": 4.242640687119285
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-05T18:13:44+00:00",
+      "last_seen": "2026-03-05T18:13:44+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "test_coverage::goseg/broadcast/state_clone.go::untested_module": {
+      "id": "test_coverage::goseg/broadcast/state_clone.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/broadcast/state_clone.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (41 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 41,
+        "importer_count": 0,
+        "loc_weight": 6.4031242374328485
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-05T18:13:44+00:00",
+      "last_seen": "2026-03-05T18:13:44+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "test_coverage::goseg/broadcast/state_schedule_queue.go::untested_module": {
+      "id": "test_coverage::goseg/broadcast/state_schedule_queue.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/broadcast/state_schedule_queue.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (52 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 52,
+        "importer_count": 0,
+        "loc_weight": 7.211102550927978
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-05T18:13:44+00:00",
+      "last_seen": "2026-03-05T18:13:44+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "test_coverage::goseg/broadcast/state_store.go::untested_module": {
+      "id": "test_coverage::goseg/broadcast/state_store.go::untested_module",
+      "detector": "test_coverage",
+      "file": "goseg/broadcast/state_store.go",
+      "tier": 3,
+      "confidence": "high",
+      "summary": "Untested module (39 LOC, 0 importers)",
+      "detail": {
+        "kind": "untested_module",
+        "loc": 39,
+        "importer_count": 0,
+        "loc_weight": 6.244997998398398
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-05T18:13:44+00:00",
+      "last_seen": "2026-03-05T18:13:44+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
+    },
+    "boilerplate_duplication::goseg/routines/backup/backup.go::37c9cd38bb6f427e": {
+      "id": "boilerplate_duplication::goseg/routines/backup/backup.go::37c9cd38bb6f427e",
+      "detector": "boilerplate_duplication",
+      "file": "goseg/routines/backup/backup.go",
+      "tier": 3,
+      "confidence": "medium",
+      "summary": "Boilerplate block repeated across 2 files (window 7 lines): goseg/routines/backup/backup.go:118, goseg/routines/system/system.go:66",
+      "detail": {
+        "distinct_files": 2,
+        "window_size": 7,
+        "locations": [
+          {
+            "file": "goseg/routines/backup/backup.go",
+            "line": 118
+          },
+          {
+            "file": "goseg/routines/system/system.go",
+            "line": 66
+          }
+        ],
+        "sample": [
+          ")",
+          "}",
+          "",
+          "func runRoutine(interval time.Duration, fn func() error, sleep func(time.Duration)) {"
+        ]
+      },
+      "status": "open",
+      "note": null,
+      "first_seen": "2026-03-05T18:13:53+00:00",
+      "last_seen": "2026-03-05T18:13:53+00:00",
+      "resolved_at": null,
+      "reopen_count": 0,
+      "lang": "go",
+      "zone": "production",
+      "suppressed": false,
+      "suppressed_at": null,
+      "suppression_pattern": null
     }
   },
   "scan_coverage": {
@@ -16144,7 +16670,7 @@
         }
       },
       "warnings": [],
-      "updated_at": "2026-03-05T14:26:04+00:00"
+      "updated_at": "2026-03-05T18:13:55+00:00"
     }
   },
   "score_confidence": {
@@ -16279,8 +16805,8 @@
     }
   },
   "zone_distribution": {
-    "test": 351,
-    "production": 304
+    "test": 381,
+    "production": 321
   },
   "scan_history": [
     {
@@ -17065,86 +17591,916 @@
           "strict": 63.0
         }
       }
+    },
+    {
+      "timestamp": "2026-03-05T15:09:41+00:00",
+      "lang": "go",
+      "strict_score": 78.6,
+      "verified_strict_score": 100.0,
+      "objective_score": 100.0,
+      "overall_score": 78.6,
+      "open": 577,
+      "diff_new": 0,
+      "diff_resolved": 19,
+      "ignored": 0,
+      "raw_findings": 0,
+      "suppressed_pct": 0.0,
+      "ignore_patterns": 0,
+      "subjective_integrity": {
+        "status": "pass",
+        "matched_count": 0,
+        "reset_count": 0,
+        "target_score": 95.0
+      },
+      "score_confidence": {
+        "status": "full",
+        "confidence": 1.0,
+        "detector_count": 0,
+        "dimension_count": 0
+      },
+      "dimension_scores": {
+        "File health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Duplication": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Test health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Security": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Error consistency": {
+          "score": 51.8,
+          "strict": 51.8
+        },
+        "Abstraction fit": {
+          "score": 48.7,
+          "strict": 48.7
+        },
+        "Cross-module arch": {
+          "score": 55.1,
+          "strict": 55.1
+        },
+        "Test strategy": {
+          "score": 66.2,
+          "strict": 66.2
+        },
+        "Design coherence": {
+          "score": 49.0,
+          "strict": 49.0
+        },
+        "AI generated debt": {
+          "score": 94.0,
+          "strict": 94.0
+        },
+        "Contracts": {
+          "score": 78.8,
+          "strict": 78.8
+        },
+        "High elegance": {
+          "score": 58.6,
+          "strict": 58.6
+        },
+        "Logic clarity": {
+          "score": 89.0,
+          "strict": 89.0
+        },
+        "Low elegance": {
+          "score": 75.9,
+          "strict": 75.9
+        },
+        "Mid elegance": {
+          "score": 54.5,
+          "strict": 54.5
+        },
+        "Naming quality": {
+          "score": 77.5,
+          "strict": 77.5
+        },
+        "Structure nav": {
+          "score": 58.4,
+          "strict": 58.4
+        },
+        "Type safety": {
+          "score": 72.5,
+          "strict": 72.5
+        },
+        "API coherence": {
+          "score": 87.0,
+          "strict": 87.0
+        },
+        "Auth consistency": {
+          "score": 74.4,
+          "strict": 74.4
+        },
+        "Convention drift": {
+          "score": 86.0,
+          "strict": 86.0
+        },
+        "Dep health": {
+          "score": 62.0,
+          "strict": 62.0
+        },
+        "Stale migration": {
+          "score": 96.0,
+          "strict": 96.0
+        },
+        "Init coupling": {
+          "score": 63.0,
+          "strict": 63.0
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-05T15:27:25+00:00",
+      "lang": "go",
+      "strict_score": 78.6,
+      "verified_strict_score": 100.0,
+      "objective_score": 100.0,
+      "overall_score": 78.6,
+      "open": 577,
+      "diff_new": 0,
+      "diff_resolved": 0,
+      "ignored": 0,
+      "raw_findings": 0,
+      "suppressed_pct": 0.0,
+      "ignore_patterns": 0,
+      "subjective_integrity": {
+        "status": "pass",
+        "matched_count": 0,
+        "reset_count": 0,
+        "target_score": 95.0
+      },
+      "score_confidence": {
+        "status": "full",
+        "confidence": 1.0,
+        "detector_count": 0,
+        "dimension_count": 0
+      },
+      "dimension_scores": {
+        "File health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Duplication": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Test health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Security": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Error consistency": {
+          "score": 51.8,
+          "strict": 51.8
+        },
+        "Abstraction fit": {
+          "score": 48.7,
+          "strict": 48.7
+        },
+        "Cross-module arch": {
+          "score": 55.1,
+          "strict": 55.1
+        },
+        "Test strategy": {
+          "score": 66.2,
+          "strict": 66.2
+        },
+        "Design coherence": {
+          "score": 49.0,
+          "strict": 49.0
+        },
+        "AI generated debt": {
+          "score": 94.0,
+          "strict": 94.0
+        },
+        "Contracts": {
+          "score": 78.8,
+          "strict": 78.8
+        },
+        "High elegance": {
+          "score": 58.6,
+          "strict": 58.6
+        },
+        "Logic clarity": {
+          "score": 89.0,
+          "strict": 89.0
+        },
+        "Low elegance": {
+          "score": 75.9,
+          "strict": 75.9
+        },
+        "Mid elegance": {
+          "score": 54.5,
+          "strict": 54.5
+        },
+        "Naming quality": {
+          "score": 77.5,
+          "strict": 77.5
+        },
+        "Structure nav": {
+          "score": 58.4,
+          "strict": 58.4
+        },
+        "Type safety": {
+          "score": 72.5,
+          "strict": 72.5
+        },
+        "API coherence": {
+          "score": 87.0,
+          "strict": 87.0
+        },
+        "Auth consistency": {
+          "score": 74.4,
+          "strict": 74.4
+        },
+        "Convention drift": {
+          "score": 86.0,
+          "strict": 86.0
+        },
+        "Dep health": {
+          "score": 62.0,
+          "strict": 62.0
+        },
+        "Stale migration": {
+          "score": 96.0,
+          "strict": 96.0
+        },
+        "Init coupling": {
+          "score": 63.0,
+          "strict": 63.0
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-05T15:46:02+00:00",
+      "lang": "go",
+      "strict_score": 78.6,
+      "verified_strict_score": 100.0,
+      "objective_score": 100.0,
+      "overall_score": 78.6,
+      "open": 577,
+      "diff_new": 0,
+      "diff_resolved": 0,
+      "ignored": 0,
+      "raw_findings": 0,
+      "suppressed_pct": 0.0,
+      "ignore_patterns": 0,
+      "subjective_integrity": {
+        "status": "pass",
+        "matched_count": 0,
+        "reset_count": 0,
+        "target_score": 95.0
+      },
+      "score_confidence": {
+        "status": "full",
+        "confidence": 1.0,
+        "detector_count": 0,
+        "dimension_count": 0
+      },
+      "dimension_scores": {
+        "File health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Duplication": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Test health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Security": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Error consistency": {
+          "score": 51.8,
+          "strict": 51.8
+        },
+        "Abstraction fit": {
+          "score": 48.7,
+          "strict": 48.7
+        },
+        "Cross-module arch": {
+          "score": 55.1,
+          "strict": 55.1
+        },
+        "Test strategy": {
+          "score": 66.2,
+          "strict": 66.2
+        },
+        "Design coherence": {
+          "score": 49.0,
+          "strict": 49.0
+        },
+        "AI generated debt": {
+          "score": 94.0,
+          "strict": 94.0
+        },
+        "Contracts": {
+          "score": 78.8,
+          "strict": 78.8
+        },
+        "High elegance": {
+          "score": 58.6,
+          "strict": 58.6
+        },
+        "Logic clarity": {
+          "score": 89.0,
+          "strict": 89.0
+        },
+        "Low elegance": {
+          "score": 75.9,
+          "strict": 75.9
+        },
+        "Mid elegance": {
+          "score": 54.5,
+          "strict": 54.5
+        },
+        "Naming quality": {
+          "score": 77.5,
+          "strict": 77.5
+        },
+        "Structure nav": {
+          "score": 58.4,
+          "strict": 58.4
+        },
+        "Type safety": {
+          "score": 72.5,
+          "strict": 72.5
+        },
+        "API coherence": {
+          "score": 87.0,
+          "strict": 87.0
+        },
+        "Auth consistency": {
+          "score": 74.4,
+          "strict": 74.4
+        },
+        "Convention drift": {
+          "score": 86.0,
+          "strict": 86.0
+        },
+        "Dep health": {
+          "score": 62.0,
+          "strict": 62.0
+        },
+        "Stale migration": {
+          "score": 96.0,
+          "strict": 96.0
+        },
+        "Init coupling": {
+          "score": 63.0,
+          "strict": 63.0
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-05T16:18:31+00:00",
+      "lang": "go",
+      "strict_score": 78.6,
+      "verified_strict_score": 100.0,
+      "objective_score": 100.0,
+      "overall_score": 78.6,
+      "open": 577,
+      "diff_new": 0,
+      "diff_resolved": 0,
+      "ignored": 0,
+      "raw_findings": 0,
+      "suppressed_pct": 0.0,
+      "ignore_patterns": 0,
+      "subjective_integrity": {
+        "status": "pass",
+        "matched_count": 0,
+        "reset_count": 0,
+        "target_score": 95.0
+      },
+      "score_confidence": {
+        "status": "full",
+        "confidence": 1.0,
+        "detector_count": 0,
+        "dimension_count": 0
+      },
+      "dimension_scores": {
+        "File health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Duplication": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Test health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Security": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Error consistency": {
+          "score": 51.8,
+          "strict": 51.8
+        },
+        "Abstraction fit": {
+          "score": 48.7,
+          "strict": 48.7
+        },
+        "Cross-module arch": {
+          "score": 55.1,
+          "strict": 55.1
+        },
+        "Test strategy": {
+          "score": 66.2,
+          "strict": 66.2
+        },
+        "Design coherence": {
+          "score": 49.0,
+          "strict": 49.0
+        },
+        "AI generated debt": {
+          "score": 94.0,
+          "strict": 94.0
+        },
+        "Contracts": {
+          "score": 78.8,
+          "strict": 78.8
+        },
+        "High elegance": {
+          "score": 58.6,
+          "strict": 58.6
+        },
+        "Logic clarity": {
+          "score": 89.0,
+          "strict": 89.0
+        },
+        "Low elegance": {
+          "score": 75.9,
+          "strict": 75.9
+        },
+        "Mid elegance": {
+          "score": 54.5,
+          "strict": 54.5
+        },
+        "Naming quality": {
+          "score": 77.5,
+          "strict": 77.5
+        },
+        "Structure nav": {
+          "score": 58.4,
+          "strict": 58.4
+        },
+        "Type safety": {
+          "score": 72.5,
+          "strict": 72.5
+        },
+        "API coherence": {
+          "score": 87.0,
+          "strict": 87.0
+        },
+        "Auth consistency": {
+          "score": 74.4,
+          "strict": 74.4
+        },
+        "Convention drift": {
+          "score": 86.0,
+          "strict": 86.0
+        },
+        "Dep health": {
+          "score": 62.0,
+          "strict": 62.0
+        },
+        "Stale migration": {
+          "score": 96.0,
+          "strict": 96.0
+        },
+        "Init coupling": {
+          "score": 63.0,
+          "strict": 63.0
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-05T16:57:48+00:00",
+      "lang": "go",
+      "strict_score": 78.6,
+      "verified_strict_score": 100.0,
+      "objective_score": 100.0,
+      "overall_score": 78.6,
+      "open": 577,
+      "diff_new": 0,
+      "diff_resolved": 0,
+      "ignored": 0,
+      "raw_findings": 0,
+      "suppressed_pct": 0.0,
+      "ignore_patterns": 0,
+      "subjective_integrity": {
+        "status": "pass",
+        "matched_count": 0,
+        "reset_count": 0,
+        "target_score": 95.0
+      },
+      "score_confidence": {
+        "status": "full",
+        "confidence": 1.0,
+        "detector_count": 0,
+        "dimension_count": 0
+      },
+      "dimension_scores": {
+        "File health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Duplication": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Test health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Security": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Error consistency": {
+          "score": 51.8,
+          "strict": 51.8
+        },
+        "Abstraction fit": {
+          "score": 48.7,
+          "strict": 48.7
+        },
+        "Cross-module arch": {
+          "score": 55.1,
+          "strict": 55.1
+        },
+        "Test strategy": {
+          "score": 66.2,
+          "strict": 66.2
+        },
+        "Design coherence": {
+          "score": 49.0,
+          "strict": 49.0
+        },
+        "AI generated debt": {
+          "score": 94.0,
+          "strict": 94.0
+        },
+        "Contracts": {
+          "score": 78.8,
+          "strict": 78.8
+        },
+        "High elegance": {
+          "score": 58.6,
+          "strict": 58.6
+        },
+        "Logic clarity": {
+          "score": 89.0,
+          "strict": 89.0
+        },
+        "Low elegance": {
+          "score": 75.9,
+          "strict": 75.9
+        },
+        "Mid elegance": {
+          "score": 54.5,
+          "strict": 54.5
+        },
+        "Naming quality": {
+          "score": 77.5,
+          "strict": 77.5
+        },
+        "Structure nav": {
+          "score": 58.4,
+          "strict": 58.4
+        },
+        "Type safety": {
+          "score": 72.5,
+          "strict": 72.5
+        },
+        "API coherence": {
+          "score": 87.0,
+          "strict": 87.0
+        },
+        "Auth consistency": {
+          "score": 74.4,
+          "strict": 74.4
+        },
+        "Convention drift": {
+          "score": 86.0,
+          "strict": 86.0
+        },
+        "Dep health": {
+          "score": 62.0,
+          "strict": 62.0
+        },
+        "Stale migration": {
+          "score": 96.0,
+          "strict": 96.0
+        },
+        "Init coupling": {
+          "score": 63.0,
+          "strict": 63.0
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-05T17:29:11+00:00",
+      "lang": "go",
+      "strict_score": 78.4,
+      "verified_strict_score": 99.6,
+      "objective_score": 99.6,
+      "overall_score": 78.4,
+      "open": 585,
+      "diff_new": 8,
+      "diff_resolved": 0,
+      "ignored": 0,
+      "raw_findings": 8,
+      "suppressed_pct": 0.0,
+      "ignore_patterns": 0,
+      "subjective_integrity": {
+        "status": "pass",
+        "matched_count": 0,
+        "reset_count": 0,
+        "target_score": 95.0
+      },
+      "score_confidence": {
+        "status": "full",
+        "confidence": 1.0,
+        "detector_count": 0,
+        "dimension_count": 0
+      },
+      "dimension_scores": {
+        "File health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Duplication": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Test health": {
+          "score": 98.0,
+          "strict": 98.0
+        },
+        "Security": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Error consistency": {
+          "score": 51.8,
+          "strict": 51.8
+        },
+        "Abstraction fit": {
+          "score": 48.7,
+          "strict": 48.7
+        },
+        "Cross-module arch": {
+          "score": 55.1,
+          "strict": 55.1
+        },
+        "Test strategy": {
+          "score": 66.2,
+          "strict": 66.2
+        },
+        "Design coherence": {
+          "score": 49.0,
+          "strict": 49.0
+        },
+        "AI generated debt": {
+          "score": 94.0,
+          "strict": 94.0
+        },
+        "Contracts": {
+          "score": 78.8,
+          "strict": 78.8
+        },
+        "High elegance": {
+          "score": 58.6,
+          "strict": 58.6
+        },
+        "Logic clarity": {
+          "score": 89.0,
+          "strict": 89.0
+        },
+        "Low elegance": {
+          "score": 75.9,
+          "strict": 75.9
+        },
+        "Mid elegance": {
+          "score": 54.5,
+          "strict": 54.5
+        },
+        "Naming quality": {
+          "score": 77.5,
+          "strict": 77.5
+        },
+        "Structure nav": {
+          "score": 58.4,
+          "strict": 58.4
+        },
+        "Type safety": {
+          "score": 72.5,
+          "strict": 72.5
+        },
+        "API coherence": {
+          "score": 87.0,
+          "strict": 87.0
+        },
+        "Auth consistency": {
+          "score": 74.4,
+          "strict": 74.4
+        },
+        "Convention drift": {
+          "score": 86.0,
+          "strict": 86.0
+        },
+        "Dep health": {
+          "score": 62.0,
+          "strict": 62.0
+        },
+        "Stale migration": {
+          "score": 96.0,
+          "strict": 96.0
+        },
+        "Init coupling": {
+          "score": 63.0,
+          "strict": 63.0
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-05T18:13:55+00:00",
+      "lang": "go",
+      "strict_score": 78.5,
+      "verified_strict_score": 99.8,
+      "objective_score": 99.8,
+      "overall_score": 78.5,
+      "open": 583,
+      "diff_new": 6,
+      "diff_resolved": 8,
+      "ignored": 0,
+      "raw_findings": 6,
+      "suppressed_pct": 0.0,
+      "ignore_patterns": 0,
+      "subjective_integrity": {
+        "status": "pass",
+        "matched_count": 0,
+        "reset_count": 0,
+        "target_score": 95.0
+      },
+      "score_confidence": {
+        "status": "full",
+        "confidence": 1.0,
+        "detector_count": 0,
+        "dimension_count": 0
+      },
+      "dimension_scores": {
+        "File health": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Duplication": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Test health": {
+          "score": 99.0,
+          "strict": 99.0
+        },
+        "Security": {
+          "score": 100.0,
+          "strict": 100.0
+        },
+        "Error consistency": {
+          "score": 51.8,
+          "strict": 51.8
+        },
+        "Abstraction fit": {
+          "score": 48.7,
+          "strict": 48.7
+        },
+        "Cross-module arch": {
+          "score": 55.1,
+          "strict": 55.1
+        },
+        "Test strategy": {
+          "score": 66.2,
+          "strict": 66.2
+        },
+        "Design coherence": {
+          "score": 49.0,
+          "strict": 49.0
+        },
+        "AI generated debt": {
+          "score": 94.0,
+          "strict": 94.0
+        },
+        "Contracts": {
+          "score": 78.8,
+          "strict": 78.8
+        },
+        "High elegance": {
+          "score": 58.6,
+          "strict": 58.6
+        },
+        "Logic clarity": {
+          "score": 89.0,
+          "strict": 89.0
+        },
+        "Low elegance": {
+          "score": 75.9,
+          "strict": 75.9
+        },
+        "Mid elegance": {
+          "score": 54.5,
+          "strict": 54.5
+        },
+        "Naming quality": {
+          "score": 77.5,
+          "strict": 77.5
+        },
+        "Structure nav": {
+          "score": 58.4,
+          "strict": 58.4
+        },
+        "Type safety": {
+          "score": 72.5,
+          "strict": 72.5
+        },
+        "API coherence": {
+          "score": 87.0,
+          "strict": 87.0
+        },
+        "Auth consistency": {
+          "score": 74.4,
+          "strict": 74.4
+        },
+        "Convention drift": {
+          "score": 86.0,
+          "strict": 86.0
+        },
+        "Dep health": {
+          "score": 62.0,
+          "strict": 62.0
+        },
+        "Stale migration": {
+          "score": 96.0,
+          "strict": 96.0
+        },
+        "Init coupling": {
+          "score": 63.0,
+          "strict": 63.0
+        }
+      }
     }
   ],
-  "tool_hash": "e073c6da67fa",
+  "tool_hash": "029d3df722df",
   "scan_path": ".",
   "scan_completeness": {
     "go": "full"
   },
   "potentials": {
     "go": {
-      "structural": 304,
-      "flat_dirs": 122,
-      "responsibility_cohesion": 31,
-      "unused_imports": 294,
-      "signature": 34,
-      "test_coverage": 3039,
-      "security": 304,
-      "subjective_review": 270,
-      "boilerplate_duplication": 0,
-      "dupes": 3685,
+      "structural": 321,
+      "test_coverage": 3144,
+      "security": 321,
+      "boilerplate_duplication": 2,
+      "dupes": 3843,
       "stale_wontfix": 0
     }
   },
   "codebase_metrics": {
     "go": {
-      "total_files": 655,
-      "total_loc": 74265,
-      "total_directories": 122
+      "total_files": 702,
+      "total_loc": 77523,
+      "total_directories": 126
     }
   },
   "dimension_scores": {
     "File health": {
-      "score": 97.5,
-      "strict_score": 97.5,
-      "verified_strict_score": 97.5,
-      "checks": 304,
-      "issues": 11,
-      "tier": 3,
-      "detectors": {
-        "structural": {
-          "potential": 304,
-          "pass_rate": 0.9746710526315789,
-          "issues": 11,
-          "weighted_failures": 7.700000000000001
-        }
-      },
-      "strict": 97.5
-    },
-    "Code quality": {
-      "score": 93.6,
-      "strict_score": 93.6,
-      "verified_strict_score": 93.6,
-      "checks": 153,
-      "issues": 14,
-      "tier": 3,
-      "detectors": {
-        "flat_dirs": {
-          "potential": 122,
-          "pass_rate": 0.9655737704918033,
-          "issues": 6,
-          "weighted_failures": 4.2
-        },
-        "responsibility_cohesion": {
-          "potential": 31,
-          "pass_rate": 0.8193548387096774,
-          "issues": 8,
-          "weighted_failures": 5.6000000000000005
-        }
-      },
-      "strict": 93.6
-    },
-    "Duplication": {
       "score": 100.0,
       "strict_score": 100.0,
       "verified_strict_score": 100.0,
-      "checks": 3685,
+      "checks": 321,
       "issues": 0,
       "tier": 3,
       "detectors": {
-        "dupes": {
-          "potential": 3685,
+        "structural": {
+          "potential": 321,
           "pass_rate": 1.0,
           "issues": 0,
           "weighted_failures": 0.0
@@ -17152,39 +18508,56 @@
       },
       "strict": 100.0
     },
-    "Test health": {
-      "score": 98.3,
-      "strict_score": 98.3,
-      "verified_strict_score": 98.3,
-      "checks": 3309,
-      "issues": 177,
-      "tier": 4,
+    "Duplication": {
+      "score": 100.0,
+      "strict_score": 100.0,
+      "verified_strict_score": 100.0,
+      "checks": 3845,
+      "issues": 1,
+      "tier": 3,
       "detectors": {
-        "test_coverage": {
-          "potential": 3039,
+        "dupes": {
+          "potential": 3843,
           "pass_rate": 1.0,
           "issues": 0,
           "weighted_failures": 0.0
         },
-        "subjective_review": {
-          "potential": 270,
-          "pass_rate": 0.79,
-          "issues": 177,
-          "weighted_failures": 56.699999999999996
+        "boilerplate_duplication": {
+          "potential": 2,
+          "pass_rate": 0.65,
+          "issues": 1,
+          "weighted_failures": 0.7
         }
       },
-      "strict": 98.3
+      "strict": 100.0
+    },
+    "Test health": {
+      "score": 99.0,
+      "strict_score": 99.0,
+      "verified_strict_score": 99.0,
+      "checks": 3144,
+      "issues": 5,
+      "tier": 4,
+      "detectors": {
+        "test_coverage": {
+          "potential": 3144,
+          "pass_rate": 0.9902242000462502,
+          "issues": 5,
+          "weighted_failures": 30.735115054589308
+        }
+      },
+      "strict": 99.0
     },
     "Security": {
       "score": 100.0,
       "strict_score": 100.0,
       "verified_strict_score": 100.0,
-      "checks": 304,
+      "checks": 321,
       "issues": 0,
       "tier": 4,
       "detectors": {
         "security": {
-          "potential": 304,
+          "potential": 321,
           "pass_rate": 1.0,
           "issues": 0,
           "weighted_failures": 0.0
@@ -17644,7 +19017,7 @@
   },
   "reminder_history": {
     "zone_classification": 3,
-    "report_scores": 5,
+    "report_scores": 12,
     "review_findings_pending": 3,
     "stagnant_nudge": 4,
     "feedback_nudge": 3

@@ -1,0 +1,104 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 72.0,
+    "test_strategy": 68.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Governance declares upload action identifiers in `goseg/protocol/contracts/governance/upload_manifest.go` (`ActionUploadOpenEndpoint`, `ActionUploadReset`) as canonical contract metadata.",
+        "`goseg/uploadsvc/actions_test.go` validates upload runtime behavior only through uploadsvc-local action constants and command validation, without any assertion against governance declarations or contract IDs.",
+        "`goseg/protocol/contracts/conformance/fixtures_action_test.go` checks fixture/binding alignment and includes a specific C2C presence assertion, but does not verify runtime modules consume the same canonical action declarations."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`README.md` defines a contract conformance quality gate spanning `./protocol/contracts/... ./uploadsvc/... ./system/wifi/...` and calls out owner-coverage/family-governance checks.",
+        "In this batch, governance modules include C2C, upload, and StarTram declarations (`c2c_manifest.go`, `upload_manifest.go`, `startram_manifest.go`), but tests shown are concentrated on fixture counting/matching and upload action parsing/payload validation.",
+        "No test in the assigned set verifies cross-module compatibility from governance declarations to uploadsvc runtime enforcement, and no assigned test exercises StarTram governance contract declarations."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_surface_split_between_governance_and_runtime",
+      "summary": "Canonical action contracts and runtime action handling are validated in isolation, creating a boundary where semantic drift can occur undetected.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/upload_manifest.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/protocol/contracts/conformance/fixtures_action_test.go"
+      ],
+      "evidence": [
+        "`upload_manifest.go` defines canonical upload actions and contract IDs as governance declarations.",
+        "`actions_test.go` checks parse/validation behavior but does not assert runtime action symbols or behavior are tied to governance declarations/contracts.",
+        "`fixtures_action_test.go` validates fixture catalog integrity but does not exercise runtime uploadsvc behavior against canonical governance entries."
+      ],
+      "suggestion": "Add a contract-bridge conformance test that imports governance canonical declarations and uploadsvc runtime action parser/validator, asserting shared action verbs and payload-rule compatibility from one source of truth.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_contract_bridge_tests"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "governance_family_coverage_gap_startram",
+      "summary": "StarTram governance contract declarations are not covered by tests in the reviewed governance/contracts quality-gate slice.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/startram_manifest.go",
+        "goseg/protocol/contracts/conformance/fixtures_action_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`startram_manifest.go` defines StarTram contract declaration constants and declaration construction.",
+        "`fixtures_action_test.go` validates action fixtures and includes explicit C2C/upload-oriented checks but no StarTram contract assertions.",
+        "`README.md` describes family-governance checks in backend quality gates, but this assigned test set does not show StarTram-focused conformance coverage."
+      ],
+      "suggestion": "Add governance conformance tests that enumerate contract families and assert StarTram declarations are present, valid, and owner-scoped as intended, similar to existing action-fixture checks.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_contract_bridge_tests"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "docs_quality_gate_not_fully_traceable_to_tests",
+      "summary": "Documented backend contract quality-gate scope is broader than the explicit test assertions visible in this batch, reducing traceability from policy to executable checks.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/conformance/fixtures_action_test.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/protocol/contracts/governance/c2c_manifest.go"
+      ],
+      "evidence": [
+        "`README.md` promises owner-coverage, family-governance, and payload-rule conformance under the contract gate.",
+        "Assigned tests strongly cover upload payload policy and fixture/binding parity, but they do not show explicit owner-coverage or family-governance assertions across all governance declarations (including StarTram).",
+        "`c2c_manifest.go` and other governance manifests carry owner metadata that is not directly asserted in the provided tests."
+      ],
+      "suggestion": "Create policy-mapped tests where each documented gate item has a named test (or subtest) proving it, and keep that mapping near README/architecture docs to prevent docs-vs-runtime drift.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_contract_bridge_tests"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance catalog integrity tests and runtime behavior tests are separated without an explicit contract-bridge test layer.",
+      "Quality-gate policy is documented centrally, but per-policy executable assertions are not clearly co-located or traceable in this slice."
+    ],
+    "likely_symptoms": [
+      "governance_family_coverage_gap_startram",
+      "docs_quality_gate_not_fully_traceable_to_tests"
+    ],
+    "possible_false_positives": []
+  }
+}

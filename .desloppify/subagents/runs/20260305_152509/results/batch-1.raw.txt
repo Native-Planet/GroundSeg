@@ -1,0 +1,128 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 63.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime wiring is split into many callback-bag structs across startup/import/workflow/orchestration layers (for example: startupInitCoreRuntime/startupInitHostRuntime/startupInitStorageRuntime in goseg/startuporchestrator/startup_orchestrator.go; importerStorageRuntime/importerUploadRuntime/importerProvisionRuntime in goseg/importer/importer.go; Runtime*Ops families in goseg/docker/orchestration/runtime_ops.go).",
+        "Multiple modules expose default-singleton wrappers plus WithRuntime variants, adding call depth while retaining hidden global state (for example: StartBroadcastLoop -> StartBroadcastLoopWithRuntime(newBroadcastLoopRuntimeWithDefault()) in goseg/broadcast/loop.go; DefaultEventRuntime/NewDefaultEventBroker indirection in goseg/docker/events/events.go).",
+        "A broad SysConfig bag is used as cross-domain transport and updated through generic registry indirection (goseg/structs/configs.go + goseg/defaults/defaults.go + goseg/config/config_update_registry.go), which obscures ownership and introduces non-local coupling."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 60.0,
+        "indirection_cost": 52.0,
+        "interface_honesty": 69.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_callback_bag_sprawl",
+      "summary": "Runtime callback-bag layering is over-fragmented and adds indirection without stable domain boundaries.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "startup_orchestrator defines multiple embedded runtime bags (startupInitCoreRuntime/startupInitHostRuntime/startupInitStorageRuntime, then StartupRuntime, then startBackgroundServicesRuntime), each mostly function pointers.",
+        "importer.go repeats the same pattern with importerStorageRuntime/importerUploadRuntime/importerProvisionRuntime and then aliases three phase types to the same underlying struct (type importerInitRuntime = importerRuntime, etc.).",
+        "runtime_ops.go defines a large registry of Runtime*Ops structs and bundle builders that mostly forward package functions (runtimeContextOps/runtimeFileOps/runtimeImageOps/runtimeWireguardOps/etc.).",
+        "shipworkflow workflowRuntime embeds RuntimeContainerOps/RuntimeUrbitOps/RuntimeSnapshotOps and re-resolves runtime for many operations, creating repeated seam choreography."
+      ],
+      "suggestion": "Collapse callback bags into a smaller set of behavior-focused interfaces per bounded context (for example StartupServices, ImportProvisioner, ContainerRuntime). Keep dependency injection at module boundaries, but remove intra-module seam layers that only forward calls. Replace phase aliases with explicit, minimal interfaces required by each phase.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "singleton_default_runtime_duality",
+      "summary": "Global default runtime singletons coexist with injected runtimes, weakening abstraction guarantees.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/docker/events/events.go",
+        "goseg/docker/orchestration/subsystem/subsystem_events.go"
+      ],
+      "evidence": [
+        "broadcast/state.go and broadcast/loop.go keep mutable process-wide defaults (defaultBroadcastStateRuntime, defaultBroadcastLoopController) with setters/resetters, while many call paths still construct defaults internally.",
+        "state_lifecycle.go and loop.go expose wrapper pairs (e.g., StartBroadcastLoop and StartBroadcastLoopWithRuntime; LoadStartramRegionsWithRuntime and LoadStartramRegionsWithRuntimeState) that preserve global fallback behavior instead of enforcing explicit ownership.",
+        "docker/events/events.go uses DefaultEventRuntime plus defaultEventBroker indirection that always routes to mutable global runtime; subsystem_events.go similarly hardwires defaultDockerSubsystemRuntime for entrypoints."
+      ],
+      "suggestion": "Choose one ownership model per subsystem: either explicit runtime dependency passed from composition root, or a strict singleton. Prefer explicit runtime injection for long-running services. Remove internal default constructors from operational paths and keep defaults only in thin top-level wiring.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "sysconfig_megabag_coupling",
+      "summary": "SysConfig acts as a mega-configuration bag spanning unrelated domains, blurring abstraction boundaries.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/defaults/defaults.go",
+        "goseg/config/config_update_registry.go",
+        "goseg/main.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "structs/configs.go defines SysConfig with broad nested sections (connectivity/runtime/auth/penpai/startram) and many unrelated fields in RuntimeConfig.",
+        "defaults.SysConfig(basePath) initializes all domain sections in one constructor with mixed concerns (runtime paths, update settings, auth session key paths, penpai model catalog, network defaults).",
+        "config_update_registry.go applies updates through generic field-reference machinery over SysConfig, increasing indirection and making mutation ownership non-local.",
+        "main/startuporchestrator consume snapshots from these broad config surfaces during boot/runtime decisions, reinforcing cross-domain coupling."
+      ],
+      "suggestion": "Split SysConfig into bounded domain configs with explicit ownership (for example RuntimeSettings, ConnectivitySettings, AuthSettings, AISettings). Replace generic patch registry indirection with per-domain update services that validate and apply domain-specific invariants.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "wide_context_bag"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wrapper_alias_indirection_in_import_and_broadcast",
+      "summary": "Several wrapper/alias layers add call depth but little behavioral leverage.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/broadcast/state_lifecycle.go",
+        "goseg/broadcast/transitions.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "importer.go defines phase type aliases (importerInitRuntime/importerWorkflowRuntime/importerPublishRuntime) to the same struct, preserving extra conceptual layers without type-level specialization.",
+        "broadcast lifecycle uses wrapper pairs where entry functions mostly nil-check and forward to similarly named implementations (bootstrapBroadcastState -> bootstrapBroadcastStateWithRuntime; LoadStartramRegionsWithRuntime -> LoadStartramRegionsWithRuntimeState).",
+        "transitions.go introduces a public type alias (type BroadcastStateRuntime = broadcastStateRuntime), signaling abstraction but exposing the same concrete runtime internals.",
+        "wireguard.go keeps overlapping write paths (WriteWgConf + writeWgConfToFile + copyWGFileToVolume-related callbacks), indicating partially collapsed abstraction seams."
+      ],
+      "suggestion": "Remove pass-through aliases/wrappers unless they enforce policy. For importer, define distinct minimal runtime interfaces per phase rather than aliases. For broadcast and wireguard, keep one canonical runtime path per operation and expose only intentionally stable public abstractions.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_overfragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams expanded into pervasive production-time indirection rather than staying at composition boundaries.",
+      "Configuration and runtime dependency ownership are centralized in broad bags/singletons instead of domain-scoped contracts."
+    ],
+    "likely_symptoms": [
+      "runtime_callback_bag_sprawl",
+      "singleton_default_runtime_duality",
+      "wrapper_alias_indirection_in_import_and_broadcast"
+    ],
+    "possible_false_positives": []
+  }
+}

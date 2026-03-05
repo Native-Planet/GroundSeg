@@ -1,0 +1,54 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/contracts/governance/upload_manifest.go defines upload action identifiers and contract IDs as package-local string constants (e.g., ActionUploadOpenEndpoint, ActionUploadReset) rather than a shared boundary type consumed by uploadsvc.",
+        "goseg/uploadsvc/doc.go documents that canonical declarations live in governance files, indicating the runtime package depends on external contract definitions by convention and comments rather than import-level contract wiring.",
+        "goseg/uploadsvc/actions_test.go validates uploadsvc-local action parsing/validation behavior but does not bind assertions to governance action declarations, so cross-package drift can pass local tests.",
+        "goseg/protocol/contracts/conformance/fixtures_action_test.go validates fixture/binding consistency centrally, but this remains an indirect safety net and does not make uploadsvc compile-time dependent on governance contracts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_boundary_by_convention",
+      "summary": "Upload action contract boundaries are enforced by convention/tests instead of a shared compile-time interface, creating drift-prone cross-module coupling.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/upload_manifest.go",
+        "goseg/uploadsvc/actions_test.go",
+        "goseg/uploadsvc/doc.go",
+        "goseg/protocol/contracts/conformance/fixtures_action_test.go"
+      ],
+      "evidence": [
+        "governance/upload_manifest.go declares upload action strings and contract IDs independently in the governance package.",
+        "uploadsvc/actions_test.go verifies local parsing/validation paths without asserting equivalence against governance declarations.",
+        "uploadsvc/doc.go explicitly relies on canonical governance files via documentation, signaling a convention-based boundary.",
+        "fixtures_action_test.go provides centralized parity checks for fixture/binding catalogs, but this does not remove duplicate contract vocabulary across module boundaries."
+      ],
+      "suggestion": "Introduce a single shared contract surface for action identifiers and payload policy metadata (e.g., typed declarations exported from a neutral contracts package) that both governance manifests and uploadsvc consume directly. Keep conformance tests as regression guards, but move source-of-truth ownership to one compile-time dependency path and generate/package-local views from it.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "string_contract_duplication_across_packages"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract semantics are represented as duplicated string constants in separate packages with synchronization enforced mostly by process and tests.",
+      "Module boundaries between governance declarations and runtime action handling are documentation-driven rather than API-driven."
+    ],
+    "likely_symptoms": [
+      "contract_boundary_by_convention"
+    ],
+    "possible_false_positives": []
+  }
+}

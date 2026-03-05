@@ -3,7 +3,6 @@ package ws
 import (
 	"encoding/json"
 	"fmt"
-	"groundseg/auth"
 	"groundseg/auth/tokens"
 	"groundseg/authsession"
 	"groundseg/broadcast"
@@ -13,6 +12,7 @@ import (
 	"groundseg/handler/ship"
 	handlerSystem "groundseg/handler/system"
 	handlerws "groundseg/handler/ws"
+	"groundseg/session"
 	"groundseg/setup"
 	"groundseg/shipworkflow"
 	"groundseg/startram"
@@ -47,6 +47,39 @@ func mustUploadMessageHandler() handlerws.UploadMessageHandler {
 	return uploadHandler
 }
 
+func deactivateSession(conn *websocket.Conn) {
+	if conn == nil {
+		return
+	}
+	clientManager := session.GetClientManager()
+	if clientManager == nil {
+		return
+	}
+	_ = clientManager.DeactivateConnection(conn)
+}
+
+func getMuConn(conn *websocket.Conn, tokenID string) *structs.MuConn {
+	if conn == nil || tokenID == "" {
+		return nil
+	}
+	clientManager := session.GetClientManager()
+	if clientManager == nil {
+		return nil
+	}
+	return clientManager.GetMuConn(conn, tokenID)
+}
+
+func readMuConn(muConn *structs.MuConn) (int, []byte, error) {
+	if muConn == nil {
+		return 0, nil, fmt.Errorf("invalid websocket session")
+	}
+	clientManager := session.GetClientManager()
+	if clientManager == nil {
+		return 0, nil, fmt.Errorf("session manager unavailable")
+	}
+	return muConn.Read(clientManager)
+}
+
 // switch on ws event cases
 func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -62,7 +95,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			zap.L().Debug("WS closed")
 			conn.Close()
 			// mute the session
-			auth.WsNilSession(conn)
+			deactivateSession(conn)
 		}
 		zap.L().Debug(fmt.Sprintf("WS error: %v", err))
 	}
@@ -73,7 +106,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenId := payload.Token.ID
 	zap.L().Debug(fmt.Sprintf("New WS session for %v", tokenId))
-	MuCon := auth.GetMuConn(conn, tokenId)
+	MuCon := getMuConn(conn, tokenId)
 	token := map[string]string{
 		"id":    payload.Token.ID,
 		"token": payload.Token.Token,
@@ -136,13 +169,13 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	for {
 		// mutexed read operations
-		_, msg, err := auth.ReadMuConn(MuCon)
+		_, msg, err := readMuConn(MuCon)
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
 				zap.L().Debug("WS closed")
 				conn.Close()
 				// mute the session
-				auth.WsNilSession(conn)
+				deactivateSession(conn)
 			}
 			zap.L().Debug(fmt.Sprintf("WS error: %v", err))
 			break
@@ -152,7 +185,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		tokenId := payload.Token.ID
 		zap.L().Debug(fmt.Sprintf("New WS session for %v", tokenId))
-		MuCon := auth.GetMuConn(conn, tokenId)
+		MuCon := getMuConn(conn, tokenId)
 		token := map[string]string{
 			"id":    payload.Token.ID,
 			"token": payload.Token.Token,

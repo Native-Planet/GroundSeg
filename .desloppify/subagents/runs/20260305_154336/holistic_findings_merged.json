@@ -1,0 +1,352 @@
+{
+  "assessments": {
+    "api_surface_coherence": 73.4,
+    "contract_coherence": 72.4,
+    "design_coherence": 50.7,
+    "error_consistency": 74.3
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_core.go` composes one `Runtime` from six embedded operation groups, while `goseg/docker/orchestration/runtime_ops.go` centralizes default wiring for config, click, network, startram, file I/O, and image logic in one seam bundle path.",
+        "`goseg/config/config_update_schema.go` mixes patch data model definitions, parsing adapters, apply/merge execution, registry lifecycle (`init`, validation, key map build), and type conversion helpers in one file-level unit.",
+        "`goseg/broadcast/state.go` combines in-memory state storage, scheduling bus publishing, collector routing, delivery orchestration, deep-copy policy, and JSON envelope serialization in one runtime/file boundary.",
+        "`goseg/system/wifi_runtime_methods.go` mixes low-level process execution seams, wifi-client querying, interface toggling, connection/disconnection flow, and captive sysctl mutation in one runtime type."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "Nil/invalid receiver behavior is inconsistent in the same runtime-style APIs: `broadcastStateRuntime.GetState()` returns zero-value state on nil, `UpdateBroadcast()` returns `ErrBroadcastRuntimeRequired`, and `AddSystemTransitionError()` silently returns nil for empty message.",
+        "`logstreamSessionStore` similarly mixes no-op nil receiver methods with error-returning methods (`PublishSystemLog`), making caller expectations inconsistent across adjacent APIs.",
+        "`docker/events` exposes two broker constructors with different lifecycle semantics (`NewDefaultEventBroker()` follows mutable process default runtime; `NewTransitionBroker()` binds to its own runtime channels), but both are presented as default in-memory broker entry points."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "In orchestration runtime dependency handling, missing callbacks produce different error families: `Runtime.UpdateConfig()` returns `errConfUpdateMissing`, `defaultRuntimeStartramOps()` returns local sentinel errors, while `StartupRuntime` methods return `seams.MissingRuntimeDependency(...)`.",
+        "Wi-Fi runtime methods use mixed failure contracts for parse/IO paths: `wifiDevices()` and `listSSIDs()` may return partial data with `ErrWiFiPartialResult`, while other methods treat errors as hard failures; this increases burden on callers to interpret severity.",
+        "`logstreamSessionStore` protects `store == nil` but not `store.systemLogBus == nil` before dereference in `SystemLogMessages()`/`PublishSystemLog()`, creating inconsistent behavior between explicit error paths and potential panic paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "contract_coherence": {
+      "evidence": [
+        "Config serialization contract has naming drift inside one model: `RuntimeConfig.CfgDir` uses JSON tag `CFG_DIR` while neighboring fields and update-patch fields use camelCase conventions (`apiVersion`, `endpointUrl`, `CfgDir` patch field).",
+        "Wi-Fi contract exposes dual-mode return semantics in core methods (`([]string, error)` where non-empty success payload can accompany an error), and tests explicitly assert this behavior; callers must know undocumented partial-result rules to use APIs safely.",
+        "Event broker contract naming suggests equivalent broker constructors, but one constructor is default-runtime indirection while the other is concrete runtime binding, creating behavior-level divergence not expressed by type signatures."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_ops_aggregate_god_runtime",
+      "summary": "Orchestration runtime dependency wiring is over-aggregated, forcing unrelated concerns through one broad runtime shape.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "`Runtime` embeds `RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeSnapshotOps`, `RuntimeHealthOps`, `RuntimeStartupOps`, and `RuntimeStartramOps`, then merges all of them through shared options and dependency constructors.",
+        "`buildRuntimeSeamBundle` and `defaultRuntime*` builders wire multiple subsystem dependencies (network/config/click/startram/file/image) in one central construction path.",
+        "Tests in startup orchestration construct wide runtime override helpers to target behavior, indicating high setup breadth caused by the broad runtime dependency surface."
+      ],
+      "suggestion": "Split runtime dependency containers by bounded workflow (for example: startup runtime, container lifecycle runtime, startram runtime, health runtime) and provide narrower constructors/options so each call path receives only the operations it needs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "over_aggregated_runtime_dependencies"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_schema_monolith",
+      "summary": "Config patch schema handling concentrates schema declaration, parsing, application, and merge policy into one monolithic unit.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/structs/configs.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "`config_update_schema.go` defines patch structs, generic field factories, patch registry build/validation, parse helpers, and `buildConfigPatch` dispatch in a single file.",
+        "Field-level semantics span multiple domains (connectivity/runtime/startram/penpai/auth session) but are managed in one registry lifecycle path initialized at package load time.",
+        "`config_test.go` carries large multi-domain merge/update tests, which reflects that cross-domain patch behavior is tightly coupled to one schema engine."
+      ],
+      "suggestion": "Refactor patch handling into per-section modules (connectivity/runtime/startram/penpai/auth) that register field specs into a small shared registry interface; keep parse, apply, and merge responsibilities separated so adding one key does not require touching the global monolith.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_patch_centralization"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_state_multi_role_runtime",
+      "summary": "Broadcast state runtime mixes state storage concerns with orchestration and transport-facing behavior.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/state_test.go",
+        "goseg/leak/broadcast_test.go"
+      ],
+      "evidence": [
+        "`broadcastStateRuntime` owns locks and mutable state, scheduled pack bookkeeping, event bus publishing, collector dependency selection, and delivery runtime invocation.",
+        "The same file includes state mutation (`UpdateBroadcast`, `AddSystemTransitionError`), event signaling (`PublishSchedulePack`), collector orchestration (`collect*` helpers), and payload serialization (`GetStateJson`).",
+        "State tests include deep-copy semantics and transition-path behavior, showing behavior layers that are not isolated by role boundaries."
+      ],
+      "suggestion": "Separate broadcast concerns into explicit components: state store (copy/mutation), schedule/event signaling, collector aggregation, and transport serialization/delivery adapter; keep a thin coordinator that composes these components.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "state_and_orchestration_coupling"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_runtime_mixed_system_roles",
+      "summary": "WiFi runtime bundles multiple operational roles (device discovery, connection control, and system policy mutation) into one type.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "`wifiRuntime` includes process execution seams, wifi client seams, and ticker seams, while methods span read/query (`wifiDevices`, `listSSIDs`), control (`connect`, `disconnect`, `toggleDevice`), and system-level captive policy updates (`applyCaptiveRules`).",
+        "`toggleDevice` performs device resolution, radio state checks, and link manipulation in one method-level flow.",
+        "Test coverage spans many behavior families in one test file and C2C flow tests, indicating one runtime abstraction currently carries multiple distinct responsibilities."
+      ],
+      "suggestion": "Split WiFi responsibilities into smaller collaborators (scanner/query service, radio/link controller, captive-policy applier) and compose them in the higher-level C2C/system workflows.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wifi_runtime_role_mixing"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "runtime_nil_contract_drift",
+      "summary": "Runtime-style APIs mix nil no-op, nil zero-value, and nil error contracts within the same call surface.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`broadcastStateRuntime.GetState()` returns empty state on nil, but `UpdateBroadcast()` returns `ErrBroadcastRuntimeRequired`.",
+        "`broadcastStateRuntime.AddSystemTransitionError(\"\")` returns nil (silent skip) while other update methods generally error on invalid runtime.",
+        "`logstreamSessionStore` methods mostly no-op on nil receiver, while `PublishSystemLog` returns an error, creating mixed caller expectations."
+      ],
+      "suggestion": "Define and document one runtime-nil policy per subsystem (strict error or benign no-op), then normalize all exported methods to that policy; add focused tests asserting the chosen contract across all runtime methods.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_contract_standardization_gap"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "missing_dependency_error_taxonomy_split",
+      "summary": "Orchestration runtime reports missing dependencies through multiple unrelated error taxonomies.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`StartupRuntime` methods return `seams.MissingRuntimeDependency(...)` for nil callbacks.",
+        "`Runtime.UpdateConfig()` returns local sentinel `errConfUpdateMissing` for the same category of fault (missing injected callback).",
+        "`defaultRuntimeStartramOps()` returns separate local sentinels (`errStartramServicesLoaderMissing`, `errStartramRegionsLoaderMissing`) for dependency-not-configured faults."
+      ],
+      "suggestion": "Adopt a single missing-dependency error contract (shared typed error or shared sentinel family with wrapping) for orchestration runtime seams, and migrate all callback-absence paths to it so callers can branch reliably.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_contract_standardization_gap"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "wifi_partial_result_contract_is_implicit",
+      "summary": "Wi-Fi APIs return partial payloads with errors, but the contract is implicit and easy to misuse.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`wifiDevices()` and `listSSIDs()` can return non-empty slices together with wrapped `ErrWiFiPartialResult`.",
+        "`primaryWifiDevice()` may return a selected device plus an error when partial parse occurs.",
+        "Tests assert this mixed-success behavior, confirming callers must special-case partial-result errors to avoid dropping valid data."
+      ],
+      "suggestion": "Make partial-result behavior explicit at API boundary: either introduce a dedicated result type (`data`, `warnings`, `fatal`) or split methods into strict vs best-effort variants, and update caller/test naming to reflect this contract.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_dual_mode_contracts"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "runtime_config_json_key_convention_outlier",
+      "summary": "Runtime config JSON schema uses a convention outlier key that breaks local contract consistency.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`RuntimeConfig.CfgDir` is tagged as `json:\"CFG_DIR\"` while adjacent fields in the same config model use lower camel-case JSON keys.",
+        "Patch/update schema exposes `CfgDir` in code-level API terms without matching explicit normalization of the persistence key naming convention."
+      ],
+      "suggestion": "Introduce explicit schema normalization for this field (accept legacy `CFG_DIR` plus canonical `cfgDir`), document the canonical key, and add compatibility tests that enforce one stable public contract.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_dual_mode_contracts"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "event_broker_constructor_semantic_split",
+      "summary": "Event broker constructors with similar role names expose materially different runtime-binding semantics.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/docker/lifecycle/lifecycle_full_test.go"
+      ],
+      "evidence": [
+        "`NewDefaultEventBroker()` routes each call through mutable process defaults (`DefaultEventRuntime()`), so behavior changes when defaults are reset.",
+        "`NewTransitionBroker(bufferSize)` returns an `EventRuntime` bound to its own channels, unaffected by later default-runtime swaps.",
+        "These are both public constructors for the same broker interface, but signatures/naming do not communicate lifecycle-binding difference."
+      ],
+      "suggestion": "Rename constructors to encode binding semantics (for example, `NewGlobalDefaultBroker` vs `NewIsolatedRuntimeBroker`) and add API docs/tests that explicitly cover behavior after `SetDefaultEventRuntime`/`ResetDefaultEventRuntime`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "implicit_dual_mode_contracts"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 2,
+    "dimension_coverage": 0.5,
+    "evidence_density": 1.4,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 19.488,
+    "dimensions_with_findings": 4
+  },
+  "review_scope": {
+    "reviewed_files_count": 31,
+    "successful_batch_count": 2,
+    "full_sweep_included": false,
+    "total_files": 660,
+    "imported_dimensions": [
+      "api_surface_coherence",
+      "contract_coherence",
+      "design_coherence",
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/docker/orchestration/runtime_core.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/main_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/structs/configs.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_c2c_flow_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260305_154336",
+    "created_at": "2026-03-05T15:45:51+00:00",
+    "batch_count": 2,
+    "batch_indexes": [
+      1,
+      2
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "aaf0966080e3a5f755d08ce8252085479a259914947661793838cff2a6bc9e0b"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "api_surface_coherence",
+      "error_consistency",
+      "design_coherence",
+      "contract_coherence"
+    ],
+    "imported_dimensions": [
+      "api_surface_coherence",
+      "contract_coherence",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

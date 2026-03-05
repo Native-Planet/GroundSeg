@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"groundseg/config"
+	"groundseg/config/runtimecontext"
 	"groundseg/docker/orchestration/subsystem"
 	"groundseg/internal/resource"
 	"groundseg/internal/seams"
@@ -107,27 +108,6 @@ func (runtime bootstrapRuntime) validate() error {
 		return fmt.Errorf("runC2CCheck callback is required")
 	}
 	return nil
-}
-
-func (runtime bootstrapRuntime) bootstrap(ctx context.Context, opts startuporchestrator.StartupOptions) error {
-	if runtime.BootstrapFn == nil {
-		return fmt.Errorf("bootstrap callback is not configured")
-	}
-	return runtime.BootstrapFn(ctx, opts)
-}
-
-func (runtime bootstrapRuntime) startServer(ctx context.Context, httpPort int, websocketPort int) error {
-	if runtime.StartServerFn == nil {
-		return fmt.Errorf("startServer callback is not configured")
-	}
-	return runtime.StartServerFn(ctx, httpPort, websocketPort)
-}
-
-func (runtime bootstrapRuntime) runC2CCheck(ctx context.Context) error {
-	if runtime.RunC2CCheckFn == nil {
-		return fmt.Errorf("runC2CCheck callback is not configured")
-	}
-	return runtime.RunC2CCheckFn(ctx)
 }
 
 type serverRuntime struct {
@@ -507,9 +487,10 @@ func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
 }
 
 type appStartupOptions struct {
-	httpPort      int
-	websocketPort int
-	devMode       bool
+	httpPort       int
+	websocketPort  int
+	devMode        bool
+	runtimeContext config.RuntimeContext
 }
 
 func parsePort(flagName, value string) (int, error) {
@@ -548,6 +529,7 @@ func parseStartupOptions(args []string) (appStartupOptions, error) {
 			opts.websocketPort = port
 		}
 	}
+	opts.runtimeContext = runtimecontext.RuntimeContextFromProcessArgs(args)
 	return opts, nil
 }
 
@@ -564,19 +546,22 @@ func startDevMode(opts appStartupOptions) {
 }
 
 func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime bootstrapRuntime) error {
+	if opts.runtimeContext != (config.RuntimeContext{}) {
+		config.SetRuntimeContext(opts.runtimeContext)
+	}
 	resolvedRuntime, err := seams.ResolveRuntime(defaultBootstrapRuntime(), bootstrapRuntime.validate, runtime)
 	if err != nil {
 		return err
 	}
 	resolvedRuntime.StartupRuntime = runtime.StartupRuntime
-	return resolvedRuntime.bootstrap(ctx, startuporchestrator.StartupOptions{
+	return resolvedRuntime.BootstrapFn(ctx, startuporchestrator.StartupOptions{
 		HTTPPort:      opts.httpPort,
 		WebsocketPort: opts.websocketPort,
 		ValidateConfig: func() error {
 			return initWebErr
 		},
-		StartServer:    resolvedRuntime.startServer,
-		StartC2CCheck:  resolvedRuntime.runC2CCheck,
+		StartServer:    resolvedRuntime.StartServerFn,
+		StartC2CCheck:  resolvedRuntime.RunC2CCheckFn,
 		StartupRuntime: resolvedRuntime.StartupRuntime,
 	})
 }

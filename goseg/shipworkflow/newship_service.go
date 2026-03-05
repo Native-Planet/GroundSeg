@@ -13,6 +13,7 @@ import (
 	"groundseg/docker/events"
 	"groundseg/driveresolver"
 	"groundseg/structs"
+	"groundseg/transition"
 )
 
 var (
@@ -21,6 +22,9 @@ var (
 	ensureDriveReadyFn   = driveresolver.EnsureReady
 	normalizePatpFn      = normalizePatp
 	validatePatpFn       = isValidPatp
+	provisionShipFn      = ProvisionShip
+	newShipSleepFn       = time.Sleep
+	newShipErrorDelay    = 5 * time.Second
 )
 
 func HandleNewShip(msg []byte, bootFn func(structs.WsNewShipPayload) error, cancelFn func(string) error, resetFn func() error) error {
@@ -55,11 +59,12 @@ func HandleNewShip(msg []byte, bootFn func(structs.WsNewShipPayload) error, canc
 	}
 }
 
+// HandleNewShipBoot performs payload preflight and launches async provisioning.
+// Returned errors represent preflight/launch failures only; provisioning failures
+// are published via new-ship transition events.
 func HandleNewShipBoot(shipPayload structs.WsNewShipPayload) error {
 	handleError := func(err error) error {
-		events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "freeError", Event: err.Error()})
-		time.Sleep(5 * time.Second)
-		events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "freeError", Event: ""})
+		publishNewShipError(err)
 		return err
 	}
 
@@ -94,18 +99,33 @@ func HandleNewShipBoot(shipPayload structs.WsNewShipPayload) error {
 	}
 
 	go func() {
-		if err := ProvisionShip(patp, shipPayload, driveResolution.Mountpoint); err != nil {
-			_ = handleError(err)
+		if err := provisionShipFn(patp, shipPayload, driveResolution.Mountpoint); err != nil {
+			publishNewShipError(err)
 		}
 	}()
 	return nil
 }
 
 func ResetNewShip() error {
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "bootStage", Event: ""})
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "patp", Event: ""})
-	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: "error", Event: ""})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: string(transition.NewShipTransitionBootStage), Event: ""})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: string(transition.NewShipTransitionPatp), Event: ""})
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{Type: string(transition.NewShipTransitionError), Event: ""})
 	return nil
+}
+
+func publishNewShipError(err error) {
+	if err == nil {
+		return
+	}
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{
+		Type:  string(transition.NewShipTransitionError),
+		Event: err.Error(),
+	})
+	newShipSleepFn(newShipErrorDelay)
+	events.DefaultEventRuntime().PublishNewShipTransition(context.Background(), structs.NewShipTransition{
+		Type:  string(transition.NewShipTransitionError),
+		Event: "",
+	})
 }
 
 func CancelNewShip(patp string) error {

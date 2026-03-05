@@ -29,6 +29,7 @@ func updateConfigFromPatch(patch *ConfigPatch) error {
 	if err := persistConfig(configStruct); err != nil {
 		return fmt.Errorf("unable to persist config update: %w", err)
 	}
+	globalConfig = configStruct
 	return nil
 }
 

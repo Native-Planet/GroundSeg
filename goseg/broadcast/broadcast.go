@@ -2,8 +2,8 @@ package broadcast
 
 import (
 	"fmt"
-	"groundseg/auth"
 	"groundseg/broadcast/collectors"
+	"groundseg/session"
 )
 
 type BroadcastRuntimeOption func(*broadcastRuntime)
@@ -24,7 +24,7 @@ func Initialize(options ...BroadcastRuntimeOption) error {
 }
 
 func InitializeWithRuntime(runtime broadcastRuntime) error {
-	if auth.GetClientManager() == nil {
+	if session.GetClientManager() == nil {
 		return fmt.Errorf("config subsystem is not initialized")
 	}
 	if runtime.bootstrapFn == nil {
@@ -56,8 +56,8 @@ func WithBroadcastLoadStartramRegions(runtimeFn func() error) BroadcastRuntimeOp
 
 func defaultBroadcastRuntime() broadcastRuntime {
 	return broadcastRuntime{
-		bootstrapFn:           func() error { return bootstrapBroadcastStateWithRuntime(DefaultBroadcastStateRuntime()) },
-		loadStartramRegionsFn: func() error { return LoadStartramRegionsWithRuntimeState(DefaultBroadcastStateRuntime()) },
+		bootstrapFn:           func() error { return bootstrapBroadcastState(DefaultBroadcastStateRuntime()) },
+		loadStartramRegionsFn: func() error { return LoadStartramRegionsWithRuntime(DefaultBroadcastStateRuntime()) },
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 type versionRuntimeChannelStub = versionChannelOps
@@ -327,6 +328,64 @@ func TestUpdateDockerVereStoppedShipPrepFlow(t *testing.T) {
 	}
 	if seenStatus != "noboot" {
 		t.Fatalf("expected final boot status noboot, got %s", seenStatus)
+	}
+}
+
+func TestStartVersionSubsystemWithContextReturnsImmediately(t *testing.T) {
+	original := runVersionSubsystemWithContextFn
+	t.Cleanup(func() {
+		runVersionSubsystemWithContextFn = original
+	})
+
+	blocked := make(chan struct{}, 1)
+	release := make(chan struct{})
+	runVersionSubsystemWithContextFn = func(context.Context) error {
+		blocked <- struct{}{}
+		<-release
+		return nil
+	}
+
+	start := time.Now()
+	if err := StartVersionSubsystemWithContext(context.Background()); err != nil {
+		t.Fatalf("StartVersionSubsystemWithContext returned error: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 100*time.Millisecond {
+		t.Fatalf("expected StartVersionSubsystemWithContext to be non-blocking, took %v", elapsed)
+	}
+	select {
+	case <-blocked:
+	case <-time.After(time.Second):
+		t.Fatal("expected version subsystem worker to start")
+	}
+	close(release)
+}
+
+func TestStartVersionSubsystemWithContextHandleCapturesTerminalError(t *testing.T) {
+	original := runVersionSubsystemWithContextFn
+	t.Cleanup(func() {
+		runVersionSubsystemWithContextFn = original
+	})
+
+	expectedErr := errors.New("version worker failed")
+	runVersionSubsystemWithContextFn = func(context.Context) error {
+		return expectedErr
+	}
+
+	handle, err := StartVersionSubsystemWithContextHandle(context.Background())
+	if err != nil {
+		t.Fatalf("StartVersionSubsystemWithContextHandle returned error: %v", err)
+	}
+	if handle == nil {
+		t.Fatal("expected async handle")
+	}
+
+	select {
+	case <-handle.Done():
+	case <-time.After(time.Second):
+		t.Fatal("expected version handle to complete")
+	}
+	if !errors.Is(handle.Err(), expectedErr) {
+		t.Fatalf("expected terminal error %v, got %v", expectedErr, handle.Err())
 	}
 }
 

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"groundseg/auth"
 	"groundseg/leak"
+	"groundseg/session"
 	"groundseg/structs"
 )
 
@@ -67,7 +67,7 @@ func TestPreserveTransitionHelpers(t *testing.T) {
 func TestRunBroadcastTickSkipsWhenNoSessionsOrLeaks(t *testing.T) {
 	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
 		rt.getClientManagerFn = func() *structs.ClientManager {
-			return auth.NewClientManager()
+			return session.NewClientManager()
 		}
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{}
@@ -79,6 +79,14 @@ func TestRunBroadcastTickSkipsWhenNoSessionsOrLeaks(t *testing.T) {
 	runBroadcastTickWithRuntime(runtime)
 	if constructed {
 		t.Fatal("expected tick to skip expensive construction when no observers are connected")
+	}
+}
+
+func TestRunBroadcastTickWithRuntimeRequiresRuntimeSentinel(t *testing.T) {
+	if err := runBroadcastTickWithRuntime(nil); err == nil {
+		t.Fatal("expected missing runtime error")
+	} else if !errors.Is(err, ErrBroadcastRuntimeRequired) {
+		t.Fatalf("expected ErrBroadcastRuntimeRequired, got %v", err)
 	}
 }
 
@@ -104,7 +112,7 @@ func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
 
 	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
 		rt.getClientManagerFn = func() *structs.ClientManager {
-			return auth.NewClientManager()
+			return session.NewClientManager()
 		}
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{"zod": {}}
@@ -125,9 +133,9 @@ func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
 		}
 	})
 	var updated structs.AuthBroadcast
-	runtime.updateBroadcastFn = func(next structs.AuthBroadcast) {
+	runtime.updateBroadcastFn = func(next structs.AuthBroadcast) error {
 		updated = next
-		DefaultBroadcastStateRuntime().UpdateBroadcast(next)
+		return DefaultBroadcastStateRuntime().UpdateBroadcast(next)
 	}
 	broadcastCalls := 0
 	runtime.broadcastToClientsFn = func() error {
@@ -178,7 +186,7 @@ func TestRunBroadcastTickHandlesPierInfoError(t *testing.T) {
 
 	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
 		rt.getClientManagerFn = func() *structs.ClientManager {
-			return auth.NewClientManager()
+			return session.NewClientManager()
 		}
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{"zod": {}}
@@ -224,7 +232,7 @@ func TestRunBroadcastTickRecordsPierInfoError(t *testing.T) {
 
 	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
 		rt.getClientManagerFn = func() *structs.ClientManager {
-			return auth.NewClientManager()
+			return session.NewClientManager()
 		}
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{"zod": {}}
@@ -253,7 +261,7 @@ func TestRunBroadcastTickRecordsPierInfoError(t *testing.T) {
 func TestRunBroadcastTickReturnsBroadcastError(t *testing.T) {
 	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
 		rt.getClientManagerFn = func() *structs.ClientManager {
-			return auth.NewClientManager()
+			return session.NewClientManager()
 		}
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{"zod": {}}
@@ -278,7 +286,7 @@ func TestRunBroadcastLoopReportsTickErrors(t *testing.T) {
 	stopCh := make(chan struct{})
 	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
 		rt.getClientManagerFn = func() *structs.ClientManager {
-			return auth.NewClientManager()
+			return session.NewClientManager()
 		}
 		rt.getLickStatusesFn = func() map[string]leak.LickStatus {
 			return map[string]leak.LickStatus{"zod": {}}

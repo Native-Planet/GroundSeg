@@ -3,29 +3,30 @@ package action
 import (
 	"groundseg/protocol/contracts/catalog/common"
 	"groundseg/protocol/contracts/familyspec"
+	"groundseg/protocol/contracts/governance"
 )
 
 const (
-	ProtocolActionContractRoot = "protocol.actions"
+	ProtocolActionContractRoot = governance.ProtocolActionContractRoot
 
-	NamespaceUpload = "upload"
-	NamespaceC2C    = "c2c"
+	NamespaceUpload = governance.NamespaceUpload
+	NamespaceC2C    = governance.NamespaceC2C
 
-	ActionUploadOpenEndpoint = "open-endpoint"
-	ActionUploadReset        = "reset"
-	ActionC2CConnect         = "connect"
+	ActionUploadOpenEndpoint = governance.ActionUploadOpenEndpoint
+	ActionUploadReset        = governance.ActionUploadReset
+	ActionC2CConnect         = governance.ActionC2CConnect
 
-	UploadOpenEndpointContractID = ProtocolActionContractRoot + "." + NamespaceUpload + "." + ActionUploadOpenEndpoint
-	UploadResetContractID        = ProtocolActionContractRoot + "." + NamespaceUpload + "." + ActionUploadReset
-	C2CConnectContractID         = ProtocolActionContractRoot + "." + NamespaceC2C + "." + ActionC2CConnect
+	UploadOpenEndpointContractID = governance.UploadOpenEndpointContractID
+	UploadResetContractID        = governance.UploadResetContractID
+	C2CConnectContractID         = governance.C2CConnectContractID
 
-	C2CConnectActionName        = "C2CConnectAction"
-	C2CConnectActionDescription = "connect c2c client"
+	C2CConnectActionName        = governance.C2CConnectActionName
+	C2CConnectActionDescription = governance.C2CConnectActionDescription
 
-	UploadOpenEndpointActionName        = "UploadOpenEndpointAction"
-	UploadOpenEndpointActionDescription = "open upload endpoint"
-	UploadResetActionName               = "UploadResetAction"
-	UploadResetActionDescription        = "reset upload session"
+	UploadOpenEndpointActionName        = governance.UploadOpenEndpointActionName
+	UploadOpenEndpointActionDescription = governance.UploadOpenEndpointActionDescription
+	UploadResetActionName               = governance.UploadResetActionName
+	UploadResetActionDescription        = governance.UploadResetActionDescription
 )
 
 type OwnerModule = common.OwnerModule
@@ -35,11 +36,11 @@ const (
 	OwnerSystemWiFi    = common.OwnerSystemWiFi
 )
 
-type UploadPayloadRule uint8
+type UploadPayloadRule = governance.UploadPayloadRule
 
 const (
-	UploadPayloadRuleOpenEndpoint UploadPayloadRule = 1 << iota
-	UploadPayloadRuleReset
+	UploadPayloadRuleOpenEndpoint = governance.UploadPayloadRuleOpenEndpoint
+	UploadPayloadRuleReset        = governance.UploadPayloadRuleReset
 )
 
 type UploadActionSpec struct {
@@ -49,45 +50,39 @@ type UploadActionSpec struct {
 }
 
 func ProtocolActionSpecs() []familyspec.ActionSpec {
-	return []familyspec.ActionSpec{
-		{
-			Namespace:   NamespaceC2C,
-			Action:      ActionC2CConnect,
-			ContractID:  C2CConnectContractID,
-			Name:        C2CConnectActionName,
-			Description: C2CConnectActionDescription,
-			Owner:       string(OwnerSystemWiFi),
-		},
+	declarations := governance.C2CActionDeclarations()
+	out := make([]familyspec.ActionSpec, 0, len(declarations))
+	for _, declaration := range declarations {
+		out = append(out, familyspec.ActionSpec{
+			Namespace:   declaration.Namespace,
+			Action:      declaration.Action,
+			ContractID:  declaration.ContractID,
+			Name:        declaration.Name,
+			Description: declaration.Description,
+			Owner:       declaration.Owner,
+		})
 	}
+	return out
 }
 
 func UploadActionSpecs() []UploadActionSpec {
-	return []UploadActionSpec{
-		{
+	declarations := governance.UploadActionDeclarations()
+	out := make([]UploadActionSpec, 0, len(declarations))
+	for _, declaration := range declarations {
+		out = append(out, UploadActionSpec{
 			ActionSpec: familyspec.ActionSpec{
-				Namespace:   NamespaceUpload,
-				Action:      ActionUploadOpenEndpoint,
-				ContractID:  UploadOpenEndpointContractID,
-				Name:        UploadOpenEndpointActionName,
-				Description: UploadOpenEndpointActionDescription,
-				Owner:       string(OwnerUploadService),
+				Namespace:   declaration.Namespace,
+				Action:      declaration.Action,
+				ContractID:  declaration.ContractID,
+				Name:        declaration.Name,
+				Description: declaration.Description,
+				Owner:       declaration.Owner,
 			},
-			RequiredPayloads:  UploadPayloadRuleOpenEndpoint,
-			ForbiddenPayloads: UploadPayloadRuleReset,
-		},
-		{
-			ActionSpec: familyspec.ActionSpec{
-				Namespace:   NamespaceUpload,
-				Action:      ActionUploadReset,
-				ContractID:  UploadResetContractID,
-				Name:        UploadResetActionName,
-				Description: UploadResetActionDescription,
-				Owner:       string(OwnerUploadService),
-			},
-			RequiredPayloads:  UploadPayloadRuleReset,
-			ForbiddenPayloads: UploadPayloadRuleOpenEndpoint,
-		},
+			RequiredPayloads:  declaration.RequiredPayloads,
+			ForbiddenPayloads: declaration.ForbiddenPayloads,
+		})
 	}
+	return out
 }
 
 func UploadActionFamilySpecs() []familyspec.ActionSpec {

@@ -1,6 +1,9 @@
 package session
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestNewSystemLogMessageBusUsesMinimumBuffer(t *testing.T) {
 	bus := newSystemLogMessageBus(0)
@@ -27,13 +30,17 @@ func TestSystemLogMessageBusMessagesHandlesNilReceiver(t *testing.T) {
 
 func TestSystemLogMessageBusPublishNoopsOnNilReceiver(t *testing.T) {
 	var bus *systemLogMessageBus
-	bus.Publish([]byte("ignored"))
+	if err := bus.Publish([]byte("ignored")); !errors.Is(err, ErrSystemLogBusNotDefined) {
+		t.Fatalf("expected nil bus publish error %v, got %v", ErrSystemLogBusNotDefined, err)
+	}
 }
 
 func TestSystemLogMessageBusPublishWritesPayload(t *testing.T) {
 	bus := newSystemLogMessageBus(1)
 	payload := []byte("system-log-entry")
-	bus.Publish(payload)
+	if err := bus.Publish(payload); err != nil {
+		t.Fatalf("publish payload: %v", err)
+	}
 
 	select {
 	case got := <-bus.Messages():
@@ -42,5 +49,15 @@ func TestSystemLogMessageBusPublishWritesPayload(t *testing.T) {
 		}
 	default:
 		t.Fatal("expected published payload to be readable from message channel")
+	}
+}
+
+func TestSystemLogMessageBusPublishReturnsFullError(t *testing.T) {
+	bus := newSystemLogMessageBus(1)
+	if err := bus.Publish([]byte("first")); err != nil {
+		t.Fatalf("publish first payload: %v", err)
+	}
+	if err := bus.Publish([]byte("second")); !errors.Is(err, ErrSystemLogBusFull) {
+		t.Fatalf("expected full bus error %v, got %v", ErrSystemLogBusFull, err)
 	}
 }

@@ -31,3 +31,13 @@ func TestContainerConfigForTypeRejectsUnknownType(t *testing.T) {
 		t.Fatal("expected unknown container type to fail")
 	}
 }
+
+func TestContainerConfigForTypeStringParsesNormalizedInput(t *testing.T) {
+	parsed, ok := transition.ParseContainerType("  VERE  ")
+	if !ok {
+		t.Fatal("expected ParseContainerType to accept normalized container type")
+	}
+	if parsed != transition.ContainerTypeVere {
+		t.Fatalf("expected parsed container type %s, got %s", transition.ContainerTypeVere, parsed)
+	}
+}

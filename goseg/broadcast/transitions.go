@@ -23,13 +23,15 @@ func ApplyBroadcastTransition(notify bool, operation BroadcastTransition, runtim
 		return nil
 	}
 	if runtime == nil {
-		return fmt.Errorf("broadcast runtime is required for transition")
+		return fmt.Errorf("apply broadcast transition: %w", ErrBroadcastRuntimeRequired)
 	}
 	current := runtime.GetState()
 	if err := operation.Apply(&current); err != nil {
 		return fmt.Errorf("apply broadcast transition %T: %w", operation, err)
 	}
-	runtime.UpdateBroadcast(current)
+	if err := runtime.UpdateBroadcast(current); err != nil {
+		return fmt.Errorf("persist broadcast transition %T: %w", operation, err)
+	}
 	if !notify {
 		return nil
 	}

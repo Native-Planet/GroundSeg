@@ -1,0 +1,152 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 2,
+  "assessments": {
+    "api_surface_coherence": 82.6,
+    "error_consistency": 79.8,
+    "contract_coherence": 81.4
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "Nil/invalid receiver behavior is inconsistent in the same runtime-style APIs: `broadcastStateRuntime.GetState()` returns zero-value state on nil, `UpdateBroadcast()` returns `ErrBroadcastRuntimeRequired`, and `AddSystemTransitionError()` silently returns nil for empty message.",
+        "`logstreamSessionStore` similarly mixes no-op nil receiver methods with error-returning methods (`PublishSystemLog`), making caller expectations inconsistent across adjacent APIs.",
+        "`docker/events` exposes two broker constructors with different lifecycle semantics (`NewDefaultEventBroker()` follows mutable process default runtime; `NewTransitionBroker()` binds to its own runtime channels), but both are presented as default in-memory broker entry points."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "In orchestration runtime dependency handling, missing callbacks produce different error families: `Runtime.UpdateConfig()` returns `errConfUpdateMissing`, `defaultRuntimeStartramOps()` returns local sentinel errors, while `StartupRuntime` methods return `seams.MissingRuntimeDependency(...)`.",
+        "Wi-Fi runtime methods use mixed failure contracts for parse/IO paths: `wifiDevices()` and `listSSIDs()` may return partial data with `ErrWiFiPartialResult`, while other methods treat errors as hard failures; this increases burden on callers to interpret severity.",
+        "`logstreamSessionStore` protects `store == nil` but not `store.systemLogBus == nil` before dereference in `SystemLogMessages()`/`PublishSystemLog()`, creating inconsistent behavior between explicit error paths and potential panic paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "contract_coherence": {
+      "evidence": [
+        "Config serialization contract has naming drift inside one model: `RuntimeConfig.CfgDir` uses JSON tag `CFG_DIR` while neighboring fields and update-patch fields use camelCase conventions (`apiVersion`, `endpointUrl`, `CfgDir` patch field).",
+        "Wi-Fi contract exposes dual-mode return semantics in core methods (`([]string, error)` where non-empty success payload can accompany an error), and tests explicitly assert this behavior; callers must know undocumented partial-result rules to use APIs safely.",
+        "Event broker contract naming suggests equivalent broker constructors, but one constructor is default-runtime indirection while the other is concrete runtime binding, creating behavior-level divergence not expressed by type signatures."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "runtime_nil_contract_drift",
+      "summary": "Runtime-style APIs mix nil no-op, nil zero-value, and nil error contracts within the same call surface.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`broadcastStateRuntime.GetState()` returns empty state on nil, but `UpdateBroadcast()` returns `ErrBroadcastRuntimeRequired`.",
+        "`broadcastStateRuntime.AddSystemTransitionError(\"\")` returns nil (silent skip) while other update methods generally error on invalid runtime.",
+        "`logstreamSessionStore` methods mostly no-op on nil receiver, while `PublishSystemLog` returns an error, creating mixed caller expectations."
+      ],
+      "suggestion": "Define and document one runtime-nil policy per subsystem (strict error or benign no-op), then normalize all exported methods to that policy; add focused tests asserting the chosen contract across all runtime methods.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_contract_standardization_gap"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "missing_dependency_error_taxonomy_split",
+      "summary": "Orchestration runtime reports missing dependencies through multiple unrelated error taxonomies.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/docker/orchestration/runtime_ops.go"
+      ],
+      "evidence": [
+        "`StartupRuntime` methods return `seams.MissingRuntimeDependency(...)` for nil callbacks.",
+        "`Runtime.UpdateConfig()` returns local sentinel `errConfUpdateMissing` for the same category of fault (missing injected callback).",
+        "`defaultRuntimeStartramOps()` returns separate local sentinels (`errStartramServicesLoaderMissing`, `errStartramRegionsLoaderMissing`) for dependency-not-configured faults."
+      ],
+      "suggestion": "Adopt a single missing-dependency error contract (shared typed error or shared sentinel family with wrapping) for orchestration runtime seams, and migrate all callback-absence paths to it so callers can branch reliably.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_contract_standardization_gap"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "wifi_partial_result_contract_is_implicit",
+      "summary": "Wi-Fi APIs return partial payloads with errors, but the contract is implicit and easy to misuse.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`wifiDevices()` and `listSSIDs()` can return non-empty slices together with wrapped `ErrWiFiPartialResult`.",
+        "`primaryWifiDevice()` may return a selected device plus an error when partial parse occurs.",
+        "Tests assert this mixed-success behavior, confirming callers must special-case partial-result errors to avoid dropping valid data."
+      ],
+      "suggestion": "Make partial-result behavior explicit at API boundary: either introduce a dedicated result type (`data`, `warnings`, `fatal`) or split methods into strict vs best-effort variants, and update caller/test naming to reflect this contract.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_dual_mode_contracts"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "runtime_config_json_key_convention_outlier",
+      "summary": "Runtime config JSON schema uses a convention outlier key that breaks local contract consistency.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config_update_schema.go"
+      ],
+      "evidence": [
+        "`RuntimeConfig.CfgDir` is tagged as `json:\"CFG_DIR\"` while adjacent fields in the same config model use lower camel-case JSON keys.",
+        "Patch/update schema exposes `CfgDir` in code-level API terms without matching explicit normalization of the persistence key naming convention."
+      ],
+      "suggestion": "Introduce explicit schema normalization for this field (accept legacy `CFG_DIR` plus canonical `cfgDir`), document the canonical key, and add compatibility tests that enforce one stable public contract.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_dual_mode_contracts"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "event_broker_constructor_semantic_split",
+      "summary": "Event broker constructors with similar role names expose materially different runtime-binding semantics.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/docker/lifecycle/lifecycle_full_test.go"
+      ],
+      "evidence": [
+        "`NewDefaultEventBroker()` routes each call through mutable process defaults (`DefaultEventRuntime()`), so behavior changes when defaults are reset.",
+        "`NewTransitionBroker(bufferSize)` returns an `EventRuntime` bound to its own channels, unaffected by later default-runtime swaps.",
+        "These are both public constructors for the same broker interface, but signatures/naming do not communicate lifecycle-binding difference."
+      ],
+      "suggestion": "Rename constructors to encode binding semantics (for example, `NewGlobalDefaultBroker` vs `NewIsolatedRuntimeBroker`) and add API docs/tests that explicitly cover behavior after `SetDefaultEventRuntime`/`ResetDefaultEventRuntime`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "implicit_dual_mode_contracts"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime seam APIs evolved incrementally without a single published error/contract policy.",
+      "Several APIs encode dual modes (strict vs best-effort, global vs isolated) without making the mode explicit in names or types."
+    ],
+    "likely_symptoms": [
+      "runtime_nil_contract_drift",
+      "missing_dependency_error_taxonomy_split",
+      "wifi_partial_result_contract_is_implicit",
+      "event_broker_constructor_semantic_split"
+    ],
+    "possible_false_positives": [
+      "runtime_config_json_key_convention_outlier may be intentional legacy-compatibility behavior if external clients strictly depend on `CFG_DIR`."
+    ]
+  }
+}

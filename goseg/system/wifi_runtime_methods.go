@@ -1,6 +1,7 @@
 package system
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -21,137 +22,6 @@ type wifiRuntime struct {
 	ClientInterfacesFn func(*wifi.Client) ([]*wifi.Interface, error)
 	ClientBSSFn        func(*wifi.Client, *wifi.Interface) (*wifi.BSS, error)
 	WifiInfoTicker     func() *time.Ticker
-}
-
-type wifiNmcliDevice struct {
-	name string
-	typ  string
-}
-
-type wifiNmcliScanResult struct {
-	ssid string
-}
-
-type wifiNmcliParseRecord struct {
-	index int
-	line  string
-	data  []string
-}
-
-type wifiNmcliParseError struct {
-	record    wifiNmcliParseRecord
-	required  int
-	found     int
-	operation string
-}
-
-func (e wifiNmcliParseError) Error() string {
-	return "invalid nmcli output for " + e.operation + "; expected " +
-		fmt.Sprintf("%d fields", e.required) + ", found " + fmt.Sprintf("%d", e.found)
-}
-
-func newWiFiNmcliParseError(operation, line string, index, required, found int) wifiNmcliParseError {
-	return wifiNmcliParseError{
-		record: wifiNmcliParseRecord{
-			index: index,
-			line:  line,
-			data:  splitNmcliRecord(line),
-		},
-		required:  required,
-		found:     found,
-		operation: operation,
-	}
-}
-
-func splitNmcliRecord(raw string) []string {
-	fields := make([]string, 0, 8)
-	var field strings.Builder
-	escaped := false
-	for _, char := range raw {
-		switch {
-		case escaped:
-			field.WriteRune(char)
-			escaped = false
-		case char == '\\':
-			escaped = true
-		case char == ':':
-			fields = append(fields, strings.TrimSpace(field.String()))
-			field.Reset()
-		default:
-			field.WriteRune(char)
-		}
-	}
-	fields = append(fields, strings.TrimSpace(field.String()))
-	return fields
-}
-
-func parseNmcliWifiDeviceRecord(raw string, index int) (wifiNmcliDevice, error) {
-	fields := splitNmcliRecord(raw)
-	if len(fields) < 2 {
-		return wifiNmcliDevice{}, newWiFiNmcliParseError(
-			"wifi device list", raw, index, 2, len(fields),
-		)
-	}
-	return wifiNmcliDevice{name: strings.TrimSpace(fields[0]), typ: strings.TrimSpace(fields[1])}, nil
-}
-
-func parseNmcliWifiScanResultRecord(raw string, index int) (wifiNmcliScanResult, error) {
-	fields := splitNmcliRecord(raw)
-	if len(fields) <= 7 {
-		return wifiNmcliScanResult{}, newWiFiNmcliParseError(
-			"wifi scan result", raw, index, 8, len(fields),
-		)
-	}
-	return wifiNmcliScanResult{ssid: strings.TrimSpace(fields[7])}, nil
-}
-
-func parseNmcliWifiDeviceRecords(raw string) ([]string, error) {
-	rawLines := strings.Split(strings.TrimSpace(raw), "\n")
-	devices := make([]string, 0, len(rawLines))
-	parseErrors := make([]error, 0)
-	for index, line := range rawLines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		deviceRecord, err := parseNmcliWifiDeviceRecord(trimmed, index)
-		if err != nil {
-			parseErrors = append(parseErrors, err)
-			continue
-		}
-		if deviceRecord.typ == "wifi" && deviceRecord.name != "" {
-			devices = append(devices, deviceRecord.name)
-		}
-	}
-	if len(parseErrors) > 0 && len(devices) == 0 {
-		return nil, parseErrors[0]
-	}
-	return devices, nil
-}
-
-func parseNmcliWifiScanResults(raw string) ([]wifiNmcliScanResult, error) {
-	rawLines := strings.Split(strings.TrimSpace(raw), "\n")
-	results := make([]wifiNmcliScanResult, 0, len(rawLines))
-	parseErrors := make([]error, 0)
-	for index, line := range rawLines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		record, err := parseNmcliWifiScanResultRecord(trimmed, index)
-		if err != nil {
-			parseErrors = append(parseErrors, err)
-			continue
-		}
-		if record.ssid == "" {
-			continue
-		}
-		results = append(results, record)
-	}
-	if len(results) == 0 && len(parseErrors) > 0 {
-		return nil, parseErrors[0]
-	}
-	return results, nil
 }
 
 func NewWiFiRuntime() wifiRuntime {
@@ -186,31 +56,6 @@ func (runtime wifiRuntime) runNmcli(args ...string) (string, error) {
 	return runtime.RunCommand("nmcli", args...)
 }
 
-func parseNmcliWifiDevices(raw string) ([]string, error) {
-	parsedDevices, err := parseNmcliWifiDeviceRecords(raw)
-	if err != nil {
-		return nil, err
-	}
-	devices := make([]string, 0, len(parsedDevices))
-	devices = append(devices, parsedDevices...)
-	if len(devices) == 0 {
-		return nil, ErrWiFiInterfaceNotFound
-	}
-	return devices, nil
-}
-
-func parseNmcliWifiSSIDs(raw string) ([]string, error) {
-	scans, err := parseNmcliWifiScanResults(raw)
-	if err != nil {
-		return nil, err
-	}
-	ssids := make([]string, 0, len(scans))
-	for _, scan := range scans {
-		ssids = append(ssids, scan.ssid)
-	}
-	return ssids, nil
-}
-
 func (runtime wifiRuntime) isWiFiRadioEnabled() (bool, error) {
 	out, err := runtime.runNmcli("radio", "wifi")
 	if err != nil {
@@ -221,17 +66,36 @@ func (runtime wifiRuntime) isWiFiRadioEnabled() (bool, error) {
 }
 
 func (runtime wifiRuntime) wifiDevices() ([]string, error) {
+	devices, err := runtime.wifiDevicesBestEffort()
+	if errors.Is(err, ErrWiFiPartialResult) {
+		return nil, fmt.Errorf("list wifi devices strictly: %w", err)
+	}
+	return devices, err
+}
+
+func (runtime wifiRuntime) wifiDevicesBestEffort() ([]string, error) {
 	out, err := runtime.runNmcli("-t", "-f", "DEVICE,TYPE", "device", "status")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read wifi devices: %w", err)
 	}
-	return parseNmcliWifiDevices(out)
+	devices, parseErr := parseNmcliWifiDevices(out)
+	if parseErr == nil {
+		return devices, nil
+	}
+	wrappedErr := wrapWiFiPartialResult("list wifi devices", parseErr)
+	if errors.Is(wrappedErr, ErrWiFiPartialResult) && len(devices) > 0 {
+		return devices, wrappedErr
+	}
+	return nil, wrappedErr
 }
 
 func (runtime wifiRuntime) primaryWifiDevice() (string, error) {
-	devices, err := runtime.wifiDevices()
+	devices, err := runtime.wifiDevicesBestEffort()
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve wifi devices: %w", err)
+		if !errors.Is(err, ErrWiFiPartialResult) || len(devices) == 0 {
+			return "", fmt.Errorf("failed to retrieve wifi devices: %w", err)
+		}
+		return devices[0], err
 	}
 	if len(devices) == 0 {
 		return "", ErrWiFiInterfaceNotFound
@@ -240,11 +104,27 @@ func (runtime wifiRuntime) primaryWifiDevice() (string, error) {
 }
 
 func (runtime wifiRuntime) listSSIDs(interfaceName string) ([]string, error) {
+	ssids, err := runtime.listSSIDsBestEffort(interfaceName)
+	if errors.Is(err, ErrWiFiPartialResult) {
+		return nil, fmt.Errorf("list wifi ssids strictly: %w", err)
+	}
+	return ssids, err
+}
+
+func (runtime wifiRuntime) listSSIDsBestEffort(interfaceName string) ([]string, error) {
 	out, err := runtime.runNmcli("-t", "dev", "wifi", "list", "ifname", interfaceName)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't gather wifi networks: %w", err)
 	}
-	return parseNmcliWifiSSIDs(out)
+	ssids, parseErr := parseNmcliWifiSSIDs(out)
+	if parseErr == nil {
+		return ssids, nil
+	}
+	wrappedErr := wrapWiFiPartialResult("list wifi SSIDs", parseErr)
+	if errors.Is(wrappedErr, ErrWiFiPartialResult) && len(ssids) > 0 {
+		return ssids, wrappedErr
+	}
+	return nil, wrappedErr
 }
 
 func (runtime wifiRuntime) connectedSSID(client *wifi.Client, interfaceName string) (string, error) {
@@ -289,30 +169,51 @@ func (runtime wifiRuntime) disconnect(interfaceName string) (err error) {
 	return nil
 }
 
-func (runtime wifiRuntime) toggleDevice(interfaceName string) error {
+func (runtime wifiRuntime) resolveToggleTarget(interfaceName string) (string, error) {
 	target := strings.TrimSpace(interfaceName)
-	if target == "" {
-		var err error
-		target, err = runtime.primaryWifiDevice()
-		if err != nil {
-			return fmt.Errorf("resolve wifi device for toggle: %w", err)
-		}
+	if target != "" {
+		return target, nil
 	}
+	resolvedTarget, resolveErr := runtime.primaryWifiDevice()
+	if resolveErr == nil {
+		return resolvedTarget, nil
+	}
+	if !errors.Is(resolveErr, ErrWiFiPartialResult) || resolvedTarget == "" {
+		return "", fmt.Errorf("resolve wifi device for toggle: %w", resolveErr)
+	}
+	zap.L().Warn(resolveErr.Error())
+	return resolvedTarget, nil
+}
 
+func (runtime wifiRuntime) deriveToggleCommand() (string, error) {
 	wifiEnabled, err := runtime.isWiFiRadioEnabled()
 	if err != nil {
-		return fmt.Errorf("failed to detect wifi radio state: %w", err)
+		return "", fmt.Errorf("failed to detect wifi radio state: %w", err)
 	}
+	if wifiEnabled {
+		return "down", nil
+	}
+	return "up", nil
+}
 
-	command := "down"
-	if !wifiEnabled {
-		command = "up"
-	}
-	_, err = runtime.RunCommand("ip", "link", "set", target, command)
+func (runtime wifiRuntime) executeLinkToggle(target, command string) error {
+	_, err := runtime.RunCommand("ip", "link", "set", target, command)
 	if err != nil {
 		return fmt.Errorf("failed to toggle wifi interface %s %s: %w", target, command, err)
 	}
 	return nil
+}
+
+func (runtime wifiRuntime) toggleDevice(interfaceName string) error {
+	target, err := runtime.resolveToggleTarget(interfaceName)
+	if err != nil {
+		return err
+	}
+	command, err := runtime.deriveToggleCommand()
+	if err != nil {
+		return err
+	}
+	return runtime.executeLinkToggle(target, command)
 }
 
 func (runtime wifiRuntime) applyCaptiveRules() error {

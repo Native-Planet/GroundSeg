@@ -144,17 +144,17 @@ func hasOpenEndpointFields(req OpenEndpointRequest) bool {
 	return req.Endpoint != "" || req.Remote || req.Fix || req.SelectedDrive != ""
 }
 
-func openReqPointerForPayload(openReq OpenEndpointRequest, contract actions.UploadActionContract) *OpenEndpointRequest {
+func openReqPointerForPayload(openReq OpenEndpointRequest, contract uploadActionGovernanceContract) *OpenEndpointRequest {
 	if !contract.RequiredPayloads.Has(actions.UploadPayloadOpenEndpoint) && !hasOpenEndpointFields(openReq) {
 		return nil
 	}
 	return &openReq
 }
 
-func actionContractForAction(action Action) (actions.UploadActionContract, error) {
-	contract, err := actions.UploadActionContractForAction(action)
+func actionContractForAction(action Action) (uploadActionGovernanceContract, error) {
+	contract, err := uploadGovernanceContractForAction(action)
 	if err != nil {
-		return actions.UploadActionContract{}, err
+		return uploadActionGovernanceContract{}, err
 	}
 	return contract, nil
 }

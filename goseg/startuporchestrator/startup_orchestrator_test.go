@@ -304,6 +304,67 @@ func TestStartBackgroundServicesHealthDetectsFailFastErrors(t *testing.T) {
 	}
 }
 
+func TestStartBackgroundServicesHealthDetectsLateFailFastErrorsAfterStartupWindow(t *testing.T) {
+	failfastErr := errors.New("late failfast startup fault")
+	runtime := withStartBackgroundServicesRuntime(
+		withStartBackgroundServiceSpecs(
+			backgroundServiceSpec{
+				name:     "late-failfast",
+				failFast: true,
+				startFn: func(context.Context) error {
+					time.Sleep(startupFailFastServiceTimeout + 50*time.Millisecond)
+					return failfastErr
+				},
+			},
+		),
+	)
+
+	services, err := startBackgroundServicesWithRuntime(context.Background(), false, nil, runtime, nil)
+	if err != nil {
+		t.Fatalf("unexpected startup background services error: %v", err)
+	}
+	defer services.stop()
+
+	time.Sleep(startupFailFastServiceTimeout + 100*time.Millisecond)
+	healthErr := services.health(context.Background())
+	if healthErr == nil {
+		t.Fatal("expected late fail-fast error to be detected by health")
+	}
+	if !strings.Contains(healthErr.Error(), "late failfast startup fault") {
+		t.Fatalf("unexpected late fail-fast error: %v", healthErr)
+	}
+}
+
+func TestMonitorBackgroundServiceHealthRecordsFailureState(t *testing.T) {
+	services := &startupBackgroundServices{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	services.add(superviseBackgroundService(ctx, "failing", func(context.Context) error {
+		return errors.New("background loop failed")
+	}))
+
+	done := make(chan struct{})
+	go func() {
+		monitorBackgroundServiceHealth(ctx, services)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(startupBackgroundHealthPollInterval + time.Second):
+		t.Fatal("expected monitorBackgroundServiceHealth to exit on service failure")
+	}
+
+	healthErr := services.health(context.Background())
+	if healthErr == nil {
+		t.Fatal("expected monitor failure to be surfaced by health")
+	}
+	if !strings.Contains(healthErr.Error(), "background loop failed") {
+		t.Fatalf("unexpected monitor-propagated health error: %v", healthErr)
+	}
+}
+
 func TestStartBackgroundServicesSkipsStartramSyncWhenNotRegistered(t *testing.T) {
 	callCount := 0
 	runtime := withStartBackgroundServicesRuntime(
@@ -324,8 +385,8 @@ func TestStartBackgroundServicesSkipsStartramSyncWhenNotRegistered(t *testing.T)
 
 func TestStartupBackgroundServicesAddRetainsHandles(t *testing.T) {
 	runtimeServices := &startupBackgroundServices{}
-	runtimeServices.add(backgroundServiceHandle{name: "a"})
-	runtimeServices.add(backgroundServiceHandle{name: "b"})
+	runtimeServices.add(&backgroundServiceHandle{name: "a"})
+	runtimeServices.add(&backgroundServiceHandle{name: "b"})
 
 	if got := len(runtimeServices.services); got != 2 {
 		t.Fatalf("expected startup background services to retain appended handles, got %d", got)
@@ -458,7 +519,7 @@ func TestStartupRuntimeValidation(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected startup runtime validation failure when required callbacks are missing")
 	}
-	if !strings.Contains(err.Error(), "startup runtime missing required callbacks") {
+	if !strings.Contains(err.Error(), "startup runtime") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

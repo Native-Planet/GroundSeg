@@ -80,12 +80,16 @@ Required checks before shipping Go backend/runtime changes:
 3. Contract conformance gate (shared ownership: protocol/contracts + runtime owner maintainers):
    `go test ./protocol/contracts/... ./uploadsvc/... ./system/wifi/...`
    This must keep action-fixture, owner-coverage, family-governance, and upload payload-rule conformance checks green.
+4. Governance/runtime traceability gate:
+   `go test ./protocol/contracts/conformance -run 'TestUploadRuntimeMatchesGovernanceDeclarations|TestStartramGovernanceDeclarationsMapToCatalogEntries' ./uploadsvc/...`
+   This must keep governance declarations directly traceable to executable runtime validation and catalog conformance checks.
 
 Detailed backend checks, runtime-boundary policy, and CI contract-gate mapping:
 
 - `docs/architecture/backend-quality-gates.md`
 - Contract governance policy and canonical entrypoints:
-  `docs/architecture/contracts-governance.md`
+  `docs/architecture/contracts-governance.md` and
+  `goseg/protocol/contracts/governance/manifest.go`
 
 ## Removing GroundSeg (Uninstall)
 

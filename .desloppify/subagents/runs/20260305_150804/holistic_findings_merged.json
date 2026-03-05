@@ -1,0 +1,336 @@
+{
+  "assessments": {
+    "api_surface_coherence": 74.5,
+    "contract_coherence": 70.5,
+    "design_coherence": 54.0,
+    "error_consistency": 62.3
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "goseg/docker/orchestration/runtime_ops.go combines dependency type declarations, default wiring, cross-package runtime construction, and fallback error policy in one file, while goseg/docker/orchestration/runtime_core.go layers another large merge/option system on top of the same composite runtime.",
+        "goseg/system/wifi_runtime_methods.go combines nmcli parsing, command execution, wifi client orchestration, interface toggling, and captive sysctl mutation in a single runtime surface; goseg/system/wifi_test.go and goseg/system/wifi_c2c_flow_test.go require broad seam scaffolding to isolate behaviors.",
+        "goseg/broadcast/state.go mixes mutable state ownership, event bus behavior, collector delegation, and manual deep-copy logic for nested broadcast payloads; goseg/broadcast/state_test.go has large mutation-heavy tests focused on clone coverage, signaling high coupling to internal representation.",
+        "goseg/config/config_update_schema.go merges patch schema declaration, parsing, apply logic, merge behavior, and init-time global registry validation; goseg/config/config_test.go correspondingly carries very large scenario-heavy tests to exercise intertwined concerns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "Publishing APIs use different failure contracts for similar queue/bus operations: `EventBroker.Publish*` returns explicit backpressure/cancel errors, while `LogstreamRuntime.PublishSystemLog` is fire-and-forget with no return channel for failure (`goseg/docker/events/events.go`, `goseg/session/logstream_session_store.go`).",
+        "Runtime APIs in adjacent subsystems expose inconsistent nil/missing-dependency behavior: some methods return typed dependency errors, others silently succeed/no-op (`goseg/docker/orchestration/runtime_core.go`, `goseg/broadcast/state.go`).",
+        "WiFi query APIs return usable results plus non-nil warning errors in some paths, but this mixed contract is not uniformly normalized by callers (`goseg/system/wifi_runtime_methods.go`, `goseg/system/wifi_test.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "contract_coherence": {
+      "evidence": [
+        "`StartupRuntime.Initialize()` returns `nil` when callback is unset, while sibling startup methods (`LoadWireguard`, `LoadMC`, `LoadUrbits`, etc.) return explicit missing-dependency errors, so the same runtime contract class has divergent semantics (`goseg/docker/orchestration/runtime_core.go`).",
+        "`broadcastStateRuntime` methods mix nil-receiver semantics (silent no-op/zero return in `UpdateBroadcast`/`GetState`) with hard errors in `UpdateScheduledPack`/`PublishSchedulePack`, making precondition contracts non-uniform (`goseg/broadcast/state.go`).",
+        "WiFi methods expose a dual-result contract (data + warning error) that is only partially honored by internal callers: `primaryWifiDevice` downgrades partial parse errors, but `listSSIDs` forwards raw warning errors unchanged (`goseg/system/wifi_runtime_methods.go`, `goseg/system/wifi_test.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "Backpressure/error propagation is explicit in event publishing (`ErrTransitionBusFull`, `ErrTransitionPublishTimeout`) but absent in system log publishing (`PublishSystemLog` has no error return despite asynchronous bus semantics), creating inconsistent failure visibility for queue-based operations (`goseg/docker/events/events.go`, `goseg/session/logstream_session_store.go`, `goseg/logger/logger_test.go`).",
+        "Config patch parsing mixes strict concrete-type assertions (`parseSessionMap`, `parseDiskWarningMap`) with tolerant JSON re-decode parsing (`parseLinuxUpdatesValue`, `parsePenpaiModels`) inside the same `map[string]interface{}` patch pipeline, producing inconsistent parse error behavior for similarly sourced payloads (`goseg/config/config_update_schema.go`).",
+        "WiFi parsing uses partial-parse warnings as `error` while still returning data, but higher-level method handling is inconsistent, so equivalent malformed-input cases can either continue or fail depending on call path (`goseg/system/wifi_runtime_methods.go`, `goseg/system/wifi_test.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "orchestration_runtime_god_composition",
+      "summary": "Orchestration runtime composition mixes unrelated responsibilities into a single mega-runtime pattern that obscures change boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "runtime_ops.go defines many unrelated ops groups (container, startup, urbit, startram, health, snapshots, files, context, timers) and also constructs defaults for them in the same unit.",
+        "runtime_core.go composes these large embedded structs and merges overrides across all groups, creating broad implicit coupling for any runtime change.",
+        "startup_orchestrator_test.go uses custom runtime builders/options to manage startup behavior, indicating callers must understand broad runtime wiring rather than focused module contracts."
+      ],
+      "suggestion": "Split orchestration runtime into narrower subsystem runtimes (for example container lifecycle, startup bootstrap, urbit config, startram integration) with explicit constructor dependencies; keep a thin top-level assembler that wires them together once.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overgrown_runtime_aggregation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_runtime_multi_concern_blob",
+      "summary": "WiFi runtime file conflates parsing, process execution, networking operations, and system policy mutation.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "wifi_runtime_methods.go includes nmcli record parsing helpers, wifi.Client interaction, shell command execution, link toggling, and captive sysctl writes in one implementation surface.",
+        "wifi_test.go has to override multiple low-level seams to test simple device/SSID behaviors, showing test setup is coupled to mixed concerns.",
+        "wifi_c2c_flow_test.go separately re-stubs higher-level connection flow behavior, indicating no clean boundary between command parsing/runtime IO and mode orchestration."
+      ],
+      "suggestion": "Extract dedicated components: nmcli parser, command executor adapter, wifi-device service, and captive-rule applier; keep wifiRuntime as a coordinator with narrow interfaces so tests can target each concern independently.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mixed_io_and_domain_logic"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_state_deepcopy_and_runtime_coupling",
+      "summary": "Broadcast state runtime couples concurrency/event responsibilities with brittle manual deep-copy ownership of a large payload model.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/state_test.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "state.go handles lock-protected state mutation, schedule bus publication, collector dispatch, and a large hand-maintained cloneBroadcastState function.",
+        "state_test.go contains broad mutation tests to guard clone behavior across many nested fields, showing the clone contract is spread and fragile.",
+        "The payload model surface is large and evolving; manual clone logic in one runtime requires constant synchronized updates across representation and tests."
+      ],
+      "suggestion": "Move state ownership to a focused store and encapsulate payload copy semantics behind typed clone/copy methods closer to model definitions, or switch to immutable update helpers that eliminate manual deep-copy maintenance in runtime logic.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "state_model_ownership_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_schema_overloaded_module",
+      "summary": "Config patch schema module is overloaded with schema, parsing, application, merge, and boot-time registry concerns.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_test.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "config_update_schema.go defines patch shapes, generic field descriptors, parse functions, apply functions, merge helpers, global registry maps, and init-time validation in one file.",
+        "config_test.go carries very large end-to-end merge/patch scenarios, suggesting behavior is difficult to reason about in smaller isolated units.",
+        "The combination of global init registry state and mixed parse/apply/merge duties increases cognitive load and makes extension of config keys error-prone."
+      ],
+      "suggestion": "Separate the module into distinct layers: field catalog definition, parsing/validation, apply engine, and merge policy; replace init-time global registry with explicit constructor-built registries used by callers/tests.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "schema_engine_conflation"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "runtime_nil_contract_divergence",
+      "summary": "Runtime dependency methods use conflicting nil/missing-callback contracts (silent success vs explicit error) within the same API families.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/broadcast/state.go",
+        "goseg/session/logstream_session_store.go"
+      ],
+      "evidence": [
+        "`StartupRuntime.Initialize()` returns `nil` when `InitializeFn` is unset, but sibling methods return `seams.MissingRuntimeDependency(...)` on unset callbacks.",
+        "`broadcastStateRuntime` nil receiver returns zero/no-op for `GetState` and `UpdateBroadcast`, but returns `errBroadcastRuntimeRequired` for `UpdateScheduledPack` and `PublishSchedulePack`.",
+        "`logstreamSessionStore` methods uniformly no-op on nil receiver, including mutating/publishing paths, with no error path available."
+      ],
+      "suggestion": "Define and enforce one runtime precondition policy per API family (either explicit dependency errors or documented no-op semantics), then normalize all methods to that policy and add contract tests for nil/missing dependency behavior.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_runtime_precondition_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "async_publish_failure_visibility_mismatch",
+      "summary": "Asynchronous publish paths expose backpressure/cancellation errors inconsistently across subsystems.",
+      "related_files": [
+        "goseg/docker/events/events.go",
+        "goseg/session/logstream_session_store.go",
+        "goseg/logger/logger_test.go"
+      ],
+      "evidence": [
+        "`publishDropOnFull` returns `ErrTransitionBusFull` and `ErrTransitionPublishTimeout`, giving callers deterministic queue failure signals.",
+        "`LogstreamRuntime.PublishSystemLog` returns no error and `logstreamSessionStore.PublishSystemLog` unconditionally publishes with no propagation path.",
+        "Logger sink contract in tests (`testSystemLogSink.PublishSystemLog`) assumes fire-and-forget semantics, reinforcing a non-reporting error strategy unlike event publishing."
+      ],
+      "suggestion": "Standardize async publish interfaces around an explicit result contract (e.g., `error` with shared sentinel errors for full/cancelled/not-initialized), or define a single explicit best-effort policy and remove/encapsulate conflicting strict error semantics behind dedicated adapters.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "inconsistent_async_bus_contracts"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "partial_result_error_contract_is_nonuniform",
+      "summary": "WiFi API methods expose partial data plus warning errors, but callers and sibling methods do not apply a consistent handling strategy.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`parseNmcliWifiDeviceRecords` and `parseNmcliWifiScanResults` can return populated results with `wifiNmcliPartialParseError`.",
+        "`primaryWifiDevice` explicitly downgrades partial parse errors when at least one device exists, while `listSSIDs` directly returns `(ssids, err)` and leaves policy to callers.",
+        "Tests encode this dual contract (`wifiDevices` and `listSSIDs` expect non-empty results with non-nil partial-parse errors), indicating a deliberately mixed but hard-to-predict API shape."
+      ],
+      "suggestion": "Introduce a single typed partial-result abstraction (for example `{Data, Warnings}` or a dedicated warning channel/type) and apply it consistently across `wifiDevices`, `listSSIDs`, and upstream call sites so callers do not need method-specific error interpretation.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "partial_success_model_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "config_patch_parser_type_tolerance_drift",
+      "summary": "Config patch parsing applies inconsistent type-tolerance rules for values from the same `map[string]interface{}` boundary.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "`buildConfigPatch` ingests `map[string]interface{}` values, but `parseSessionMap`/`parseDiskWarningMap` require concrete map types (`map[string]structs.SessionInfo` / `map[string]structs.DiskWarning`).",
+        "In the same parser layer, `parseLinuxUpdatesValue` and `parsePenpaiModels` normalize generic inputs by marshal/unmarshal, accepting structurally compatible untyped maps/slices.",
+        "Existing tests heavily validate merge behavior but do not provide equivalent boundary tests for generic map-backed session/disk-warning patches, leaving this inconsistency unguarded."
+      ],
+      "suggestion": "Unify parser strategy at this boundary: either require strict typed option builders before `buildConfigPatch`, or make all composite-field parsers normalize generic map input through shared decode helpers; add tests that feed untyped JSON-decoded maps for every composite patch key.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_decode_policy_inconsistency"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 2,
+    "dimension_coverage": 0.5,
+    "evidence_density": 1.625,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 20.53,
+    "dimensions_with_findings": 4
+  },
+  "review_scope": {
+    "reviewed_files_count": 31,
+    "successful_batch_count": 2,
+    "full_sweep_included": false,
+    "total_files": 655,
+    "imported_dimensions": [
+      "api_surface_coherence",
+      "contract_coherence",
+      "design_coherence",
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/broadcast/state.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/config/config_test.go",
+    "goseg/config/config_update_schema.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/lifecycle/lifecycle_full_test.go",
+    "goseg/docker/orchestration/runtime_core.go",
+    "goseg/docker/orchestration/runtime_ops.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger_test.go",
+    "goseg/main_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/protocol/contracts/contracts_test.go",
+    "goseg/session/logstream_session_store.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/structs/configs.go",
+    "goseg/system/metrics/metrics_test.go",
+    "goseg/system/storage/storage_test.go",
+    "goseg/system/wifi_c2c_flow_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260305_150804",
+    "created_at": "2026-03-05T15:09:30+00:00",
+    "batch_count": 2,
+    "batch_indexes": [
+      1,
+      2
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "b9a6cb02ecbcaa04de7c2ba7f41537a7ccecc152f46737b56f06873414235f10"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "api_surface_coherence",
+      "contract_coherence",
+      "error_consistency",
+      "design_coherence"
+    ],
+    "imported_dimensions": [
+      "api_surface_coherence",
+      "contract_coherence",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

@@ -1,9 +1,9 @@
 package leak
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+	"groundseg/broadcast/presenter"
 	"groundseg/internal/resource"
 	"groundseg/structs"
 	"io"
@@ -99,9 +99,9 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 	if reflect.DeepEqual(oldBroadcast, newBroadcast) {
 		return oldBroadcast, nil
 	}
-	newBroadcastBytes, err := json.Marshal(newBroadcast)
+	newBroadcastBytes, err := presenter.MarshalAuthorized(newBroadcast)
 	if err != nil {
-		return oldBroadcast, fmt.Errorf("failed to marshal full broadcast for lick: %w", err)
+		return oldBroadcast, fmt.Errorf("marshal authorized broadcast for leak: %w", err)
 	}
 	statuses := GetLickStatuses()
 	channels := GetLickChannels()
@@ -122,30 +122,16 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 			}
 			continue
 		}
-
-		shipInfo, exists := newBroadcast.Urbits[patp]
-		if !exists {
-			continue
-		}
-
-		urbits := map[string]structs.Urbit{
-			patp: shipInfo,
-		}
-		wrappedUrbit := structs.AuthBroadcast{
-			Type:      "structure",
-			AuthLevel: patp,
-			Urbits:    urbits,
-		}
-		wrappedUrbit.Profile.Startram.Info.Registered = newBroadcast.Profile.Startram.Info.Registered
-		wrappedUrbit.Profile.Startram.Info.Running = newBroadcast.Profile.Startram.Info.Running
-
-		wrapperUrbitBytes, err := json.Marshal(wrappedUrbit)
+		scopedBytes, exists, err := presenter.MarshalScoped(newBroadcast, patp)
 		if err != nil {
 			sendErrors = append(sendErrors, fmt.Errorf("marshal scoped broadcast for %q: %w", patp, err))
 			continue
 		}
+		if !exists {
+			continue
+		}
 		select {
-		case channel <- string(wrapperUrbitBytes):
+		case channel <- string(scopedBytes):
 		default:
 			sendErrors = append(sendErrors, fmt.Errorf("dropping scoped broadcast for %q", patp))
 		}

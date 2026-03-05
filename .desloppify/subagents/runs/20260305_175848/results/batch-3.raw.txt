@@ -1,0 +1,101 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 81.0,
+    "test_strategy": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md defines a governance/runtime traceability gate that runs only `TestUploadRuntimeMatchesGovernanceDeclarations|TestStartramGovernanceDeclarationsMapToCatalogEntries` (README.md:84), while `c2c_manifest.go` defines a first-class governance declaration set.",
+        "Conformance checks for C2C are limited to fixture presence and canonical binding parity (`foundC2C` and fixture/binding matching in fixtures_action_test.go), not governance declaration traceability to runtime/catalog contracts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "Only upload declarations have dedicated field-level unit coverage (`upload_manifest_test.go`); there is no sibling test file for `c2c_manifest.go` or `startram_manifest.go` validating declaration fields like Owner/Name/Description/Message.",
+        "`upload_manifest_test.go` asserts declaration semantics by positional indexing (`declarations[0]`, `declarations[1]`), coupling correctness checks to list ordering rather than action identity.",
+        "Conformance tests include a StarTram ID-to-catalog check but no equivalent C2C governance-declaration conformance test."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "governance_traceability_family_gap",
+      "summary": "Governance traceability enforcement is inconsistent across contract families.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/governance/c2c_manifest.go",
+        "goseg/protocol/contracts/conformance/fixtures_action_test.go"
+      ],
+      "evidence": [
+        "The documented traceability gate runs Upload and StarTram tests only (`README.md` backend quality gate command), omitting any C2C governance traceability test.",
+        "C2C governance declarations exist (`c2cActionDeclarations`) but conformance tests only enforce fixture presence for C2C, not declaration-to-runtime/catalog mapping."
+      ],
+      "suggestion": "Add a C2C governance traceability conformance test aligned with existing Upload/StarTram checks and include it in the README quality-gate command; preferably refactor to one table-driven per-family traceability test to avoid future family omissions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "family_specific_governance_gates"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "manifest_coverage_asymmetry",
+      "summary": "Declaration-level tests are concentrated on upload, leaving C2C/StarTram contract fields unguarded.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/upload_manifest_test.go",
+        "goseg/protocol/contracts/governance/c2c_manifest.go",
+        "goseg/protocol/contracts/governance/startram_manifest.go",
+        "goseg/protocol/contracts/conformance/fixtures_action_test.go"
+      ],
+      "evidence": [
+        "Upload has explicit tests for action token, contract ID, owner, and payload rules in `upload_manifest_test.go`.",
+        "No comparable test file validates `c2cActionDeclarations` field values (owner/name/description).",
+        "StarTram conformance currently checks only declaration ID presence in catalog, not message/name/owner coherence."
+      ],
+      "suggestion": "Add dedicated governance declaration tests for C2C and StarTram mirroring upload-style assertions, or introduce one shared table-driven test that validates all declaration fields across all governance families.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "family_specific_governance_gates"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "order_coupled_upload_manifest_test",
+      "summary": "Upload declaration tests are brittle because they depend on slice order.",
+      "related_files": [
+        "goseg/protocol/contracts/governance/upload_manifest_test.go",
+        "goseg/protocol/contracts/governance/upload_manifest.go"
+      ],
+      "evidence": [
+        "`upload_manifest_test.go` reads `declarations[0]` as open-endpoint and `declarations[1]` as reset.",
+        "A non-semantic reorder in `uploadActionDeclarations` would fail tests even if contract declarations remain valid."
+      ],
+      "suggestion": "Refactor the test to index declarations by action key (map/action lookup) and assert per-action contracts, so tests verify semantics instead of declaration ordering.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "order_sensitive_contract_tests"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance conformance strategy is family-specific rather than policy-driven and uniform across all declared contract families.",
+      "Tests mix semantic contract checks with representation details (declaration ordering), reducing long-term resilience."
+    ],
+    "likely_symptoms": [
+      "governance_traceability_family_gap",
+      "manifest_coverage_asymmetry",
+      "order_coupled_upload_manifest_test"
+    ],
+    "possible_false_positives": []
+  }
+}

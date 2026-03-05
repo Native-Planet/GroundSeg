@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestStartConfigEventLoopSetsDefaultC2CInterval(t *testing.T) {
+func TestProcessConfigEventSetsDefaultC2CInterval(t *testing.T) {
 	originalBasePath := BasePath()
 	originalGlobalConfig := globalConfig
 
@@ -18,30 +18,31 @@ func TestStartConfigEventLoopSetsDefaultC2CInterval(t *testing.T) {
 		globalConfig = originalGlobalConfig
 	})
 
-	SetBasePath(t.TempDir())
+	tempBasePath := t.TempDir()
+	originalEnvBasePath := os.Getenv("GS_BASE_PATH")
+	t.Cleanup(func() {
+		if originalEnvBasePath == "" {
+			_ = os.Unsetenv("GS_BASE_PATH")
+		} else {
+			_ = os.Setenv("GS_BASE_PATH", originalEnvBasePath)
+		}
+	})
+	if err := os.Setenv("GS_BASE_PATH", tempBasePath); err != nil {
+		t.Fatalf("failed to set GS_BASE_PATH: %v", err)
+	}
 	initializePaths()
 	if err := os.MkdirAll(filepath.Dir(ConfigFilePath()), 0o755); err != nil {
 		t.Fatalf("failed to prepare config directory: %v", err)
 	}
+	if err := createDefaultConf(); err != nil {
+		t.Fatalf("failed to seed default config file: %v", err)
+	}
 	globalConfig = structs.SysConfig{}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	events := make(chan string, 1)
-	if err := StartConfigEventLoop(ctx, events); err != nil {
-		t.Fatalf("StartConfigEventLoop returned error: %v", err)
+	processConfigEvent("c2cInterval")
+	if got := Config().Connectivity.C2CInterval; got != 600 {
+		t.Fatalf("expected C2CInterval to be set to 600, got %d", got)
 	}
-
-	events <- "c2cInterval"
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if Config().Connectivity.C2CInterval == 600 {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("expected C2CInterval to be set to 600, got %d", Config().Connectivity.C2CInterval)
 }
 
 func TestStartConfigEventLoopCancels(t *testing.T) {
@@ -53,10 +54,24 @@ func TestStartConfigEventLoopCancels(t *testing.T) {
 		globalConfig = originalGlobalConfig
 	})
 
-	SetBasePath(t.TempDir())
+	tempBasePath := t.TempDir()
+	originalEnvBasePath := os.Getenv("GS_BASE_PATH")
+	t.Cleanup(func() {
+		if originalEnvBasePath == "" {
+			_ = os.Unsetenv("GS_BASE_PATH")
+		} else {
+			_ = os.Setenv("GS_BASE_PATH", originalEnvBasePath)
+		}
+	})
+	if err := os.Setenv("GS_BASE_PATH", tempBasePath); err != nil {
+		t.Fatalf("failed to set GS_BASE_PATH: %v", err)
+	}
 	initializePaths()
 	if err := os.MkdirAll(filepath.Dir(ConfigFilePath()), 0o755); err != nil {
 		t.Fatalf("failed to prepare config directory: %v", err)
+	}
+	if err := createDefaultConf(); err != nil {
+		t.Fatalf("failed to seed default config file: %v", err)
 	}
 	globalConfig = structs.SysConfig{}
 	globalConfig.Connectivity.C2CInterval = 60

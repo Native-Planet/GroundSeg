@@ -17,12 +17,14 @@ import (
 	"groundseg/rectify"
 	"groundseg/routines"
 	"groundseg/routines/logstream"
+	routinesystem "groundseg/routines/system"
 	"groundseg/session"
 	"groundseg/startram"
 	"groundseg/startupdeps"
 	"groundseg/system"
 	systemdisk "groundseg/system/disk"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -30,6 +32,7 @@ import (
 
 const cloudCheckHost = "1.1.1.1:53"
 const startupFailFastServiceTimeout = 250 * time.Millisecond
+const startupBackgroundHealthPollInterval = 5 * time.Second
 
 type startupSubsystemPolicy string
 
@@ -169,7 +172,16 @@ func (runtime startupInitRuntime) initSubsystems() []startupSubsystemStep {
 }
 
 func (runtime startupInitRuntime) validate() error {
-	return seams.NewCallbackRequirementsWithGroups("startup-init").ValidateCallbacks(runtime, "startup init runtime")
+	missing := make([]string, 0, 4)
+	for _, step := range runtime.initSubsystems() {
+		if step.policy == startupSubsystemRequired && step.initFn == nil {
+			missing = append(missing, step.name)
+		}
+	}
+	if len(missing) > 0 {
+		return seams.MissingRuntimeDependency("startup init runtime", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 func startupInitDefaultRuntime() startupInitRuntime {
@@ -230,42 +242,8 @@ func (runtime StartupRuntime) startupInitSubsystems() []startupSubsystemStep {
 }
 
 type startBackgroundServicesRuntime struct {
-	startupBackgroundCoreRuntime
-	startupBackgroundTransitionRuntime
-	startupBackgroundLogRuntime
-	startupBackgroundStartramRuntime
+	serviceCallbacksMap    map[startupBackgroundServiceName]func(context.Context) error
 	overrideServiceSpecsFn func(startramWgRegistered bool) []backgroundServiceSpec
-}
-
-type startupBackgroundCoreRuntime struct {
-	StartVersionFn          func(context.Context) error `runtime:"startup-background-service" runtime_name:"version"`
-	StartDockerFn           func(context.Context) error `runtime:"startup-background-service" runtime_name:"docker"`
-	StartLeakFn             func(context.Context) error `runtime:"startup-background-service" runtime_name:"leak"`
-	StartOldLogsCleanerFn   func(context.Context) error `runtime:"startup-background-service" runtime_name:"old-logs-cleaner"`
-	StartDiskUsageWarningFn func(context.Context) error `runtime:"startup-background-service" runtime_name:"disk-usage-warning"`
-	StartSmartDiskCheckFn   func(context.Context) error `runtime:"startup-background-service" runtime_name:"smart-disk-check"`
-	StartPackScheduleFn     func(context.Context) error `runtime:"startup-background-service" runtime_name:"pack-schedule"`
-	StartChopRoutinesFn     func(context.Context) error `runtime:"startup-background-service" runtime_name:"chop-routines"`
-	StartBackupRoutinesFn   func(context.Context) error `runtime:"startup-background-service" runtime_name:"backup-routines"`
-}
-
-type startupBackgroundTransitionRuntime struct {
-	StartUrbitTransitionFn      func(context.Context) error `runtime:"startup-background-service" runtime_name:"urbit-transition"`
-	StartSystemTransitionFn     func(context.Context) error `runtime:"startup-background-service" runtime_name:"system-transition"`
-	StartNewShipTransitionFn    func(context.Context) error `runtime:"startup-background-service" runtime_name:"new-ship-transition"`
-	StartImportShipTransitionFn func(context.Context) error `runtime:"startup-background-service" runtime_name:"import-ship-transition"`
-	StartRectifyFn              func(context.Context) error `runtime:"startup-background-service" runtime_name:"rectify"`
-}
-
-type startupBackgroundLogRuntime struct {
-	StartSysLogStreamerFn       func(context.Context) error `runtime:"startup-background-service" runtime_name:"sys-log-streamer"`
-	StartDockerLogStreamerFn    func(context.Context) error `runtime:"startup-background-service" runtime_name:"docker-log-streamer"`
-	StartDockerLogConnRemoverFn func(context.Context) error `runtime:"startup-background-service" runtime_name:"docker-log-conn-remover"`
-}
-
-type startupBackgroundStartramRuntime struct {
-	StartStartramSyncFn    func(context.Context) error `runtime:"startup-background-service,startup-background-service-startram" runtime_name:"startram-sync"`
-	StartStartramRenewalFn func(context.Context) error `runtime:"startup-background-service,startup-background-service-startram" runtime_name:"startram-renewal"`
 }
 
 type startupBackgroundServiceName string
@@ -392,17 +370,30 @@ func startupServiceSpecsForMode(startramWgRegistered bool) []startBackgroundServ
 
 func (runtime StartupRuntime) validate() error {
 	initErr := runtime.startupInitRuntime.validate()
-	runtimeErr := seams.NewCallbackRequirementsWithGroups("startup-runtime").ValidateCallbacks(runtime, "startup runtime")
+	parts := make([]string, 0, 3)
+	if runtime.StartConfigEventLoopFn == nil {
+		parts = append(parts, "startConfigEventLoop")
+	}
+	if runtime.StartStartupContainersFn == nil {
+		parts = append(parts, "startStartupContainers")
+	}
+	if runtime.StartupSettingsFn == nil {
+		parts = append(parts, "startupSettings")
+	}
+	var runtimeErr error
+	if len(parts) > 0 {
+		runtimeErr = seams.MissingRuntimeDependency("startup runtime", strings.Join(parts, ", "))
+	}
 	if initErr == nil && runtimeErr == nil {
 		return nil
 	}
-	parts := make([]string, 0, 2)
+	errParts := make([]string, 0, 2)
 	for _, err := range []error{initErr, runtimeErr} {
 		if err != nil {
-			parts = append(parts, err.Error())
+			errParts = append(errParts, err.Error())
 		}
 	}
-	return seams.MissingRuntimeDependency("startup runtime", strings.Join(parts, ", "))
+	return seams.MissingRuntimeDependency("startup runtime", strings.Join(errParts, ", "))
 }
 
 type backgroundServiceSpec struct {
@@ -419,12 +410,10 @@ func syncRetrieveWithStartram() error {
 type startupTaskID string
 
 func (runtime startBackgroundServicesRuntime) validate(startramWgRegistered bool) error {
-	requiredGroups := []string{"startup-background-service"}
-	if startramWgRegistered {
-		requiredGroups = append(requiredGroups, "startup-background-service-startram")
-	}
-	if err := seams.NewCallbackRequirementsWithGroups(requiredGroups...).ValidateCallbacks(runtime, "start background services runtime"); err != nil {
-		return err
+	for _, serviceSpec := range startupServiceSpecsForMode(startramWgRegistered) {
+		if runtime.serviceCallback(serviceSpec.name) == nil {
+			return fmt.Errorf("start background services runtime missing required callbacks: %s", serviceSpec.name)
+		}
 	}
 	return nil
 }
@@ -433,10 +422,9 @@ func (runtime startBackgroundServicesRuntime) startupServiceSpecs(startramWgRegi
 	if runtime.overrideServiceSpecsFn != nil {
 		return runtime.overrideServiceSpecsFn(startramWgRegistered)
 	}
-	callbacks := runtime.serviceCallbacks()
 	specs := make([]backgroundServiceSpec, 0, len(startBackgroundServiceSpecs))
 	for _, serviceSpec := range startupServiceSpecsForMode(startramWgRegistered) {
-		startFn := callbacks[serviceSpec.name]
+		startFn := runtime.serviceCallback(serviceSpec.name)
 		specs = append(specs, backgroundServiceSpec{
 			name:     string(serviceSpec.name),
 			startFn:  startFn,
@@ -446,74 +434,21 @@ func (runtime startBackgroundServicesRuntime) startupServiceSpecs(startramWgRegi
 	return specs
 }
 
-func (runtime startBackgroundServicesRuntime) serviceCallbacks() map[startupBackgroundServiceName]func(context.Context) error {
-	return map[startupBackgroundServiceName]func(context.Context) error{
-		startBackgroundServiceVersion:              runtime.StartVersionFn,
-		startBackgroundServiceDocker:               runtime.StartDockerFn,
-		startBackgroundServiceLeak:                 runtime.StartLeakFn,
-		startBackgroundServiceSysLogStreamer:       runtime.StartSysLogStreamerFn,
-		startBackgroundServiceOldLogsCleaner:       runtime.StartOldLogsCleanerFn,
-		startBackgroundServiceDiskUsageWarning:     runtime.StartDiskUsageWarningFn,
-		startBackgroundServiceSmartDiskCheck:       runtime.StartSmartDiskCheckFn,
-		startBackgroundServicePackSchedule:         runtime.StartPackScheduleFn,
-		startBackgroundServiceChopRoutines:         runtime.StartChopRoutinesFn,
-		startBackgroundServiceBackupRoutines:       runtime.StartBackupRoutinesFn,
-		startBackgroundServiceUrbitTransition:      runtime.StartUrbitTransitionFn,
-		startBackgroundServiceSystemTransition:     runtime.StartSystemTransitionFn,
-		startBackgroundServiceNewShipTransition:    runtime.StartNewShipTransitionFn,
-		startBackgroundServiceImportShipTransition: runtime.StartImportShipTransitionFn,
-		startBackgroundServiceRectify:              runtime.StartRectifyFn,
-		startBackgroundServiceStartramSync:         runtime.StartStartramSyncFn,
-		startBackgroundServiceStartramRenewal:      runtime.StartStartramRenewalFn,
-		startBackgroundServiceDockerLogStreamer:    runtime.StartDockerLogStreamerFn,
-		startBackgroundServiceDockerLogConnRemover: runtime.StartDockerLogConnRemoverFn,
+func (runtime startBackgroundServicesRuntime) serviceCallback(name startupBackgroundServiceName) func(context.Context) error {
+	if runtime.serviceCallbacksMap == nil {
+		return nil
 	}
+	return runtime.serviceCallbacksMap[name]
 }
 
 func (runtime *startBackgroundServicesRuntime) setServiceCallback(name startupBackgroundServiceName, callback func(context.Context) error) {
 	if runtime == nil {
 		return
 	}
-	switch name {
-	case startBackgroundServiceVersion:
-		runtime.StartVersionFn = callback
-	case startBackgroundServiceDocker:
-		runtime.StartDockerFn = callback
-	case startBackgroundServiceLeak:
-		runtime.StartLeakFn = callback
-	case startBackgroundServiceSysLogStreamer:
-		runtime.StartSysLogStreamerFn = callback
-	case startBackgroundServiceOldLogsCleaner:
-		runtime.StartOldLogsCleanerFn = callback
-	case startBackgroundServiceDiskUsageWarning:
-		runtime.StartDiskUsageWarningFn = callback
-	case startBackgroundServiceSmartDiskCheck:
-		runtime.StartSmartDiskCheckFn = callback
-	case startBackgroundServicePackSchedule:
-		runtime.StartPackScheduleFn = callback
-	case startBackgroundServiceChopRoutines:
-		runtime.StartChopRoutinesFn = callback
-	case startBackgroundServiceBackupRoutines:
-		runtime.StartBackupRoutinesFn = callback
-	case startBackgroundServiceUrbitTransition:
-		runtime.StartUrbitTransitionFn = callback
-	case startBackgroundServiceSystemTransition:
-		runtime.StartSystemTransitionFn = callback
-	case startBackgroundServiceNewShipTransition:
-		runtime.StartNewShipTransitionFn = callback
-	case startBackgroundServiceImportShipTransition:
-		runtime.StartImportShipTransitionFn = callback
-	case startBackgroundServiceRectify:
-		runtime.StartRectifyFn = callback
-	case startBackgroundServiceStartramSync:
-		runtime.StartStartramSyncFn = callback
-	case startBackgroundServiceStartramRenewal:
-		runtime.StartStartramRenewalFn = callback
-	case startBackgroundServiceDockerLogStreamer:
-		runtime.StartDockerLogStreamerFn = callback
-	case startBackgroundServiceDockerLogConnRemover:
-		runtime.StartDockerLogConnRemoverFn = callback
+	if runtime.serviceCallbacksMap == nil {
+		runtime.serviceCallbacksMap = make(map[startupBackgroundServiceName]func(context.Context) error)
 	}
+	runtime.serviceCallbacksMap[name] = callback
 }
 
 func resolveStartupRuntime(runtime StartupRuntime) (StartupRuntime, error) {
@@ -546,11 +481,15 @@ func startupRuntimeWithDefaults(overrides StartupRuntime) StartupRuntime {
 
 func startBackgroundServicesRuntimeWithDefaults(logstreamRuntime *logstream.LogstreamRuntime, overrides startBackgroundServicesRuntime) startBackgroundServicesRuntime {
 	defaults := defaultStartBackgroundServicesRuntime(logstreamRuntime)
+	resolvedCallbacks := make(map[startupBackgroundServiceName]func(context.Context) error, len(defaults.serviceCallbacksMap))
+	for name, callback := range defaults.serviceCallbacksMap {
+		resolvedCallbacks[name] = callback
+	}
+	for name, callback := range overrides.serviceCallbacksMap {
+		resolvedCallbacks[name] = callback
+	}
 	resolved := startBackgroundServicesRuntime{
-		startupBackgroundCoreRuntime:       seams.Merge(defaults.startupBackgroundCoreRuntime, overrides.startupBackgroundCoreRuntime),
-		startupBackgroundTransitionRuntime: seams.Merge(defaults.startupBackgroundTransitionRuntime, overrides.startupBackgroundTransitionRuntime),
-		startupBackgroundLogRuntime:        seams.Merge(defaults.startupBackgroundLogRuntime, overrides.startupBackgroundLogRuntime),
-		startupBackgroundStartramRuntime:   seams.Merge(defaults.startupBackgroundStartramRuntime, overrides.startupBackgroundStartramRuntime),
+		serviceCallbacksMap: resolvedCallbacks,
 	}
 	if overrides.overrideServiceSpecsFn != nil {
 		resolved.overrideServiceSpecsFn = overrides.overrideServiceSpecsFn
@@ -560,42 +499,44 @@ func startBackgroundServicesRuntimeWithDefaults(logstreamRuntime *logstream.Logs
 
 func defaultStartBackgroundServicesRuntime(logstreamRuntime *logstream.LogstreamRuntime) startBackgroundServicesRuntime {
 	return startBackgroundServicesRuntime{
-		startupBackgroundCoreRuntime: startupBackgroundCoreRuntime{
-			StartVersionFn:          routines.RunVersionSubsystemWithContext,
-			StartDockerFn:           subsystem.RunDockerSubsystem,
-			StartLeakFn:             leak.StartLeakWithContext,
-			StartOldLogsCleanerFn:   logstream.RunOldLogsCleanupLoopWithContext,
-			StartDiskUsageWarningFn: routines.DiskUsageWarningWithContext,
-			StartSmartDiskCheckFn:   routines.SmartDiskCheckWithContext,
-			StartPackScheduleFn:     routines.PackScheduleLoopWithContext,
-			StartChopRoutinesFn:     routines.StartChopRoutinesWithContext,
-			StartBackupRoutinesFn:   routines.StartBackupRoutinesWithContext,
-		},
-		startupBackgroundTransitionRuntime: startupBackgroundTransitionRuntime{
-			StartUrbitTransitionFn: func(ctx context.Context) error {
+		serviceCallbacksMap: map[startupBackgroundServiceName]func(context.Context) error{
+			startBackgroundServiceVersion:        routines.RunVersionSubsystemWithContext,
+			startBackgroundServiceDocker:         subsystem.RunDockerSubsystem,
+			startBackgroundServiceLeak:           leak.StartLeakWithContext,
+			startBackgroundServiceOldLogsCleaner: logstream.RunOldLogsCleanupLoopWithContext,
+			startBackgroundServiceDiskUsageWarning: func(ctx context.Context) error {
+				return routines.DiskUsageWarningWithContext(ctx)
+			},
+			startBackgroundServiceSmartDiskCheck: func(ctx context.Context) error {
+				return routines.SmartDiskCheckWithContext(ctx)
+			},
+			startBackgroundServicePackSchedule:   routines.PackScheduleLoopWithContext,
+			startBackgroundServiceChopRoutines:   routinesystem.RunChopRoutinesWithContext,
+			startBackgroundServiceBackupRoutines: routinesystem.RunBackupRoutinesWithContext,
+			startBackgroundServiceUrbitTransition: func(ctx context.Context) error {
 				return rectify.UrbitTransitionHandlerWithContextAndRuntime(ctx, rectify.NewRectifyRuntime())
 			},
-			StartSystemTransitionFn: func(ctx context.Context) error {
+			startBackgroundServiceSystemTransition: func(ctx context.Context) error {
 				return rectify.SystemTransitionHandlerWithContextAndRuntime(ctx, rectify.NewRectifyRuntime())
 			},
-			StartNewShipTransitionFn: func(ctx context.Context) error {
+			startBackgroundServiceNewShipTransition: func(ctx context.Context) error {
 				return rectify.NewShipTransitionHandlerWithContextAndRuntime(ctx, rectify.NewRectifyRuntime())
 			},
-			StartImportShipTransitionFn: func(ctx context.Context) error {
+			startBackgroundServiceImportShipTransition: func(ctx context.Context) error {
 				return rectify.ImportShipTransitionHandlerWithContextAndRuntime(ctx, nil)
 			},
-			StartRectifyFn: rectify.RectifyUrbitWithContext,
-		},
-		startupBackgroundLogRuntime: startupBackgroundLogRuntime{
-			StartSysLogStreamerFn:    func(ctx context.Context) error { return logstream.SysLogStreamerWithRuntime(ctx, logstreamRuntime) },
-			StartDockerLogStreamerFn: func(ctx context.Context) error { return logstream.DockerLogStreamerWithRuntime(ctx, logstreamRuntime) },
-			StartDockerLogConnRemoverFn: func(ctx context.Context) error {
+			startBackgroundServiceRectify: rectify.RectifyUrbitWithContext,
+			startBackgroundServiceSysLogStreamer: func(ctx context.Context) error {
+				return logstream.SysLogStreamerWithRuntime(ctx, logstreamRuntime)
+			},
+			startBackgroundServiceDockerLogStreamer: func(ctx context.Context) error {
+				return logstream.DockerLogStreamerWithRuntime(ctx, logstreamRuntime)
+			},
+			startBackgroundServiceDockerLogConnRemover: func(ctx context.Context) error {
 				return logstream.DockerLogConnRemoverWithRuntime(ctx, logstreamRuntime)
 			},
-		},
-		startupBackgroundStartramRuntime: startupBackgroundStartramRuntime{
-			StartStartramSyncFn:    func(context.Context) error { return syncRetrieveWithStartram() },
-			StartStartramRenewalFn: routines.StartramRenewalReminderWithContext,
+			startBackgroundServiceStartramSync:    func(context.Context) error { return syncRetrieveWithStartram() },
+			startBackgroundServiceStartramRenewal: routines.StartramRenewalReminderWithContext,
 		},
 	}
 }
@@ -632,13 +573,18 @@ type backgroundServiceHandle struct {
 	stop     context.CancelFunc
 	err      <-chan error
 	failFast bool
+	mu       sync.Mutex
+	done     bool
+	terminal error
 }
 
 type startupBackgroundServices struct {
-	services []backgroundServiceHandle
+	services       []*backgroundServiceHandle
+	monitorFailure error
+	monitorMu      sync.Mutex
 }
 
-func superviseBackgroundService(ctx context.Context, name string, fn func(context.Context) error) backgroundServiceHandle {
+func superviseBackgroundService(ctx context.Context, name string, fn func(context.Context) error) *backgroundServiceHandle {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -656,85 +602,163 @@ func superviseBackgroundService(ctx context.Context, name string, fn func(contex
 			errCh <- fmt.Errorf("%s background service failed: %w", name, err)
 		}
 	}()
-	return backgroundServiceHandle{name: name, stop: stop, err: errCh}
+	return &backgroundServiceHandle{name: name, stop: stop, err: errCh}
 }
 
-func (services *startupBackgroundServices) add(service backgroundServiceHandle) {
+func (service *backgroundServiceHandle) pollTerminal(ctx context.Context) (bool, error) {
+	if service == nil {
+		return true, nil
+	}
+	service.mu.Lock()
+	if service.done {
+		err := service.terminal
+		service.mu.Unlock()
+		return true, err
+	}
+	errCh := service.err
+	service.mu.Unlock()
+	if errCh == nil {
+		return false, nil
+	}
+	select {
+	case <-ctx.Done():
+		return false, nil
+	case serviceErr, ok := <-errCh:
+		service.mu.Lock()
+		defer service.mu.Unlock()
+		service.done = true
+		service.err = nil
+		if ok && serviceErr != nil {
+			service.terminal = serviceErr
+		}
+		return true, service.terminal
+	default:
+		return false, nil
+	}
+}
+
+func (services *startupBackgroundServices) add(service *backgroundServiceHandle) {
 	services.services = append(services.services, service)
 }
 
-func (services startupBackgroundServices) stop() {
+func (services *startupBackgroundServices) stop() {
+	if services == nil {
+		return
+	}
 	for _, service := range services.services {
-		if service.stop != nil {
+		if service != nil && service.stop != nil {
 			service.stop()
 		}
 	}
 }
 
-func (services startupBackgroundServices) health(ctx context.Context) error {
+func (services *startupBackgroundServices) health(ctx context.Context) error {
+	if services == nil {
+		return nil
+	}
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if err := services.monitorFailureSnapshot(); err != nil {
+		return err
 	}
 	if err := services.waitForFailFastErrors(ctx); err != nil {
 		return err
 	}
 	for _, service := range services.services {
-		if service.err == nil {
+		if service == nil {
 			continue
 		}
-		if service.failFast {
-			continue
-		}
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return nil
-		case serviceErr, ok := <-service.err:
-			if ok && serviceErr != nil {
-				return serviceErr
-			}
-		default:
+		}
+		_, serviceErr := service.pollTerminal(ctx)
+		if serviceErr != nil {
+			return serviceErr
 		}
 	}
 	return nil
 }
 
-func (services startupBackgroundServices) waitForFailFastErrors(ctx context.Context) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, startupFailFastServiceTimeout)
-	defer cancel()
-	failFastServices := make([]backgroundServiceHandle, 0, len(services.services))
-	for _, service := range services.services {
-		if service.failFast {
-			failFastServices = append(failFastServices, service)
-		}
+func (services *startupBackgroundServices) reportMonitorFailure(err error) {
+	if services == nil || err == nil {
+		return
 	}
-	if len(failFastServices) == 0 {
+	services.monitorMu.Lock()
+	defer services.monitorMu.Unlock()
+	if services.monitorFailure == nil {
+		services.monitorFailure = err
+	}
+}
+
+func (services *startupBackgroundServices) monitorFailureSnapshot() error {
+	if services == nil {
 		return nil
 	}
-	errCh := make(chan error, len(failFastServices))
-	for _, service := range failFastServices {
-		monitored := service
-		go func() {
-			serviceErr, ok := <-monitored.err
-			if !ok || serviceErr == nil {
-				errCh <- nil
-				return
-			}
-			errCh <- serviceErr
-		}()
+	services.monitorMu.Lock()
+	defer services.monitorMu.Unlock()
+	return services.monitorFailure
+}
+
+func monitorBackgroundServiceHealth(ctx context.Context, services *startupBackgroundServices) {
+	if services == nil {
+		return
 	}
-	remaining := len(failFastServices)
-	for remaining > 0 {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ticker := time.NewTicker(startupBackgroundHealthPollInterval)
+	defer ticker.Stop()
+	for {
+		if err := services.health(ctx); err != nil {
+			failure := fmt.Errorf("background service health check failed: %w", err)
+			services.reportMonitorFailure(failure)
+			zap.L().Error(failure.Error())
+			services.stop()
+			return
+		}
 		select {
-		case err := <-errCh:
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (services *startupBackgroundServices) waitForFailFastErrors(ctx context.Context) error {
+	if services == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	timeoutCtx, cancel := context.WithTimeout(ctx, startupFailFastServiceTimeout)
+	defer cancel()
+	for {
+		pending := 0
+		failFastCount := 0
+		for _, service := range services.services {
+			if service == nil || !service.failFast {
+				continue
+			}
+			failFastCount++
+			done, err := service.pollTerminal(timeoutCtx)
 			if err != nil {
 				return err
 			}
-			remaining--
-		case <-timeoutCtx.Done():
+			if !done {
+				pending++
+			}
+		}
+		if failFastCount == 0 || pending == 0 {
 			return nil
 		}
+		select {
+		case <-timeoutCtx.Done():
+			return nil
+		case <-time.After(10 * time.Millisecond):
+		}
 	}
-	return nil
 }
 
 type StartupOptions struct {
@@ -932,6 +956,7 @@ func newStartupOrchestrator(opts startupOptions) startupOrchestrator {
 					return err
 				}
 				backgroundServices = services
+				go monitorBackgroundServiceHealth(ctx, backgroundServices)
 
 				waitForVersionDiscovery(remoteVersion, versionUpdateChannel, updateSettings.UpdateBranch)
 				if opts.StartupRuntime.StartStartupContainersFn == nil {

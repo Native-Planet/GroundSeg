@@ -13,14 +13,26 @@ func TestSysConfigDefaults(t *testing.T) {
 	if cfg.Runtime.Setup != "start" {
 		t.Fatalf("expected default setup=start, got %q", cfg.Runtime.Setup)
 	}
-	if cfg.Runtime.DockerData != DockerData(basePath) {
-		t.Fatalf("expected DockerData to follow supplied base path, got %q", cfg.Runtime.DockerData)
+	if cfg.Runtime.DockerData != DockerBaseDir() {
+		t.Fatalf("expected DockerData to use docker base dir, got %q", cfg.Runtime.DockerData)
 	}
 	if cfg.AuthSession.KeyFile != filepath.Join(basePath, "settings", "session.key") {
 		t.Fatalf("unexpected keyFile path: %q", cfg.AuthSession.KeyFile)
 	}
 	if cfg.Runtime.SwapFile != filepath.Join(basePath, "swapfile") {
 		t.Fatalf("unexpected swap file path: %q", cfg.Runtime.SwapFile)
+	}
+}
+
+func TestDockerDataSelectorCompatibility(t *testing.T) {
+	if DockerData("volumes") != DockerVolumesDir() {
+		t.Fatalf("expected volumes selector to match DockerVolumesDir")
+	}
+	if DockerData("basePath") != DockerBaseDir() {
+		t.Fatalf("expected base selector to match DockerBaseDir")
+	}
+	if DockerData("unsupported") != "" {
+		t.Fatalf("expected unsupported selector to resolve empty path")
 	}
 }
 

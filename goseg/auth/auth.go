@@ -52,17 +52,9 @@ func Initialize() error {
 }
 
 func InitializeWithContext(ctx context.Context) error {
-	if err := Start(ctx); err != nil {
+	if err := lifecycle.Start(ctx); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to initialize auth lifecycle: %v", err))
 		return err
 	}
 	return nil
-}
-
-func Start(ctx context.Context) error {
-	return lifecycle.Start(ctx)
-}
-
-func Stop() {
-	lifecycle.Stop()
 }

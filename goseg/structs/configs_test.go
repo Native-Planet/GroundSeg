@@ -2,6 +2,7 @@ package structs
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -103,5 +104,40 @@ func TestUpdateConnectivityConfigWritesWithCorrectType(t *testing.T) {
 	}
 	if conf.Connectivity.EndpointURL != "wss://example" {
 		t.Fatalf("expected endpoint URL to be updated, got %q", conf.Connectivity.EndpointURL)
+	}
+}
+
+func TestRuntimeConfigMarshalUsesCanonicalCfgDir(t *testing.T) {
+	raw, err := json.Marshal(RuntimeConfig{CfgDir: "/tmp/groundseg"})
+	if err != nil {
+		t.Fatalf("marshal runtime config: %v", err)
+	}
+	payload := string(raw)
+	if !strings.Contains(payload, `"cfgDir":"\/tmp\/groundseg"`) &&
+		!strings.Contains(payload, `"cfgDir":"/tmp/groundseg"`) {
+		t.Fatalf("expected canonical cfgDir key in payload: %s", payload)
+	}
+	if strings.Contains(payload, `"CFG_DIR"`) {
+		t.Fatalf("expected legacy CFG_DIR key to be omitted from payload: %s", payload)
+	}
+}
+
+func TestRuntimeConfigUnmarshalAcceptsLegacyCfgDir(t *testing.T) {
+	var cfg RuntimeConfig
+	if err := json.Unmarshal([]byte(`{"CFG_DIR":"/legacy/path"}`), &cfg); err != nil {
+		t.Fatalf("unmarshal legacy cfg dir: %v", err)
+	}
+	if cfg.CfgDir != "/legacy/path" {
+		t.Fatalf("expected legacy cfg dir to populate CfgDir, got %q", cfg.CfgDir)
+	}
+}
+
+func TestRuntimeConfigUnmarshalPrefersCanonicalCfgDir(t *testing.T) {
+	var cfg RuntimeConfig
+	if err := json.Unmarshal([]byte(`{"cfgDir":"/canonical","CFG_DIR":"/legacy"}`), &cfg); err != nil {
+		t.Fatalf("unmarshal cfg dir variants: %v", err)
+	}
+	if cfg.CfgDir != "/canonical" {
+		t.Fatalf("expected canonical cfgDir to win, got %q", cfg.CfgDir)
 	}
 }

@@ -74,7 +74,8 @@ func processConfigEvent(event string) {
 	configSnapshot := Config()
 	if configSnapshot.Connectivity.C2CInterval == 0 {
 		if err := UpdateConfigTyped(WithC2CInterval(600)); err != nil {
-			zap.L().Error(fmt.Sprintf("couldn't set C2C interval: %v", err))
+			zap.L().Error(fmt.Sprintf("couldn't persist C2C interval default: %v", err))
+			return
 		}
 	}
 }

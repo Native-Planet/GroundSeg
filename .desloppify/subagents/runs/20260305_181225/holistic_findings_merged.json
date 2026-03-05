@@ -1,0 +1,221 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 49.7,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 70.0,
+        "Indirection Cost": 69.0,
+        "Interface Honesty": 73.0
+      }
+    }
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Large callback-bag runtimes are used as primary dependency boundaries (e.g., `startupInitRuntime` + `StartupRuntime` in `goseg/startuporchestrator/startup_orchestrator.go`, `importerRuntime` in `goseg/importer/importer.go`, `workflowRuntime` in `goseg/shipworkflow/operations_runtime.go`) with many function fields and grouped runtime tags.",
+        "Multiple packages expose mutable process-global dependency registries (`SetDefaultEventBroker` in `goseg/importer/importer.go` and `goseg/shipworkflow/operations_runtime.go`) while startup wiring mutates them (`goseg/startuporchestrator/startup_orchestrator.go`), making effective dependencies implicit and boot-order sensitive.",
+        "Several runtime factory helpers are largely pass-through mapping layers without strong policy/translation (e.g., `runtimeContextOps`, `runtimeFileOps`, `defaultRuntime*` in `goseg/docker/orchestration/runtime_defaults.go`; function-pointer wrappers in `goseg/main.go`)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 70.0,
+        "indirection_cost": 69.0,
+        "interface_honesty": 73.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_runtime_sprawl",
+      "summary": "Core runtime boundaries rely on oversized callback bags, creating low-cohesion abstractions with weak compile-time contracts.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`startupInitRuntime`/`StartupRuntime` aggregate many unrelated callbacks (init, host, storage, background service concerns) behind one merged struct and validation by tag groups.",
+        "`importerRuntime` embeds three runtime structs and exposes many callback fields; behavior contracts are validated at runtime through `seams.NewCallbackRequirementsWithGroups(...)` instead of narrow compile-time interfaces.",
+        "`workflowRuntime` mixes event publication, transition policy, sleep/timing, DNS resolution, ship ops, config ops, and upload orchestration in one dependency object."
+      ],
+      "suggestion": "Split runtime bags into use-case-scoped interfaces/constructors (e.g., startup init, startup background, import upload, import provision, workflow transition emit). Replace string-tag group validation with typed constructor requirements so missing dependencies fail at compile time where possible.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_bag_overgeneralization"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "mutable_global_broker_boundary",
+      "summary": "Event broker abstraction is undermined by mutable package-global defaults, hiding dependency direction and creating order-dependent behavior.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/docker/events/events.go"
+      ],
+      "evidence": [
+        "`importer` and `shipworkflow` each hold a package-global default broker plus `SetDefaultEventBroker(...)` mutation points guarded by mutexes.",
+        "Startup wiring mutates these globals during initialization (`InitializeImporterFn` in startup runtime), so correctness depends on initialization sequence.",
+        "`events.NewGlobalDefaultBroker()` delegates through mutable process-default runtime lookups on each call, reinforcing implicit global indirection."
+      ],
+      "suggestion": "Make broker dependencies explicit in constructors and pass them through runtime instances end-to-end. Remove package-level setter mutation for production paths and reserve globals only for legacy compatibility wrappers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_state"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_runtime_factories",
+      "summary": "Runtime factory layers add indirection but little behavioral value, increasing call depth and maintenance surface.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_defaults.go",
+        "goseg/main.go",
+        "goseg/config/runtimecontext/context.go"
+      ],
+      "evidence": [
+        "`runtime_defaults.go` has many helpers that primarily forward package functions into function fields (`runtimeFileOps`, `runtimeContextOps`, `runtimeNetdataOps`, `runtimeMinioOps`, `defaultRuntimeSnapshot`, etc.) with minimal policy.",
+        "`main.go` introduces wrapper methods (`bootstrapRuntime.bootstrap`, `.startServer`, `.runC2CCheck`) that mostly nil-check and forward to stored callbacks.",
+        "`runtimecontext/context.go` adds getter/setter wrappers over a global pointer state, and these are then re-wrapped again through orchestration runtime op structs."
+      ],
+      "suggestion": "Collapse pure pass-through wrappers where no policy/testing seam is needed; keep only seams that enforce behavior (timeouts, retries, fallback rules, translation). For remaining seams, centralize them in a smaller number of domain adapters instead of many per-function factories.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_bag_overgeneralization"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 1,
+    "dimension_coverage": 1.0,
+    "evidence_density": 1.0,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 9.424,
+    "dimensions_with_findings": 1
+  },
+  "review_scope": {
+    "reviewed_files_count": 40,
+    "successful_batch_count": 1,
+    "full_sweep_included": false,
+    "total_files": 702,
+    "imported_dimensions": [
+      "abstraction_fitness"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state_lifecycle.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/broadcast/state_clone.go",
+    "goseg/broadcast/collectors/system_info_test.go",
+    "goseg/broadcast/state_components_test.go",
+    "goseg/rectify/rectify_services.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/broadcast/loop.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/broadcast/presenter/presenter.go",
+    "goseg/broadcast/presenter/presenter_test.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/system/wifi_runtime_methods.go",
+    "goseg/broadcast/state_store.go",
+    "goseg/leak/leak_test.go",
+    "goseg/broadcast/transitions.go",
+    "goseg/startuporchestrator/startup_orchestrator.go",
+    "goseg/importer/importer.go",
+    "goseg/main.go",
+    "goseg/handler/systemsvc/system_test.go",
+    "goseg/startuporchestrator/startup_orchestrator_test.go",
+    "goseg/docker/orchestration/subsystem/subsystem_events.go",
+    "goseg/routines/version.go",
+    "goseg/docker/events/events.go",
+    "goseg/routines/system/system.go",
+    "goseg/structs/configs.go",
+    "goseg/routines/logstream/logs.go",
+    "goseg/main_bootstrap_test.go",
+    "goseg/docker/orchestration/subsystem/subsystem_health.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/lifecycle/planner.go",
+    "goseg/docker/network/network.go",
+    "goseg/config/runtimecontext/context.go",
+    "goseg/docker/orchestration/runtime_defaults.go",
+    "goseg/routines/system/system_test.go",
+    "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260305_181225",
+    "created_at": "2026-03-05T18:13:43+00:00",
+    "batch_count": 1,
+    "batch_indexes": [
+      1
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "8da0a5c494f9ef88320bd3e1384ff94da27f525251cfbf63c255128f46ea67e0"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

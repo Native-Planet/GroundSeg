@@ -42,13 +42,60 @@ func TestGetWifiDeviceParsesAndTrimsOutput(t *testing.T) {
 		},
 	})
 
-	devices, err := runtime.wifiDevices()
+	devices, err := runtime.wifiDevicesBestEffort()
 	if err != nil {
 		t.Fatalf("wifiDevices returned error: %v", err)
 	}
 	want := []string{"wlan1", "wlan2"}
 	if !reflect.DeepEqual(devices, want) {
 		t.Fatalf("unexpected wifi devices: got %v want %v", devices, want)
+	}
+}
+
+func TestGetWifiDeviceReturnsPartialParseWarningForMalformedRows(t *testing.T) {
+	resetWifiSeamsForTest(t)
+
+	runtime := testWifiRuntime(wifiRuntime{
+		RunCommand: func(command string, args ...string) (string, error) {
+			if command != "nmcli" {
+				t.Fatalf("unexpected command: %s", command)
+			}
+			if strings.Join(args, " ") != "-t -f DEVICE,TYPE device status" {
+				t.Fatalf("unexpected nmcli args: %q", strings.Join(args, " "))
+			}
+			return "wlan0:wifi\nmalformed-row\n", nil
+		},
+	})
+
+	devices, err := runtime.wifiDevicesBestEffort()
+	if err == nil {
+		t.Fatal("expected wifiDevices to report partial parse warning")
+	}
+	if !errors.Is(err, ErrWiFiPartialResult) {
+		t.Fatalf("expected wifi partial result warning, got %T: %v", err, err)
+	}
+	var partialErr wifiNmcliPartialParseError
+	if !errors.As(err, &partialErr) {
+		t.Fatalf("expected partial parse warning type, got %T: %v", err, err)
+	}
+	if !reflect.DeepEqual(devices, []string{"wlan0"}) {
+		t.Fatalf("expected partial parse to preserve valid devices, got %v", devices)
+	}
+}
+
+func TestGetWifiDeviceStrictFailsOnPartialParseWarning(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	runtime := testWifiRuntime(wifiRuntime{
+		RunCommand: func(command string, args ...string) (string, error) {
+			_ = command
+			_ = args
+			return "wlan0:wifi\nmalformed-row\n", nil
+		},
+	})
+	if _, err := runtime.wifiDevices(); err == nil {
+		t.Fatal("expected strict wifiDevices to fail on partial parse warning")
+	} else if !errors.Is(err, ErrWiFiPartialResult) {
+		t.Fatalf("expected strict wifiDevices error to wrap ErrWiFiPartialResult, got %v", err)
 	}
 }
 
@@ -199,13 +246,39 @@ func TestListWifiSSIDsParsesValidEntriesAndSkipsMalformed(t *testing.T) {
 		},
 	})
 
-	ssids, err := runtime.listSSIDs("wlan0")
-	if err != nil {
-		t.Fatalf("listSSIDs returned error: %v", err)
+	ssids, err := runtime.listSSIDsBestEffort("wlan0")
+	if err == nil {
+		t.Fatal("expected listSSIDs to report partial parse warning for malformed rows")
+	}
+	if !errors.Is(err, ErrWiFiPartialResult) {
+		t.Fatalf("expected wifi partial result warning, got %T: %v", err, err)
+	}
+	var partialErr wifiNmcliPartialParseError
+	if !errors.As(err, &partialErr) {
+		t.Fatalf("expected partial parse error type, got %T: %v", err, err)
 	}
 	want := []string{"HomeWiFi"}
 	if !reflect.DeepEqual(ssids, want) {
 		t.Fatalf("unexpected ssid list: got %v want %v", ssids, want)
+	}
+}
+
+func TestListWifiSSIDsStrictFailsOnPartialParseWarning(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	runtime := testWifiRuntime(wifiRuntime{
+		RunCommand: func(command string, args ...string) (string, error) {
+			_ = command
+			_ = args
+			return strings.Join([]string{
+				"a:b:c:d:e:f:g:HomeWiFi",
+				"malformed:line",
+			}, "\n"), nil
+		},
+	})
+	if _, err := runtime.listSSIDs("wlan0"); err == nil {
+		t.Fatal("expected strict listSSIDs to fail on partial parse warning")
+	} else if !errors.Is(err, ErrWiFiPartialResult) {
+		t.Fatalf("expected strict listSSIDs error to wrap ErrWiFiPartialResult, got %v", err)
 	}
 }
 
@@ -249,9 +322,27 @@ func TestListWifiSSIDsPropagatesScanFailures(t *testing.T) {
 	}
 }
 
-func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
+func TestIsWiFiRadioEnabledUsesNmcliRuntime(t *testing.T) {
 	resetWifiSeamsForTest(t)
+	runtime := testWifiRuntime(wifiRuntime{
+		RunCommand: func(command string, args ...string) (string, error) {
+			if command == "nmcli" && strings.Join(args, " ") == "radio wifi" {
+				return "enabled\n", nil
+			}
+			return "", errors.New("unexpected command")
+		},
+	})
+	wifiEnabled, err := runtime.isWiFiRadioEnabled()
+	if err != nil {
+		t.Fatalf("ifCheck returned error: %v", err)
+	}
+	if !wifiEnabled {
+		t.Fatal("expected ifCheck to return true when nmcli output contains enabled")
+	}
+}
 
+func TestToggleDeviceTurnsDeviceDownWhenRadioEnabled(t *testing.T) {
+	resetWifiSeamsForTest(t)
 	calls := []string{}
 	runtime := testWifiRuntime(wifiRuntime{
 		RunCommand: func(command string, args ...string) (string, error) {
@@ -262,25 +353,22 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 				return "enabled\n", nil
 			case command == "ip" && strings.Join(args, " ") == "link set wlan0 down":
 				return "", nil
-			case command == "ip" && strings.Join(args, " ") == "link set wlan0 up":
-				return "", nil
 			}
 			return "", errors.New("unexpected command: " + call)
 		},
 	})
-	wifiEnabled, err := runtime.isWiFiRadioEnabled()
-	if err != nil {
-		t.Fatalf("ifCheck returned error: %v", err)
-	}
-	if !wifiEnabled {
-		t.Fatal("expected ifCheck to return true when nmcli output contains enabled")
-	}
-
 	if err := runtime.toggleDevice("wlan0"); err != nil {
 		t.Fatalf("toggleDevice(off) returned error: %v", err)
 	}
+	if _, ok := findCall(calls, "ip link set wlan0 down"); !ok {
+		t.Fatalf("expected down command in calls: %v", calls)
+	}
+}
 
-	runtime = testWifiRuntime(wifiRuntime{
+func TestToggleDeviceTurnsDeviceUpWhenRadioDisabled(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	calls := []string{}
+	runtime := testWifiRuntime(wifiRuntime{
 		RunCommand: func(command string, args ...string) (string, error) {
 			call := command + " " + strings.Join(args, " ")
 			calls = append(calls, strings.TrimSpace(call))
@@ -296,27 +384,59 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 	if err := runtime.toggleDevice("wlan0"); err != nil {
 		t.Fatalf("toggleDevice(on) returned error: %v", err)
 	}
-
-	wantCalls := map[string]struct{}{
-		"nmcli radio wifi":       {},
-		"ip link set wlan0 down": {},
-		"ip link set wlan0 up":   {},
+	if _, ok := findCall(calls, "ip link set wlan0 up"); !ok {
+		t.Fatalf("expected up command in calls: %v", calls)
 	}
-	for _, call := range calls {
-		if _, ok := wantCalls[call]; !ok {
-			t.Fatalf("unexpected command in wifi seam test: %q", call)
-		}
-	}
+}
 
-	runtime = testWifiRuntime(wifiRuntime{
+func TestIsWiFiRadioEnabledReturnsErrorWhenCommandFails(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	runtime := testWifiRuntime(wifiRuntime{
 		RunCommand: func(string, ...string) (string, error) { return "", errors.New("nmcli error") },
 	})
-	wifiEnabled, err = runtime.isWiFiRadioEnabled()
+	wifiEnabled, err := runtime.isWiFiRadioEnabled()
 	if err == nil {
 		t.Fatal("expected ifCheck to return error when command fails")
 	}
 	if wifiEnabled {
 		t.Fatal("expected ifCheck to default to false when command fails")
+	}
+}
+
+func findCall(calls []string, call string) (string, bool) {
+	for _, candidate := range calls {
+		if candidate == call {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
+func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
+	resetWifiSeamsForTest(t)
+
+	calls := []string{}
+	runtime := testWifiRuntime(wifiRuntime{
+		RunCommand: func(command string, args ...string) (string, error) {
+			call := command + " " + strings.Join(args, " ")
+			calls = append(calls, strings.TrimSpace(call))
+			switch {
+			case command == "nmcli" && strings.Join(args, " ") == "radio wifi":
+				return "enabled\n", nil
+			case command == "ip" && strings.Join(args, " ") == "link set wlan0 down":
+				return "", nil
+			}
+			return "", errors.New("unexpected command: " + call)
+		},
+	})
+	if err := runtime.toggleDevice("wlan0"); err != nil {
+		t.Fatalf("toggleDevice returned error: %v", err)
+	}
+	if _, ok := findCall(calls, "nmcli radio wifi"); !ok {
+		t.Fatalf("expected nmcli radio check call, got %v", calls)
+	}
+	if _, ok := findCall(calls, "ip link set wlan0 down"); !ok {
+		t.Fatalf("expected link down call, got %v", calls)
 	}
 }
 
@@ -482,6 +602,70 @@ func TestConstructWifiInfoRefreshesWithCustomRuntime(t *testing.T) {
 	}
 	if len(info.Networks) == 0 || info.Networks[0] != "HomeWiFi" {
 		t.Fatalf("expected networks to include HomeWiFi, got %v", info.Networks)
+	}
+}
+
+func TestWiFiRuntimeServiceListWiFiSSIDsReturnsPartialResultsWithWarning(t *testing.T) {
+	state := &wifiRuntimeState{}
+	setWiFiDevice("wlan0", state)
+	runtime := NewWiFiRuntimeWith(wifiRuntime{
+		RunCommand: func(command string, args ...string) (string, error) {
+			switch {
+			case command == "nmcli" && len(args) == 5 && args[0] == "-t" && args[1] == "-f" && args[2] == "DEVICE,TYPE":
+				return "wlan0:wifi\n", nil
+			case command == "nmcli" && strings.Contains(strings.Join(args, " "), "dev wifi list ifname wlan0"):
+				return strings.Join([]string{
+					"a:b:c:d:e:f:g:HomeWiFi",
+					"malformed",
+				}, "\n"), nil
+			}
+			return "", nil
+		},
+	})
+	service := &WiFiRuntimeService{
+		runtime: runtime,
+		state:   state,
+	}
+
+	ssids, err := service.ListWiFiSSIDs("")
+	if err == nil {
+		t.Fatal("expected ListWiFiSSIDs to return partial parse warning")
+	}
+	if !errors.Is(err, ErrWiFiPartialResult) {
+		t.Fatalf("expected wifi partial result warning, got %T: %v", err, err)
+	}
+	var partialErr wifiNmcliPartialParseError
+	if !errors.As(err, &partialErr) {
+		t.Fatalf("expected wrapped partial parse error type, got %T: %v", err, err)
+	}
+	if !reflect.DeepEqual(ssids, []string{"HomeWiFi"}) {
+		t.Fatalf("expected partial SSID list to be returned, got %v", ssids)
+	}
+}
+
+func TestWiFiRuntimeServiceListWiFiSSIDsStrictFailsOnPartialParseWarning(t *testing.T) {
+	state := &wifiRuntimeState{}
+	setWiFiDevice("wlan0", state)
+	runtime := NewWiFiRuntimeWith(wifiRuntime{
+		RunCommand: func(command string, args ...string) (string, error) {
+			switch {
+			case command == "nmcli" && strings.Contains(strings.Join(args, " "), "dev wifi list ifname wlan0"):
+				return strings.Join([]string{
+					"a:b:c:d:e:f:g:HomeWiFi",
+					"malformed",
+				}, "\n"), nil
+			}
+			return "wlan0:wifi\n", nil
+		},
+	})
+	service := &WiFiRuntimeService{
+		runtime: runtime,
+		state:   state,
+	}
+	if _, err := service.ListWiFiSSIDsStrict(""); err == nil {
+		t.Fatal("expected ListWiFiSSIDsStrict to fail on partial parse warning")
+	} else if !errors.Is(err, ErrWiFiPartialResult) {
+		t.Fatalf("expected strict service error to wrap ErrWiFiPartialResult, got %v", err)
 	}
 }
 

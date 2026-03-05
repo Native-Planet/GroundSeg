@@ -1,0 +1,116 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 1,
+  "assessments": {
+    "design_coherence": 78.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "goseg/docker/orchestration/runtime_ops.go combines dependency type declarations, default wiring, cross-package runtime construction, and fallback error policy in one file, while goseg/docker/orchestration/runtime_core.go layers another large merge/option system on top of the same composite runtime.",
+        "goseg/system/wifi_runtime_methods.go combines nmcli parsing, command execution, wifi client orchestration, interface toggling, and captive sysctl mutation in a single runtime surface; goseg/system/wifi_test.go and goseg/system/wifi_c2c_flow_test.go require broad seam scaffolding to isolate behaviors.",
+        "goseg/broadcast/state.go mixes mutable state ownership, event bus behavior, collector delegation, and manual deep-copy logic for nested broadcast payloads; goseg/broadcast/state_test.go has large mutation-heavy tests focused on clone coverage, signaling high coupling to internal representation.",
+        "goseg/config/config_update_schema.go merges patch schema declaration, parsing, apply logic, merge behavior, and init-time global registry validation; goseg/config/config_test.go correspondingly carries very large scenario-heavy tests to exercise intertwined concerns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "orchestration_runtime_god_composition",
+      "summary": "Orchestration runtime composition mixes unrelated responsibilities into a single mega-runtime pattern that obscures change boundaries.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "runtime_ops.go defines many unrelated ops groups (container, startup, urbit, startram, health, snapshots, files, context, timers) and also constructs defaults for them in the same unit.",
+        "runtime_core.go composes these large embedded structs and merges overrides across all groups, creating broad implicit coupling for any runtime change.",
+        "startup_orchestrator_test.go uses custom runtime builders/options to manage startup behavior, indicating callers must understand broad runtime wiring rather than focused module contracts."
+      ],
+      "suggestion": "Split orchestration runtime into narrower subsystem runtimes (for example container lifecycle, startup bootstrap, urbit config, startram integration) with explicit constructor dependencies; keep a thin top-level assembler that wires them together once.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overgrown_runtime_aggregation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_runtime_multi_concern_blob",
+      "summary": "WiFi runtime file conflates parsing, process execution, networking operations, and system policy mutation.",
+      "related_files": [
+        "goseg/system/wifi_runtime_methods.go",
+        "goseg/system/wifi_test.go",
+        "goseg/system/wifi_c2c_flow_test.go"
+      ],
+      "evidence": [
+        "wifi_runtime_methods.go includes nmcli record parsing helpers, wifi.Client interaction, shell command execution, link toggling, and captive sysctl writes in one implementation surface.",
+        "wifi_test.go has to override multiple low-level seams to test simple device/SSID behaviors, showing test setup is coupled to mixed concerns.",
+        "wifi_c2c_flow_test.go separately re-stubs higher-level connection flow behavior, indicating no clean boundary between command parsing/runtime IO and mode orchestration."
+      ],
+      "suggestion": "Extract dedicated components: nmcli parser, command executor adapter, wifi-device service, and captive-rule applier; keep wifiRuntime as a coordinator with narrow interfaces so tests can target each concern independently.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mixed_io_and_domain_logic"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_state_deepcopy_and_runtime_coupling",
+      "summary": "Broadcast state runtime couples concurrency/event responsibilities with brittle manual deep-copy ownership of a large payload model.",
+      "related_files": [
+        "goseg/broadcast/state.go",
+        "goseg/broadcast/state_test.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "state.go handles lock-protected state mutation, schedule bus publication, collector dispatch, and a large hand-maintained cloneBroadcastState function.",
+        "state_test.go contains broad mutation tests to guard clone behavior across many nested fields, showing the clone contract is spread and fragile.",
+        "The payload model surface is large and evolving; manual clone logic in one runtime requires constant synchronized updates across representation and tests."
+      ],
+      "suggestion": "Move state ownership to a focused store and encapsulate payload copy semantics behind typed clone/copy methods closer to model definitions, or switch to immutable update helpers that eliminate manual deep-copy maintenance in runtime logic.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "state_model_ownership_blur"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_schema_overloaded_module",
+      "summary": "Config patch schema module is overloaded with schema, parsing, application, merge, and boot-time registry concerns.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_test.go",
+        "goseg/structs/configs.go"
+      ],
+      "evidence": [
+        "config_update_schema.go defines patch shapes, generic field descriptors, parse functions, apply functions, merge helpers, global registry maps, and init-time validation in one file.",
+        "config_test.go carries very large end-to-end merge/patch scenarios, suggesting behavior is difficult to reason about in smaller isolated units.",
+        "The combination of global init registry state and mixed parse/apply/merge duties increases cognitive load and makes extension of config keys error-prone."
+      ],
+      "suggestion": "Separate the module into distinct layers: field catalog definition, parsing/validation, apply engine, and merge policy; replace init-time global registry with explicit constructor-built registries used by callers/tests.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "schema_engine_conflation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Over-aggregation of runtime dependencies into large composite structs instead of bounded subsystem contracts.",
+      "Conflation of domain logic, infrastructure IO, and data-shape mechanics in single modules.",
+      "Manual representation management (deep-copy and patch registries) without clear ownership boundaries."
+    ],
+    "likely_symptoms": [
+      "orchestration_runtime_god_composition",
+      "wifi_runtime_multi_concern_blob",
+      "broadcast_state_deepcopy_and_runtime_coupling",
+      "config_patch_schema_overloaded_module"
+    ],
+    "possible_false_positives": []
+  }
+}

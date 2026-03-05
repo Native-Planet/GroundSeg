@@ -20,10 +20,13 @@ type LogstreamRuntime interface {
 	SetDockerLogSessionLive(string, *websocket.Conn, bool)
 	RemoveDockerLogSession(string, *websocket.Conn)
 	SystemLogMessages() <-chan []byte
-	PublishSystemLog([]byte)
+	PublishSystemLog([]byte) error
 }
 
 type logstreamSessionStore struct {
+	// Nil receiver policy:
+	// - session query/mutation methods are benign no-op/empty
+	// - publish path returns explicit bus dependency/backpressure errors
 	sysLogMu           sync.RWMutex
 	sysLogSessions     []*websocket.Conn
 	sysSessionsToClear []*websocket.Conn
@@ -206,9 +209,9 @@ func (store *logstreamSessionStore) SystemLogMessages() <-chan []byte {
 	return store.systemLogBus.Messages()
 }
 
-func (store *logstreamSessionStore) PublishSystemLog(logData []byte) {
+func (store *logstreamSessionStore) PublishSystemLog(logData []byte) error {
 	if store == nil {
-		return
+		return ErrSystemLogBusNotDefined
 	}
-	store.systemLogBus.Publish(logData)
+	return store.systemLogBus.Publish(logData)
 }
