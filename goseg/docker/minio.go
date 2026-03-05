@@ -936,7 +936,6 @@ func MarkObjectStoreLinkConfigured(patp string) error {
 	content := fmt.Sprintf("ok %s\n", time.Now().UTC().Format(time.RFC3339))
 	return WriteFileToVolume(volumeName, objectStoreLinkMarker, content)
 }
-
 func CreateObjectStoreCredentials(patp string) (structs.MinIOServiceAccount, error) {
 	var svcAccount structs.MinIOServiceAccount
 	svcAccount.Alias = fmt.Sprintf("patp_%s", patp)
