@@ -19,8 +19,8 @@ const (
 	autoLinkMaxAttempts   = 18
 )
 
-// AutoConfigureObjectStoreLinks links S3 storage for ships that are unlinked at startup.
-// This is bounded and only targets ships unlinked at daemon boot, so user-initiated unlinks are respected.
+// AutoConfigureObjectStoreLinks performs one-time S3 link/relink for ships missing the RustFS link marker.
+// Once marked, startup auto-link stops touching that ship and user-managed unlinks are respected.
 func AutoConfigureObjectStoreLinks() {
 	time.Sleep(autoLinkInitialDelay)
 
@@ -35,8 +35,15 @@ func AutoConfigureObjectStoreLinks() {
 			zap.L().Warn(fmt.Sprintf("Skipping auto S3 link for %s: failed to load config: %v", pier, err))
 			continue
 		}
-		shipConf := config.UrbitConf(pier)
-		if !shipConf.MinIOLinked {
+		linkConfigured, err := docker.IsObjectStoreLinkConfigured(pier)
+		if err != nil {
+			zap.L().Warn(fmt.Sprintf("Skipping auto S3 link for %s: failed to read link marker: %v", pier, err))
+			continue
+		}
+		// One-time migration behavior:
+		// - marker missing: auto-link/relink once
+		// - marker present: no auto action (respects user-managed link state)
+		if !linkConfigured {
 			pending[pier] = struct{}{}
 		}
 	}
@@ -74,7 +81,11 @@ func ensureObjectStoreLinked(patp string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 	shipConf := config.UrbitConf(patp)
-	if shipConf.MinIOLinked {
+	linkConfigured, err := docker.IsObjectStoreLinkConfigured(patp)
+	if err != nil {
+		return fmt.Errorf("failed to read link marker: %w", err)
+	}
+	if shipConf.MinIOLinked && linkConfigured {
 		return nil
 	}
 
@@ -120,6 +131,9 @@ func ensureObjectStoreLinked(patp string) error {
 	update := map[string]structs.UrbitDocker{patp: shipConf}
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("failed to persist link status: %w", err)
+	}
+	if err := docker.MarkObjectStoreLinkConfigured(patp); err != nil {
+		return fmt.Errorf("failed to persist object-store link marker: %w", err)
 	}
 	return nil
 }

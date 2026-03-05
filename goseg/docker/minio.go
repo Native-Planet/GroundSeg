@@ -28,6 +28,7 @@ const (
 	defaultRustFSImageRef = "rustfs/rustfs:latest"
 	legacyMinIOImageRef   = "registry.hub.docker.com/minio/minio:latest"
 	minioMigrationMarker  = ".groundseg-rustfs-migration-complete"
+	objectStoreLinkMarker = ".groundseg-rustfs-link-configured"
 )
 
 var (
@@ -297,16 +298,25 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 	}
 	shipConf := config.UrbitConf(shipName)
 
-	randomBytes := make([]byte, 16)
-	_, err = rand.Read(randomBytes)
-	if err != nil {
-		return containerConfig, hostConfig, err
+	storePwd := strings.TrimSpace(shipConf.MinioPassword)
+	if storePwd == "" {
+		randomBytes := make([]byte, 16)
+		_, err = rand.Read(randomBytes)
+		if err != nil {
+			return containerConfig, hostConfig, err
+		}
+		storePwd = hex.EncodeToString(randomBytes)
+		shipConf.MinioPassword = storePwd
+		update := map[string]structs.UrbitDocker{shipName: shipConf}
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return containerConfig, hostConfig, err
+		}
 	}
-	storePwd := hex.EncodeToString(randomBytes)
 	if err := setObjectStorePassword(shipName, storePwd); err != nil {
 		return containerConfig, hostConfig, err
 	}
 
+	serverDomains := objectStoreServerDomains(shipConf)
 	environment := []string{
 		fmt.Sprintf("RUSTFS_ACCESS_KEY=%s", shipName),
 		fmt.Sprintf("RUSTFS_SECRET_KEY=%s", storePwd),
@@ -314,7 +324,9 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 		fmt.Sprintf("RUSTFS_CONSOLE_ADDRESS=0.0.0.0:%v", shipConf.WgConsolePort),
 		"RUSTFS_CONSOLE_ENABLE=true",
 		"RUSTFS_VOLUMES=/data",
-		fmt.Sprintf("RUSTFS_SERVER_DOMAINS=s3.%s", shipConf.WgURL),
+	}
+	if serverDomains != "" {
+		environment = append(environment, fmt.Sprintf("RUSTFS_SERVER_DOMAINS=%s", serverDomains))
 	}
 	mounts := []mount.Mount{
 		{
@@ -375,6 +387,32 @@ func newS3Client(endpoint string, accessKey string, secretKey string) (*s3v2.Cli
 		o.UsePathStyle = true
 	})
 	return client, nil
+}
+
+func normalizeObjectStoreDomain(domain string) string {
+	domain = strings.TrimSpace(domain)
+	domain = strings.TrimPrefix(domain, "https://")
+	domain = strings.TrimPrefix(domain, "http://")
+	if cut := strings.IndexRune(domain, '/'); cut >= 0 {
+		domain = domain[:cut]
+	}
+	return strings.TrimSpace(strings.Trim(domain, "/"))
+}
+
+func objectStoreServerDomains(shipConf structs.UrbitDocker) string {
+	var domains []string
+	baseDomain := strings.TrimSpace(shipConf.WgURL)
+	if baseDomain != "" {
+		defaultDomain := normalizeObjectStoreDomain(fmt.Sprintf("s3.%s", baseDomain))
+		if defaultDomain != "" {
+			domains = append(domains, defaultDomain)
+		}
+	}
+	customDomain := normalizeObjectStoreDomain(shipConf.CustomS3Web)
+	if customDomain != "" && !contains(domains, customDomain) {
+		domains = append(domains, customDomain)
+	}
+	return strings.Join(domains, ",")
 }
 
 func bucketNotFound(err error) bool {
@@ -872,6 +910,31 @@ func readMigrationMarkerStatus(volumeName, marker string) (string, error) {
 func writeMigrationMarker(volumeName, status string) error {
 	content := fmt.Sprintf("%s %s\n", status, time.Now().UTC().Format(time.RFC3339))
 	return WriteFileToVolume(volumeName, minioMigrationMarker, content)
+}
+
+func IsObjectStoreLinkConfigured(patp string) (bool, error) {
+	volumeName := GetObjectStoreDataVolumeName(patp)
+	exists, err := volumeExists(volumeName)
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
+	return volumeHasMarker(volumeName, objectStoreLinkMarker)
+}
+
+func MarkObjectStoreLinkConfigured(patp string) error {
+	volumeName := GetObjectStoreDataVolumeName(patp)
+	exists, err := volumeExists(volumeName)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	content := fmt.Sprintf("ok %s\n", time.Now().UTC().Format(time.RFC3339))
+	return WriteFileToVolume(volumeName, objectStoreLinkMarker, content)
 }
 
 func CreateObjectStoreCredentials(patp string) (structs.MinIOServiceAccount, error) {

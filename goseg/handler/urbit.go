@@ -1104,6 +1104,9 @@ func toggleMinIOLink(patp string, shipConf structs.UrbitDocker) error {
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
+		if err := docker.MarkObjectStoreLinkConfigured(patp); err != nil {
+			zap.L().Warn(fmt.Sprintf("Couldn't persist S3 link marker for %s: %v", patp, err))
+		}
 
 		// Success
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "success"}
