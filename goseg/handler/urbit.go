@@ -674,6 +674,35 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
+
+	// Recreate RustFS so domain-related env is applied immediately.
+	storeContainer := docker.GetObjectStoreContainerName(patp)
+	if err := docker.DeleteContainer(storeContainer); err != nil {
+		zap.L().Warn(fmt.Sprintf("Couldn't delete RustFS container %s while applying custom domain: %v", storeContainer, err))
+	}
+	storeInfo, err := docker.StartContainer(storeContainer, "minio")
+	if err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return fmt.Errorf("Couldn't restart RustFS for %s after setting custom domain: %v", patp, err)
+	}
+	config.UpdateContainerState(storeContainer, storeInfo)
+
+	// If storage is currently linked, refresh the endpoint on-ship.
+	if shipConf.MinIOLinked {
+		svcAccount, err := docker.CreateObjectStoreCredentials(patp)
+		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Couldn't load RustFS credentials for %s after setting custom domain: %v", patp, err)
+		}
+		if err := click.LinkStorage(patp, alias, svcAccount); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Couldn't relink storage for %s after setting custom domain: %v", patp, err)
+		}
+		if err := docker.MarkObjectStoreLinkConfigured(patp); err != nil {
+			zap.L().Warn(fmt.Sprintf("Couldn't persist S3 link marker for %s after custom domain update: %v", patp, err))
+		}
+	}
+
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"}
 	time.Sleep(3 * time.Second)
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "done"}
