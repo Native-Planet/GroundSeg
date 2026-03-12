@@ -23,7 +23,7 @@
     <!--
     <LogArea type="wireguard" />
     -->
-    <LogArea type="haltyc-rosled-nallux-dozryl" />
+    <LogArea type="urbit" />
   {:else}
     <LogArea type="system" />
   {/if}
