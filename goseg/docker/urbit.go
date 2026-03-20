@@ -109,6 +109,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		scriptContent = defaults.PrepScript
 	case "chop":
 		scriptContent = defaults.ChopScript
+	case "rollchop":
+		scriptContent = defaults.RollChopScript
 	case "roll":
 		scriptContent = defaults.RollScript
 	default:
@@ -116,7 +118,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	// reset ship status to boot for next time
 	switch act {
-	case "pack", "meld", "chop", "noboot":
+	case "pack", "meld", "chop", "rollchop", "noboot":
 		// we'll set this to noboot because we want to manually control the boot
 		// status the next time handler (or other modules) decides to call this func
 		updateUrbitConf := shipConf

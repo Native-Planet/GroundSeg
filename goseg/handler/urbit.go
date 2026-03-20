@@ -1203,35 +1203,30 @@ func performChop(patp string, shipConf structs.UrbitDocker, transitionType strin
 		WaitComplete(patp)
 	}
 
+	bootStatus := "chop"
 	if rollBeforeChop {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "rolling"}
-		zap.L().Info(fmt.Sprintf("Attempting to roll %s", patp))
-		shipConf.BootStatus = "roll"
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		if err := config.UpdateUrbitConfig(update); err != nil {
-			return chopError(fmt.Errorf("Failed to update %s urbit config to roll: %v", patp, err))
-		}
-		if _, err := docker.StartContainer(patp, "vere"); err != nil {
-			return chopError(fmt.Errorf("Failed to roll %s: %v", patp, err))
-		}
-		zap.L().Info(fmt.Sprintf("Waiting for roll to complete for %s", patp))
-		WaitComplete(patp)
+		zap.L().Info(fmt.Sprintf("Attempting roll & chop for %s", patp))
+		bootStatus = "rollchop"
+	} else {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "chopping"}
+		zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
 	}
 
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "chopping"}
-	zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
-	shipConf.BootStatus = "chop"
+	shipConf.BootStatus = bootStatus
 	update := make(map[string]structs.UrbitDocker)
 	update[patp] = shipConf
 	if err := config.UpdateUrbitConfig(update); err != nil {
-		return chopError(fmt.Errorf("Failed to update %s urbit config to chop: %v", patp, err))
+		return chopError(fmt.Errorf("Failed to update %s urbit config to %s: %v", patp, bootStatus, err))
 	}
 	if _, err := docker.StartContainer(patp, "vere"); err != nil {
-		return chopError(fmt.Errorf("Failed to chop %s: %v", patp, err))
+		return chopError(fmt.Errorf("Failed to start %s maintenance for %s: %v", bootStatus, patp, err))
+	}
+	if rollBeforeChop {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "chopping"}
 	}
 
-	zap.L().Info(fmt.Sprintf("Waiting for chop to complete for %s", patp))
+	zap.L().Info(fmt.Sprintf("Waiting for %s to complete for %s", bootStatus, patp))
 	WaitComplete(patp)
 
 	if isRunning {
