@@ -1187,6 +1187,11 @@ func performChop(patp string, shipConf structs.UrbitDocker, transitionType strin
 		return chopError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 	}
 	isRunning := strings.Contains(status, "Up")
+	// prevent die/stop watchers from restarting the ship while maintenance exits are expected
+	if containerState, exists := config.GetContainerState()[patp]; exists {
+		containerState.DesiredStatus = "stopped"
+		config.UpdateContainerState(patp, containerState)
+	}
 	if isRunning {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "stopping"}
 		if err := click.BarExit(patp); err != nil {
@@ -1231,6 +1236,10 @@ func performChop(patp string, shipConf structs.UrbitDocker, transitionType strin
 
 	if isRunning {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "starting"}
+		if containerState, exists := config.GetContainerState()[patp]; exists {
+			containerState.DesiredStatus = "running"
+			config.UpdateContainerState(patp, containerState)
+		}
 		shipConf.BootStatus = "boot"
 		update := make(map[string]structs.UrbitDocker)
 		update[patp] = shipConf
