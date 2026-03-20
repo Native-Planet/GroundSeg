@@ -153,7 +153,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	shipName := shipConf.PierName
 	loomValue := fmt.Sprintf("%v", shipConf.LoomSize)
 	var devMode string
-	if shipConf.DevMode == true {
+	if shipUsesDevMode(act) && shipConf.DevMode == true {
 		devMode = "True"
 	} else {
 		devMode = "False"
@@ -245,4 +245,13 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	zap.L().Debug(fmt.Sprintf("Boot command: %v", containerConfig.Cmd))
 	return containerConfig, hostConfig, nil
+}
+
+func shipUsesDevMode(bootStatus string) bool {
+	switch bootStatus {
+	case "boot", "noboot", "ignore":
+		return true
+	default:
+		return false
+	}
 }

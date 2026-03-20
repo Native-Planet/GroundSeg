@@ -60,6 +60,7 @@ func UnlinkStorage(patp string) error { return unlinkStorage(patp) }
 func LinkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) error {
 	return linkStorage(patp, endpoint, svcAccount)
 }
+func GetStorageEndpoint(patp string) (string, error) { return getStorageEndpoint(patp) }
 
 // restore.go
 func RestoreTlon(patp string) error {
