@@ -19,11 +19,11 @@ func ChopAtLimit() {
 			if urbConf.SizeLimit == 0 {
 				continue
 			}
-			currentSize := int64(docker.GetContainerStats(patp).DiskUsage / GB)
+			currentSize := int64(docker.ForceUpdateContainerStats(patp).DiskUsage / GB)
 			zap.L().Info(fmt.Sprintf("Auto chop: Checking if %s requires a chop. Limit: %v GB, Current Size (rounded) %v GB", patp, urbConf.SizeLimit, currentSize))
 			if int64(urbConf.SizeLimit) <= currentSize {
-				zap.L().Info(fmt.Sprintf("Auto chop: Attempting to chop %s", patp))
-				go handler.ChopPier(patp, urbConf)
+				zap.L().Info(fmt.Sprintf("Auto chop: Attempting roll & chop for %s", patp))
+				go handler.ScheduledChopPier(patp, urbConf)
 			}
 		}
 

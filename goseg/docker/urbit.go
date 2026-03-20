@@ -109,6 +109,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		scriptContent = defaults.PrepScript
 	case "chop":
 		scriptContent = defaults.ChopScript
+	case "rollchop":
+		scriptContent = defaults.RollChopScript
 	case "roll":
 		scriptContent = defaults.RollScript
 	default:
@@ -116,7 +118,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	// reset ship status to boot for next time
 	switch act {
-	case "pack", "meld", "chop", "noboot":
+	case "pack", "meld", "chop", "rollchop", "noboot":
 		// we'll set this to noboot because we want to manually control the boot
 		// status the next time handler (or other modules) decides to call this func
 		updateUrbitConf := shipConf
@@ -153,7 +155,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	shipName := shipConf.PierName
 	loomValue := fmt.Sprintf("%v", shipConf.LoomSize)
 	var devMode string
-	if shipConf.DevMode == true {
+	if shipUsesDevMode(act) && shipConf.DevMode == true {
 		devMode = "True"
 	} else {
 		devMode = "False"
@@ -245,4 +247,13 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	zap.L().Debug(fmt.Sprintf("Boot command: %v", containerConfig.Cmd))
 	return containerConfig, hostConfig, nil
+}
+
+func shipUsesDevMode(bootStatus string) bool {
+	switch bootStatus {
+	case "boot", "noboot", "ignore":
+		return true
+	default:
+		return false
+	}
 }
