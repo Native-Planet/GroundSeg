@@ -25,7 +25,6 @@
   $: isLoading = tExtraArgs == "loading"
   $: isSuccess = tExtraArgs == "success"
   $: remoteMessage = tExtraArgs.length > 0 && !isLoading && !isSuccess ? tExtraArgs : ""
-  $: statusMessage = lint.message.length > 0 ? lint.message : remoteMessage
   $: preview = bootCommandBase.length > 0
     ? (trimmedDraft.length > 0 ? `${bootCommandBase} ${trimmedDraft}` : bootCommandBase)
     : "Preview unavailable"
@@ -55,7 +54,7 @@
   {#if expanded}
     <div class="panel">
       <div class="helper">
-        Enter flags exactly as you would on the CLI, for example <code>--bootstrap-url google.com/pill --no-demand</code>.
+        Enter flags exactly as you would on the CLI, for example <code>-L --no-demand</code>.
       </div>
       {#if $URBIT_MODE && ownShip}
         <div class="helper warning">
@@ -63,14 +62,16 @@
         </div>
       {/if}
       <textarea
-        class:error={statusMessage.length > 0}
+        class:error={remoteMessage.length > 0}
+        class:lint-error={!lint.valid}
         bind:value={draft}
         disabled={isLoading}
-        placeholder="--bootstrap-url google.com/pill --no-demand" />
+        placeholder="-L --no-demand"
+        title={!lint.valid ? lint.message : remoteMessage} />
       <div class="preview-label">Boot command preview</div>
       <pre>{preview}</pre>
-      {#if statusMessage.length > 0}
-        <div class="status-message">{statusMessage}</div>
+      {#if remoteMessage.length > 0}
+        <div class="status-message">{remoteMessage}</div>
       {/if}
       <div class="actions">
         <button class="save-button" disabled={saveDisabled} on:click={handleSave}>
@@ -126,7 +127,12 @@
   }
   textarea.error {
     border-color: #d45151;
+  }
+  textarea.lint-error {
     color: #ffd4d4;
+    text-decoration-line: line-through;
+    text-decoration-color: #d45151;
+    text-decoration-thickness: 2px;
   }
   textarea:disabled {
     opacity: .6;

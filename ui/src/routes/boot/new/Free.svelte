@@ -117,14 +117,12 @@
   </div>
   <div class="input-wrapper">
     <div class="label">First-Time Only CLI Flags</div>
-    <div class="sub-label">Used only during the initial key boot, for example <code>--bootstrap-url ... --prop-url ... --prop-name ...</code>.</div>
+    <div class="sub-label">Used only during the initial key boot, for example <code>--bootstrap-url https://bootstrap.urbit.org/urbit-vX.Y.pill</code>.</div>
     <textarea
-      class:error={firstBootLint.message.length > 0}
+      class:lint-error={!firstBootLint.valid}
       bind:value={firstBootArgs}
-      placeholder="--bootstrap-url google.com/pill --prop-url https://example.com --prop-name my-planet" />
-    {#if firstBootLint.message.length > 0}
-      <div class="lint-error">{firstBootLint.message}</div>
-    {/if}
+      placeholder="--bootstrap-url https://bootstrap.urbit.org/urbit-vX.Y.pill"
+      title={!firstBootLint.valid ? firstBootLint.message : ""} />
   </div>
 {/if}
 <div class="input-wrapper">
@@ -294,9 +292,12 @@
   textarea:focus {
     outline: none;
   }
-  textarea.error {
+  textarea.lint-error {
     border-color: #d45151;
     color: #d45151;
+    text-decoration-line: line-through;
+    text-decoration-color: #d45151;
+    text-decoration-thickness: 2px;
   }
   .sub-label {
     color: var(--Gray-400, #5C7060);
@@ -310,15 +311,6 @@
   .sub-label code {
     font-family: 'Source Code Pro', monospace;
     font-size: 90%;
-  }
-  .lint-error {
-    color: #d45151;
-    font-family: Inter;
-    font-size: 16px;
-    font-style: normal;
-    font-weight: 400;
-    line-height: 22px;
-    letter-spacing: -0.8px;
   }
   .advance {
     cursor: pointer;
