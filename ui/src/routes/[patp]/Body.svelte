@@ -20,6 +20,7 @@
   import AdditionalArgs from './Section/AdditionalArgs.svelte'
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
+  import WebShell from './Section/WebShell.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
   import BackupTlon from './Section/BackupTlon.svelte'
   import Chop from './Section/Chop.svelte'  // vere 3.0
@@ -160,6 +161,12 @@
     {tToggleDevMode}
     {ownShip}
     />
+
+  {#if devMode}
+    <WebShell
+      {patp}
+    />
+  {/if}
 
   <!-- Loom -->
   <Loom
