@@ -11,7 +11,6 @@
 
   export let running
   export let minioAlias
-  export let startramRunning
   export let patp
   export let minioUrl
   export let minioPwd
@@ -22,6 +21,7 @@
   let copy
   let copied = false
   let showCustom = false
+  $: s3Ready = (minioPwd?.length > 0) && (minioUrl != "#")
 
   onMount(()=>{
     copy = new Clipboard('#copy');
@@ -35,9 +35,10 @@
 <div>
   <div class="section-title">S3</div>
   <div class="wrapper">
-    <button disabled={!startramRunning} id="copy" class="btn copy-btn" data-clipboard-text={minioPwd}>
+    <button disabled={!s3Ready} id="copy" class="btn copy-btn" data-clipboard-text={minioPwd}>
       <img
         src={pfx+"/clipboard.svg"}
+        alt="clipboard"
         width="24px"
         height="24px" />
       {#if copied}
@@ -52,7 +53,7 @@
     <button
       class="btn"
       on:click={()=>toggleRustFSLink(patp)}
-      disabled={(tToggleMinIOLink == "linking") || !startramRunning || !running || (tToggleMinIOLink == "unlinking")}
+      disabled={(tToggleMinIOLink == "linking") || !s3Ready || !running || (tToggleMinIOLink == "unlinking")}
       >
       {#if tToggleMinIOLink == "linking"}
         Linking..

@@ -139,12 +139,9 @@ func ensureObjectStoreLinked(patp string) (bool, error) {
 		return false, fmt.Errorf("failed to create RustFS credentials: %w", err)
 	}
 
-	endpoint := strings.TrimSpace(shipConf.CustomS3Web)
-	if endpoint == "" && strings.TrimSpace(shipConf.WgURL) != "" {
-		endpoint = fmt.Sprintf("s3.%s", shipConf.WgURL)
-	}
-	if endpoint == "" {
-		return false, fmt.Errorf("no S3 endpoint configured")
+	endpoint, err := docker.GetObjectStoreLinkEndpoint(patp)
+	if err != nil {
+		return false, fmt.Errorf("failed to determine S3 endpoint: %w", err)
 	}
 
 	if err := click.LinkStorage(patp, endpoint, svcAccount); err != nil {
@@ -185,6 +182,9 @@ func expectedStorageEndpointHosts(shipConf structs.UrbitDocker) map[string]struc
 		endpoints[host] = struct{}{}
 	}
 	if host := normalizeStorageEndpointHost(shipConf.CustomS3Web); host != "" {
+		endpoints[host] = struct{}{}
+	}
+	if host := normalizeStorageEndpointHost(fmt.Sprintf("http://%s:%d", "host.docker.internal", shipConf.HTTPPort+2000)); host != "" {
 		endpoints[host] = struct{}{}
 	}
 	return endpoints

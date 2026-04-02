@@ -147,6 +147,8 @@ type Urbit struct {
 		DiskUsage                int64          `json:"diskUsage"`
 		LoomSize                 int            `json:"loomSize"`
 		SnapTime                 int            `json:"snapTime"`
+		ExtraArgs                string         `json:"extraArgs"`
+		BootCommandBase          string         `json:"bootCommandBase"`
 		DevMode                  bool           `json:"devMode"`
 		DetectBootStatus         bool           `json:"detectBootStatus"`
 		Remote                   bool           `json:"remote"`
@@ -210,6 +212,7 @@ type UrbitTransitionBroadcast struct {
 	LocalTlonBackupSchedule   string `json:"localTlonBackupSchedule"`
 	HandleRestoreTlonBackup   string `json:"handleRestoreTlonBackup"`
 	SnapTime                  string `json:"snapTime"`
+	ExtraArgs                 string `json:"extraArgs"`
 }
 
 // used to construct broadcast pier info subobject

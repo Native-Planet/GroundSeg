@@ -17,8 +17,10 @@
   import MinIO from './Section/MinIO.svelte'
   import Loom from './Section/Loom.svelte'
   import SnapTime from './Section/SnapTime.svelte'
+  import AdditionalArgs from './Section/AdditionalArgs.svelte'
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
+  import WebShell from './Section/WebShell.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
   import BackupTlon from './Section/BackupTlon.svelte'
   import Chop from './Section/Chop.svelte'  // vere 3.0
@@ -50,6 +52,8 @@
   $: running = (ship?.running) || false
   $: loomSize = (ship?.loomSize)
   $: snapTime = (ship?.snapTime)
+  $: extraArgs = (ship?.extraArgs) || ""
+  $: bootCommandBase = (ship?.bootCommandBase) || ""
   $: lusCode = (ship?.lusCode) || ""
   $: url = (ship?.url) || "#"
   $: showUrbAlias = (ship?.showUrbAlias) || false
@@ -75,8 +79,6 @@
 
   // profile > startram
   $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
-  $: startramRunning = ($structure?.profile?.startram?.info?.running) || false
-
   const handleGallseg = p => {
     if (gallseg) {
       uninstallGallseg(p)
@@ -114,7 +116,6 @@
     <!-- MinIO Info -->
     <MinIO 
       {running}
-      {startramRunning}
       {patp}
       {minioAlias}
       {minioUrl}
@@ -161,6 +162,12 @@
     {ownShip}
     />
 
+  {#if devMode}
+    <WebShell
+      {patp}
+    />
+  {/if}
+
   <!-- Loom -->
   <Loom
     {patp}
@@ -174,6 +181,13 @@
     {snapTime} 
     {ownShip}
     />
+
+  <AdditionalArgs
+    {patp}
+    {ownShip}
+    {extraArgs}
+    {bootCommandBase}
+  />
   <!-- vere 3.0 -->
   <!-- Chop -->
   <Chop {patp} />

@@ -21,14 +21,20 @@ import (
 	s3v2 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/go-connections/nat"
 	"go.uber.org/zap"
 )
 
 const (
-	defaultRustFSImageRef = "rustfs/rustfs:latest"
-	legacyMinIOImageRef   = "registry.hub.docker.com/minio/minio:latest"
-	minioMigrationMarker  = ".groundseg-rustfs-migration-complete"
-	objectStoreLinkMarker = ".groundseg-rustfs-link-configured"
+	defaultRustFSImageRef      = "rustfs/rustfs:latest"
+	legacyMinIOImageRef        = "registry.hub.docker.com/minio/minio:latest"
+	minioMigrationMarker       = ".groundseg-rustfs-migration-complete"
+	objectStoreLinkMarker      = ".groundseg-rustfs-link-configured"
+	offlineRustFSS3Port        = 9000
+	offlineRustFSUIPort        = 9001
+	offlineRustFSConsoleOffset = 1000
+	offlineRustFSS3Offset      = 2000
+	objectStoreHostAlias       = "host.docker.internal"
 )
 
 var (
@@ -38,6 +44,14 @@ var (
 	legacyEmptyRetryConsumed      = make(map[string]bool)
 	legacyEmptyRetryConsumedM     sync.Mutex
 )
+
+type objectStorePortConfig struct {
+	useWireguard      bool
+	listenS3Port      int
+	listenConsolePort int
+	hostS3Port        int
+	hostConsolePort   int
+}
 
 func SetForceLegacyMigration(force bool) {
 	forceLegacyMigrationConsumedM.Lock()
@@ -178,6 +192,70 @@ func GetObjectStoreDataVolumeName(patp string) string {
 	return fmt.Sprintf("rustfs_%s", patp)
 }
 
+func objectStoreStarTramEnabled(conf structs.SysConfig) bool {
+	return conf.WgRegistered && conf.WgOn
+}
+
+func objectStoreOfflineHostPorts(shipConf structs.UrbitDocker) (int, int) {
+	consolePort := shipConf.HTTPPort + offlineRustFSConsoleOffset
+	s3Port := shipConf.HTTPPort + offlineRustFSS3Offset
+	return s3Port, consolePort
+}
+
+func objectStorePorts(conf structs.SysConfig, shipConf structs.UrbitDocker) objectStorePortConfig {
+	if objectStoreStarTramEnabled(conf) {
+		return objectStorePortConfig{
+			useWireguard:      true,
+			listenS3Port:      shipConf.WgS3Port,
+			listenConsolePort: shipConf.WgConsolePort,
+		}
+	}
+	hostS3Port, hostConsolePort := objectStoreOfflineHostPorts(shipConf)
+	return objectStorePortConfig{
+		listenS3Port:      offlineRustFSS3Port,
+		listenConsolePort: offlineRustFSUIPort,
+		hostS3Port:        hostS3Port,
+		hostConsolePort:   hostConsolePort,
+	}
+}
+
+func objectStoreAdminEndpoint(conf structs.SysConfig, patp string, shipConf structs.UrbitDocker) (string, error) {
+	portConf := objectStorePorts(conf, shipConf)
+	if portConf.useWireguard {
+		return wireguardEndpoint(portConf.listenS3Port)
+	}
+	if portConf.hostS3Port <= 0 {
+		return "", fmt.Errorf("invalid offline RustFS port for %s", patp)
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d", portConf.hostS3Port), nil
+}
+
+func objectStoreLinkEndpoint(conf structs.SysConfig, shipConf structs.UrbitDocker) string {
+	if endpoint := strings.TrimSpace(shipConf.CustomS3Web); endpoint != "" {
+		return endpoint
+	}
+	if objectStoreStarTramEnabled(conf) && strings.TrimSpace(shipConf.WgURL) != "" {
+		return fmt.Sprintf("s3.%s", shipConf.WgURL)
+	}
+	hostS3Port, _ := objectStoreOfflineHostPorts(shipConf)
+	return fmt.Sprintf("http://%s:%d", objectStoreHostAlias, hostS3Port)
+}
+
+func GetObjectStoreLinkEndpoint(patp string) (string, error) {
+	if err := config.LoadUrbitConfig(patp); err != nil {
+		return "", err
+	}
+	return objectStoreLinkEndpoint(config.Conf(), config.UrbitConf(patp)), nil
+}
+
+func ObjectStoreConsoleURL(hostName string, conf structs.SysConfig, shipConf structs.UrbitDocker) string {
+	if objectStoreStarTramEnabled(conf) && strings.TrimSpace(shipConf.WgURL) != "" {
+		return fmt.Sprintf("https://console.s3.%s/rustfs/console/index.html", shipConf.WgURL)
+	}
+	_, hostConsolePort := objectStoreOfflineHostPorts(shipConf)
+	return fmt.Sprintf("http://%s:%d/rustfs/console/index.html", hostName, hostConsolePort)
+}
+
 // Backward-compatible wrapper used by existing call sites.
 func GetMinIODataVolumeName(containerName string) string {
 	patp, err := getPatpFromObjectStoreName(containerName)
@@ -315,13 +393,18 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 	if err := setObjectStorePassword(shipName, storePwd); err != nil {
 		return containerConfig, hostConfig, err
 	}
+	conf := config.Conf()
+	portConf := objectStorePorts(conf, shipConf)
+	if !portConf.useWireguard && (portConf.hostS3Port <= 0 || portConf.hostConsolePort <= 0) {
+		return containerConfig, hostConfig, fmt.Errorf("invalid offline RustFS host ports for %s", shipName)
+	}
 
 	serverDomains := objectStoreServerDomains(shipConf)
 	environment := []string{
 		fmt.Sprintf("RUSTFS_ACCESS_KEY=%s", shipName),
 		fmt.Sprintf("RUSTFS_SECRET_KEY=%s", storePwd),
-		fmt.Sprintf("RUSTFS_ADDRESS=0.0.0.0:%v", shipConf.WgS3Port),
-		fmt.Sprintf("RUSTFS_CONSOLE_ADDRESS=0.0.0.0:%v", shipConf.WgConsolePort),
+		fmt.Sprintf("RUSTFS_ADDRESS=0.0.0.0:%v", portConf.listenS3Port),
+		fmt.Sprintf("RUSTFS_CONSOLE_ADDRESS=0.0.0.0:%v", portConf.listenConsolePort),
 		"RUSTFS_CONSOLE_ENABLE=true",
 		"RUSTFS_VOLUMES=/data",
 	}
@@ -342,10 +425,28 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 		User: "0:0",
 	}
 	hostConfig = container.HostConfig{
-		NetworkMode: "container:wireguard",
-		Mounts:      mounts,
+		Mounts: mounts,
+	}
+	if portConf.useWireguard {
+		hostConfig.NetworkMode = "container:wireguard"
+	} else {
+		containerConfig.ExposedPorts = nat.PortSet{
+			nat.Port(fmt.Sprintf("%d/tcp", portConf.listenS3Port)):      struct{}{},
+			nat.Port(fmt.Sprintf("%d/tcp", portConf.listenConsolePort)): struct{}{},
+		}
+		hostConfig.NetworkMode = "default"
+		hostConfig.PortBindings = nat.PortMap{
+			nat.Port(fmt.Sprintf("%d/tcp", portConf.listenS3Port)): []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: fmt.Sprintf("%d", portConf.hostS3Port)},
+			},
+			nat.Port(fmt.Sprintf("%d/tcp", portConf.listenConsolePort)): []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: fmt.Sprintf("%d", portConf.hostConsolePort)},
+			},
+		}
+		return containerConfig, hostConfig, nil
 	}
 	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 minioNetworkLoop:
 	for {
 		select {
@@ -604,7 +705,7 @@ func setMinIOAdminAccount(containerName string) error {
 	if err != nil {
 		return err
 	}
-	targetEndpoint, err := wireguardEndpoint(urbConf.WgS3Port)
+	targetEndpoint, err := objectStoreAdminEndpoint(config.Conf(), patp, urbConf)
 	if err != nil {
 		return err
 	}
@@ -692,9 +793,15 @@ func maybeMigrateLegacyMinIOData(patp string, urbConf structs.UrbitDocker, targe
 	if err != nil {
 		return err
 	}
-	sourcePort := urbConf.WgS3Port + 10000
-	if sourcePort > 64000 || sourcePort == urbConf.WgS3Port {
-		sourcePort = 39000 + (urbConf.WgS3Port % 1000)
+	conf := config.Conf()
+	portConf := objectStorePorts(conf, urbConf)
+	basePort := portConf.listenS3Port
+	if !portConf.useWireguard {
+		basePort = portConf.hostS3Port
+	}
+	sourcePort := basePort + 10000
+	if sourcePort > 64000 || sourcePort == basePort {
+		sourcePort = 39000 + (basePort % 1000)
 	}
 	sourceConsolePort := sourcePort + 1
 	sourceContainer := fmt.Sprintf("minio_migrate_%s", patp)
@@ -703,7 +810,7 @@ func maybeMigrateLegacyMinIOData(patp string, urbConf structs.UrbitDocker, targe
 	}
 
 	zap.L().Info(fmt.Sprintf("Migrating legacy MinIO volume %s -> %s for %s", legacyVolume, targetVolume, patp))
-	if err := startLegacyMinIOMigrationSource(sourceContainer, legacyVolume, patp, sourceSecret, sourcePort, sourceConsolePort); err != nil {
+	if err := startLegacyMinIOMigrationSource(sourceContainer, legacyVolume, patp, sourceSecret, sourcePort, sourceConsolePort, portConf.useWireguard); err != nil {
 		return err
 	}
 	defer func() {
@@ -712,9 +819,14 @@ func maybeMigrateLegacyMinIOData(patp string, urbConf structs.UrbitDocker, targe
 		}
 	}()
 
-	sourceEndpoint, err := wireguardEndpoint(sourcePort)
-	if err != nil {
-		return err
+	var sourceEndpoint string
+	if portConf.useWireguard {
+		sourceEndpoint, err = wireguardEndpoint(sourcePort)
+		if err != nil {
+			return err
+		}
+	} else {
+		sourceEndpoint = fmt.Sprintf("http://127.0.0.1:%d", sourcePort)
 	}
 	sourceClient, err := newS3Client(sourceEndpoint, patp, sourceSecret)
 	if err != nil {
@@ -795,7 +907,7 @@ func maybeMigrateLegacyMinIOData(patp string, urbConf structs.UrbitDocker, targe
 	return writeMigrationMarker(targetVolume, "ok")
 }
 
-func startLegacyMinIOMigrationSource(containerName, volumeName, accessKey, secretKey string, s3Port, consolePort int) error {
+func startLegacyMinIOMigrationSource(containerName, volumeName, accessKey, secretKey string, s3Port, consolePort int, useWireguard bool) error {
 	_ = DeleteContainer(containerName)
 	imageRef := legacyMinIOMigrationImageRef()
 	if err := PullImageByRef(imageRef); err != nil {
@@ -824,7 +936,6 @@ func startLegacyMinIOMigrationSource(containerName, volumeName, accessKey, secre
 		},
 	}
 	hostConfig := container.HostConfig{
-		NetworkMode: "container:wireguard",
 		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeVolume,
@@ -832,6 +943,23 @@ func startLegacyMinIOMigrationSource(containerName, volumeName, accessKey, secre
 				Target: "/data",
 			},
 		},
+	}
+	if useWireguard {
+		hostConfig.NetworkMode = "container:wireguard"
+	} else {
+		containerConfig.ExposedPorts = nat.PortSet{
+			nat.Port(fmt.Sprintf("%d/tcp", s3Port)):      struct{}{},
+			nat.Port(fmt.Sprintf("%d/tcp", consolePort)): struct{}{},
+		}
+		hostConfig.NetworkMode = "default"
+		hostConfig.PortBindings = nat.PortMap{
+			nat.Port(fmt.Sprintf("%d/tcp", s3Port)): []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: fmt.Sprintf("%d", s3Port)},
+			},
+			nat.Port(fmt.Sprintf("%d/tcp", consolePort)): []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: fmt.Sprintf("%d", consolePort)},
+			},
+		}
 	}
 
 	if _, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName); err != nil {

@@ -82,6 +82,8 @@ func UrbitHandler(msg []byte) error {
 		return handleLoom(patp, urbitPayload, shipConf)
 	case "snaptime":
 		return handleSnapTime(patp, urbitPayload, shipConf)
+	case "extra-args":
+		return handleExtraArgs(patp, urbitPayload, shipConf)
 	case "toggle-boot-status":
 		return toggleBootStatus(patp, shipConf)
 	case "toggle-auto-reboot":
@@ -1023,11 +1025,9 @@ func toggleMinIOLink(patp string, shipConf structs.UrbitDocker) error {
 		if err != nil {
 			return fmt.Errorf("Failed to create RustFS credentials for %s: %v", patp, err)
 		}
-		// get minio endpoint
-		var endpoint string
-		endpoint = shipConf.CustomS3Web
-		if endpoint == "" {
-			endpoint = fmt.Sprintf("s3.%s", shipConf.WgURL)
+		endpoint, err := docker.GetObjectStoreLinkEndpoint(patp)
+		if err != nil {
+			return fmt.Errorf("Failed to determine RustFS endpoint for %s: %v", patp, err)
 		}
 		// link to urbit
 		if err := click.LinkStorage(patp, endpoint, svcAccount); err != nil {
@@ -1108,6 +1108,47 @@ func handleSnapTime(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "done"}
 	time.Sleep(1 * time.Second)
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: ""}
+	return nil
+}
+
+func handleExtraArgs(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "extraArgs", Event: "loading"}
+	fail := func(message string, err error) error {
+		text := fmt.Sprintf("%s: %v", message, err)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "extraArgs", Event: text}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "extraArgs", Event: ""}
+		return err
+	}
+
+	extraArgs := strings.TrimSpace(urbitPayload.Payload.ExtraArgs)
+	if _, err := docker.ValidatePersistentExtraArgs(extraArgs); err != nil {
+		return fail("Invalid CLI flags", err)
+	}
+
+	shipConf.ExtraArgs = extraArgs
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		return fail("Couldn't update urbit config", err)
+	}
+	if err := urbitCleanDelete(patp); err != nil {
+		zap.L().Error(fmt.Sprintf("Container deletion for extra args rebuild failed: %v", err))
+	}
+
+	if shipConf.BootStatus != "noboot" {
+		if _, err := docker.StartContainer(patp, "vere"); err != nil {
+			return fail(fmt.Sprintf("Couldn't start %s", patp), err)
+		}
+	} else {
+		if _, err := docker.CreateContainer(patp, "vere"); err != nil {
+			return fail(fmt.Sprintf("Couldn't create %s", patp), err)
+		}
+	}
+
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "extraArgs", Event: "success"}
+	time.Sleep(3 * time.Second)
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "extraArgs", Event: ""}
 	return nil
 }
 

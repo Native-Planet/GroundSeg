@@ -19,6 +19,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const firstBootArgsFile = ".groundseg-first-boot-args"
+
 func resetNewShip() error {
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: ""}
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "patp", Event: ""}
@@ -114,6 +116,12 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 			errorCleanup(patp, errmsg, customDrive)
 			return
 		}
+		if err := writeFirstBootArgs(patp, customDrive, shipPayload.Payload.Command); err != nil {
+			errmsg := fmt.Sprintf("write first boot args error: %v", err)
+			zap.L().Error(errmsg)
+			errorCleanup(patp, errmsg, customDrive)
+			return
+		}
 	} else { // now this is for custom drive
 		path := filepath.Join(customDrive, patp)
 		filename := patp + ".key"
@@ -129,6 +137,12 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 		filePath := path + "/" + filename
 		if err := ioutil.WriteFile(filePath, []byte(key), 0644); err != nil {
 			errmsg := fmt.Sprintf("Error writing to file: %v", err)
+			zap.L().Error(errmsg)
+			errorCleanup(patp, errmsg, customDrive)
+			return
+		}
+		if err := writeFirstBootArgs(patp, customDrive, shipPayload.Payload.Command); err != nil {
+			errmsg := fmt.Sprintf("write first boot args error: %v", err)
 			zap.L().Error(errmsg)
 			errorCleanup(patp, errmsg, customDrive)
 			return
@@ -168,6 +182,16 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	}
 	// check for +code
 	go waitForShipReady(shipPayload, customDrive)
+}
+
+func writeFirstBootArgs(patp string, customDrive string, encodedArgs string) error {
+	if strings.TrimSpace(encodedArgs) == "" {
+		return nil
+	}
+	if customDrive == "" {
+		return docker.WriteFileToVolume(patp, firstBootArgsFile, encodedArgs)
+	}
+	return ioutil.WriteFile(filepath.Join(customDrive, patp, firstBootArgsFile), []byte(encodedArgs), 0644)
 }
 
 func waitForShipReady(shipPayload structs.WsNewShipPayload, customDrive string) {
