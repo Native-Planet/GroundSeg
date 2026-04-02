@@ -37,6 +37,8 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.Loom = event.Event
 			case "snapTime":
 				urbitStruct.Transition.SnapTime = event.Event
+			case "extraArgs":
+				urbitStruct.Transition.ExtraArgs = event.Event
 			case "urbitDomain":
 				urbitStruct.Transition.UrbitDomain = event.Event
 			case "minioDomain":

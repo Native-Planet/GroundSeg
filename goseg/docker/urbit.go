@@ -92,6 +92,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		errmsg := fmt.Errorf("Error loading %s config: %v", containerName, err)
 		return containerConfig, hostConfig, errmsg
 	}
+	shipConf = config.UrbitConf(containerName)
 	// todo: this BootStatus doesnt actually have anythin to do with pack and meld right now
 	act := shipConf.BootStatus
 	// get the correct startup script based on BootStatus val
@@ -151,50 +152,23 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
-	// gather boot option values
-	shipName := shipConf.PierName
-	loomValue := fmt.Sprintf("%v", shipConf.LoomSize)
-	var devMode string
-	if shipUsesDevMode(act) && shipConf.DevMode == true {
-		devMode = "True"
-	} else {
-		devMode = "False"
-	}
-	snapTime := "60"
-	// global snap time default
-	if conf.SnapTime != 0 && conf.SnapTime != 60 {
-		snapTime = fmt.Sprintf("%v", conf.SnapTime)
-	}
-	// per-ship snap time default
-	if shipConf.SnapTime != 0 && shipConf.SnapTime != 60 {
-		snapTime = fmt.Sprintf("%v", shipConf.SnapTime)
+	bootCommand, err := BuildUrbitBootCommand(shipConf, conf, act)
+	if err != nil {
+		return containerConfig, hostConfig, err
 	}
 	// construct the network configuration based on conf val
-	var httpPort string
-	var amesPort string
 	var network string
 	var portMap nat.PortMap
 	if shipConf.Network == "wireguard" {
 		zap.L().Debug(fmt.Sprintf("%v ship conf: %v", containerName, shipConf))
-		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
-		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
 		network = "container:wireguard"
 		containerConfig = container.Config{
 			Image: desiredImage,
-			Cmd: []string{
-				"bash",
-				"/urbit/start_urbit.sh",
-				"--loom=" + loomValue,
-				"--dirname=" + shipName,
-				"--devmode=" + devMode,
-				"--http-port=" + httpPort,
-				"--port=" + amesPort,
-				"--snap-time=" + snapTime,
-			},
+			Cmd:   bootCommand.ScriptArgs,
 		}
 	} else {
-		httpPort = fmt.Sprintf("%v", shipConf.HTTPPort)
-		amesPort = fmt.Sprintf("%v", shipConf.AmesPort)
+		httpPort := fmt.Sprintf("%v", shipConf.HTTPPort)
+		amesPort := fmt.Sprintf("%v", shipConf.AmesPort)
 		network = "default"
 		//httpPortStr := nat.Port(fmt.Sprintf(httpPort + "/tcp"))
 		//amesPortStr := nat.Port(fmt.Sprintf(amesPort + "/udp"))
@@ -214,18 +188,11 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 				"80/tcp":    struct{}{},
 				"34343/udp": struct{}{},
 			},
-			Cmd: []string{
-				"bash",
-				"/urbit/start_urbit.sh",
-				"--loom=" + loomValue,
-				"--dirname=" + shipName,
-				"--devmode=" + devMode,
-				"--snap-time=" + snapTime,
-			},
+			Cmd: bootCommand.ScriptArgs,
 		}
 	}
 	mountType := mount.TypeVolume
-	sourceStr := shipName
+	sourceStr := shipConf.PierName
 	if shipConf.CustomPierLocation != nil {
 		mountType = mount.TypeBind
 		if str, ok := shipConf.CustomPierLocation.(string); ok {
@@ -248,7 +215,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	if shipConf.Network != "wireguard" {
 		hostConfig.ExtraHosts = []string{"host.docker.internal:host-gateway"}
 	}
-	zap.L().Debug(fmt.Sprintf("Boot command: %v", containerConfig.Cmd))
+	zap.L().Debug(fmt.Sprintf("Boot command: %s", bootCommand.PreviewFull))
 	return containerConfig, hostConfig, nil
 }
 

@@ -310,6 +310,7 @@ type WsUrbitAction struct {
 	Action       string `json:"action"`
 	Patp         string `json:"patp"`
 	Value        int    `json:value"`
+	ExtraArgs    string `json:"extraArgs"`
 	Domain       string `json:"domain"`
 	Frequency    int    `json:"frequency"`
 	IntervalType string `json:"intervalType"`

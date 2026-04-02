@@ -17,6 +17,7 @@
   import MinIO from './Section/MinIO.svelte'
   import Loom from './Section/Loom.svelte'
   import SnapTime from './Section/SnapTime.svelte'
+  import AdditionalArgs from './Section/AdditionalArgs.svelte'
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
@@ -50,6 +51,8 @@
   $: running = (ship?.running) || false
   $: loomSize = (ship?.loomSize)
   $: snapTime = (ship?.snapTime)
+  $: extraArgs = (ship?.extraArgs) || ""
+  $: bootCommandBase = (ship?.bootCommandBase) || ""
   $: lusCode = (ship?.lusCode) || ""
   $: url = (ship?.url) || "#"
   $: showUrbAlias = (ship?.showUrbAlias) || false
@@ -171,6 +174,13 @@
     {snapTime} 
     {ownShip}
     />
+
+  <AdditionalArgs
+    {patp}
+    {ownShip}
+    {extraArgs}
+    {bootCommandBase}
+  />
   <!-- vere 3.0 -->
   <!-- Chop -->
   <Chop {patp} />

@@ -411,7 +411,7 @@ export const cancelNewShip = patp => {
   send(payload)
 }
 
-export const bootShip = (patp,key,keyType,remote,selectedDrive) => {
+export const bootShip = (patp,key,keyType,remote,selectedDrive,command="") => {
   let payload = {
     "type":"new_ship",
     "action":"boot",
@@ -419,7 +419,8 @@ export const bootShip = (patp,key,keyType,remote,selectedDrive) => {
     "keyType":keyType,
     "key":key,
     "remote":remote,
-    "selectedDrive":selectedDrive
+    "selectedDrive":selectedDrive,
+    "command":command
   }
   send(payload)
 }
@@ -673,6 +674,16 @@ export const setUrbitSnapTime = (patp, value) => {
     "action":"snaptime",
     "patp":patp,
     "value": value
+  }
+  send(payload)
+}
+
+export const setUrbitExtraArgs = (patp, extraArgs) => {
+  let payload = {
+    "type":"urbit",
+    "action":"extra-args",
+    "patp":patp,
+    "extraArgs": extraArgs
   }
   send(payload)
 }

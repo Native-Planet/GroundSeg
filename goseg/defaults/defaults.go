@@ -16,6 +16,7 @@ var (
 		HTTPPort:            0,
 		AmesPort:            0,
 		LoomSize:            31,
+		ExtraArgs:           "",
 		UrbitVersion:        "v2.11",
 		MinioVersion:        "latest",
 		UrbitRepo:           "registry.hub.docker.com/nativeplanet/urbit",

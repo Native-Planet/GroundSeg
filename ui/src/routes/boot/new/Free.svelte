@@ -3,6 +3,7 @@
   import { bootShip } from '$lib/stores/websocket';
   import { structure } from '$lib/stores/data'
   import { sigRemove, checkPatp } from '$lib/stores/patp';
+  import { lintFirstBootArgs } from '$lib/urbitArgs'
   import { goto } from '$app/navigation';
   import Sigil from './Sigil.svelte'
   import { URBIT_MODE } from '$lib/stores/data'
@@ -20,9 +21,11 @@
   let remote = true;
   let advanceOpen = false
   let selectedDrive = "system-drive"
+  let firstBootArgs = ""
 
   $: noSig = sigRemove(name)
   $: validPatp = checkPatp(noSig)
+  $: firstBootLint = lintFirstBootArgs(firstBootArgs)
 
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
@@ -33,7 +36,7 @@
   $: driveNames = Object.keys(drives)
 
   const handleBoot = () => {
-      bootShip(noSig,key.trim(),keyType,remote,selectedDrive)
+      bootShip(noSig,key.trim(),keyType,remote,selectedDrive,firstBootArgs.trim())
     /*
     if (selectedDrive == "system-drive") {
       bootShip(noSig,key,remote,selectedDrive)
@@ -112,6 +115,17 @@
       </div>
     {/if}
   </div>
+  <div class="input-wrapper">
+    <div class="label">First-Time Only CLI Flags</div>
+    <div class="sub-label">Used only during the initial key boot, for example <code>--bootstrap-url ... --prop-url ... --prop-name ...</code>.</div>
+    <textarea
+      class:error={firstBootLint.message.length > 0}
+      bind:value={firstBootArgs}
+      placeholder="--bootstrap-url google.com/pill --prop-url https://example.com --prop-name my-planet" />
+    {#if firstBootLint.message.length > 0}
+      <div class="lint-error">{firstBootLint.message}</div>
+    {/if}
+  </div>
 {/if}
 <div class="input-wrapper">
   <div class="buttons">
@@ -120,7 +134,7 @@
       class="btn boot"
       on:click={handleBoot}
       disabled={
-      (key.length < 1) || (name.length < 1) || (!validPatp)
+      (key.length < 1) || (name.length < 1) || (!validPatp) || !firstBootLint.valid
       }>
       Boot
     </button>
@@ -257,6 +271,54 @@
   }
   input::placeholder {
     color: var(--Gray-200, #ABBAAE);
+  }
+  textarea {
+    flex: 1;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 20px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 28px;
+    letter-spacing: -0.96px;
+    border-radius: 16px;
+    padding: 16px 22px;
+    width: calc(100% - 48px);
+    min-height: 110px;
+    border: 2px solid var(--Gray-400, #5C7060);
+    background: var(--bg-base);
+    color: var(--text-color);
+    resize: vertical;
+  }
+  textarea:focus {
+    outline: none;
+  }
+  textarea.error {
+    border-color: #d45151;
+    color: #d45151;
+  }
+  .sub-label {
+    color: var(--Gray-400, #5C7060);
+    font-family: Inter;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 22px;
+    letter-spacing: -0.8px;
+  }
+  .sub-label code {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 90%;
+  }
+  .lint-error {
+    color: #d45151;
+    font-family: Inter;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 22px;
+    letter-spacing: -0.8px;
   }
   .advance {
     cursor: pointer;

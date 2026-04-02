@@ -99,6 +99,7 @@ var (
 	loom="31"
 	devMode="False"
 	snapTime="60"
+	extraArgs=()
 	
 	# Find the first directory and start urbit with the ship therein
 	dirnames="*/"
@@ -164,6 +165,9 @@ var (
 		  snapTime="${i#*=}"
 		  shift
 		  ;;
+	   *)
+		  extraArgs+=("$i")
+		  ;;
 	esac
 	done
 	
@@ -175,6 +179,26 @@ var (
 	echo "Running with no STDIN"
 	ttyflag="-t"
 	fi
+
+	managedRunArgs=()
+	if [ -n "$ttyflag" ]; then
+		managedRunArgs+=("$ttyflag")
+	fi
+	managedRunArgs+=(-p "$amesPort" --http-port "$httpPort" --loom "$loom" --snap-time "$snapTime" "$dirname")
+	runArgs=("${managedRunArgs[@]}")
+	runArgs+=("${extraArgs[@]}")
+
+	runCommand=""
+	printf -v runCommand '%q ' urbit "${runArgs[@]}"
+	runCommand="${runCommand% }"
+
+	firstBootArgs=()
+	firstBootArgsFile=".groundseg-first-boot-args"
+	if [ -f "$firstBootArgsFile" ]; then
+		while IFS= read -r line || [ -n "$line" ]; do
+			firstBootArgs+=("$line")
+		done < "$firstBootArgsFile"
+	fi
 	
 	# Check if there is a keyfile, if so boot a ship with its name, and then remove the key
 	if [ -e *.key ]; then
@@ -185,9 +209,10 @@ var (
 		mv $keyname /tmp
 	
 		# Boot urbit with the key, exit when done booting
-		urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -p $amesPort -x --http-port $httpPort --loom $loom
+		urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -p $amesPort -x --http-port $httpPort --loom $loom "${firstBootArgs[@]}"
 	
 		# Remove the keyfile for security
+		rm -f "$firstBootArgsFile"
 		rm /tmp/$keyname
 		rm *.key || true
 	fi
@@ -202,7 +227,7 @@ var (
 	fi
 
 	trap_urbit() {
-		local args="$@"
+		local args=("$@")
 
 		# probe for stale snapshot with a quick exit
 		local probe_log=$(mktemp)
@@ -231,17 +256,17 @@ var (
 
 			export version_output=$(urbit -R 2>&1 || true)
 			export raw_version=$(echo "$version_output" | awk 'tolower($1) == "urbit" {print $2; exit}')
-			if [[ -z "$raw_version" ]]; then
-				echo "Cannot determine current vere version from 'urbit -R'"
-				exec prev-urbit -Lx $ttyflag $args
-			fi
+				if [[ -z "$raw_version" ]]; then
+					echo "Cannot determine current vere version from 'urbit -R'"
+					exec prev-urbit -Lx "${managedRunArgs[@]}"
+				fi
 			# normalize to release tag format
 			export cleaned=$(echo "$raw_version" | sed 's/^vere-//; s/^v//')
 			export ver_num=$(echo "$cleaned" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-			if [[ -z "$ver_num" ]]; then
-				echo "Cannot parse version number from: $raw_version"
-				exec prev-urbit -Lx $ttyflag $args
-			fi
+				if [[ -z "$ver_num" ]]; then
+					echo "Cannot parse version number from: $raw_version"
+					exec prev-urbit -Lx "${managedRunArgs[@]}"
+				fi
 			export current_tag="vere-v${ver_num}"
 			echo "Detected current vere version: $current_tag"
 
@@ -359,18 +384,18 @@ var (
 
 			rm -rf "$tmpdir"
 			echo "Migration complete"
-			exec urbit $args
+			exec urbit "${args[@]}"
 		fi
 
 		rm -f "$probe_log"
-		exec urbit $args
+		exec urbit "${args[@]}"
 	}
 	
 	if [ $devMode == "True" ]; then
 		echo "Developer mode: $devMode"
 		echo "No logs will display"
 		# Run urbit inside a tmux pane (no logs)
-		tmux new -d -s urbit "script -q -c 'exec urbit -p $amesPort --http-port $httpPort --loom $loom --snap-time $snapTime $dirname' /dev/null"
+		tmux new -d -s urbit "script -q -c \"$runCommand\" /dev/null"
 		tmux_pid=$(tmux list-panes -t urbit -F "#{pane_pid}")
 		while kill -0 "$tmux_pid" 2> /dev/null; do
 			sleep 3
@@ -378,9 +403,9 @@ var (
 		tmux kill-session -t urbit
 		exit 0
 	else
-		echo "urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom --snap-time $snapTime $dirname"
+		echo "$runCommand"
 		
-		trap_urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom --snap-time $snapTime  $dirname
+		trap_urbit "${runArgs[@]}"
 	fi`
 
 	RollScript = `#!/bin/bash

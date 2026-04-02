@@ -327,6 +327,12 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 
 		// collate all the info from our sources into the struct
+		bootCommandBase := ""
+		if bootCommand, err := docker.BuildUrbitBootCommand(dockerConfig, conf, dockerConfig.BootStatus); err != nil {
+			zap.L().Warn(fmt.Sprintf("Unable to build boot command preview for %s: %v", pier, err))
+		} else {
+			bootCommandBase = bootCommand.PreviewBase
+		}
 		urbit.Info.LusCode = lusCode
 		urbit.Info.Running = isRunning
 		urbit.Info.Network = shipNetworks[pier]
@@ -334,6 +340,8 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.LoomSize = dockerConfig.LoomSize
 		urbit.Info.DiskUsage = dockerStats.DiskUsage
 		urbit.Info.MemUsage = dockerStats.MemoryUsage
+		urbit.Info.ExtraArgs = dockerConfig.ExtraArgs
+		urbit.Info.BootCommandBase = bootCommandBase
 		urbit.Info.DevMode = dockerConfig.DevMode
 		urbit.Info.Vere = dockerConfig.UrbitVersion
 		urbit.Info.DetectBootStatus = bootStatus

@@ -109,6 +109,13 @@ func NewShipHandler(msg []byte) error {
 			// handleError(errMsg)
 			return errMsg
 		}
+		firstBootArgs, err := docker.ValidateFirstBootArgs(strings.TrimSpace(shipPayload.Payload.Command))
+		if err != nil {
+			errMsg := fmt.Errorf("Invalid first boot flags: %v", err)
+			handleError(errMsg)
+			return errMsg
+		}
+		shipPayload.Payload.Command = strings.Join(firstBootArgs, "\n")
 		go createUrbitShip(patp, shipPayload)
 	case "reset":
 		err := resetNewShip()

@@ -86,6 +86,7 @@ type UrbitDocker struct {
 	HTTPPort            int    `json:"http_port"`
 	AmesPort            int    `json:"ames_port"`
 	LoomSize            int    `json:"loom_size"`
+	ExtraArgs           string `json:"extra_args"`
 	UrbitVersion        string `json:"urbit_version"`
 	MinioVersion        string `json:"minio_version"`
 	UrbitRepo           string `json:"urbit_repo"`
@@ -179,6 +180,8 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			u.AmesPort = toInt(v)
 		case "loom_size":
 			u.LoomSize = toInt(v)
+		case "extra_args":
+			u.ExtraArgs, _ = v.(string)
 		case "urbit_version":
 			u.UrbitVersion, _ = v.(string)
 		case "minio_version":
