@@ -52,7 +52,7 @@
       return
     }
     if (message.type === "ready") {
-      status = "Attached to tmux"
+      status = "Connected"
       terminal?.focus()
       return
     }
@@ -146,7 +146,7 @@
       socket.binaryType = "arraybuffer"
 
       socket.onopen = () => {
-        status = "Attaching to tmux..."
+        status = "Connecting shell..."
         sendMessage({
           patp,
           cols: terminal.cols,
@@ -168,7 +168,7 @@
       }
 
       socket.onerror = () => {
-        if (status === "Connecting..." || status === "Attaching to tmux...") {
+        if (status === "Connecting..." || status === "Connecting shell...") {
           status = "Web shell connection failed"
         }
       }
@@ -176,8 +176,8 @@
       socket.onclose = () => {
         if (
           status === "Connecting..." ||
-          status === "Attaching to tmux..." ||
-          status === "Attached to tmux"
+          status === "Connecting shell..." ||
+          status === "Connected"
         ) {
           status = "Disconnected"
         }
@@ -204,7 +204,6 @@
       <div class="title">Web Shell</div>
       <div class="status">{status}</div>
     </div>
-    <div class="hint">Attached with <code>tmux a</code>. Use <code>Ctrl-b d</code> to detach.</div>
     <div class="terminal" bind:this={terminalEl}></div>
   </div>
 </Modal>
@@ -236,18 +235,6 @@
     font-weight: 400;
     line-height: 22px;
     text-align: right;
-  }
-  .hint {
-    margin-bottom: 16px;
-    color: var(--Gray-400, #5C7060);
-    font-family: Inter;
-    font-size: 16px;
-    font-weight: 300;
-    line-height: 22px;
-  }
-  code {
-    font-family: 'Source Code Pro', monospace;
-    font-size: 90%;
   }
   .terminal {
     height: 60vh;

@@ -187,10 +187,16 @@ var (
 	managedRunArgs+=(-p "$amesPort" --http-port "$httpPort" --loom "$loom" --snap-time "$snapTime" "$dirname")
 	runArgs=("${managedRunArgs[@]}")
 	runArgs+=("${extraArgs[@]}")
+	devRunArgs=(-p "$amesPort" --http-port "$httpPort" --loom "$loom" --snap-time "$snapTime" "$dirname")
+	devRunArgs+=("${extraArgs[@]}")
 
 	runCommand=""
 	printf -v runCommand '%q ' urbit "${runArgs[@]}"
 	runCommand="${runCommand% }"
+
+	devRunCommand=""
+	printf -v devRunCommand '%q ' urbit "${devRunArgs[@]}"
+	devRunCommand="${devRunCommand% }"
 
 	firstBootArgs=()
 	firstBootArgsFile=".groundseg-first-boot-args"
@@ -395,7 +401,7 @@ var (
 		echo "Developer mode: $devMode"
 		echo "No logs will display"
 		# Run urbit inside a tmux pane (no logs)
-		tmux new -d -s urbit "script -q -c \"$runCommand\" /dev/null"
+		tmux new -d -s urbit "script -q -c \"$devRunCommand\" /dev/null"
 		tmux_pid=$(tmux list-panes -t urbit -F "#{pane_pid}")
 		while kill -0 "$tmux_pid" 2> /dev/null; do
 			sleep 3
