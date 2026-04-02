@@ -319,13 +319,14 @@ func main() {
 		}
 	}
 	if conf.WgRegistered == true {
-		// Load Wireguard
-		if err := docker.LoadWireguard(); err != nil {
-			zap.L().Error(fmt.Sprintf("Unable to load Wireguard: %v", err))
-		} else {
-			// Load object stores
-			loadService(docker.LoadObjectStores, "Unable to load RustFS containers!")
+		if conf.WgOn {
+			// Load Wireguard
+			if err := docker.LoadWireguard(); err != nil {
+				zap.L().Error(fmt.Sprintf("Unable to load Wireguard: %v", err))
+			}
 		}
+		// Load object stores
+		loadService(docker.LoadObjectStores, "Unable to load RustFS containers!")
 	}
 	// Load Netdata
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")

@@ -1023,11 +1023,9 @@ func toggleMinIOLink(patp string, shipConf structs.UrbitDocker) error {
 		if err != nil {
 			return fmt.Errorf("Failed to create RustFS credentials for %s: %v", patp, err)
 		}
-		// get minio endpoint
-		var endpoint string
-		endpoint = shipConf.CustomS3Web
-		if endpoint == "" {
-			endpoint = fmt.Sprintf("s3.%s", shipConf.WgURL)
+		endpoint, err := docker.GetObjectStoreLinkEndpoint(patp)
+		if err != nil {
+			return fmt.Errorf("Failed to determine RustFS endpoint for %s: %v", patp, err)
 		}
 		// link to urbit
 		if err := click.LinkStorage(patp, endpoint, svcAccount); err != nil {

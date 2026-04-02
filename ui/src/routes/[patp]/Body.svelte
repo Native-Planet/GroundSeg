@@ -75,8 +75,6 @@
 
   // profile > startram
   $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
-  $: startramRunning = ($structure?.profile?.startram?.info?.running) || false
-
   const handleGallseg = p => {
     if (gallseg) {
       uninstallGallseg(p)
@@ -114,7 +112,6 @@
     <!-- MinIO Info -->
     <MinIO 
       {running}
-      {startramRunning}
       {patp}
       {minioAlias}
       {minioUrl}

@@ -262,9 +262,9 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		if dockerConfig.ShowUrbitWeb == "custom" {
 			showUrbAlias = true
 		}
-		minIOUrl := fmt.Sprintf("https://console.s3.%s/rustfs/console/index.html", dockerConfig.WgURL)
+		minIOUrl := docker.ObjectStoreConsoleURL(hostName, conf, dockerConfig)
 		minIOPwd := ""
-		if conf.WgRegistered && conf.WgOn {
+		if conf.WgRegistered {
 			minIOPwd, err = config.GetMinIOPassword(docker.GetObjectStoreContainerName(pier))
 			if err != nil {
 				//zap.L().Debug(fmt.Sprintf("Failed to get MinIO Password: %v", err))

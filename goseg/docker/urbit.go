@@ -245,6 +245,9 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		Mounts:       mounts,
 		PortBindings: portMap,
 	}
+	if shipConf.Network != "wireguard" {
+		hostConfig.ExtraHosts = []string{"host.docker.internal:host-gateway"}
+	}
 	zap.L().Debug(fmt.Sprintf("Boot command: %v", containerConfig.Cmd))
 	return containerConfig, hostConfig, nil
 }
