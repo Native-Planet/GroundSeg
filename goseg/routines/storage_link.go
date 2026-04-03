@@ -189,6 +189,9 @@ func expectedStorageEndpointHosts(shipConf structs.UrbitDocker) map[string]struc
 	if host := normalizeStorageEndpointHost(fmt.Sprintf("http://%s:%d", "host.docker.internal", shipConf.HTTPPort+2000)); host != "" {
 		endpoints[host] = struct{}{}
 	}
+	if host := normalizeStorageEndpointHost(fmt.Sprintf("http://%s:%d", "host.docker.internal", shipConf.HTTPPort+2000)); host != "" {
+		endpoints[host] = struct{}{}
+	}
 	return endpoints
 }
 
