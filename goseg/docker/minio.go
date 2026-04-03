@@ -267,7 +267,7 @@ func objectStoreOfflineHostPorts(shipConf structs.UrbitDocker) (int, int) {
 }
 
 func objectStorePorts(conf structs.SysConfig, shipConf structs.UrbitDocker) objectStorePortConfig {
-	if objectStoreStarTramEnabled(conf) {
+	if ObjectStoreUsesRemoteDomain(conf, shipConf) {
 		return objectStorePortConfig{
 			useWireguard:      true,
 			listenS3Port:      shipConf.WgS3Port,
@@ -463,7 +463,7 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 		return containerConfig, hostConfig, fmt.Errorf("invalid offline RustFS host ports for %s", shipName)
 	}
 
-	serverDomains := objectStoreServerDomains(shipConf)
+	serverDomains := objectStoreServerDomains(conf, shipConf)
 	environment := []string{
 		fmt.Sprintf("RUSTFS_ACCESS_KEY=%s", shipName),
 		fmt.Sprintf("RUSTFS_SECRET_KEY=%s", storePwd),
@@ -564,10 +564,10 @@ func normalizeObjectStoreDomain(domain string) string {
 	return strings.TrimSpace(strings.Trim(domain, "/"))
 }
 
-func objectStoreServerDomains(shipConf structs.UrbitDocker) string {
+func objectStoreServerDomains(conf structs.SysConfig, shipConf structs.UrbitDocker) string {
 	var domains []string
 	baseDomain := strings.TrimSpace(shipConf.WgURL)
-	if baseDomain != "" {
+	if ObjectStoreUsesRemoteDomain(conf, shipConf) && baseDomain != "" {
 		defaultDomain := normalizeObjectStoreDomain(fmt.Sprintf("s3.%s", baseDomain))
 		if defaultDomain != "" {
 			domains = append(domains, defaultDomain)

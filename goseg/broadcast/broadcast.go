@@ -256,7 +256,10 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 				}
 			}
 		}
-		urbitAlias := dockerConfig.CustomUrbitWeb
+		urbitAlias := strings.TrimSpace(dockerConfig.CustomUrbitWeb)
+		if strings.EqualFold(urbitAlias, "null") {
+			urbitAlias = ""
+		}
 		minIOAlias := docker.ObjectStoreCustomDomain(conf, dockerConfig)
 		minIOAliasMode := docker.ObjectStoreCustomDomainMode(conf, dockerConfig)
 		showUrbAlias := false

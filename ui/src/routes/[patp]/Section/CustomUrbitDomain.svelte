@@ -3,17 +3,30 @@
   import "../theme.css"
   import { setUrbitDomain } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
-  import { onMount, createEventDispatcher, afterUpdate } from 'svelte'
+  import { createEventDispatcher, afterUpdate } from 'svelte'
   import DocsModal from '$lib/DocsModal.svelte'
   import { openModal } from 'svelte-modals'
   export let patp
   export let urbitAlias
   let domain = ""
+  let lastSavedDomain = ""
 
   const dispatch = createEventDispatcher()
+  const normalizeDomainValue = value => {
+    if (value == null) {
+      return ""
+    }
+    const text = String(value).trim()
+    return text.toLowerCase() === "null" ? "" : text
+  }
 
   $: tUrbitDomain = ($structure?.urbits?.[patp]?.transition?.urbitDomain) || ""
   $: t = tUrbitDomain
+  $: savedDomain = normalizeDomainValue(urbitAlias)
+  $: if (savedDomain !== lastSavedDomain && t !== "loading") {
+    domain = savedDomain
+    lastSavedDomain = savedDomain
+  }
 
   let docsInfo = {
     title: "Custom Urbit Domain",
@@ -22,7 +35,6 @@
     docURL: "https://manual.groundseg.app/guide/custom-domains.html"
   }
 
-  onMount(()=>domain = urbitAlias)
   afterUpdate(()=> {
     if (t == "done") {
       dispatch("done")
@@ -37,7 +49,10 @@
   </div>
   <div class="wrapper">
     <input type="text" placeholder="ship.example.com" bind:value={domain} disabled={t.length > 0} />
-    <button disabled={(domain.length < 1) || (domain == urbitAlias) || (t.length > 0)} class="save-button" on:click={()=>setUrbitDomain(patp, domain)}>
+    <button
+      disabled={(domain.trim().length < 1) || (domain.trim() == savedDomain) || (t.length > 0)}
+      class="save-button"
+      on:click={()=>setUrbitDomain(patp, domain.trim())}>
       {#if t.length < 1}
         Save
       {:else if t == "loading"}

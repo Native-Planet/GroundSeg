@@ -64,7 +64,7 @@
   $: lusCode = (ship?.lusCode) || ""
   $: url = (ship?.url) || "#"
   $: showUrbAlias = (ship?.showUrbAlias) || false
-  $: urbitAlias = (ship?.urbitAlias) || ""
+  $: urbitAlias = normalizeDisplayString(ship?.urbitAlias)
   $: minioAlias = normalizeDisplayString(ship?.minioAlias)
   $: minioAliasMode = (ship?.minioAliasMode) || "local"
   $: minioUrl = (ship?.minioUrl) || "#"
