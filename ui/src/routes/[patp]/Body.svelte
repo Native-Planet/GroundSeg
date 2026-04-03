@@ -59,6 +59,7 @@
   $: showUrbAlias = (ship?.showUrbAlias) || false
   $: urbitAlias = (ship?.urbitAlias) || ""
   $: minioAlias = (ship?.minioAlias) || ""
+  $: minioAliasMode = (ship?.minioAliasMode) || "local"
   $: minioUrl = (ship?.minioUrl) || "#"
   $: minioPwd = (ship?.minioPwd) || ""
   $: minioLinked = (ship?.minioLinked) || false
@@ -118,6 +119,7 @@
       {running}
       {patp}
       {minioAlias}
+      {minioAliasMode}
       {minioUrl}
       {minioPwd}
       {minioLinked}

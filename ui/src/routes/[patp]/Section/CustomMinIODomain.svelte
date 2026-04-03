@@ -8,12 +8,14 @@
   import { openModal } from 'svelte-modals'
   export let patp
   export let minioAlias
+  export let minioAliasMode = "local"
   let domain = ""
 
   const dispatch = createEventDispatcher()
 
   $: tMinioDomain = ($structure?.urbits?.[patp]?.transition?.minioDomain) || ""
   $: t = tMinioDomain
+  $: modeLabel = minioAliasMode === "remote" ? "Remote" : "Local"
 
   onMount(()=>domain = minioAlias)
   afterUpdate(()=> {
@@ -22,9 +24,11 @@
     }
   })
 
-  let docsInfo = {
-    title: "Custom S3 Domain",
-    description: "Publish locally hosted media from custom domain.",
+  $: docsInfo = {
+    title: `Custom ${modeLabel} S3 Domain`,
+    description: minioAliasMode === "remote"
+      ? "Publish StarTram-hosted media from a custom domain."
+      : "Publish locally hosted media from a custom domain.",
     docName: "Custom StarTram Domains",
     docURL: "https://manual.groundseg.app/guide/custom-domains.html"
   }
@@ -33,7 +37,7 @@
 
 <div>
   <div class="section-title-wrapper">
-    <div class="section-title">Custom S3 Domain</div>
+    <div class="section-title">Custom {modeLabel} S3 Domain</div>
     <div class="what" on:click={()=>openModal(DocsModal, {info:docsInfo})}>?</div>
   </div>
   <div class="wrapper">

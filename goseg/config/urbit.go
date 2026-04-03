@@ -67,6 +67,7 @@ func LoadUrbitConfig(pier string) error {
 	if targetStruct.SnapTime == 0 {
 		targetStruct.SnapTime = 60
 	}
+	structs.SyncCustomS3Domains(&targetStruct)
 	// Store in var
 	UrbitsConfig[pier] = targetStruct
 	return nil
@@ -89,6 +90,7 @@ func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
 	defer urbitMutex.Unlock()
 	// update UrbitsConfig with the values from inputConfig
 	for pier, config := range inputConfig {
+		structs.SyncCustomS3Domains(&config)
 		ver, err := getImageTagByContainerName(pier)
 		if err == nil {
 			config.UrbitVersion = ver

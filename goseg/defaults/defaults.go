@@ -42,6 +42,8 @@ var (
 		CustomPierLocation:  nil,
 		CustomUrbitWeb:      "",
 		CustomS3Web:         "",
+		CustomS3WebLocal:    "",
+		CustomS3WebRemote:   "",
 		ShowUrbitWeb:        "",
 		DevMode:             false,
 		Click:               true,

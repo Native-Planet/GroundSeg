@@ -652,24 +652,33 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: ""}
 	}()
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "loading"}
-	// check if new domain is valid
-	alias := urbitPayload.Payload.Domain
-	oldDomain := fmt.Sprintf("s3.%s", shipConf.WgURL)
-	areAliases, err := AreSubdomainsAliases(alias, oldDomain)
-	if err != nil {
+
+	alias := strings.TrimSpace(urbitPayload.Payload.Domain)
+	if alias == "" {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-		return fmt.Errorf("Failed to check RustFS domain alias for %s: %v", patp, err)
+		return fmt.Errorf("RustFS domain cannot be empty for %s", patp)
 	}
-	if !areAliases {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-		return fmt.Errorf("Invalid RustFS domain alias for %s", patp)
+
+	conf := config.Conf()
+	remoteObjectStore := docker.ObjectStoreUsesRemoteDomain(conf, shipConf)
+	if remoteObjectStore {
+		oldDomain := fmt.Sprintf("s3.%s", shipConf.WgURL)
+		areAliases, err := AreSubdomainsAliases(alias, oldDomain)
+		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Failed to check RustFS domain alias for %s: %v", patp, err)
+		}
+		if !areAliases {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Invalid RustFS domain alias for %s", patp)
+		}
+		if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return err
+		}
 	}
-	// Creae Alias
-	if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-		return err
-	}
-	shipConf.CustomS3Web = alias
+
+	docker.SetObjectStoreCustomDomain(conf, &shipConf, alias)
 	update := make(map[string]structs.UrbitDocker)
 	update[patp] = shipConf
 	if err := config.UpdateUrbitConfig(update); err != nil {

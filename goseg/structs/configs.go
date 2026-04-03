@@ -114,6 +114,8 @@ type UrbitDocker struct {
 	CustomPierLocation  any    `json:"custom_pier_location"`
 	CustomUrbitWeb      string `json:"custom_urbit_web"`
 	CustomS3Web         string `json:"custom_s3_web"`
+	CustomS3WebLocal    string `json:"custom_s3_web_local"`
+	CustomS3WebRemote   string `json:"custom_s3_web_remote"`
 	ShowUrbitWeb        string `json:"show_urbit_web"`
 	DevMode             bool   `json:"dev_mode"`
 	Click               bool   `json:"click"`
@@ -240,6 +242,10 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			u.CustomUrbitWeb, _ = v.(string)
 		case "custom_s3_web":
 			u.CustomS3Web, _ = v.(string)
+		case "custom_s3_web_local":
+			u.CustomS3WebLocal, _ = v.(string)
+		case "custom_s3_web_remote":
+			u.CustomS3WebRemote, _ = v.(string)
 		case "show_urbit_web":
 			u.ShowUrbitWeb, _ = v.(string)
 		case "dev_mode":

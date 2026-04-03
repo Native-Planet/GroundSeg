@@ -63,6 +63,75 @@ func TestObjectStoreLinkEndpointFallsBackToHostGatewayOffline(t *testing.T) {
 	}
 }
 
+func TestObjectStoreLinkEndpointUsesLocalCustomDomainOffline(t *testing.T) {
+	conf := structs.SysConfig{WgRegistered: true, WgOn: false}
+	shipConf := structs.UrbitDocker{
+		HTTPPort:         8080,
+		CustomS3WebLocal: "local.storage.example.com",
+	}
+
+	endpoint := objectStoreLinkEndpoint(conf, shipConf)
+
+	if endpoint != "local.storage.example.com" {
+		t.Fatalf("unexpected offline custom endpoint: %s", endpoint)
+	}
+}
+
+func TestObjectStoreLinkEndpointUsesRemoteCustomDomainWhenStarTramRunning(t *testing.T) {
+	conf := structs.SysConfig{WgRegistered: true, WgOn: true}
+	shipConf := structs.UrbitDocker{
+		WgURL:             "sampel-palnet.nativeplanet.live",
+		CustomS3WebLocal:  "local.storage.example.com",
+		CustomS3WebRemote: "remote.storage.example.com",
+	}
+
+	endpoint := objectStoreLinkEndpoint(conf, shipConf)
+
+	if endpoint != "remote.storage.example.com" {
+		t.Fatalf("unexpected remote custom endpoint: %s", endpoint)
+	}
+}
+
+func TestSyncObjectStoreCustomDomainsKeepsLegacyCompatibilityField(t *testing.T) {
+	shipConf := structs.UrbitDocker{
+		CustomS3Web: "legacy.storage.example.com",
+	}
+
+	structs.SyncCustomS3Domains(&shipConf)
+
+	if shipConf.CustomS3WebLocal != "legacy.storage.example.com" {
+		t.Fatalf("expected local custom domain to inherit legacy value, got %q", shipConf.CustomS3WebLocal)
+	}
+	if shipConf.CustomS3WebRemote != "legacy.storage.example.com" {
+		t.Fatalf("expected remote custom domain to inherit legacy value, got %q", shipConf.CustomS3WebRemote)
+	}
+	if shipConf.CustomS3Web != "legacy.storage.example.com" {
+		t.Fatalf("expected legacy compatibility field to stay populated, got %q", shipConf.CustomS3Web)
+	}
+}
+
+func TestSetObjectStoreCustomDomainPreservesLegacyLocalCompatibility(t *testing.T) {
+	conf := structs.SysConfig{WgRegistered: true, WgOn: true}
+	shipConf := structs.UrbitDocker{
+		WgURL:             "sampel-palnet.nativeplanet.live",
+		CustomS3Web:       "local.storage.example.com",
+		CustomS3WebLocal:  "local.storage.example.com",
+		CustomS3WebRemote: "remote.storage.example.com",
+	}
+
+	SetObjectStoreCustomDomain(conf, &shipConf, "new.remote.storage.example.com")
+
+	if shipConf.CustomS3WebRemote != "new.remote.storage.example.com" {
+		t.Fatalf("expected remote custom domain to update, got %q", shipConf.CustomS3WebRemote)
+	}
+	if shipConf.CustomS3WebLocal != "local.storage.example.com" {
+		t.Fatalf("expected local custom domain to remain unchanged, got %q", shipConf.CustomS3WebLocal)
+	}
+	if shipConf.CustomS3Web != "local.storage.example.com" {
+		t.Fatalf("expected legacy compatibility field to remain local/default, got %q", shipConf.CustomS3Web)
+	}
+}
+
 func TestObjectStoreConsoleURLUsesPublishedOfflineConsolePort(t *testing.T) {
 	conf := structs.SysConfig{WgRegistered: true, WgOn: false}
 	shipConf := structs.UrbitDocker{HTTPPort: 8080}

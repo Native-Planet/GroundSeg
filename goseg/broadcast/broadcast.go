@@ -257,7 +257,8 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			}
 		}
 		urbitAlias := dockerConfig.CustomUrbitWeb
-		minIOAlias := dockerConfig.CustomS3Web
+		minIOAlias := docker.ObjectStoreCustomDomain(conf, dockerConfig)
+		minIOAliasMode := docker.ObjectStoreCustomDomainMode(conf, dockerConfig)
 		showUrbAlias := false
 		if dockerConfig.ShowUrbitWeb == "custom" {
 			showUrbAlias = true
@@ -352,6 +353,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.MinIOPwd = minIOPwd
 		urbit.Info.UrbitAlias = urbitAlias
 		urbit.Info.MinIOAlias = minIOAlias
+		urbit.Info.MinIOAliasMode = minIOAliasMode
 		urbit.Info.ShowUrbAlias = showUrbAlias
 		urbit.Info.MinIOLinked = minioLinked
 		urbit.Info.PackScheduleActive = dockerConfig.MeldSchedule
