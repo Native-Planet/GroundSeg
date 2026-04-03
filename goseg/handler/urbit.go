@@ -157,6 +157,24 @@ func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
 	return cname1 == cname2, nil
 }
 
+func looksLikeObjectStoreAlias(patp string, alias string) bool {
+	alias = strings.ToLower(strings.TrimSpace(alias))
+	patp = strings.ToLower(strings.TrimSpace(patp))
+	if alias == "" || patp == "" {
+		return false
+	}
+	for _, prefix := range []string{
+		"s3." + patp + ".",
+		"bucket.s3." + patp + ".",
+		"console.s3." + patp + ".",
+	} {
+		if strings.HasPrefix(alias, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func WaitComplete(patp string) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
@@ -610,13 +628,18 @@ func toggleAlias(patp string, shipConf structs.UrbitDocker) error {
 }
 
 func setUrbitDomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	alias := strings.TrimSpace(urbitPayload.Payload.Domain)
+	if looksLikeObjectStoreAlias(patp, alias) {
+		zap.L().Warn(fmt.Sprintf("Rerouting S3-style alias submitted via Urbit domain action for %s: %s", patp, alias))
+		urbitPayload.Payload.Domain = alias
+		return setMinIODomain(patp, urbitPayload, shipConf)
+	}
 	defer func() {
 		time.Sleep(1 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: ""}
 	}()
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "loading"}
 	// check if new domain is valid
-	alias := urbitPayload.Payload.Domain
 	oldDomain := shipConf.WgURL
 	areAliases, err := AreSubdomainsAliases(alias, oldDomain)
 	if err != nil {
