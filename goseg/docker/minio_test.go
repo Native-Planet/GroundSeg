@@ -80,6 +80,7 @@ func TestObjectStoreLinkEndpointUsesLocalCustomDomainOffline(t *testing.T) {
 func TestObjectStoreLinkEndpointUsesRemoteCustomDomainWhenStarTramRunning(t *testing.T) {
 	conf := structs.SysConfig{WgRegistered: true, WgOn: true}
 	shipConf := structs.UrbitDocker{
+		Network:           "wireguard",
 		WgURL:             "sampel-palnet.nativeplanet.live",
 		CustomS3WebLocal:  "local.storage.example.com",
 		CustomS3WebRemote: "remote.storage.example.com",
@@ -89,6 +90,31 @@ func TestObjectStoreLinkEndpointUsesRemoteCustomDomainWhenStarTramRunning(t *tes
 
 	if endpoint != "remote.storage.example.com" {
 		t.Fatalf("unexpected remote custom endpoint: %s", endpoint)
+	}
+}
+
+func TestObjectStoreUsesLocalModeWhenShipIsNotRemote(t *testing.T) {
+	conf := structs.SysConfig{WgRegistered: true, WgOn: true}
+	shipConf := structs.UrbitDocker{
+		Network:           "bridge",
+		WgURL:             "sampel-palnet.nativeplanet.live",
+		HTTPPort:          8080,
+		CustomS3WebLocal:  "local.storage.example.com",
+		CustomS3WebRemote: "remote.storage.example.com",
+	}
+
+	if ObjectStoreCustomDomainMode(conf, shipConf) != "local" {
+		t.Fatalf("expected local mode for non-remote ship")
+	}
+
+	endpoint := objectStoreLinkEndpoint(conf, shipConf)
+	if endpoint != "local.storage.example.com" {
+		t.Fatalf("unexpected local endpoint for non-remote ship: %s", endpoint)
+	}
+
+	url := ObjectStoreConsoleURL("nativeplanet.local", conf, shipConf)
+	if url != "http://nativeplanet.local:9080/rustfs/console/index.html" {
+		t.Fatalf("unexpected console url for non-remote ship: %s", url)
 	}
 }
 
@@ -113,6 +139,7 @@ func TestSyncObjectStoreCustomDomainsKeepsLegacyCompatibilityField(t *testing.T)
 func TestSetObjectStoreCustomDomainPreservesLegacyLocalCompatibility(t *testing.T) {
 	conf := structs.SysConfig{WgRegistered: true, WgOn: true}
 	shipConf := structs.UrbitDocker{
+		Network:           "wireguard",
 		WgURL:             "sampel-palnet.nativeplanet.live",
 		CustomS3Web:       "local.storage.example.com",
 		CustomS3WebLocal:  "local.storage.example.com",
@@ -129,6 +156,23 @@ func TestSetObjectStoreCustomDomainPreservesLegacyLocalCompatibility(t *testing.
 	}
 	if shipConf.CustomS3Web != "local.storage.example.com" {
 		t.Fatalf("expected legacy compatibility field to remain local/default, got %q", shipConf.CustomS3Web)
+	}
+}
+
+func TestObjectStoreCustomDomainIgnoresNullString(t *testing.T) {
+	conf := structs.SysConfig{WgRegistered: true, WgOn: false}
+	shipConf := structs.UrbitDocker{
+		HTTPPort:         8080,
+		CustomS3WebLocal: "null",
+	}
+
+	if domain := ObjectStoreCustomDomain(conf, shipConf); domain != "" {
+		t.Fatalf("expected null custom domain to be treated as empty, got %q", domain)
+	}
+
+	endpoint := objectStoreLinkEndpoint(conf, shipConf)
+	if endpoint != "http://host.docker.internal:10080" {
+		t.Fatalf("unexpected endpoint when custom domain is null: %s", endpoint)
 	}
 }
 

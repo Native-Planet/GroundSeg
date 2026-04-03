@@ -178,16 +178,15 @@ func storageEndpointMatchesShip(endpoint string, shipConf structs.UrbitDocker) b
 
 func expectedStorageEndpointHosts(shipConf structs.UrbitDocker) map[string]struct{} {
 	endpoints := make(map[string]struct{})
-	if host := normalizeStorageEndpointHost(fmt.Sprintf("s3.%s", strings.TrimSpace(shipConf.WgURL))); host != "" {
-		endpoints[host] = struct{}{}
+	if startramObjectStoreEnabled(shipConf) {
+		if host := normalizeStorageEndpointHost(fmt.Sprintf("s3.%s", strings.TrimSpace(shipConf.WgURL))); host != "" {
+			endpoints[host] = struct{}{}
+		}
 	}
 	for _, domain := range docker.ObjectStoreCustomDomains(shipConf) {
 		if host := normalizeStorageEndpointHost(domain); host != "" {
 			endpoints[host] = struct{}{}
 		}
-	}
-	if host := normalizeStorageEndpointHost(fmt.Sprintf("http://%s:%d", "host.docker.internal", shipConf.HTTPPort+2000)); host != "" {
-		endpoints[host] = struct{}{}
 	}
 	if host := normalizeStorageEndpointHost(fmt.Sprintf("http://%s:%d", "host.docker.internal", shipConf.HTTPPort+2000)); host != "" {
 		endpoints[host] = struct{}{}

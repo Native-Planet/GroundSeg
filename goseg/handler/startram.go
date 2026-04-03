@@ -139,6 +139,10 @@ func handleStartramToggle() {
 	startram.EventBus <- structs.Event{Type: "toggle", Data: "loading"}
 	conf := config.Conf()
 	if conf.WgOn {
+		if containerState, exists := config.GetContainerState()["wireguard"]; exists {
+			containerState.DesiredStatus = "stopped"
+			config.UpdateContainerState("wireguard", containerState)
+		}
 		if err := config.UpdateConf(map[string]interface{}{
 			"wgOn": false,
 		}); err != nil {
