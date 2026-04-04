@@ -683,6 +683,7 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 	}
 
 	conf := config.Conf()
+	oldShipConf := shipConf
 	remoteObjectStore := docker.ObjectStoreUsesRemoteDomain(conf, shipConf)
 	if remoteObjectStore {
 		oldDomain := fmt.Sprintf("s3.%s", shipConf.WgURL)
@@ -707,6 +708,16 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	if err := recreateObjectStoreContainer(patp); err != nil {
+		rollback := map[string]structs.UrbitDocker{patp: oldShipConf}
+		if rollbackErr := config.UpdateUrbitConfig(rollback); rollbackErr != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't roll back RustFS domain change for %s after recreate failure: %v", patp, rollbackErr))
+		} else if rollbackStartErr := recreateObjectStoreContainer(patp); rollbackStartErr != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't restore RustFS container for %s after recreate failure: %v", patp, rollbackStartErr))
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return err
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"}
 	time.Sleep(3 * time.Second)
@@ -981,6 +992,22 @@ func toggleNetwork(patp string, shipConf structs.UrbitDocker) error {
 			zap.L().Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 		}
 	}
+	if err := recreateObjectStoreContainer(patp); err != nil {
+		return err
+	}
+	return nil
+}
+
+func recreateObjectStoreContainer(patp string) error {
+	if !config.Conf().WgRegistered {
+		return nil
+	}
+	containerName := docker.GetObjectStoreContainerName(patp)
+	info, err := docker.StartContainer(containerName, "minio")
+	if err != nil {
+		return fmt.Errorf("Couldn't recreate RustFS container for %s: %v", patp, err)
+	}
+	config.UpdateContainerState(containerName, info)
 	return nil
 }
 
