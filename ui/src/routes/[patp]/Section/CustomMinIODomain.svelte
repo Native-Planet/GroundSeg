@@ -3,28 +3,43 @@
   import "../theme.css"
   import { setRustFSDomain } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
-  import { onMount, createEventDispatcher, afterUpdate } from 'svelte'
+  import { createEventDispatcher, afterUpdate } from 'svelte'
   import DocsModal from '$lib/DocsModal.svelte'
   import { openModal } from 'svelte-modals'
   export let patp
   export let minioAlias
+  export let minioAliasMode = "local"
   let domain = ""
+  let lastSavedDomain = ""
 
   const dispatch = createEventDispatcher()
+  const normalizeDomainValue = value => {
+    if (value == null) {
+      return ""
+    }
+    const text = String(value).trim()
+    return text.toLowerCase() === "null" ? "" : text
+  }
 
   $: tMinioDomain = ($structure?.urbits?.[patp]?.transition?.minioDomain) || ""
   $: t = tMinioDomain
-
-  onMount(()=>domain = minioAlias)
+  $: modeLabel = minioAliasMode === "remote" ? "Remote" : "Local"
+  $: savedDomain = normalizeDomainValue(minioAlias)
+  $: if (savedDomain !== lastSavedDomain && t !== "loading") {
+    domain = savedDomain
+    lastSavedDomain = savedDomain
+  }
   afterUpdate(()=> {
     if (t == "done") {
       dispatch("done")
     }
   })
 
-  let docsInfo = {
-    title: "Custom S3 Domain",
-    description: "Publish locally hosted media from custom domain.",
+  $: docsInfo = {
+    title: `Custom ${modeLabel} S3 Domain`,
+    description: minioAliasMode === "remote"
+      ? "Publish StarTram-hosted media from a custom domain."
+      : "Publish locally hosted media from a custom domain.",
     docName: "Custom StarTram Domains",
     docURL: "https://manual.groundseg.app/guide/custom-domains.html"
   }
@@ -33,12 +48,15 @@
 
 <div>
   <div class="section-title-wrapper">
-    <div class="section-title">Custom S3 Domain</div>
+    <div class="section-title">Custom {modeLabel} S3 Domain</div>
     <div class="what" on:click={()=>openModal(DocsModal, {info:docsInfo})}>?</div>
   </div>
   <div class="wrapper">
     <input type="text" placeholder="storage.example.com" bind:value={domain} disabled={t.length > 0} />
-    <button disabled={(domain.length < 1) || (domain == minioAlias) || (t.length > 0)} class="save-button" on:click={()=>setRustFSDomain(patp, domain)}>
+    <button
+      disabled={(domain.trim().length < 1) || (domain.trim() == savedDomain) || (t.length > 0)}
+      class="save-button"
+      on:click={()=>setRustFSDomain(patp, domain.trim())}>
       {#if t.length < 1}
         Save
       {:else if t == "loading"}

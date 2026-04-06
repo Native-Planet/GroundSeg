@@ -166,6 +166,9 @@ func RectifyUrbit() {
 			// nil/null - Empty
 			current := broadcast.GetState()
 			current.Profile.Startram.Transition.Toggle = event.Data
+			if event.Data == nil {
+				current.Profile.Startram.Info.Running = config.Conf().WgOn
+			}
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		case "register":

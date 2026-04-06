@@ -142,6 +142,7 @@ type Urbit struct {
 		URL                      string         `json:"url"`
 		UrbitAlias               string         `json:"urbitAlias"`
 		MinIOAlias               string         `json:"minioAlias"`
+		MinIOAliasMode           string         `json:"minioAliasMode"`
 		ShowUrbAlias             bool           `json:"showUrbAlias"`
 		MemUsage                 uint64         `json:"memUsage"`
 		DiskUsage                int64          `json:"diskUsage"`

@@ -11,6 +11,7 @@
 
   export let running
   export let minioAlias
+  export let minioAliasMode = "local"
   export let patp
   export let minioUrl
   export let minioPwd
@@ -22,6 +23,7 @@
   let copied = false
   let showCustom = false
   $: s3Ready = (minioPwd?.length > 0) && (minioUrl != "#")
+  $: modeLabel = minioAliasMode === "remote" ? "Remote" : "Local"
 
   onMount(()=>{
     copy = new Clipboard('#copy');
@@ -72,12 +74,12 @@
       class="btn domain-btn"
       class:active={showCustom}
       on:click={()=>showCustom = !showCustom}>
-      {minioAlias.length > 0 ? "Modify" : "Set"} Custom S3 Domain
+      {minioAlias.length > 0 ? "Modify" : "Set"} Custom {modeLabel} S3 Domain
     </button>
   </div>
   {#if showCustom}
     <!-- Custom S3 Domain -->
-    <CustomMinIODomain {patp} {minioAlias} on:done={()=>showCustom = false} />
+    <CustomMinIODomain {patp} {minioAlias} {minioAliasMode} on:done={()=>showCustom = false} />
   {/if}
 </div>
 

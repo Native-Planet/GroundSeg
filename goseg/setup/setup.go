@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"groundseg/auth"
 	"groundseg/config"
+	"groundseg/docker"
 	"groundseg/startram"
 	"groundseg/structs"
 
@@ -62,8 +63,12 @@ func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 			if err = startram.Register(key, region); err != nil {
 				return fmt.Errorf("Failed registration: %v", err)
 			}
+			if err = docker.LoadWireguard(); err != nil {
+				return fmt.Errorf("Unable to start Wireguard: %v", err)
+			}
 			if err = config.UpdateConf(map[string]interface{}{
 				"setup": "complete",
+				"wgOn":  true,
 			}); err != nil {
 				return fmt.Errorf("Unable to update config: %v", err)
 			}

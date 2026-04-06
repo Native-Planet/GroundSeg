@@ -157,6 +157,24 @@ func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
 	return cname1 == cname2, nil
 }
 
+func looksLikeObjectStoreAlias(patp string, alias string) bool {
+	alias = strings.ToLower(strings.TrimSpace(alias))
+	patp = strings.ToLower(strings.TrimSpace(patp))
+	if alias == "" || patp == "" {
+		return false
+	}
+	for _, prefix := range []string{
+		"s3." + patp + ".",
+		"bucket.s3." + patp + ".",
+		"console.s3." + patp + ".",
+	} {
+		if strings.HasPrefix(alias, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func WaitComplete(patp string) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
@@ -610,13 +628,18 @@ func toggleAlias(patp string, shipConf structs.UrbitDocker) error {
 }
 
 func setUrbitDomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	alias := strings.TrimSpace(urbitPayload.Payload.Domain)
+	if looksLikeObjectStoreAlias(patp, alias) {
+		zap.L().Warn(fmt.Sprintf("Rerouting S3-style alias submitted via Urbit domain action for %s: %s", patp, alias))
+		urbitPayload.Payload.Domain = alias
+		return setMinIODomain(patp, urbitPayload, shipConf)
+	}
 	defer func() {
 		time.Sleep(1 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: ""}
 	}()
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "loading"}
 	// check if new domain is valid
-	alias := urbitPayload.Payload.Domain
 	oldDomain := shipConf.WgURL
 	areAliases, err := AreSubdomainsAliases(alias, oldDomain)
 	if err != nil {
@@ -652,29 +675,49 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: ""}
 	}()
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "loading"}
-	// check if new domain is valid
-	alias := urbitPayload.Payload.Domain
-	oldDomain := fmt.Sprintf("s3.%s", shipConf.WgURL)
-	areAliases, err := AreSubdomainsAliases(alias, oldDomain)
-	if err != nil {
+
+	alias := strings.TrimSpace(urbitPayload.Payload.Domain)
+	if alias == "" {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-		return fmt.Errorf("Failed to check RustFS domain alias for %s: %v", patp, err)
+		return fmt.Errorf("RustFS domain cannot be empty for %s", patp)
 	}
-	if !areAliases {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-		return fmt.Errorf("Invalid RustFS domain alias for %s", patp)
+
+	conf := config.Conf()
+	oldShipConf := shipConf
+	remoteObjectStore := docker.ObjectStoreUsesRemoteDomain(conf, shipConf)
+	if remoteObjectStore {
+		oldDomain := fmt.Sprintf("s3.%s", shipConf.WgURL)
+		areAliases, err := AreSubdomainsAliases(alias, oldDomain)
+		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Failed to check RustFS domain alias for %s: %v", patp, err)
+		}
+		if !areAliases {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Invalid RustFS domain alias for %s", patp)
+		}
+		if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return err
+		}
 	}
-	// Creae Alias
-	if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-		return err
-	}
-	shipConf.CustomS3Web = alias
+
+	docker.SetObjectStoreCustomDomain(conf, &shipConf, alias)
 	update := make(map[string]structs.UrbitDocker)
 	update[patp] = shipConf
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	if err := recreateObjectStoreContainer(patp); err != nil {
+		rollback := map[string]structs.UrbitDocker{patp: oldShipConf}
+		if rollbackErr := config.UpdateUrbitConfig(rollback); rollbackErr != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't roll back RustFS domain change for %s after recreate failure: %v", patp, rollbackErr))
+		} else if rollbackStartErr := recreateObjectStoreContainer(patp); rollbackStartErr != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't restore RustFS container for %s after recreate failure: %v", patp, rollbackStartErr))
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return err
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"}
 	time.Sleep(3 * time.Second)
@@ -949,6 +992,22 @@ func toggleNetwork(patp string, shipConf structs.UrbitDocker) error {
 			zap.L().Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 		}
 	}
+	if err := recreateObjectStoreContainer(patp); err != nil {
+		return err
+	}
+	return nil
+}
+
+func recreateObjectStoreContainer(patp string) error {
+	if !config.Conf().WgRegistered {
+		return nil
+	}
+	containerName := docker.GetObjectStoreContainerName(patp)
+	info, err := docker.StartContainer(containerName, "minio")
+	if err != nil {
+		return fmt.Errorf("Couldn't recreate RustFS container for %s: %v", patp, err)
+	}
+	config.UpdateContainerState(containerName, info)
 	return nil
 }
 

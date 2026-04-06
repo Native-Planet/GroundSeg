@@ -196,6 +196,70 @@ func objectStoreStarTramEnabled(conf structs.SysConfig) bool {
 	return conf.WgRegistered && conf.WgOn
 }
 
+func normalizedObjectStoreCustomDomain(domain string) string {
+	domain = strings.TrimSpace(domain)
+	if strings.EqualFold(domain, "null") {
+		return ""
+	}
+	return domain
+}
+
+func ObjectStoreUsesRemoteDomain(conf structs.SysConfig, shipConf structs.UrbitDocker) bool {
+	return objectStoreStarTramEnabled(conf) &&
+		shipConf.Network == "wireguard" &&
+		strings.TrimSpace(shipConf.WgURL) != ""
+}
+
+func ObjectStoreCustomDomainMode(conf structs.SysConfig, shipConf structs.UrbitDocker) string {
+	if ObjectStoreUsesRemoteDomain(conf, shipConf) {
+		return "remote"
+	}
+	return "local"
+}
+
+func objectStoreCustomDomainForMode(shipConf structs.UrbitDocker, mode string) string {
+	switch mode {
+	case "remote":
+		if domain := normalizedObjectStoreCustomDomain(shipConf.CustomS3WebRemote); domain != "" {
+			return domain
+		}
+	default:
+		if domain := normalizedObjectStoreCustomDomain(shipConf.CustomS3WebLocal); domain != "" {
+			return domain
+		}
+	}
+	return normalizedObjectStoreCustomDomain(shipConf.CustomS3Web)
+}
+
+func ObjectStoreCustomDomain(conf structs.SysConfig, shipConf structs.UrbitDocker) string {
+	return objectStoreCustomDomainForMode(shipConf, ObjectStoreCustomDomainMode(conf, shipConf))
+}
+
+func ObjectStoreCustomDomains(shipConf structs.UrbitDocker) []string {
+	domains := []string{}
+	for _, candidate := range []string{
+		normalizedObjectStoreCustomDomain(shipConf.CustomS3WebLocal),
+		normalizedObjectStoreCustomDomain(shipConf.CustomS3WebRemote),
+		normalizedObjectStoreCustomDomain(shipConf.CustomS3Web),
+	} {
+		if candidate != "" && !contains(domains, candidate) {
+			domains = append(domains, candidate)
+		}
+	}
+	return domains
+}
+
+func SetObjectStoreCustomDomain(conf structs.SysConfig, shipConf *structs.UrbitDocker, domain string) {
+	domain = normalizedObjectStoreCustomDomain(domain)
+	switch ObjectStoreCustomDomainMode(conf, *shipConf) {
+	case "remote":
+		shipConf.CustomS3WebRemote = domain
+	default:
+		shipConf.CustomS3WebLocal = domain
+	}
+	structs.SyncCustomS3Domains(shipConf)
+}
+
 func objectStoreOfflineHostPorts(shipConf structs.UrbitDocker) (int, int) {
 	consolePort := shipConf.HTTPPort + offlineRustFSConsoleOffset
 	s3Port := shipConf.HTTPPort + offlineRustFSS3Offset
@@ -203,7 +267,7 @@ func objectStoreOfflineHostPorts(shipConf structs.UrbitDocker) (int, int) {
 }
 
 func objectStorePorts(conf structs.SysConfig, shipConf structs.UrbitDocker) objectStorePortConfig {
-	if objectStoreStarTramEnabled(conf) {
+	if ObjectStoreUsesRemoteDomain(conf, shipConf) {
 		return objectStorePortConfig{
 			useWireguard:      true,
 			listenS3Port:      shipConf.WgS3Port,
@@ -231,10 +295,10 @@ func objectStoreAdminEndpoint(conf structs.SysConfig, patp string, shipConf stru
 }
 
 func objectStoreLinkEndpoint(conf structs.SysConfig, shipConf structs.UrbitDocker) string {
-	if endpoint := strings.TrimSpace(shipConf.CustomS3Web); endpoint != "" {
+	if endpoint := strings.TrimSpace(ObjectStoreCustomDomain(conf, shipConf)); endpoint != "" {
 		return endpoint
 	}
-	if objectStoreStarTramEnabled(conf) && strings.TrimSpace(shipConf.WgURL) != "" {
+	if ObjectStoreUsesRemoteDomain(conf, shipConf) {
 		return fmt.Sprintf("s3.%s", shipConf.WgURL)
 	}
 	hostS3Port, _ := objectStoreOfflineHostPorts(shipConf)
@@ -249,7 +313,7 @@ func GetObjectStoreLinkEndpoint(patp string) (string, error) {
 }
 
 func ObjectStoreConsoleURL(hostName string, conf structs.SysConfig, shipConf structs.UrbitDocker) string {
-	if objectStoreStarTramEnabled(conf) && strings.TrimSpace(shipConf.WgURL) != "" {
+	if ObjectStoreUsesRemoteDomain(conf, shipConf) {
 		return fmt.Sprintf("https://console.s3.%s/rustfs/console/index.html", shipConf.WgURL)
 	}
 	_, hostConsolePort := objectStoreOfflineHostPorts(shipConf)
@@ -399,7 +463,7 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 		return containerConfig, hostConfig, fmt.Errorf("invalid offline RustFS host ports for %s", shipName)
 	}
 
-	serverDomains := objectStoreServerDomains(shipConf)
+	serverDomains := objectStoreServerDomains(conf, shipConf)
 	environment := []string{
 		fmt.Sprintf("RUSTFS_ACCESS_KEY=%s", shipName),
 		fmt.Sprintf("RUSTFS_SECRET_KEY=%s", storePwd),
@@ -500,18 +564,20 @@ func normalizeObjectStoreDomain(domain string) string {
 	return strings.TrimSpace(strings.Trim(domain, "/"))
 }
 
-func objectStoreServerDomains(shipConf structs.UrbitDocker) string {
+func objectStoreServerDomains(conf structs.SysConfig, shipConf structs.UrbitDocker) string {
 	var domains []string
 	baseDomain := strings.TrimSpace(shipConf.WgURL)
-	if baseDomain != "" {
+	if ObjectStoreUsesRemoteDomain(conf, shipConf) && baseDomain != "" {
 		defaultDomain := normalizeObjectStoreDomain(fmt.Sprintf("s3.%s", baseDomain))
 		if defaultDomain != "" {
 			domains = append(domains, defaultDomain)
 		}
 	}
-	customDomain := normalizeObjectStoreDomain(shipConf.CustomS3Web)
-	if customDomain != "" && !contains(domains, customDomain) {
-		domains = append(domains, customDomain)
+	for _, customDomain := range ObjectStoreCustomDomains(shipConf) {
+		normalized := normalizeObjectStoreDomain(customDomain)
+		if normalized != "" && !contains(domains, normalized) {
+			domains = append(domains, normalized)
+		}
 	}
 	return strings.Join(domains, ",")
 }

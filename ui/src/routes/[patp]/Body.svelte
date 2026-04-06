@@ -35,6 +35,13 @@
   export let patp
 
   let ownShip = false
+  const normalizeDisplayString = value => {
+    if (value == null) {
+      return ""
+    }
+    const text = String(value).trim()
+    return text.toLowerCase() === "null" ? "" : text
+  }
 
   afterUpdate(()=>{
     if ($URBIT_MODE) {
@@ -57,8 +64,9 @@
   $: lusCode = (ship?.lusCode) || ""
   $: url = (ship?.url) || "#"
   $: showUrbAlias = (ship?.showUrbAlias) || false
-  $: urbitAlias = (ship?.urbitAlias) || ""
-  $: minioAlias = (ship?.minioAlias) || ""
+  $: urbitAlias = normalizeDisplayString(ship?.urbitAlias)
+  $: minioAlias = normalizeDisplayString(ship?.minioAlias)
+  $: minioAliasMode = (ship?.minioAliasMode) || "local"
   $: minioUrl = (ship?.minioUrl) || "#"
   $: minioPwd = (ship?.minioPwd) || ""
   $: minioLinked = (ship?.minioLinked) || false
@@ -118,6 +126,7 @@
       {running}
       {patp}
       {minioAlias}
+      {minioAliasMode}
       {minioUrl}
       {minioPwd}
       {minioLinked}

@@ -139,6 +139,10 @@ func handleStartramToggle() {
 	startram.EventBus <- structs.Event{Type: "toggle", Data: "loading"}
 	conf := config.Conf()
 	if conf.WgOn {
+		if containerState, exists := config.GetContainerState()["wireguard"]; exists {
+			containerState.DesiredStatus = "stopped"
+			config.UpdateContainerState("wireguard", containerState)
+		}
 		if err := config.UpdateConf(map[string]interface{}{
 			"wgOn": false,
 		}); err != nil {
@@ -175,9 +179,13 @@ func handleStartramToggle() {
 		}); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
-		_, err := docker.StartContainer("wireguard", "wireguard")
-		if err != nil {
+		if err := docker.LoadWireguard(); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
+			if revertErr := config.UpdateConf(map[string]interface{}{
+				"wgOn": false,
+			}); revertErr != nil {
+				zap.L().Error(fmt.Sprintf("%v", revertErr))
+			}
 		}
 	}
 	for _, patp := range conf.Piers {

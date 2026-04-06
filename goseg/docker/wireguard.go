@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -97,53 +99,81 @@ func buildWgConf() (string, error) {
 	return res, nil
 }
 
+func wireguardHostConfigPath() string {
+	dockerDir := filepath.Clean(config.DockerDir)
+	if dockerDir == "." || dockerDir == "/" {
+		return ""
+	}
+	return filepath.Join(dockerDir, "wireguard", "_data", "wg0.conf")
+}
+
 // write latest conf
 func WriteWgConf() error {
 	newConf, err := buildWgConf()
 	if err != nil {
 		return err
 	}
-	filePath := filepath.Join(config.DockerDir, "wireguard", "_data", "wg0.conf")
-	existingConf, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		// assume it doesn't exist, so write the current config
-		zap.L().Info("Creating WG config")
-		return writeWgConfToFile(filePath, newConf)
+	filePath := wireguardHostConfigPath()
+	if filePath != "" {
+		existingConf, err := ioutil.ReadFile(filePath)
+		switch {
+		case err == nil && string(existingConf) == newConf:
+			return nil
+		case err == nil:
+			zap.L().Info("Updating WG config")
+			if err := writeWgConfToFile(filePath, newConf); err == nil {
+				return nil
+			} else {
+				zap.L().Warn(fmt.Sprintf("Direct WG config write failed, falling back to Docker volume copy: %v", err))
+			}
+		case os.IsNotExist(err):
+			zap.L().Info("Creating WG config")
+			if err := writeWgConfToFile(filePath, newConf); err == nil {
+				return nil
+			} else {
+				zap.L().Warn(fmt.Sprintf("Direct WG config create failed, falling back to Docker volume copy: %v", err))
+			}
+		default:
+			zap.L().Warn(fmt.Sprintf("Couldn't read WG config from host path %s, falling back to Docker volume copy: %v", filePath, err))
+		}
+	} else {
+		zap.L().Warn("Docker volume path could not be resolved on host, writing WG config via Docker volume copy")
 	}
-	if string(existingConf) != newConf {
-		// If they differ, overwrite
-		zap.L().Info("Updating WG config")
-		return writeWgConfToFile(filePath, newConf)
-	}
-	return nil
+	return copyWGFileToVolume("wg0.conf", newConf, "/config", "wireguard")
 }
 
-// either write directly or create volumes
+// write directly to the docker volume mount when the host path is known
 func writeWgConfToFile(filePath string, content string) error {
-	// try writing
-	err := ioutil.WriteFile(filePath, []byte(content), 0644)
-	if err == nil {
-		return nil
-	}
-	// ensure the directory structure exists
 	dir := filepath.Dir(filePath)
-	if err = os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	// try writing again
-	err = ioutil.WriteFile(filePath, []byte(content), 0644)
-	if err != nil {
-		err = copyWGFileToVolume(filePath, "/etc/wireguard/", "wireguard")
-		// otherwise create the volume
-		if err != nil {
-			return fmt.Errorf("Failed to copy WG config file to volume: %v", err)
-		}
+	return ioutil.WriteFile(filePath, []byte(content), 0644)
+}
+
+func wgConfTarStream(fileName string, content string) (*bytes.Buffer, error) {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	body := []byte(content)
+	header := &tar.Header{
+		Name: fileName,
+		Mode: 0644,
+		Size: int64(len(body)),
 	}
-	return nil
+	if err := tw.WriteHeader(header); err != nil {
+		return nil, err
+	}
+	if _, err := tw.Write(body); err != nil {
+		return nil, err
+	}
+	if err := tw.Close(); err != nil {
+		return nil, err
+	}
+	return &buf, nil
 }
 
 // write wg conf to volume
-func copyWGFileToVolume(filePath string, targetPath string, volumeName string) error {
+func copyWGFileToVolume(fileName string, content string, targetPath string, volumeName string) error {
 	ctx := context.Background()
 	cli, err := dockerclient.New()
 	if err != nil {
@@ -155,33 +185,18 @@ func copyWGFileToVolume(filePath string, targetPath string, volumeName string) e
 		return err
 	}
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
+	tarStream, err := wgConfTarStream(fileName, content)
+	if err != nil {
+		return err
+	}
 	// temp container to mount
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: desiredImage,
+		Cmd:   []string{"sh", "-c", "sleep 30"},
 	}, &container.HostConfig{
 		Binds: []string{volumeName + ":" + targetPath},
 	}, nil, nil, "wg_writer")
 	if err != nil {
-		return err
-	}
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return err
-	}
-	file, err := os.Open(filepath.Join(filePath))
-	if err != nil {
-		return fmt.Errorf("failed to open wg0 file: %v", err)
-	}
-	defer file.Close()
-	// Copy the file to the volume via the temporary container
-	err = cli.CopyToContainer(ctx, resp.ID, targetPath, file, container.CopyToContainerOptions{})
-	if err != nil {
-		return err
-	}
-	// remove temporary container
-	if err := StopContainerByName("wg_writer"); err != nil {
-		return err
-	}
-	if err := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
 		return err
 	}
 	defer func() {
@@ -189,5 +204,13 @@ func copyWGFileToVolume(filePath string, targetPath string, volumeName string) e
 			zap.L().Error(fmt.Sprintf("Failed to remove temporary container: %v", removeErr))
 		}
 	}()
+	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return err
+	}
+	// Copy the file to the volume via the temporary container
+	err = cli.CopyToContainer(ctx, resp.ID, targetPath, tarStream, container.CopyToContainerOptions{})
+	if err != nil {
+		return err
+	}
 	return nil
 }
