@@ -167,28 +167,14 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 			Cmd:   bootCommand.ScriptArgs,
 		}
 	} else {
-		httpPort := fmt.Sprintf("%v", shipConf.HTTPPort)
-		amesPort := fmt.Sprintf("%v", shipConf.AmesPort)
 		network = "default"
-		//httpPortStr := nat.Port(fmt.Sprintf(httpPort + "/tcp"))
-		//amesPortStr := nat.Port(fmt.Sprintf(amesPort + "/udp"))
-		// Port mapping
-		portMap = nat.PortMap{
-			"80/tcp": []nat.PortBinding{
-				{HostIP: "0.0.0.0", HostPort: httpPort},
-			},
-			"34343/udp": []nat.PortBinding{
-				{HostIP: "0.0.0.0", HostPort: amesPort},
-			},
-		}
+		var exposedPorts nat.PortSet
+		portMap, exposedPorts = localUrbitPortBindings(shipConf)
 		// finally construct the container config structs
 		containerConfig = container.Config{
-			Image: desiredImage,
-			ExposedPorts: nat.PortSet{
-				"80/tcp":    struct{}{},
-				"34343/udp": struct{}{},
-			},
-			Cmd: bootCommand.ScriptArgs,
+			Image:        desiredImage,
+			ExposedPorts: exposedPorts,
+			Cmd:          bootCommand.ScriptArgs,
 		}
 	}
 	mountType := mount.TypeVolume
@@ -217,6 +203,26 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	zap.L().Debug(fmt.Sprintf("Boot command: %s", bootCommand.PreviewFull))
 	return containerConfig, hostConfig, nil
+}
+
+func localUrbitPortBindings(shipConf structs.UrbitDocker) (nat.PortMap, nat.PortSet) {
+	httpPort := fmt.Sprintf("%v", shipConf.HTTPPort)
+	amesPort := resolvedLocalAmesPort(shipConf)
+	amesPortProto := nat.Port(amesPort + "/udp")
+
+	portMap := nat.PortMap{
+		"80/tcp": []nat.PortBinding{
+			{HostIP: "0.0.0.0", HostPort: httpPort},
+		},
+		amesPortProto: []nat.PortBinding{
+			{HostIP: "0.0.0.0", HostPort: amesPort},
+		},
+	}
+	exposedPorts := nat.PortSet{
+		"80/tcp":      struct{}{},
+		amesPortProto: struct{}{},
+	}
+	return portMap, exposedPorts
 }
 
 func shipUsesDevMode(bootStatus string) bool {
