@@ -34,13 +34,13 @@ func SystemHandler(msg []byte) error {
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to stop Llama UI: %v", err))
 			}
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"penpaiAllow": false,
 			}); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't toggle penpai feature: %v", err))
 			}
 		} else {
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"penpaiAllow": true,
 			}); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't toggle penpai feature: %v", err))
@@ -53,7 +53,7 @@ func SystemHandler(msg []byte) error {
 		zap.L().Info(fmt.Sprintf("Device shutdown requested"))
 		switch systemPayload.Payload.Command {
 		case "restart":
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"gracefulExit": true,
 			}); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't set graceful exit to true: %v", err))
@@ -73,7 +73,7 @@ func SystemHandler(msg []byte) error {
 		switch systemPayload.Payload.Command {
 		case "shutdown":
 			zap.L().Info(fmt.Sprintf("Device shutdown requested"))
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"gracefulExit": true,
 			}); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't set graceful exit to true: %v", err))
@@ -88,7 +88,7 @@ func SystemHandler(msg []byte) error {
 			}
 		case "restart":
 			zap.L().Info(fmt.Sprintf("Device restart requested"))
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"gracefulExit": true,
 			}); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't set graceful exit to true: %v", err))
@@ -114,7 +114,7 @@ func SystemHandler(msg []byte) error {
 			//broadcast.SysTransBus <- structs.SystemTransition{Swap: false, Type: "swap"}
 			return fmt.Errorf("Unable to set swap: %v", err)
 		}
-		if err = config.UpdateConf(map[string]interface{}{
+		if err = config.UpdateConf(map[string]any{
 			"swapVal": systemPayload.Payload.Value,
 		}); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't update swap value: %v", err))

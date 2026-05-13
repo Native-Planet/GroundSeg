@@ -88,7 +88,7 @@ func mDNSServer() {
 			zap.L().Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
 		} else {
 			zap.L().Info(fmt.Sprintf("Caching %v", system.LocalUrl))
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"gracefulExit":  false,
 				"lastKnownMDNS": system.LocalUrl,
 			}); err != nil {

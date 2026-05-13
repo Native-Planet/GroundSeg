@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,13 +35,7 @@ var (
 )
 
 func checkDevMode() bool {
-	for _, arg := range os.Args[1:] {
-		// trigger dev mode with `./groundseg dev`
-		if arg == "dev" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(os.Args[1:], "dev")
 }
 
 func DevHandler(msg []byte) error {
@@ -165,7 +160,7 @@ func DevHandler(msg []byte) error {
 		}
 	case "startram-reminder-toggle":
 		reminded := devPayload.Payload.Reminded
-		if err := config.UpdateConf(map[string]interface{}{
+		if err := config.UpdateConf(map[string]any{
 			"startramSetReminder": map[string]bool{
 				"one":   reminded,
 				"three": reminded,

@@ -267,7 +267,7 @@ type C2CPayload struct {
 type WsPayload struct {
 	ID      string        `json:"id"`
 	Type    string        `json:"type"`
-	Payload interface{}   `json:"payload"`
+	Payload any           `json:"payload"`
 	Token   WsTokenStruct `json:"token"`
 }
 

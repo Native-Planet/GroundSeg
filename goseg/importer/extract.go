@@ -97,11 +97,8 @@ func extractZip(src, dest string) error {
 			extractedSize += written
 			processedCount++
 
-			percentExtracted := int((float64(processedCount) / float64(fileCount) * 50) +
-				(float64(extractedSize) / float64(totalSize) * 50))
-			if percentExtracted > 99 {
-				percentExtracted = 99
-			}
+			percentExtracted := min(int((float64(processedCount)/float64(fileCount)*50)+
+				(float64(extractedSize)/float64(totalSize)*50)), 99)
 
 			docker.ImportShipTransBus <- structs.UploadTransition{
 				Type:  "extracted",
@@ -202,10 +199,7 @@ func extractTarGz(src, dest string) error {
 				processedBytes += written
 
 				if time.Since(lastUpdate) > time.Second {
-					percentExtracted := int(float64(processedBytes) / float64(totalSize*2) * 100)
-					if percentExtracted > 99 {
-						percentExtracted = 99
-					}
+					percentExtracted := min(int(float64(processedBytes)/float64(totalSize*2)*100), 99)
 
 					docker.ImportShipTransBus <- structs.UploadTransition{
 						Type:  "extracted",
@@ -319,11 +313,8 @@ func extractTar(src, dest string) error {
 				// Only update progress at most once per second
 				if time.Since(lastUpdate) > time.Second {
 					// Use both file count and processed bytes for progress
-					percentExtracted := int((float64(processedCount) / float64(fileCount) * 50) +
-						(float64(processedBytes) / float64(totalSize) * 50))
-					if percentExtracted > 99 {
-						percentExtracted = 99
-					}
+					percentExtracted := min(int((float64(processedCount)/float64(fileCount)*50)+
+						(float64(processedBytes)/float64(totalSize)*50)), 99)
 
 					docker.ImportShipTransBus <- structs.UploadTransition{
 						Type:  "extracted",

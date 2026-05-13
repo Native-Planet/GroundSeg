@@ -312,8 +312,8 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 		Created: created,
 	}
 	if authorized {
-		update := map[string]interface{}{
-			"sessions": map[string]interface{}{
+		update := map[string]any{
+			"sessions": map[string]any{
 				"authorized": map[string]structs.SessionInfo{
 					tokenID: session,
 				},
@@ -324,8 +324,8 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 		}
 		RemoveFromAuthMap(tokenID, false)
 	} else {
-		update := map[string]interface{}{
-			"sessions": map[string]interface{}{
+		update := map[string]any{
+			"sessions": map[string]any{
 				"unauthorized": map[string]structs.SessionInfo{
 					tokenID: session,
 				},

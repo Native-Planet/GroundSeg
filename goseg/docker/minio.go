@@ -533,7 +533,7 @@ func newS3Client(endpoint string, accessKey string, secretKey string) (*s3v2.Cli
 		awscfg.WithRegion("us-east-1"),
 		awscfg.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
 		awscfg.WithEndpointResolverWithOptions(awsv2.EndpointResolverWithOptionsFunc(
-			func(service, region string, options ...interface{}) (awsv2.Endpoint, error) {
+			func(service, region string, options ...any) (awsv2.Endpoint, error) {
 				if service == s3v2.ServiceID {
 					return awsv2.Endpoint{
 						URL:               endpoint,
@@ -627,7 +627,7 @@ func setPublicReadPolicy(client *s3v2.Client, bucket string) error {
 
 func waitForS3Ready(client *s3v2.Client) error {
 	var lastErr error
-	for i := 0; i < 30; i++ {
+	for range 30 {
 		_, err := client.ListBuckets(context.Background(), &s3v2.ListBucketsInput{})
 		if err == nil {
 			return nil

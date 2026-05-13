@@ -207,8 +207,8 @@ func main() {
 			zap.L().Info("Forcing legacy S3 migration for this run")
 		}
 		// set non-default port like `--http-port=8060`
-		if strings.HasPrefix(arg, "--http-port=") {
-			portStr := strings.TrimPrefix(arg, "--http-port=")
+		if after, ok := strings.CutPrefix(arg, "--http-port="); ok {
+			portStr := after
 			port, err := strconv.Atoi(portStr)
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("Invalid port number: %s -- defaulting to 80", portStr))

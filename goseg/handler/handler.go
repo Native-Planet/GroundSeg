@@ -282,7 +282,7 @@ func PwHandler(msg []byte, urbitMode bool) error {
 		zap.L().Info("Setting new password")
 		conf := config.Conf()
 		if auth.Hasher(pwPayload.Payload.Old) == conf.PwHash {
-			update := map[string]interface{}{
+			update := map[string]any{
 				"pwHash": auth.Hasher(pwPayload.Payload.Password),
 			}
 			if err := config.UpdateConf(update); err != nil {

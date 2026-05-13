@@ -39,7 +39,7 @@ type BackupObject struct {
 func (s *Subdomain) UnmarshalJSON(data []byte) error {
 	type Alias Subdomain // create an alias to avoid recursion
 	aux := &struct {
-		Port interface{} `json:"port"` // use interface{} type for Port
+		Port any `json:"port"` // use interface{} type for Port
 		*Alias
 	}{
 		Alias: (*Alias)(s),
@@ -102,7 +102,7 @@ type StartramSvcResp struct {
 func (s *StartramSvcResp) UnmarshalJSON(data []byte) error {
 	type Alias StartramSvcResp
 	aux := &struct {
-		Lease interface{} `json:"lease"`
+		Lease any `json:"lease"`
 		*Alias
 	}{
 		Alias: (*Alias)(s),

@@ -29,7 +29,7 @@ func CheckVersion() (structs.Channel, bool) {
 	const delay = time.Second
 	url := globalConfig.UpdateUrl
 	var fetchedVersion structs.Version
-	for i := 0; i < retries; i++ {
+	for i := range retries {
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 		}

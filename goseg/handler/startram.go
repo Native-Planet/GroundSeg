@@ -143,7 +143,7 @@ func handleStartramToggle() {
 			containerState.DesiredStatus = "stopped"
 			config.UpdateContainerState("wireguard", containerState)
 		}
-		if err := config.UpdateConf(map[string]interface{}{
+		if err := config.UpdateConf(map[string]any{
 			"wgOn": false,
 		}); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
@@ -174,14 +174,14 @@ func handleStartramToggle() {
 			}
 		}
 	} else {
-		if err := config.UpdateConf(map[string]interface{}{
+		if err := config.UpdateConf(map[string]any{
 			"wgOn": true,
 		}); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 		if err := docker.LoadWireguard(); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
-			if revertErr := config.UpdateConf(map[string]interface{}{
+			if revertErr := config.UpdateConf(map[string]any{
 				"wgOn": false,
 			}); revertErr != nil {
 				zap.L().Error(fmt.Sprintf("%v", revertErr))
@@ -289,7 +289,7 @@ func handleStartramEndpoint(endpoint string) {
 	}
 	// set endpoint to config and persist
 	startram.EventBus <- structs.Event{Type: "endpoint", Data: "finalizing"}
-	err = config.UpdateConf(map[string]interface{}{
+	err = config.UpdateConf(map[string]any{
 		"endpointUrl":  endpoint,
 		"wgRegistered": false,
 	})
@@ -443,7 +443,7 @@ func shipExited(patp string) (bool, error) {
 }
 
 func handleStartramSetBackupPassword(password string) {
-	err := config.UpdateConf(map[string]interface{}{
+	err := config.UpdateConf(map[string]any{
 		"remoteBackupPassword": password,
 	})
 	if err != nil {

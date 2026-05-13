@@ -87,7 +87,7 @@ func StartramRenewalReminder() {
 }
 
 func setReminder(daysType string, reminded bool) {
-	if err := config.UpdateConf(map[string]interface{}{
+	if err := config.UpdateConf(map[string]any{
 		"startramSetReminder": map[string]bool{
 			daysType: reminded,
 		},

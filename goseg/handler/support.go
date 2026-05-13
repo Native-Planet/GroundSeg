@@ -170,7 +170,7 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 
 	// description.txt
 	descPath := filepath.Join(bugReportDir, "description.txt")
-	if err := ioutil.WriteFile(descPath, []byte(fmt.Sprintf("Contact:\n%s\nDetails:\n%s", contact, description)), 0644); err != nil {
+	if err := ioutil.WriteFile(descPath, fmt.Appendf(nil, "Contact:\n%s\nDetails:\n%s", contact, description), 0644); err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't write details.txt"))
 		return err
 	}
@@ -310,7 +310,7 @@ func sanitizeJSON(filePath string, keysToRemove ...string) error {
 	}
 
 	// Unmarshal into a map
-	var jsonData map[string]interface{}
+	var jsonData map[string]any
 	err = json.Unmarshal(data, &jsonData)
 	if err != nil {
 		return err

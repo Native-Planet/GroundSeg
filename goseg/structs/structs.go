@@ -7,7 +7,7 @@ import (
 // eventbus event payloads
 type Event struct {
 	Type string
-	Data interface{}
+	Data any
 }
 
 // urbit transition eventbus payloads

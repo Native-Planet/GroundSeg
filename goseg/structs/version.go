@@ -9,7 +9,7 @@ type Version struct {
 type Channel struct {
 	Groundseg VersionDetails `json:"groundseg"`
 	Manual    VersionDetails `json:"manual"`
-	Rustfs    VersionDetails `json:"rustfs,omitempty"`
+	Rustfs    VersionDetails `json:"rustfs"`
 	Minio     VersionDetails `json:"minio"`
 	Miniomc   VersionDetails `json:"miniomc"`
 	Netdata   VersionDetails `json:"netdata"`
