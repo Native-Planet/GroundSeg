@@ -90,9 +90,9 @@ func ActiveSwap(loc string) int {
 	if err != nil {
 		return 0
 	}
-	for _, line := range strings.Split(string(output), "\n") {
+	for line := range strings.SplitSeq(string(output), "\n") {
 		if strings.Contains(line, loc) {
-			for _, item := range strings.Fields(line) {
+			for item := range strings.FieldsSeq(line) {
 				if strings.Contains(item, "M") || strings.Contains(item, "G") {
 					num, _ := strconv.Atoi(strings.TrimRight(item, "MG"))
 					if strings.Contains(item, "M") {

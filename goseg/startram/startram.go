@@ -105,7 +105,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	}
 	if conf.WgRegistered != regStatus {
 		zap.L().Info("Updating registration status")
-		err = config.UpdateConf(map[string]interface{}{
+		err = config.UpdateConf(map[string]any{
 			"wgRegistered": regStatus,
 		})
 		if err != nil {
@@ -147,7 +147,7 @@ func Register(regCode string, region string) error {
 		return fmt.Errorf("Error unmarshalling response: %v", err)
 	}
 	if respObj.Error == 0 {
-		err = config.UpdateConf(map[string]interface{}{
+		err = config.UpdateConf(map[string]any{
 			"wgRegistered": true,
 		})
 		if err != nil {
@@ -158,7 +158,7 @@ func Register(regCode string, region string) error {
 			return fmt.Errorf("Error retrieving post-registration: %v", err)
 		}
 	} else {
-		err = config.UpdateConf(map[string]interface{}{
+		err = config.UpdateConf(map[string]any{
 			"wgRegistered": false,
 		})
 		if err != nil {
@@ -412,7 +412,7 @@ func CancelSub(key string) error {
 	conf := config.Conf()
 	var respObj structs.CancelStartramSub
 	url := "https://" + conf.EndpointUrl + "/v1/stripe/cancel"
-	cancelObj := map[string]interface{}{
+	cancelObj := map[string]any{
 		"reg_key": key,
 	}
 	cancelJSON, err := json.Marshal(cancelObj)
@@ -454,7 +454,7 @@ func maskPubkey(input string) string {
 		replacement := prefix + string(make([]rune, length, length)) + suffix
 
 		// Replace all characters in between with "x"
-		for i := 0; i < length; i++ {
+		for i := range length {
 			replacement = replacement[:len(prefix)+i] + "x" + replacement[len(prefix)+i+1:]
 		}
 

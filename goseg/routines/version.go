@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -26,11 +27,7 @@ import (
 func CheckVersionLoop() {
 	conf := config.Conf()
 	var updateInterval int
-	if conf.UpdateInterval < 60 {
-		updateInterval = 60
-	} else {
-		updateInterval = conf.UpdateInterval
-	}
+	updateInterval = max(conf.UpdateInterval, 60)
 	checkInterval := time.Duration(updateInterval) * time.Second
 	ticker := time.NewTicker(checkInterval)
 	releaseChannel := conf.UpdateBranch
@@ -183,7 +180,7 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	// re-disable bypass after one update
 	if conf.DisableSlsa {
-		if err := config.UpdateConf(map[string]interface{}{
+		if err := config.UpdateConf(map[string]any{
 			"disableSlsa": false,
 		}); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't reset SLSA bypass config: %v", err))
@@ -196,7 +193,7 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't hash new binary: %v", err))
 	}
-	if err := config.UpdateConf(map[string]interface{}{
+	if err := config.UpdateConf(map[string]any{
 		"gsVersion": versionStr,
 		"binHash":   binHash,
 	}); err != nil {
@@ -256,12 +253,7 @@ func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI str
 }
 
 func contains(slice []string, item string) bool {
-	for _, a := range slice {
-		if a == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, item)
 }
 
 func updateDocker(release string, currentVersion structs.Channel, latestVersion structs.Channel) {

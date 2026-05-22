@@ -121,7 +121,7 @@ func getStorageEndpoint(patp string) (string, error) {
 }
 
 func parseStorageEndpoint(response string) (string, error) {
-	for _, line := range strings.Split(response, "\n") {
+	for line := range strings.SplitSeq(response, "\n") {
 		if !strings.Contains(line, "%avow") {
 			continue
 		}

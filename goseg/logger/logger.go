@@ -254,7 +254,7 @@ func getDockerLogs(name string) ([]byte, error) {
 	jsArray := fmt.Sprintf("[%s]", strings.Join(logEntries, ", "))
 
 	// Print the JavaScript array string
-	return []byte(fmt.Sprintf(`{"type":"%s","history":true,"log":%s}`, name, jsArray)), nil
+	return fmt.Appendf(nil, `{"type":"%s","history":true,"log":%s}`, name, jsArray), nil
 }
 
 func RetrieveSysLogHistory() ([]byte, error) {
@@ -285,5 +285,5 @@ func RetrieveSysLogHistory() ([]byte, error) {
 	fmt.Println(jsArray)
 
 	// Print the JavaScript array string
-	return []byte(fmt.Sprintf(`{"type":"system","history":true,"log":%s}`, jsArray)), nil
+	return fmt.Appendf(nil, `{"type":"system","history":true,"log":%s}`, jsArray), nil
 }

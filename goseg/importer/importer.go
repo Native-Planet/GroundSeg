@@ -184,7 +184,7 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 			docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "aborted"}
 		}
 		w.WriteHeader(requestCode)
-		w.Write([]byte(fmt.Sprintf(`{"status": "%s", "message": "%s"}`, status, message)))
+		w.Write(fmt.Appendf(nil, `{"status": "%s", "message": "%s"}`, status, message))
 	}
 
 	// Verify session
@@ -307,7 +307,7 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func allChunksReceived(filename string, total int) bool {
-	for i := 0; i < total; i++ {
+	for i := range total {
 		if _, err := os.Stat(filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, i))); os.IsNotExist(err) {
 			return false
 		}
@@ -326,7 +326,7 @@ func combineChunks(filename string, total int) error {
 	// Use a buffer to improve performance
 	buffer := make([]byte, 32*1024) // 32KB buffer
 
-	for i := 0; i < total; i++ {
+	for i := range total {
 		partFilePath := filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, i))
 
 		// Open each chunk file

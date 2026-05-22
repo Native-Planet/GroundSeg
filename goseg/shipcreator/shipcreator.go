@@ -5,6 +5,7 @@ import (
 	"groundseg/config"
 	"groundseg/defaults"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"go.uber.org/zap"
@@ -86,18 +87,12 @@ func AppendSysConfigPier(patp string) error {
 	conf := config.Conf()
 	piers := conf.Piers
 	// Check if value already exists in slice
-	exists := false
-	for _, v := range piers {
-		if v == patp {
-			exists = true
-			break
-		}
-	}
+	exists := slices.Contains(piers, patp)
 	// Append only if it doesn't exist yet
 	if !exists {
 		piers = append(piers, patp)
 	}
-	err := config.UpdateConf(map[string]interface{}{
+	err := config.UpdateConf(map[string]any{
 		"piers": piers,
 	})
 	if err != nil {
@@ -116,7 +111,7 @@ func RemoveSysConfigPier(patp string) error {
 			updated = append(updated, memShip)
 		}
 	}
-	err := config.UpdateConf(map[string]interface{}{
+	err := config.UpdateConf(map[string]any{
 		"piers": updated,
 	})
 	return err

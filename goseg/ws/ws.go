@@ -69,7 +69,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conf := config.Conf()
 	// if in c2cmode
 	isC2C := system.IsC2CMode()
-	result := map[string]interface{}{
+	result := map[string]any{
 		"type":  "c2c",
 		"ssids": system.C2CStoredSSIDs,
 	}
@@ -101,7 +101,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			zap.L().Error(fmt.Sprintf("Unable to create token: %v", err))
 			ack = "nack"
 		}
-		result := map[string]interface{}{
+		result := map[string]any{
 			"type":     "activity",
 			"id":       payload.ID,
 			"error":    "null",
@@ -302,7 +302,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				MuCon.Write(respJSON)
 			}
 			// ack/nack for auth
-			result := map[string]interface{}{
+			result := map[string]any{
 				"type":     "activity",
 				"id":       payload.ID,
 				"error":    "null",
@@ -351,7 +351,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				ack = "nack"
 			}
 			// ack/nack for unauth broadcast
-			result := map[string]interface{}{
+			result := map[string]any{
 				"type":     "activity",
 				"id":       payload.ID,
 				"error":    "null",

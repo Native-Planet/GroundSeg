@@ -20,7 +20,7 @@ func handleAction(patp string, result []byte) {
 	reversed := reverseLittleEndian(stripped)
 	jam := new(big.Int).SetBytes(reversed)
 	res := noun.Cue(jam)
-	if reflect.TypeOf(res) == reflect.TypeOf(noun.Cell{}) {
+	if reflect.TypeOf(res) == reflect.TypeFor[noun.Cell]() {
 		bytes, err := decodeAtom(noun.Slag(res, 1).String())
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to decode payload: %v", err))

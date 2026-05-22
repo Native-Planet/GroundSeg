@@ -94,7 +94,7 @@ func DockerSubscriptionHandler() {
 				switch contName {
 				case "wireguard":
 					// set wgOn to false
-					err := config.UpdateConf(map[string]interface{}{
+					err := config.UpdateConf(map[string]any{
 						"wgOn": true,
 					})
 					if err != nil {
@@ -169,7 +169,7 @@ func makeBroadcast(contName string, status string) {
 		if status == "start" {
 			wgOn = true
 		}
-		if err := config.UpdateConf(map[string]interface{}{"wgOn": wgOn}); err != nil {
+		if err := config.UpdateConf(map[string]any{"wgOn": wgOn}); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 		// update profile

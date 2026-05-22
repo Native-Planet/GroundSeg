@@ -65,7 +65,7 @@ func BuildUrbitBootCommand(shipConf structs.UrbitDocker, systemConf structs.SysC
 		"--dirname=" + shipConf.PierName,
 		"--devmode=" + devMode,
 	}
-	if shipConf.Network == "wireguard" {
+	if shipConf.Network == "wireguard" || amesPort != "34343" {
 		scriptArgs = append(scriptArgs,
 			"--http-port="+httpPort,
 			"--port="+amesPort,
@@ -247,7 +247,14 @@ func resolvedRuntimePorts(shipConf structs.UrbitDocker) (string, string) {
 	if shipConf.Network == "wireguard" {
 		return fmt.Sprintf("%v", shipConf.WgHTTPPort), fmt.Sprintf("%v", shipConf.WgAmesPort)
 	}
-	return "80", "34343"
+	return "80", resolvedLocalAmesPort(shipConf)
+}
+
+func resolvedLocalAmesPort(shipConf structs.UrbitDocker) string {
+	if shipConf.AmesPort > 0 {
+		return fmt.Sprintf("%v", shipConf.AmesPort)
+	}
+	return "34343"
 }
 
 func formatShellCommand(command string, args []string) string {

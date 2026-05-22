@@ -11,10 +11,12 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"maps"
 	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -150,9 +152,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	remoteBackups := config.StartramConfig.Backups
 	remoteBackupMap := make(structs.Backup)
 	for _, backup := range remoteBackups {
-		for ship, backupInfo := range backup {
-			remoteBackupMap[ship] = backupInfo
-		}
+		maps.Copy(remoteBackupMap, backup)
 	}
 	localDailyBackups := make(structs.Backup)
 	localWeeklyBackups := make(structs.Backup)
@@ -325,10 +325,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 
 		// pack date
-		packDate := 1
-		if dockerConfig.MeldDate > 1 {
-			packDate = dockerConfig.MeldDate
-		}
+		packDate := max(dockerConfig.MeldDate, 1)
 
 		// collate all the info from our sources into the struct
 		bootCommandBase := ""
@@ -462,13 +459,7 @@ func constructProfileInfo() structs.Profile {
 			patp := parts[len(parts)-3]
 
 			// Put ships in slice
-			shipExists := false
-			for _, ship := range startramServices {
-				if ship == patp {
-					shipExists = true
-					break
-				}
-			}
+			shipExists := slices.Contains(startramServices, patp)
 			if !shipExists {
 				startramServices = append(startramServices, patp)
 			}

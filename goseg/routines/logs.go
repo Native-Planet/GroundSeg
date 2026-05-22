@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,7 +43,7 @@ var (
 	logsMap                = make(map[*structs.MuConn]map[string]*structs.CtxWithCancel)
 	dockerLogCancelChannel = make(chan DockerCancel, 100)
 	wsLogMessagePool       = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return new(structs.WsLogMessage)
 		},
 	}
@@ -97,7 +98,7 @@ func SysLogStreamer() {
 			continue
 		}
 		escapedLog := buffer.Bytes()
-		logJSON := []byte(fmt.Sprintf(`{"type":"system","history":false,"log":%s}`, escapedLog))
+		logJSON := fmt.Appendf(nil, `{"type":"system","history":false,"log":%s}`, escapedLog)
 		if err != nil {
 			continue
 		}
@@ -177,7 +178,7 @@ func streamToConn(containerName string, conn *websocket.Conn) {
 			line = scanner.Text()[8:]
 		}
 		line = strings.ReplaceAll(line, "\\", "\\\\")
-		logJSON := []byte(fmt.Sprintf(`{"type":"%s","history":false,"log":"%s"}`, containerName, line))
+		logJSON := fmt.Appendf(nil, `{"type":"%s","history":false,"log":"%s"}`, containerName, line)
 		if err := conn.WriteMessage(1, logJSON); err != nil {
 			zap.L().Error(fmt.Sprintf("error writing message for %v: %v", containerName, err))
 			return
@@ -322,10 +323,5 @@ func keepMostRecentFiles(dirPath string) error {
 
 // Helper function to check if a string is in a slice
 func logContains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, item)
 }

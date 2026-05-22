@@ -187,7 +187,7 @@ func RectifyUrbit() {
 				if exists {
 					running := containerState.ActualStatus == "running"
 					current.Profile.Startram.Info.Running = running
-					if err := config.UpdateConf(map[string]interface{}{"wgOn": running}); err != nil {
+					if err := config.UpdateConf(map[string]any{"wgOn": running}); err != nil {
 						zap.L().Error(fmt.Sprintf("%v", err))
 					}
 				}

@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -147,10 +148,8 @@ func GetContainerRunningStatus(containerName string) (string, error) {
 	}
 	// Loop through containers to find the one with the given name
 	for _, container := range containers {
-		for _, name := range container.Names {
-			if name == "/"+containerName {
-				return container.Status, nil
-			}
+		if slices.Contains(container.Names, "/"+containerName) {
+			return container.Status, nil
 		}
 	}
 	return status, fmt.Errorf("Unable to get container running status: %v", containerName)
@@ -535,12 +534,12 @@ func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 		return res, err
 	}
 	// Convert JSON to map
-	var m map[string]interface{}
+	var m map[string]any
 	err = json.Unmarshal(jsonData, &m)
 	if err != nil {
 		return res, err
 	}
-	containerData, ok := m[containerType].(map[string]interface{})
+	containerData, ok := m[containerType].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("%s data is not a map", containerType)
 	}
@@ -606,10 +605,8 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 		return false, err
 	}
 	for _, img := range images {
-		for _, digest := range img.RepoDigests {
-			if digest == fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]) {
-				return true, nil
-			}
+		if slices.Contains(img.RepoDigests, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"])) {
+			return true, nil
 		}
 	}
 	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), imagetypes.PullOptions{})
@@ -635,15 +632,11 @@ func PullImageByRef(imageRef string) error {
 		return err
 	}
 	for _, img := range images {
-		for _, tag := range img.RepoTags {
-			if tag == imageRef {
-				return nil
-			}
+		if slices.Contains(img.RepoTags, imageRef) {
+			return nil
 		}
-		for _, digest := range img.RepoDigests {
-			if digest == imageRef {
-				return nil
-			}
+		if slices.Contains(img.RepoDigests, imageRef) {
+			return nil
 		}
 	}
 
@@ -751,10 +744,8 @@ func GetContainerIDByName(ctx context.Context, cli *client.Client, name string) 
 		return "", err
 	}
 	for _, container := range containers {
-		for _, n := range container.Names {
-			if n == "/"+name {
-				return container.ID, nil
-			}
+		if slices.Contains(container.Names, "/"+name) {
+			return container.ID, nil
 		}
 	}
 	return "", fmt.Errorf("Container not found")
@@ -783,12 +774,7 @@ func RestartContainer(name string) error {
 }
 
 func contains(slice []string, str string) bool {
-	for _, item := range slice {
-		if item == str {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, str)
 }
 
 func volumeExists(volumeName string) (bool, error) {

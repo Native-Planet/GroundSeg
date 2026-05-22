@@ -40,7 +40,7 @@ func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 	for {
 		switch setupPayload.Payload.Action {
 		case "begin":
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"setup": "profile",
 			}); err != nil {
 				return fmt.Errorf("Unable to begin profile setup: %v", err)
@@ -48,7 +48,7 @@ func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 		case "password":
 			password := setupPayload.Payload.Password
 			hashed := auth.Hasher(password)
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"setup":  "startram",
 				"pwHash": hashed,
 			}); err != nil {
@@ -66,7 +66,7 @@ func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 			if err = docker.LoadWireguard(); err != nil {
 				return fmt.Errorf("Unable to start Wireguard: %v", err)
 			}
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"setup": "complete",
 				"wgOn":  true,
 			}); err != nil {
@@ -76,7 +76,7 @@ func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 				return fmt.Errorf("Error moving session to auth: %v", err)
 			}
 		case "skip":
-			if err = config.UpdateConf(map[string]interface{}{
+			if err = config.UpdateConf(map[string]any{
 				"setup": "complete",
 			}); err != nil {
 				return fmt.Errorf("Unable to update config: %v", err)

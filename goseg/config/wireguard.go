@@ -107,7 +107,7 @@ func CycleWgKey() error {
 	if err != nil {
 		return fmt.Errorf("Couldn't reset WG keys: %w", err)
 	}
-	if err := UpdateConf(map[string]interface{}{
+	if err := UpdateConf(map[string]any{
 		"pubkey":  pub,
 		"privkey": priv,
 	}); err != nil {

@@ -13,6 +13,7 @@ import (
 	"groundseg/system"
 	"io"
 	"io/ioutil"
+	"maps"
 	"math/rand"
 	"net"
 	"os"
@@ -82,7 +83,7 @@ func init() {
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		} else {
-			if err = UpdateConf(map[string]interface{}{
+			if err = UpdateConf(map[string]any{
 				"pubkey":  wgPub,
 				"privkey": wgPriv,
 				"salt":    salt,
@@ -124,7 +125,7 @@ func init() {
 	globalConfig.BinHash = hash
 	zap.L().Info(fmt.Sprintf("Binary sha256 hash: %v", hash))
 
-	configMap := make(map[string]interface{})
+	configMap := make(map[string]any)
 	configBytes, err := json.Marshal(globalConfig)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error marshaling JSON: %v", err)
@@ -163,7 +164,7 @@ func init() {
 			}
 		}
 		file, _ = os.Open(confPath)
-		if err = UpdateConf(map[string]interface{}{
+		if err = UpdateConf(map[string]any{
 			"keyfile": keyPath,
 		}); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
@@ -266,7 +267,7 @@ func ConfChannel() {
 		case "c2cInterval":
 			conf := Conf()
 			if conf.C2cInterval == 0 {
-				if err := UpdateConf(map[string]interface{}{
+				if err := UpdateConf(map[string]any{
 					"c2cInterval": 600,
 				}); err != nil {
 					zap.L().Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
@@ -277,7 +278,7 @@ func ConfChannel() {
 }
 
 // update by passing in a map of key:values you want to modify
-func UpdateConf(values map[string]interface{}) error {
+func UpdateConf(values map[string]any) error {
 	// mutex lock to avoid race conditions
 	confMutex.Lock()
 	defer confMutex.Unlock()
@@ -286,21 +287,19 @@ func UpdateConf(values map[string]interface{}) error {
 		return fmt.Errorf("Unable to load config: %v", err)
 	}
 	// unmarshal the config to struct
-	var configMap map[string]interface{}
+	var configMap map[string]any
 	if err := json.Unmarshal(file, &configMap); err != nil {
 		return fmt.Errorf("Error decoding JSON: %v", err)
 	}
 	// update our unmarshaled struct
-	for key, value := range values {
-		configMap[key] = value
-	}
+	maps.Copy(configMap, values)
 	if err = persistConf(configMap); err != nil {
 		return fmt.Errorf("Unable to persist config update: %v", err)
 	}
 	return nil
 }
 
-func persistConf(configMap map[string]interface{}) error {
+func persistConf(configMap map[string]any) error {
 	BasePath := getBasePath()
 	confPath := filepath.Join(BasePath, "settings", "system.json")
 	tmpFile, err := os.CreateTemp(filepath.Dir(confPath), "system.json.*")

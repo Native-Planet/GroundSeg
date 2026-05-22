@@ -95,7 +95,7 @@ func setWarningInfo(conf structs.SysConfig, part string, eighty, ninety bool, ni
 		Ninety:     ninety,
 		NinetyFive: ninetyFive,
 	}
-	if err := config.UpdateConf(map[string]interface{}{
+	if err := config.UpdateConf(map[string]any{
 		"diskWarning": conf.DiskWarning,
 	}); err != nil {
 		return fmt.Errorf("Couldn't set disk warning in config 80%%:%v 90%%:%v 95%%:%v: %v", eighty, ninety, ninetyFive, err)

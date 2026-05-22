@@ -133,11 +133,11 @@ func cutSlice(slice []string, s string) []string {
 // AreSubdomainsAliases checks if two subdomains are aliases of each other.
 func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
 	// Skip check for alt domains
-	firstDot := strings.Index(domain1, ".")
-	if firstDot == -1 {
+	_, after, ok := strings.Cut(domain1, ".")
+	if !ok {
 		return false, fmt.Errorf("Invalid subdomain")
 	}
-	if config.StartramConfig.Cname != "" && domain1[firstDot+1:] == config.StartramConfig.Cname {
+	if config.StartramConfig.Cname != "" && after == config.StartramConfig.Cname {
 		// if it matches startram alt cname, we good
 		return true, nil
 	}
@@ -788,7 +788,7 @@ func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 	}
 	conf = config.Conf()
 	piers := cutSlice(conf.Piers, patp)
-	if err := config.UpdateConf(map[string]interface{}{
+	if err := config.UpdateConf(map[string]any{
 		"piers": piers,
 	}); err != nil {
 		zap.L().Error(fmt.Sprintf("Error updating config: %v", err))

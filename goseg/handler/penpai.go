@@ -41,7 +41,7 @@ func PenpaiHandler(msg []byte) error {
 			config.UpdateContainerState("llama-api", info)
 			running = true
 		}
-		if err = config.UpdateConf(map[string]interface{}{
+		if err = config.UpdateConf(map[string]any{
 			"penpaiRunning": running,
 		}); err != nil {
 			return fmt.Errorf("%v", err)
@@ -50,7 +50,7 @@ func PenpaiHandler(msg []byte) error {
 	case "set-model":
 		// update config
 		model := penpaiPayload.Payload.Model
-		if err = config.UpdateConf(map[string]interface{}{
+		if err = config.UpdateConf(map[string]any{
 			"penpaiActive": model,
 		}); err != nil {
 			return fmt.Errorf("%v", err)
@@ -74,7 +74,7 @@ func PenpaiHandler(msg []byte) error {
 			return fmt.Errorf("Penpai unable to set %v cores!", cores)
 		}
 		// update config
-		if err = config.UpdateConf(map[string]interface{}{
+		if err = config.UpdateConf(map[string]any{
 			"penpaiCores": cores,
 		}); err != nil {
 			return fmt.Errorf("%v", err)
