@@ -13,6 +13,9 @@ import (
   get-our
 ;<    ~
     bind:m
+  (poke [our %storage] %storage-action !>([%toggle-service %credentials]))
+;<    ~
+    bind:m
   (poke [our %storage] %storage-action !>([%set-endpoint '{payload['endpoint']}']))
 ;<    ~
     bind:m
@@ -66,6 +69,7 @@ func linkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) 
 	hoon := joinGap([]string{
 		"=/", "m", "(strand ,vase)",
 		";<", "our=@p", "bind:m", "get-our",
+		storageToggleService("%credentials"),
 		storageAction("%set-endpoint", endpoint),
 		storageAction("%set-access-key-id", svcAccount.AccessKey),
 		storageAction("%set-secret-access-key", svcAccount.SecretKey),
