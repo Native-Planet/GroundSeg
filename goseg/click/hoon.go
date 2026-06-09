@@ -71,3 +71,13 @@ func storageAction(key, value string) string {
 	})
 	return hoon
 }
+
+func storageToggleService(service string) string {
+	hoon := joinGap([]string{
+		";<",
+		"~",
+		"bind:m",
+		fmt.Sprintf("(poke [our %%storage] %%storage-action !>([%%toggle-service %s]))", service),
+	})
+	return hoon
+}
