@@ -68,10 +68,9 @@ h2 {
 
 .roller-control label,
 .field-label,
-.credential-row summary,
+.wallet-status-row,
+.passphrase-field summary,
 .check-row,
-.status-text,
-.address-line,
 code,
 pre,
 .pending-status,
@@ -83,7 +82,7 @@ pre,
 
 .roller-control label,
 .field-label,
-.credential-row summary,
+.passphrase-field summary,
 .advanced summary,
 .state-row span,
 .boot-row span {
@@ -92,9 +91,17 @@ pre,
   font-weight: 700;
 }
 
-.ship-row {
+.identity-row {
   display: grid;
-  grid-template-columns: auto minmax(240px, 1fr) auto;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(360px, 440px) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.inline-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   align-items: center;
 }
@@ -205,30 +212,28 @@ select:focus {
   overflow-wrap: anywhere;
 }
 
-.credential-row summary,
+.wallet-button {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wallet-status-row {
+  color: rgba(49, 57, 51, 0.76);
+  font-size: 12px;
+}
+
+.passphrase-field summary,
 .advanced summary {
   cursor: pointer;
   list-style-position: outside;
 }
 
-.credential-grid {
+.credential-row {
   display: grid;
-  grid-template-columns: minmax(180px, 260px) auto minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) minmax(180px, 340px);
+  gap: 10px;
   align-items: center;
-  margin-top: 16px;
-}
-
-.credential-grid .segmented {
-  grid-column: 1 / -1;
-}
-
-.address-line,
-.status-text {
-  display: block;
-  color: rgba(49, 57, 51, 0.76);
-  font-size: 12px;
-  overflow-wrap: anywhere;
 }
 
 .segmented,
@@ -242,6 +247,10 @@ select:focus {
 
 .segmented {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.credential-tabs {
+  min-width: 0;
 }
 
 .segmented.compact {
@@ -278,6 +287,17 @@ select:focus {
 .operation-body {
   display: grid;
   gap: 14px;
+}
+
+.operation-line {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.operation-line .segmented.compact {
+  max-width: none;
 }
 
 .button-row,
@@ -355,8 +375,29 @@ pre {
   padding-top: 12px;
 }
 
+.passphrase-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.passphrase-field:not([open]) {
+  grid-template-columns: auto;
+}
+
+.passphrase-field summary {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+}
+
 .advanced input {
   margin-top: 10px;
+}
+
+.seed-field input {
+  max-width: 420px;
 }
 
 .error-line,
@@ -429,8 +470,10 @@ pre {
   }
 
   .top-row,
-  .ship-row,
-  .credential-grid,
+  .identity-row,
+  .inline-control,
+  .credential-row,
+  .operation-line,
   .state-row {
     grid-template-columns: 1fr;
   }

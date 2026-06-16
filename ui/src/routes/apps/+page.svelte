@@ -117,8 +117,6 @@
       : walletAddress.trim().length > 0
   $: visiblePending = $keyPending.filter(tx => !terminalStatuses.has(tx.status))
   $: canBootFromKeyfile = validShip && !localShipExists && keyfile.trim().length > 0
-  $: selectedCredential = credentials.find(item => item.id === credentialType)?.label || 'AUTH'
-
   onMount(() => {
     loadKeyPending()
     pollDueKeyPending(false)
@@ -162,7 +160,7 @@
       credentialType,
       ticket,
       privateKey,
-      passphrase,
+      passphrase: credentialType === 'wallet' ? '' : passphrase,
       seed: seedForOperation(operation),
       sponsor,
       adoptee,
@@ -333,6 +331,11 @@
   function pendingTitle(tx) {
     return `${tx.operation || 'transaction'} ${tx.ship || ''}`.trim()
   }
+
+  function shortAddress(address) {
+    if (!address) return ''
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
 </script>
 
 <div class="keys-shell">
@@ -345,19 +348,56 @@
       </div>
     </div>
 
-    <div class="keys-row ship-row">
-      <label class="field-label" for="ship">SHIP</label>
-      <input id="ship" bind:value={ship} list="azimuth-ships" placeholder="~sampel-palnet" on:change={loadPoint} />
+    <div class="keys-row identity-row">
+      <div class="inline-control ship-control">
+        <label class="field-label" for="ship">SHIP</label>
+        <input id="ship" bind:value={ship} list="azimuth-ships" placeholder="~sampel-palnet" on:change={loadPoint} />
+      </div>
       <button class="btn secondary" on:click={loadPoint} disabled={pointLoading || !validShip}>
         <Fa icon={pointLoading ? faCircleNotch : faRotate} spin={pointLoading} size="1x" />
         LOAD
       </button>
+      <div class="inline-control auth-control">
+        <span class="field-label">AUTH</span>
+        <div class="segmented credential-tabs" role="tablist" aria-label="Signing credential">
+          {#each credentials as credential}
+            <button class:active={credentialType === credential.id} on:click={() => credentialType = credential.id}>
+              {credential.label}
+            </button>
+          {/each}
+        </div>
+      </div>
+      {#if credentialType === 'wallet'}
+        <button class="btn secondary wallet-button" on:click={connectWallet} title={walletAddress}>
+          {walletAddress ? shortAddress(walletAddress) : 'CONNECT WALLET'}
+        </button>
+      {/if}
       <datalist id="azimuth-ships">
         {#each localShips as patp}
           <option value={patp}></option>
         {/each}
       </datalist>
     </div>
+
+    {#if credentialType === 'wallet' && walletStatus && !walletAddress}
+      <div class="keys-row wallet-status-row">{walletStatus}</div>
+    {/if}
+
+    {#if credentialType !== 'wallet'}
+      <div class="keys-row credential-row">
+        {#if credentialType === 'ticket'}
+          <label class="field-label" for="ticket">MASTER TICKET</label>
+          <input id="ticket" bind:value={ticket} type="password" placeholder="~sampel-sampel-sampel-sampel" />
+        {:else}
+          <label class="field-label" for="private-key">ETHEREUM PRIVATE KEY</label>
+          <input id="private-key" bind:value={privateKey} type="password" placeholder="0x..." />
+        {/if}
+        <details class="passphrase-field">
+          <summary>PASSPHRASE</summary>
+          <input id="passphrase" bind:value={passphrase} type="password" placeholder="optional" />
+        </details>
+      </div>
+    {/if}
 
     {#if point}
       <div class="keys-row state-row">
@@ -371,39 +411,6 @@
         <div><span>SPAWN</span><code>{pointSpawn || '-'}</code></div>
       </div>
     {/if}
-
-    <details class="keys-row credential-row">
-      <summary>AUTH: {selectedCredential}{passphrase.trim() ? ' / PASSPHRASE' : ''}</summary>
-      <div class="credential-grid">
-        <div class="segmented" role="tablist" aria-label="Signing credential">
-          {#each credentials as credential}
-            <button class:active={credentialType === credential.id} on:click={() => credentialType = credential.id}>
-              {credential.label}
-            </button>
-          {/each}
-        </div>
-
-        {#if credentialType === 'ticket'}
-          <label class="field-label" for="ticket">MASTER TICKET</label>
-          <input id="ticket" bind:value={ticket} type="password" placeholder="~sampel-sampel-sampel-sampel" />
-        {:else if credentialType === 'private-key'}
-          <label class="field-label" for="private-key">ETHEREUM PRIVATE KEY</label>
-          <input id="private-key" bind:value={privateKey} type="password" placeholder="0x..." />
-        {:else}
-          <div class="field-label">EXTERNAL WALLET</div>
-          <button class="btn secondary" on:click={connectWallet}>{walletAddress ? 'RECONNECT WALLET' : 'CONNECT WALLET'}</button>
-          {#if walletAddress}
-            <code class="address-line">{walletAddress}</code>
-          {/if}
-          {#if walletStatus}
-            <div class="status-text">{walletStatus}</div>
-          {/if}
-        {/if}
-
-        <label class="field-label" for="passphrase">PASSPHRASE</label>
-        <input id="passphrase" bind:value={passphrase} type="password" placeholder="optional" />
-      </div>
-    </details>
 
     <div class="keys-row operation-row">
       <div class="operation-tabs" role="tablist" aria-label="PKI operation">
@@ -492,9 +499,8 @@
             {/if}
           </div>
           {#if credentialType !== 'ticket'}
-            <details class="advanced">
-              <summary>SEED OVERRIDE</summary>
-              <label class="field-label" for="seed">NETWORK KEY SEED</label>
+            <details class="advanced seed-field">
+              <summary>NETWORK KEY SEED</summary>
               <input id="seed" bind:value={seed} placeholder="optional 64 hex seed" />
             </details>
           {/if}
@@ -505,22 +511,24 @@
         </div>
       {:else if activeSection === 'sponsor'}
         <div class="operation-body">
-          <div class="segmented compact">
-            {#each sponsorOps as op}
-              <button class:active={sponsorOperation === op.id} on:click={() => sponsorOperation = op.id}>{op.label}</button>
-            {/each}
+          <div class="operation-line sponsor-line">
+            <div class="segmented compact">
+              {#each sponsorOps as op}
+                <button class:active={sponsorOperation === op.id} on:click={() => sponsorOperation = op.id}>{op.label}</button>
+              {/each}
+            </div>
+            {#if sponsorOperation === 'adopt'}
+              <label class="field-label" for="adoptee">ADOPTEE</label>
+              <input id="adoptee" bind:value={adoptee} placeholder="~sampel-palnet" />
+            {:else}
+              <label class="field-label" for="sponsor">SPONSOR</label>
+              <input id="sponsor" bind:value={sponsor} placeholder="~sampel" />
+            {/if}
+            <button class="btn primary" disabled={!operationReady(sponsorOperation)} on:click={() => submitOperation(sponsorOperation)}>
+              <Fa icon={actionLoading === sponsorOperation ? faCircleNotch : faPaperPlane} spin={actionLoading === sponsorOperation} size="1x" />
+              SUBMIT
+            </button>
           </div>
-          {#if sponsorOperation === 'adopt'}
-            <label class="field-label" for="adoptee">ADOPTEE</label>
-            <input id="adoptee" bind:value={adoptee} placeholder="~sampel-palnet" />
-          {:else}
-            <label class="field-label" for="sponsor">SPONSOR</label>
-            <input id="sponsor" bind:value={sponsor} placeholder="~sampel" />
-          {/if}
-          <button class="btn primary" disabled={!operationReady(sponsorOperation)} on:click={() => submitOperation(sponsorOperation)}>
-            <Fa icon={actionLoading === sponsorOperation ? faCircleNotch : faPaperPlane} spin={actionLoading === sponsorOperation} size="1x" />
-            SUBMIT
-          </button>
         </div>
       {:else if activeSection === 'transfer'}
         <div class="operation-body">
@@ -537,17 +545,19 @@
         </div>
       {:else if activeSection === 'proxy'}
         <div class="operation-body">
-          <div class="segmented compact">
-            {#each proxyOps as op}
-              <button class:active={proxyOperation === op.id} on:click={() => proxyOperation = op.id}>{op.label}</button>
-            {/each}
+          <div class="operation-line proxy-line">
+            <div class="segmented compact">
+              {#each proxyOps as op}
+                <button class:active={proxyOperation === op.id} on:click={() => proxyOperation = op.id}>{op.label}</button>
+              {/each}
+            </div>
+            <label class="field-label" for="proxy">ADDRESS</label>
+            <input id="proxy" bind:value={proxy} placeholder="0x..." />
+            <button class="btn primary" disabled={!operationReady(proxyOperation)} on:click={() => submitOperation(proxyOperation)}>
+              <Fa icon={actionLoading === proxyOperation ? faCircleNotch : faPaperPlane} spin={actionLoading === proxyOperation} size="1x" />
+              SET PROXY
+            </button>
           </div>
-          <label class="field-label" for="proxy">ADDRESS</label>
-          <input id="proxy" bind:value={proxy} placeholder="0x..." />
-          <button class="btn primary" disabled={!operationReady(proxyOperation)} on:click={() => submitOperation(proxyOperation)}>
-            <Fa icon={actionLoading === proxyOperation ? faCircleNotch : faPaperPlane} spin={actionLoading === proxyOperation} size="1x" />
-            SET PROXY
-          </button>
         </div>
       {/if}
     </div>

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/dockerclient"
+	"io"
 	"os"
 	"path"
 	"strings"
@@ -294,11 +295,19 @@ func getDockerLogs(name string) ([]byte, error) {
 }
 
 func RetrieveSysLogHistory() ([]byte, error) {
+	logs, _, _, err := RetrieveSysLogHistoryWithOffset()
+	return logs, err
+}
+
+func RetrieveSysLogHistoryWithOffset() ([]byte, string, int64, error) {
 	filePath := SysLogfile()
 	// Open the file
 	file, err := os.Open(filePath)
 	if err != nil {
-		return []byte{}, fmt.Errorf("Error opening file: %v", err)
+		if os.IsNotExist(err) {
+			return []byte(`{"type":"system","history":true,"log":[]}`), filePath, 0, nil
+		}
+		return []byte{}, filePath, 0, fmt.Errorf("Error opening file: %v", err)
 	}
 	defer file.Close()
 
@@ -313,13 +322,16 @@ func RetrieveSysLogHistory() ([]byte, error) {
 
 	// Check for scanner errors
 	if err := scanner.Err(); err != nil {
-		return []byte{}, fmt.Errorf("Error reading file: %w", err)
+		return []byte{}, filePath, 0, fmt.Errorf("Error reading file: %w", err)
+	}
+	offset, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return []byte{}, filePath, 0, fmt.Errorf("Error reading file offset: %w", err)
 	}
 
 	// Join the lines slice into a single string resembling a JavaScript array
 	jsArray := fmt.Sprintf("[%s]", strings.Join(lines, ", "))
-	fmt.Println(jsArray)
 
 	// Print the JavaScript array string
-	return fmt.Appendf(nil, `{"type":"system","history":true,"log":%s}`, jsArray), nil
+	return fmt.Appendf(nil, `{"type":"system","history":true,"log":%s}`, jsArray), filePath, offset, nil
 }

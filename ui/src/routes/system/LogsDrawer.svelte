@@ -1,7 +1,4 @@
 <script>
-  import Fa from 'svelte-fa'
-  import { faXmark } from '@fortawesome/free-solid-svg-icons';
-  import { showLogs } from './store'
   import { structure } from '$lib/stores/data'
   import Drawer from '$lib/Drawer.svelte'
   import LogArea from '$lib/LogArea.svelte'
@@ -20,10 +17,7 @@
     {/if}
   </div>
   {#if type == "startram"}
-    <!--
     <LogArea type="wireguard" />
-    -->
-    <LogArea type="urbit" />
   {:else}
     <LogArea type="system" />
   {/if}
@@ -38,14 +32,13 @@
   }
   .log-option {
     color: var(--Gray-200, #ABBAAE);
-    leading-trim: both;
-    text-edge: cap;
-    font-family: Inter;
+    font-family: var(--title-font);
     font-size: 24px;
     font-style: normal;
     font-weight: 300;
     line-height: 48px; /* 200% */
-    letter-spacing: -1.44px;
+    letter-spacing: 0;
+    cursor: pointer;
   }
   .active {
     color: var(--text-color);
