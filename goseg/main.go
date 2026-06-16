@@ -21,6 +21,7 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/exporter"
+	"groundseg/handler"
 	"groundseg/importer"
 	"groundseg/leak"
 	"groundseg/rectify"
@@ -157,6 +158,12 @@ func startServer() { // *http.Server {
 	w.HandleFunc("/shell", ws.ShellHandler)
 	w.HandleFunc("/export/{container}", exporter.ExportHandler)
 	w.HandleFunc("/import/{uploadSession}/{patp}", importer.HTTPUploadHandler)
+	w.HandleFunc("/keys/point", handler.KeysPointHandler)
+	w.HandleFunc("/keys/keyfile", handler.KeysKeyfileHandler)
+	w.HandleFunc("/keys/code", handler.KeysCodeHandler)
+	w.HandleFunc("/keys/operation", handler.KeysOperationHandler)
+	w.HandleFunc("/keys/wallet/prepare", handler.KeysPrepareWalletHandler)
+	w.HandleFunc("/keys/wallet/submit", handler.KeysSubmitWalletHandler)
 	wsServer := &http.Server{
 		Addr:    ":3000",
 		Handler: w,

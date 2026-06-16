@@ -9,8 +9,11 @@ import (
 	"groundseg/dockerclient"
 	"groundseg/logger"
 	"groundseg/structs"
+	"io"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/gorilla/websocket"
@@ -136,7 +139,7 @@ func LogsStreamHandler(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	if payload.Type == "system" {
-		logHistory, err := logger.RetrieveSysLogHistory()
+		logHistory, logPath, logOffset, err := logger.RetrieveSysLogHistoryWithOffset()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("failed to retrieve log history: %v", err))
 			return
@@ -145,23 +148,8 @@ func LogsStreamHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		flusher.Flush()
-
-		logs, cancel := logger.SubscribeSysLogStream()
-		defer cancel()
-		for {
-			select {
-			case <-r.Context().Done():
-				return
-			case log, ok := <-logs:
-				if !ok {
-					return
-				}
-				if err := writeLogStreamEvent(w, log); err != nil {
-					return
-				}
-				flusher.Flush()
-			}
-		}
+		streamSystemLogs(w, flusher, r, logPath, logOffset)
+		return
 	}
 
 	if _, err := docker.FindContainer(payload.Type); err != nil {
@@ -169,6 +157,101 @@ func LogsStreamHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	streamDockerLogs(w, flusher, r, payload.Type)
+}
+
+func streamSystemLogs(w http.ResponseWriter, flusher http.Flusher, r *http.Request, filePath string, offset int64) {
+	if filePath == "" {
+		filePath = logger.SysLogfile()
+	}
+	file, err := os.Open(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			waitForSystemLogFile(w, flusher, r, filePath, offset)
+			return
+		}
+		zap.L().Error(fmt.Sprintf("failed to open system log file %s: %v", filePath, err))
+		return
+	}
+	defer func() {
+		if file != nil {
+			file.Close()
+		}
+	}()
+
+	if info, err := file.Stat(); err == nil && offset > info.Size() {
+		offset = 0
+	}
+	if _, err := file.Seek(offset, io.SeekStart); err != nil {
+		zap.L().Error(fmt.Sprintf("failed to seek system log file %s: %v", filePath, err))
+		return
+	}
+
+	reader := bufio.NewReader(file)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ticker.C:
+			for {
+				line, err := reader.ReadString('\n')
+				if line != "" {
+					if err := writeSystemLogLine(w, flusher, line); err != nil {
+						return
+					}
+				}
+				if err == nil {
+					continue
+				}
+				if err != io.EOF {
+					zap.L().Error(fmt.Sprintf("error reading system log file %s: %v", filePath, err))
+					return
+				}
+				nextPath := logger.SysLogfile()
+				if nextPath != filePath {
+					if nextFile, openErr := os.Open(nextPath); openErr == nil {
+						file.Close()
+						file = nextFile
+						filePath = nextPath
+						reader = bufio.NewReader(file)
+					}
+				}
+				break
+			}
+		}
+	}
+}
+
+func waitForSystemLogFile(w http.ResponseWriter, flusher http.Flusher, r *http.Request, filePath string, offset int64) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ticker.C:
+			if _, err := os.Stat(filePath); err == nil {
+				streamSystemLogs(w, flusher, r, filePath, offset)
+				return
+			}
+			filePath = logger.SysLogfile()
+		}
+	}
+}
+
+func writeSystemLogLine(w http.ResponseWriter, flusher http.Flusher, line string) error {
+	line = strings.TrimRight(line, "\r\n")
+	if strings.TrimSpace(line) == "" {
+		return nil
+	}
+	logJSON := fmt.Appendf(nil, `{"type":"system","history":false,"log":%s}`, line)
+	if err := writeLogStreamEvent(w, logJSON); err != nil {
+		return err
+	}
+	flusher.Flush()
+	return nil
 }
 
 func streamDockerLogs(w http.ResponseWriter, flusher http.Flusher, r *http.Request, containerName string) {

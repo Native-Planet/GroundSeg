@@ -55,7 +55,7 @@
         class:highlight={$page.route.id != (pfx+"/apps")}
         on:click={()=>goto(pfx+"/apps")}
         class="btn option"
-        >APPS
+        >KEYS
       </div>
       <div
         class:highlight={$page.route.id != (pfx+"/profile")}

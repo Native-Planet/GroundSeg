@@ -1,20 +1,504 @@
-.container {
-  flex: 1;
-  background: var(--bg-base);
+.keys-shell {
+  width: 1104px;
+  max-width: 98vw;
+  margin: 0 auto 48px auto;
   color: var(--text-color);
-  padding: 56px;
-  border-radius: 16px;
-  margin: 0;
-  min-width: 700px;
+  font-family: var(--regular-font);
 }
-.sys-title {
-  color: #000;
-  leading-trim: both;
-  text-edge: cap;
-  font-family: BPdotsUnicase;
-  font-size: 32px;
-  font-style: normal;
+
+.keys-panel {
+  background: var(--bg-base);
+  border-radius: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  padding: 32px 40px;
+}
+
+.keys-row {
+  border-top: 1px solid rgba(22, 29, 23, 0.16);
+  box-sizing: border-box;
+  padding: 18px 0;
+}
+
+.keys-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.top-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(280px, 420px);
+  gap: 24px;
+  align-items: end;
+  padding-bottom: 22px;
+}
+
+h1,
+h2,
+.operation-tabs button,
+.segmented button,
+.notice {
+  font-family: var(--title-font);
+  letter-spacing: 0;
+}
+
+h1,
+h2 {
+  margin: 0;
   font-weight: 700;
-  line-height: normal;
-  letter-spacing: -1.92px;
+  line-height: 1;
+}
+
+h1 {
+  font-size: 48px;
+}
+
+h2 {
+  font-size: 26px;
+}
+
+.roller-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.roller-control label,
+.field-label,
+.wallet-status-row,
+.passphrase-field summary,
+.check-row,
+code,
+pre,
+.pending-status,
+.state-row span,
+.boot-row span,
+.advanced summary {
+  font-family: var(--log-font);
+}
+
+.roller-control label,
+.field-label,
+.passphrase-field summary,
+.advanced summary,
+.state-row span,
+.boot-row span {
+  color: rgba(49, 57, 51, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.identity-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(360px, 440px) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.inline-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.field-label {
+  display: block;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  border: 1px solid rgba(22, 29, 23, 0.24);
+  border-radius: 4px;
+  background: #f8f8f6;
+  color: var(--text-color);
+  font-family: var(--regular-font);
+  font-size: 15px;
+  padding: 0 12px;
+  outline: none;
+}
+
+input:focus,
+select:focus {
+  border-color: var(--btn-primary);
+}
+
+.btn,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 4px;
+  font-family: var(--regular-font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.btn:disabled,
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.primary {
+  background: var(--btn-primary);
+  color: var(--text-card-color);
+}
+
+.primary:hover {
+  background: var(--btn-special);
+}
+
+.secondary,
+.icon-button {
+  background: var(--btn-secondary);
+  color: var(--text-card-color);
+}
+
+.secondary:hover,
+.icon-button:hover {
+  background: var(--fg-card);
+}
+
+.danger {
+  background: var(--locked-color);
+  color: var(--text-card-color);
+}
+
+.danger:hover {
+  background: #6f1209;
+}
+
+.icon-button {
+  width: 42px;
+  padding: 0;
+}
+
+.icon-button.small {
+  width: 34px;
+  min-height: 34px;
+}
+
+.state-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 18px;
+}
+
+.state-row div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.state-row strong,
+.state-row code {
+  min-width: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.wallet-button {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wallet-status-row {
+  color: rgba(49, 57, 51, 0.76);
+  font-size: 12px;
+}
+
+.passphrase-field summary,
+.advanced summary {
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.credential-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(180px, 340px);
+  gap: 10px;
+  align-items: center;
+}
+
+.segmented,
+.operation-tabs {
+  display: grid;
+  gap: 0;
+  border: 1px solid rgba(22, 29, 23, 0.18);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.segmented {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.credential-tabs {
+  min-width: 0;
+}
+
+.segmented.compact {
+  max-width: 520px;
+}
+
+.operation-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.segmented button,
+.operation-tabs button {
+  min-height: 42px;
+  border: 0;
+  border-right: 1px solid rgba(22, 29, 23, 0.14);
+  background: transparent;
+  color: rgba(49, 57, 51, 0.7);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.segmented button:last-child,
+.operation-tabs button:last-child {
+  border-right: 0;
+}
+
+.segmented button.active,
+.operation-tabs button.active {
+  background: var(--bg-card);
+  color: var(--text-card-color);
+}
+
+.operation-body {
+  display: grid;
+  gap: 14px;
+}
+
+.operation-line {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.operation-line .segmented.compact {
+  max-width: none;
+}
+
+.button-row,
+.output-row,
+.boot-row,
+.notice,
+.pending-header,
+.pending-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.button-row {
+  flex-wrap: wrap;
+}
+
+.output-row {
+  justify-content: space-between;
+  border-top: 1px solid rgba(22, 29, 23, 0.12);
+  padding-top: 12px;
+}
+
+.output-row code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.small-actions {
+  display: flex;
+  gap: 6px;
+}
+
+pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px 0 0 0;
+  border-top: 1px solid rgba(22, 29, 23, 0.12);
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+
+.boot-row {
+  flex-wrap: wrap;
+  border-top: 1px solid rgba(22, 29, 23, 0.12);
+  padding-top: 12px;
+}
+
+.boot-row select {
+  width: min(100%, 280px);
+}
+
+.check-row {
+  min-height: 42px;
+  color: rgba(49, 57, 51, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.check-row input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.notice {
+  justify-content: space-between;
+  color: var(--locked-color);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.advanced {
+  border-top: 1px solid rgba(22, 29, 23, 0.12);
+  padding-top: 12px;
+}
+
+.passphrase-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.passphrase-field:not([open]) {
+  grid-template-columns: auto;
+}
+
+.passphrase-field summary {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+}
+
+.advanced input {
+  margin-top: 10px;
+}
+
+.seed-field input {
+  max-width: 420px;
+}
+
+.error-line,
+.success-line {
+  border-left: 4px solid;
+  font-family: var(--log-font);
+  font-size: 12px;
+  padding-left: 12px;
+}
+
+.error-line {
+  border-color: var(--locked-color);
+  color: var(--locked-color);
+}
+
+.success-line {
+  border-color: var(--btn-primary);
+  color: var(--btn-primary);
+}
+
+.pending-header {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pending-list {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid rgba(22, 29, 23, 0.16);
+}
+
+.pending-item {
+  min-height: 56px;
+  border-bottom: 1px solid rgba(22, 29, 23, 0.12);
+  padding: 10px 0;
+}
+
+.pending-main {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.pending-main strong {
+  font-size: 14px;
+}
+
+.pending-main code,
+.pending-main span {
+  font-family: var(--log-font);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.pending-main span {
+  color: var(--locked-color);
+}
+
+.pending-status {
+  color: rgba(49, 57, 51, 0.7);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .keys-panel {
+    padding: 22px;
+  }
+
+  .top-row,
+  .identity-row,
+  .inline-control,
+  .credential-row,
+  .operation-line,
+  .state-row {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .segmented,
+  .segmented.compact {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
+
+  .button-row,
+  .output-row,
+  .boot-row,
+  .notice,
+  .pending-header,
+  .pending-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+  }
 }
