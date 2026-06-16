@@ -102,6 +102,7 @@ func SysLogStreamer() {
 		if err != nil {
 			continue
 		}
+		logger.PublishSysLogStream(logJSON)
 		for _, conn := range logger.SysLogSessions {
 			if err := conn.WriteMessage(1, logJSON); err != nil {
 				zap.L().Error(fmt.Sprintf("error writing message: %v", err))

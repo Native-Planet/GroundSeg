@@ -590,13 +590,15 @@ func BroadcastToClients() error {
 	bState := GetState()
 	leak.LeakChan <- bState // vere 3.0
 	cm := auth.GetClientManager()
-	if cm.HasAuthSession() {
+	if cm.HasAuthSession() || HasEventAuthSession() {
 		authJson, err := GetStateJson(bState)
-		auth.ClientManager.BroadcastAuth(authJson)
 		if err != nil {
 			return err
 		}
-		auth.ClientManager.BroadcastAuth(authJson)
+		broadcastAuthEvent(authJson)
+		if !HasEventAuthSession() {
+			auth.ClientManager.BroadcastAuth(authJson)
+		}
 		return nil
 	}
 	return nil
@@ -604,7 +606,10 @@ func BroadcastToClients() error {
 
 // broadcast to unauth clients
 func UnauthBroadcast(input []byte) error {
-	auth.ClientManager.BroadcastUnauth(input)
+	broadcastUnauthEvent(input)
+	if !hasEventUnauthSession() {
+		auth.ClientManager.BroadcastUnauth(input)
+	}
 	return nil
 }
 func ReloadUrbits() error {
