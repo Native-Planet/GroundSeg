@@ -11,6 +11,7 @@ import (
 	"groundseg/structs"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -23,7 +24,8 @@ import (
 const keysRequestTimeout = 30 * time.Second
 
 type keysBaseRequest struct {
-	Token structs.WsTokenStruct `json:"token"`
+	Token  structs.WsTokenStruct `json:"token"`
+	Roller string                `json:"roller,omitempty"`
 }
 
 type keysPointRequest struct {
@@ -141,6 +143,8 @@ func KeysPointHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), keysRequestTimeout)
 		defer cancel()
+		endpoint := normalizeRollerEndpoint(req.Roller)
+		client := rollerClient(endpoint)
 		resp := keysPointResponse{OK: true}
 		if strings.TrimSpace(req.Ship) != "" {
 			ship, err := normalizeShip(req.Ship)
@@ -148,35 +152,42 @@ func KeysPointHandler(w http.ResponseWriter, r *http.Request) {
 				writeKeysError(w, http.StatusBadRequest, err)
 				return
 			}
-			point, err := libprg.Point(ship)
+			point, err := client.GetPoint(ctx, ship)
 			if err != nil {
 				writeKeysError(w, http.StatusBadGateway, err)
 				return
 			}
 			resp.Ship = ship
-			resp.Point = point.Point
-			pending, err := libprg.Pending(ship)
-			if err == nil {
-				resp.Pending = pending
+			resp.Point = point
+			if strings.TrimSpace(point.Ownership.Owner.Address) != "" {
+				pending, err := client.GetPendingByAddress(ctx, point.Ownership.Owner.Address)
+				if err == nil {
+					resp.Pending = pending
+				}
 			}
 		} else if strings.TrimSpace(req.Address) != "" {
-			pending, err := libprg.Pending(strings.TrimSpace(req.Address))
+			address, err := normalizeAddress(req.Address)
+			if err != nil {
+				writeKeysError(w, http.StatusBadRequest, err)
+				return
+			}
+			pending, err := client.GetPendingByAddress(ctx, address)
 			if err != nil {
 				writeKeysError(w, http.StatusBadGateway, err)
 				return
 			}
 			resp.Pending = pending
 		}
-		batch, err := roller.Client.WhenNextBatch(ctx)
+		batch, err := client.WhenNextBatch(ctx)
 		if err == nil {
 			resp.Batch = batch
 		}
 		if strings.TrimSpace(req.Hash) != "" {
-			status, err := rollerRPC(ctx, "getTransactionStatus", map[string]any{"hash": strings.TrimSpace(req.Hash)})
+			status, err := rollerRPC(ctx, endpoint, "getTransactionStatus", map[string]any{"hash": strings.TrimSpace(req.Hash)})
 			if err == nil {
 				_ = json.Unmarshal(status, &resp.Status)
 			}
-			pendingTx, err := rollerRPC(ctx, "getPendingTx", map[string]any{"hash": strings.TrimSpace(req.Hash)})
+			pendingTx, err := rollerRPC(ctx, endpoint, "getPendingTx", map[string]any{"hash": strings.TrimSpace(req.Hash)})
 			if err == nil {
 				var raw any
 				if json.Unmarshal(pendingTx, &raw) == nil {
@@ -296,6 +307,7 @@ func KeysSubmitWalletHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), keysRequestTimeout)
 		defer cancel()
+		endpoint := normalizeRollerEndpoint(req.Roller)
 		params := map[string]any{
 			"address": prepared.Address,
 			"from":    prepared.From,
@@ -303,7 +315,7 @@ func KeysSubmitWalletHandler(w http.ResponseWriter, r *http.Request) {
 			"sig":     signature,
 			"force":   false,
 		}
-		result, err := rollerRPC(ctx, prepared.Method, params)
+		result, err := rollerRPC(ctx, endpoint, prepared.Method, params)
 		if err != nil {
 			writeKeysError(w, http.StatusBadGateway, err)
 			return
@@ -394,7 +406,7 @@ func runSoftwareKeysOperation(req keysOperationRequest) (any, string, error) {
 	switch operation {
 	case "breach":
 		if req.CredentialType == "private-key" {
-			tx, err := breachWithPrivateKey(ship, credential, req.Passphrase, req.Seed)
+			tx, err := breachWithPrivateKey(ship, credential, req.Passphrase, req.Seed, req.Roller)
 			return tx, ship, err
 		}
 		tx, err := libprg.Breach(ship, credential, req.Passphrase, req.Seed)
@@ -465,11 +477,13 @@ func prepareWalletOperation(parentCtx context.Context, req keysWalletPrepareRequ
 	operation := normalizeOperation(req.Operation)
 	ctx, cancel := context.WithTimeout(parentCtx, keysRequestTimeout)
 	defer cancel()
+	endpoint := normalizeRollerEndpoint(req.Roller)
+	rClient := rollerClient(endpoint)
 	method, data, proxyKind, seed, err := walletOperationData(operation, req.keysOperationRequest)
 	if err != nil {
 		return keysPrepareResponse{}, err
 	}
-	point, err := roller.Client.GetPoint(ctx, ship)
+	point, err := rClient.GetPoint(ctx, ship)
 	if err != nil {
 		return keysPrepareResponse{}, fmt.Errorf("getting point: %v", err)
 	}
@@ -478,12 +492,12 @@ func prepareWalletOperation(parentCtx context.Context, req keysWalletPrepareRequ
 		return keysPrepareResponse{}, err
 	}
 	from := map[string]any{"ship": ship, "proxy": proxy}
-	client := perigeeTypes.Client{Endpoint: roller.RollerURL, HttpClient: http.DefaultClient}
+	client := perigeeTypes.Client{Endpoint: endpoint, HttpClient: http.DefaultClient}
 	nonce, err := client.GetNonce(ctx, map[string]any{"from": from})
 	if err != nil {
 		return keysPrepareResponse{}, fmt.Errorf("getting nonce: %v", err)
 	}
-	signingPayloadRaw, err := rollerRPC(ctx, "prepareForSigning", map[string]any{
+	signingPayloadRaw, err := rollerRPC(ctx, endpoint, "prepareForSigning", map[string]any{
 		"nonce": nonce,
 		"from":  from,
 		"tx":    method,
@@ -604,7 +618,7 @@ func proxyTypeForAddress(point *perigeeTypes.Point, address, kind string) (strin
 	}
 }
 
-func breachWithPrivateKey(ship, privateKey, passphrase, seed string) (*perigeeTypes.Transaction, error) {
+func breachWithPrivateKey(ship, privateKey, passphrase, seed, rollerEndpoint string) (*perigeeTypes.Transaction, error) {
 	seed = strings.TrimPrefix(strings.TrimSpace(seed), "0x")
 	if seed == "" {
 		generated, err := defaultNetworkSeed()
@@ -620,7 +634,7 @@ func breachWithPrivateKey(ship, privateKey, passphrase, seed string) (*perigeeTy
 	if pointInfo.Dominion != "l2" {
 		return nil, fmt.Errorf("private-key breach through Roller is only available for L2 ships")
 	}
-	return roller.Client.ConfigureKeys(
+	return rollerClient(normalizeRollerEndpoint(rollerEndpoint)).ConfigureKeys(
 		context.Background(),
 		ship,
 		"0x"+networkKeys.Crypt.Public,
@@ -686,6 +700,28 @@ func normalizeOperation(operation string) string {
 	return strings.TrimSpace(strings.ToLower(operation))
 }
 
+func normalizeRollerEndpoint(raw string) string {
+	endpoint := strings.TrimSpace(raw)
+	if endpoint == "" {
+		return roller.RollerURL
+	}
+	if !strings.Contains(endpoint, "://") {
+		endpoint = "https://" + endpoint
+	}
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Host == "" {
+		return endpoint
+	}
+	if parsed.Path == "" || parsed.Path == "/" {
+		parsed.Path = "/v1/roller"
+	}
+	return parsed.String()
+}
+
+func rollerClient(endpoint string) *roller.Roller {
+	return roller.New(roller.Config{Endpoint: endpoint, HTTPClient: http.DefaultClient})
+}
+
 func summarizePending(ship, operation string, tx any) *keysPendingSummary {
 	raw, err := json.Marshal(tx)
 	if err != nil {
@@ -740,7 +776,7 @@ func walletOperationMessage(operation string) string {
 	return ""
 }
 
-func rollerRPC(ctx context.Context, method string, params any) (json.RawMessage, error) {
+func rollerRPC(ctx context.Context, endpoint, method string, params any) (json.RawMessage, error) {
 	reqPayload := keysRPCRequest{
 		Version: "2.0",
 		Method:  method,
@@ -751,7 +787,7 @@ func rollerRPC(ctx context.Context, method string, params any) (json.RawMessage,
 	if err != nil {
 		return nil, fmt.Errorf("marshal roller request: %v", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, roller.RollerURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create roller request: %v", err)
 	}

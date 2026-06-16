@@ -84,11 +84,12 @@ export const updateKeyPending = updated => {
   }))
 }
 
-export const getPoint = ship => keysRequest('/keys/point', { ship })
+export const getPoint = (ship, roller = '') => keysRequest('/keys/point', { ship, roller })
 
 export const checkPending = tx => keysRequest('/keys/point', {
   ship: tx.ship,
-  hash: tx.hash
+  hash: tx.hash,
+  roller: tx.roller
 })
 
 export const generateKeyfile = payload => keysRequest('/keys/keyfile', payload)

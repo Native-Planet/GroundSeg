@@ -10,7 +10,6 @@
     faDownload,
     faEye,
     faEyeSlash,
-    faFileArrowUp,
     faFileExport,
     faPaperPlane,
     faRotate,
@@ -64,6 +63,7 @@
   const terminalStatuses = new Set(['complete', 'confirmed', 'failed'])
 
   let ship = ''
+  let rollerEndpoint = 'roller.urbit.org'
   let credentialType = 'ticket'
   let ticket = ''
   let privateKey = ''
@@ -86,8 +86,6 @@
   let actionMessage = ''
   let keyfile = ''
   let keyfileName = ''
-  let bootKeyfile = ''
-  let bootFileName = ''
   let code = ''
   let revealKeyfile = false
   let copiedKeyfile = false
@@ -104,6 +102,7 @@
   $: normalizedShip = normalizeShip(ship)
   $: localShipExists = Boolean(normalizedShip && urbits[normalizedShip])
   $: validShip = Boolean(normalizedShip && checkPatp(sigRemove(normalizedShip)))
+  $: roller = rollerEndpoint.trim() || 'roller.urbit.org'
   $: pointOwner = point?.ownership?.owner?.address || ''
   $: pointManager = point?.ownership?.managementProxy?.address || ''
   $: pointTransfer = point?.ownership?.transferProxy?.address || ''
@@ -117,8 +116,8 @@
       ? privateKey.trim().length > 0
       : walletAddress.trim().length > 0
   $: visiblePending = $keyPending.filter(tx => !terminalStatuses.has(tx.status))
-  $: keyfileForBoot = (bootKeyfile || keyfile).trim()
-  $: canBootFromKeyfile = validShip && !localShipExists && keyfileForBoot.length > 0
+  $: canBootFromKeyfile = validShip && !localShipExists && keyfile.trim().length > 0
+  $: selectedCredential = credentials.find(item => item.id === credentialType)?.label || 'AUTH'
 
   onMount(() => {
     loadKeyPending()
@@ -159,6 +158,7 @@
     return {
       operation,
       ship: normalizedShip,
+      roller,
       credentialType,
       ticket,
       privateKey,
@@ -189,7 +189,7 @@
     pointLoading = true
     actionError = ''
     try {
-      const response = await getPoint(normalizedShip)
+      const response = await getPoint(normalizedShip, roller)
       ship = response.ship
       point = response.point
     } catch (error) {
@@ -201,7 +201,7 @@
   }
 
   function rememberTransaction(response) {
-    if (response.pending) addKeyPending(response.pending)
+    if (response.pending) addKeyPending({ ...response.pending, roller })
     actionMessage = response.message || 'Transaction submitted to Roller.'
     if (response.exportSuggested) activeSection = 'breach'
   }
@@ -264,9 +264,8 @@
     actionMessage = ''
     try {
       if (!validShip || !ticket.trim()) throw new Error('Enter a ship and master ticket.')
-      const response = await generateKeyfile({ ship: normalizedShip, ticket, passphrase })
+      const response = await generateKeyfile({ ship: normalizedShip, roller, ticket, passphrase })
       keyfile = response.keyfile
-      bootKeyfile = response.keyfile
       keyfileName = response.filename
       actionMessage = 'Keyfile generated.'
     } catch (error) {
@@ -282,7 +281,7 @@
     actionMessage = ''
     try {
       if (!validShip || !ticket.trim()) throw new Error('Enter a ship and master ticket.')
-      const response = await generateCode({ ship: normalizedShip, ticket, passphrase, step: 0 })
+      const response = await generateCode({ ship: normalizedShip, roller, ticket, passphrase, step: 0 })
       code = response.code
       actionMessage = 'Network code generated.'
     } catch (error) {
@@ -311,15 +310,6 @@
     setTimeout(() => copiedCode = false, 1600)
   }
 
-  async function handleKeyfileUpload(event) {
-    const file = event.currentTarget.files?.[0]
-    if (!file) return
-    bootFileName = file.name
-    bootKeyfile = await file.text()
-    const fromName = file.name.replace(/\.key$/i, '')
-    if (!ship.trim() && fromName) ship = normalizeShip(fromName)
-  }
-
   function handleBootFromKeyfile() {
     actionError = ''
     actionMessage = ''
@@ -328,10 +318,10 @@
       return
     }
     if (!canBootFromKeyfile) {
-      actionError = 'Enter a valid ship and keyfile.'
+      actionError = 'Generate a keyfile for this ship first.'
       return
     }
-    bootShip(sigRemove(normalizedShip), keyfileForBoot, 'keyfile', startramReady ? remote : false, selectedDrive, '')
+    bootShip(sigRemove(normalizedShip), keyfile.trim(), 'keyfile', startramReady ? remote : false, selectedDrive, '')
     actionMessage = `Boot requested for ${normalizedShip}.`
   }
 
@@ -346,77 +336,76 @@
 </script>
 
 <div class="keys-shell">
-  <header class="keys-header">
-    <div>
-      <div class="eyebrow">ROLLER PKI</div>
+  <section class="keys-panel">
+    <div class="keys-row top-row">
       <h1>KEYS</h1>
+      <div class="roller-control">
+        <label for="roller">ROLLER:</label>
+        <input id="roller" bind:value={rollerEndpoint} spellcheck="false" />
+      </div>
     </div>
-    <div class="endpoint">roller.urbit.org</div>
-  </header>
 
-  <div class="keys-grid">
-    <section class="panel identity-panel">
-      <div class="panel-title-row">
-        <h2>POINT</h2>
-        <button class="icon-button" on:click={loadPoint} disabled={pointLoading || !validShip} title="Refresh point">
-          <Fa icon={pointLoading ? faCircleNotch : faRotate} spin={pointLoading} size="1x" />
-        </button>
-      </div>
-
+    <div class="keys-row ship-row">
       <label class="field-label" for="ship">SHIP</label>
-      <div class="inline-row">
-        <input id="ship" bind:value={ship} list="azimuth-ships" placeholder="~sampel-palnet" on:change={loadPoint} />
-        <button class="btn secondary" on:click={loadPoint} disabled={pointLoading || !validShip}>LOAD</button>
-      </div>
+      <input id="ship" bind:value={ship} list="azimuth-ships" placeholder="~sampel-palnet" on:change={loadPoint} />
+      <button class="btn secondary" on:click={loadPoint} disabled={pointLoading || !validShip}>
+        <Fa icon={pointLoading ? faCircleNotch : faRotate} spin={pointLoading} size="1x" />
+        LOAD
+      </button>
       <datalist id="azimuth-ships">
         {#each localShips as patp}
           <option value={patp}></option>
         {/each}
       </datalist>
+    </div>
 
-      <div class="segmented" role="tablist" aria-label="Signing credential">
-        {#each credentials as credential}
-          <button class:active={credentialType === credential.id} on:click={() => credentialType = credential.id}>
-            {credential.label}
-          </button>
-        {/each}
+    {#if point}
+      <div class="keys-row state-row">
+        <div><span>DOMINION</span><strong>{point?.dominion || '-'}</strong></div>
+        <div><span>LIFE</span><strong>{pointLife || '-'}</strong></div>
+        <div><span>RIFT</span><strong>{pointRift || '-'}</strong></div>
+        <div><span>SPONSOR</span><strong>{pointSponsor || '-'}</strong></div>
+        <div><span>OWNER</span><code>{pointOwner || '-'}</code></div>
+        <div><span>MANAGE</span><code>{pointManager || '-'}</code></div>
+        <div><span>TRANSFER</span><code>{pointTransfer || '-'}</code></div>
+        <div><span>SPAWN</span><code>{pointSpawn || '-'}</code></div>
       </div>
+    {/if}
 
-      {#if credentialType === 'ticket'}
-        <label class="field-label" for="ticket">MASTER TICKET</label>
-        <input id="ticket" bind:value={ticket} type="password" placeholder="~sampel-sampel-sampel-sampel" />
-      {:else if credentialType === 'private-key'}
-        <label class="field-label" for="private-key">ETHEREUM PRIVATE KEY</label>
-        <input id="private-key" bind:value={privateKey} type="password" placeholder="0x..." />
-      {:else}
-        <div class="field-label">EXTERNAL WALLET</div>
-        <button class="btn secondary full" on:click={connectWallet}>{walletAddress ? 'RECONNECT WALLET' : 'CONNECT WALLET'}</button>
-        {#if walletAddress}
-          <code class="address-line">{walletAddress}</code>
-        {/if}
-        {#if walletStatus}
-          <div class="status-text">{walletStatus}</div>
-        {/if}
-      {/if}
-
-      <label class="field-label" for="passphrase">PASSPHRASE</label>
-      <input id="passphrase" bind:value={passphrase} type="password" placeholder="optional" />
-
-      {#if point}
-        <div class="state-list">
-          <div><span>DOMINION</span><strong>{point?.dominion || '-'}</strong></div>
-          <div><span>LIFE</span><strong>{pointLife || '-'}</strong></div>
-          <div><span>RIFT</span><strong>{pointRift || '-'}</strong></div>
-          <div><span>SPONSOR</span><strong>{pointSponsor || '-'}</strong></div>
-          <div><span>OWNER</span><code>{pointOwner || '-'}</code></div>
-          <div><span>MANAGEMENT</span><code>{pointManager || '-'}</code></div>
-          <div><span>TRANSFER</span><code>{pointTransfer || '-'}</code></div>
-          <div><span>SPAWN</span><code>{pointSpawn || '-'}</code></div>
+    <details class="keys-row credential-row">
+      <summary>AUTH: {selectedCredential}{passphrase.trim() ? ' / PASSPHRASE' : ''}</summary>
+      <div class="credential-grid">
+        <div class="segmented" role="tablist" aria-label="Signing credential">
+          {#each credentials as credential}
+            <button class:active={credentialType === credential.id} on:click={() => credentialType = credential.id}>
+              {credential.label}
+            </button>
+          {/each}
         </div>
-      {/if}
-    </section>
 
-    <section class="panel operation-panel">
+        {#if credentialType === 'ticket'}
+          <label class="field-label" for="ticket">MASTER TICKET</label>
+          <input id="ticket" bind:value={ticket} type="password" placeholder="~sampel-sampel-sampel-sampel" />
+        {:else if credentialType === 'private-key'}
+          <label class="field-label" for="private-key">ETHEREUM PRIVATE KEY</label>
+          <input id="private-key" bind:value={privateKey} type="password" placeholder="0x..." />
+        {:else}
+          <div class="field-label">EXTERNAL WALLET</div>
+          <button class="btn secondary" on:click={connectWallet}>{walletAddress ? 'RECONNECT WALLET' : 'CONNECT WALLET'}</button>
+          {#if walletAddress}
+            <code class="address-line">{walletAddress}</code>
+          {/if}
+          {#if walletStatus}
+            <div class="status-text">{walletStatus}</div>
+          {/if}
+        {/if}
+
+        <label class="field-label" for="passphrase">PASSPHRASE</label>
+        <input id="passphrase" bind:value={passphrase} type="password" placeholder="optional" />
+      </div>
+    </details>
+
+    <div class="keys-row operation-row">
       <div class="operation-tabs" role="tablist" aria-label="PKI operation">
         {#each sections as section}
           <button class:active={activeSection === section.id} on:click={() => activeSection = section.id}>
@@ -427,42 +416,39 @@
 
       {#if activeSection === 'keyfile'}
         <div class="operation-body">
-          <div class="operation-heading">KEYFILE</div>
           <div class="button-row">
             <button class="btn primary" disabled={actionLoading || credentialType !== 'ticket' || !validShip || !ticket.trim()} on:click={handleKeyfile}>
               <Fa icon={actionLoading === 'keyfile' ? faCircleNotch : faDownload} spin={actionLoading === 'keyfile'} size="1x" />
-              GENERATE
+              GENERATE KEYFILE
             </button>
             <button class="btn secondary" disabled={actionLoading || credentialType !== 'ticket' || !validShip || !ticket.trim()} on:click={handleCode}>
               <Fa icon={actionLoading === 'code' ? faCircleNotch : faPaperPlane} spin={actionLoading === 'code'} size="1x" />
-              +CODE
+              GENERATE +CODE
             </button>
           </div>
 
           {#if keyfile}
-            <div class="output-block">
-              <div class="output-toolbar">
-                <code>{keyfileName}</code>
-                <div class="small-actions">
-                  <button class="icon-button small" on:click={downloadKeyfile} title="Download keyfile">
-                    <Fa icon={faDownload} size="1x" />
-                  </button>
-                  <button class="icon-button small" on:click={() => revealKeyfile = !revealKeyfile} title="Reveal keyfile">
-                    <Fa icon={revealKeyfile ? faEyeSlash : faEye} size="1x" />
-                  </button>
-                  <button class="icon-button small" on:click={copyKeyfile} title="Copy keyfile">
-                    <Fa icon={copiedKeyfile ? faCheck : faCopy} size="1x" />
-                  </button>
-                </div>
+            <div class="output-row">
+              <code>{keyfileName}</code>
+              <div class="small-actions">
+                <button class="icon-button small" on:click={downloadKeyfile} title="Download keyfile">
+                  <Fa icon={faDownload} size="1x" />
+                </button>
+                <button class="icon-button small" on:click={() => revealKeyfile = !revealKeyfile} title="Reveal keyfile">
+                  <Fa icon={revealKeyfile ? faEyeSlash : faEye} size="1x" />
+                </button>
+                <button class="icon-button small" on:click={copyKeyfile} title="Copy keyfile">
+                  <Fa icon={copiedKeyfile ? faCheck : faCopy} size="1x" />
+                </button>
               </div>
-              {#if revealKeyfile}
-                <pre>{keyfile}</pre>
-              {/if}
             </div>
+            {#if revealKeyfile}
+              <pre>{keyfile}</pre>
+            {/if}
           {/if}
 
           {#if code}
-            <div class="code-row">
+            <div class="output-row">
               <code>+code {code}</code>
               <button class="icon-button small" on:click={copyCode} title="Copy code">
                 <Fa icon={copiedCode ? faCheck : faCopy} size="1x" />
@@ -470,50 +456,34 @@
             </div>
           {/if}
 
-          {#if normalizedShip && !localShipExists}
-            <div class="boot-block">
-              <div class="operation-heading small-heading">BOOT FROM KEYFILE</div>
-              <label class="field-label" for="boot-keyfile">KEYFILE</label>
-              <textarea id="boot-keyfile" bind:value={bootKeyfile} placeholder="paste keyfile"></textarea>
-              <div class="button-row">
-                <label class="file-button" for="keyfile-upload">
-                  <Fa icon={faFileArrowUp} size="1x" />
-                  UPLOAD
+          {#if canBootFromKeyfile}
+            <div class="boot-row">
+              <span>SHIP NOT LOCAL</span>
+              {#if driveNames.length > 0}
+                <select bind:value={selectedDrive}>
+                  <option value="system-drive">System Drive</option>
+                  {#each driveNames as name}
+                    <option value={name}>{drives[name].driveID == 0 ? 'New Drive' : `Drive ${drives[name].driveID}`} ({name})</option>
+                  {/each}
+                </select>
+              {/if}
+              {#if startramReady}
+                <label class="check-row">
+                  <input type="checkbox" bind:checked={remote} />
+                  <span>REMOTE</span>
                 </label>
-                <input id="keyfile-upload" class="file-input" type="file" accept=".key,text/plain" on:change={handleKeyfileUpload} />
-                <button class="btn primary" disabled={!canBootFromKeyfile} on:click={handleBootFromKeyfile}>
-                  <Fa icon={faPaperPlane} size="1x" />
-                  BOOT
-                </button>
-              </div>
-              {#if bootFileName}
-                <div class="status-text">{bootFileName}</div>
               {/if}
-              {#if driveNames.length > 0 || startramReady}
-                <div class="boot-options">
-                  <label class="field-label" for="drive">DRIVE</label>
-                  <select id="drive" bind:value={selectedDrive}>
-                    <option value="system-drive">System Drive</option>
-                    {#each driveNames as name}
-                      <option value={name}>{drives[name].driveID == 0 ? 'New Drive' : `Drive ${drives[name].driveID}`} ({name})</option>
-                    {/each}
-                  </select>
-                  {#if startramReady}
-                    <label class="check-row">
-                      <input type="checkbox" bind:checked={remote} />
-                      <span>SET REMOTE</span>
-                    </label>
-                  {/if}
-                </div>
-              {/if}
+              <button class="btn primary" on:click={handleBootFromKeyfile}>
+                <Fa icon={faPaperPlane} size="1x" />
+                BOOT
+              </button>
             </div>
           {/if}
         </div>
       {:else if activeSection === 'breach'}
         <div class="operation-body">
-          <div class="operation-heading">BREACH</div>
           <div class="notice">
-            <span>Export the ship before booting from breached keys.</span>
+            <span>EXPORT THE SHIP BEFORE BOOTING FROM BREACHED KEYS.</span>
             {#if localShipExists}
               <button class="btn secondary" on:click={exportShip}>
                 <Fa icon={faFileExport} size="1x" />
@@ -535,7 +505,6 @@
         </div>
       {:else if activeSection === 'sponsor'}
         <div class="operation-body">
-          <div class="operation-heading">SPONSOR</div>
           <div class="segmented compact">
             {#each sponsorOps as op}
               <button class:active={sponsorOperation === op.id} on:click={() => sponsorOperation = op.id}>{op.label}</button>
@@ -555,7 +524,6 @@
         </div>
       {:else if activeSection === 'transfer'}
         <div class="operation-body">
-          <div class="operation-heading">TRANSFER</div>
           <label class="field-label" for="new-owner">NEW OWNER</label>
           <input id="new-owner" bind:value={newOwner} placeholder="0x..." />
           <label class="check-row">
@@ -569,7 +537,6 @@
         </div>
       {:else if activeSection === 'proxy'}
         <div class="operation-body">
-          <div class="operation-heading">PROXY</div>
           <div class="segmented compact">
             {#each proxyOps as op}
               <button class:active={proxyOperation === op.id} on:click={() => proxyOperation = op.id}>{op.label}</button>
@@ -583,42 +550,42 @@
           </button>
         </div>
       {/if}
+    </div>
 
-      {#if actionError}
-        <div class="error-line">{actionError}</div>
-      {/if}
-      {#if actionMessage}
-        <div class="success-line">{actionMessage}</div>
-      {/if}
-    </section>
-  </div>
+    {#if actionError}
+      <div class="keys-row error-line">{actionError}</div>
+    {/if}
+    {#if actionMessage}
+      <div class="keys-row success-line">{actionMessage}</div>
+    {/if}
 
-  {#if visiblePending.length > 0}
-    <section class="panel pending-panel">
-      <div class="panel-title-row">
-        <h2>PENDING</h2>
-        <button class="btn secondary" on:click={() => pollDueKeyPending(true)}>
-          <Fa icon={faRotate} size="1x" />
-          CHECK
-        </button>
-      </div>
-      <div class="pending-list">
-        {#each visiblePending as tx}
-          <div class="pending-item">
-            <div class="pending-main">
-              <strong>{pendingTitle(tx)}</strong>
-              <code>{tx.hash || tx.signature || 'queued'}</code>
-              {#if tx.lastError}
-                <span>{tx.lastError}</span>
-              {/if}
+    {#if visiblePending.length > 0}
+      <div class="keys-row pending-row">
+        <div class="pending-header">
+          <h2>PENDING</h2>
+          <button class="btn secondary" on:click={() => pollDueKeyPending(true)}>
+            <Fa icon={faRotate} size="1x" />
+            CHECK
+          </button>
+        </div>
+        <div class="pending-list">
+          {#each visiblePending as tx}
+            <div class="pending-item">
+              <div class="pending-main">
+                <strong>{pendingTitle(tx)}</strong>
+                <code>{tx.hash || tx.signature || 'queued'}</code>
+                {#if tx.lastError}
+                  <span>{tx.lastError}</span>
+                {/if}
+              </div>
+              <div class="pending-status">{tx.status || 'pending'}</div>
+              <button class="icon-button small" on:click={() => removeKeyPending(tx)} title="Remove saved transaction">
+                <Fa icon={faXmark} size="1x" />
+              </button>
             </div>
-            <div class="pending-status">{tx.status || 'pending'}</div>
-            <button class="icon-button small" on:click={() => removeKeyPending(tx)} title="Remove saved transaction">
-              <Fa icon={faXmark} size="1x" />
-            </button>
-          </div>
-        {/each}
+          {/each}
+        </div>
       </div>
-    </section>
-  {/if}
+    {/if}
+  </section>
 </div>
