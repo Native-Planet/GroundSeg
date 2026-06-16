@@ -3,6 +3,8 @@ package handler
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"groundseg/auth"
@@ -107,6 +109,7 @@ type keysPrepareResponse struct {
 	Ship           string         `json:"ship"`
 	Operation      string         `json:"operation"`
 	Address        string         `json:"address"`
+	Seed           string         `json:"seed,omitempty"`
 	SigningPayload string         `json:"signingPayload"`
 	SignMethod     string         `json:"signMethod"`
 	Method         string         `json:"method"`
@@ -298,6 +301,7 @@ func KeysSubmitWalletHandler(w http.ResponseWriter, r *http.Request) {
 			"from":    prepared.From,
 			"data":    prepared.Data,
 			"sig":     signature,
+			"force":   false,
 		}
 		result, err := rollerRPC(ctx, prepared.Method, params)
 		if err != nil {
@@ -461,7 +465,7 @@ func prepareWalletOperation(parentCtx context.Context, req keysWalletPrepareRequ
 	operation := normalizeOperation(req.Operation)
 	ctx, cancel := context.WithTimeout(parentCtx, keysRequestTimeout)
 	defer cancel()
-	method, data, proxyKind, err := walletOperationData(operation, req.keysOperationRequest)
+	method, data, proxyKind, seed, err := walletOperationData(operation, req.keysOperationRequest)
 	if err != nil {
 		return keysPrepareResponse{}, err
 	}
@@ -497,6 +501,7 @@ func prepareWalletOperation(parentCtx context.Context, req keysWalletPrepareRequ
 		Ship:           ship,
 		Operation:      operation,
 		Address:        address,
+		Seed:           seed,
 		SigningPayload: signingPayload,
 		SignMethod:     "personal_sign",
 		Method:         method,
@@ -506,63 +511,71 @@ func prepareWalletOperation(parentCtx context.Context, req keysWalletPrepareRequ
 	}, nil
 }
 
-func walletOperationData(operation string, req keysOperationRequest) (string, any, string, error) {
+func walletOperationData(operation string, req keysOperationRequest) (string, any, string, string, error) {
 	switch operation {
 	case "breach":
-		keys, err := libprg.GenerateNetworkKeysFromSeed(req.Seed)
+		seed := strings.TrimPrefix(strings.TrimSpace(req.Seed), "0x")
+		if seed == "" {
+			generated, err := defaultNetworkSeed()
+			if err != nil {
+				return "", nil, "", "", err
+			}
+			seed = generated
+		}
+		keys, err := libprg.GenerateNetworkKeysFromSeed(seed)
 		if err != nil {
-			return "", nil, "", err
+			return "", nil, "", "", err
 		}
 		return "configureKeys", map[string]any{
 			"encrypt":     "0x" + keys.Crypt.Public,
 			"auth":        "0x" + keys.Auth.Public,
 			"cryptoSuite": "1",
 			"breach":      true,
-		}, "management", nil
+		}, "management", seed, nil
 	case "escape":
 		sponsor, err := normalizeShip(req.Sponsor)
 		if err != nil {
-			return "", nil, "", fmt.Errorf("invalid sponsor: %v", err)
+			return "", nil, "", "", fmt.Errorf("invalid sponsor: %v", err)
 		}
-		return "escape", map[string]any{"ship": sponsor}, "management", nil
+		return "escape", map[string]any{"ship": sponsor}, "management", "", nil
 	case "cancel-escape":
 		sponsor, err := normalizeShip(req.Sponsor)
 		if err != nil {
-			return "", nil, "", fmt.Errorf("invalid sponsor: %v", err)
+			return "", nil, "", "", fmt.Errorf("invalid sponsor: %v", err)
 		}
-		return "cancel-escape", map[string]any{"ship": sponsor}, "management", nil
+		return "cancel-escape", map[string]any{"ship": sponsor}, "management", "", nil
 	case "adopt":
 		adoptee, err := normalizeShip(req.Adoptee)
 		if err != nil {
-			return "", nil, "", fmt.Errorf("invalid adoptee: %v", err)
+			return "", nil, "", "", fmt.Errorf("invalid adoptee: %v", err)
 		}
-		return "adopt", map[string]any{"ship": adoptee}, "management", nil
+		return "adopt", map[string]any{"ship": adoptee}, "management", "", nil
 	case "transfer":
 		newOwner, err := normalizeAddress(req.NewOwner)
 		if err != nil {
-			return "", nil, "", fmt.Errorf("invalid new owner: %v", err)
+			return "", nil, "", "", fmt.Errorf("invalid new owner: %v", err)
 		}
-		return "transferPoint", map[string]any{"address": newOwner, "reset": req.Reset}, "transfer", nil
+		return "transferPoint", map[string]any{"address": newOwner, "reset": req.Reset}, "transfer", "", nil
 	case "set-management-proxy":
 		proxy, err := normalizeAddress(req.Proxy)
 		if err != nil {
-			return "", nil, "", fmt.Errorf("invalid management proxy: %v", err)
+			return "", nil, "", "", fmt.Errorf("invalid management proxy: %v", err)
 		}
-		return "setManagementProxy", map[string]any{"address": proxy}, "management", nil
+		return "setManagementProxy", map[string]any{"address": proxy}, "management", "", nil
 	case "set-spawn-proxy":
 		proxy, err := normalizeAddress(req.Proxy)
 		if err != nil {
-			return "", nil, "", fmt.Errorf("invalid spawn proxy: %v", err)
+			return "", nil, "", "", fmt.Errorf("invalid spawn proxy: %v", err)
 		}
-		return "setSpawnProxy", map[string]any{"address": proxy}, "management", nil
+		return "setSpawnProxy", map[string]any{"address": proxy}, "management", "", nil
 	case "set-transfer-proxy":
 		proxy, err := normalizeAddress(req.Proxy)
 		if err != nil {
-			return "", nil, "", fmt.Errorf("invalid transfer proxy: %v", err)
+			return "", nil, "", "", fmt.Errorf("invalid transfer proxy: %v", err)
 		}
-		return "setTransferProxy", map[string]any{"address": proxy}, "management", nil
+		return "setTransferProxy", map[string]any{"address": proxy}, "management", "", nil
 	default:
-		return "", nil, "", fmt.Errorf("unsupported wallet operation: %s", operation)
+		return "", nil, "", "", fmt.Errorf("unsupported wallet operation: %s", operation)
 	}
 }
 
@@ -592,8 +605,13 @@ func proxyTypeForAddress(point *perigeeTypes.Point, address, kind string) (strin
 }
 
 func breachWithPrivateKey(ship, privateKey, passphrase, seed string) (*perigeeTypes.Transaction, error) {
-	if strings.TrimSpace(seed) == "" {
-		return nil, fmt.Errorf("seed is required when breaching with an ethereum private key")
+	seed = strings.TrimPrefix(strings.TrimSpace(seed), "0x")
+	if seed == "" {
+		generated, err := defaultNetworkSeed()
+		if err != nil {
+			return nil, err
+		}
+		seed = generated
 	}
 	privKey, derivedPubkey, pointInfo, networkKeys, _, err := libprg.ValidateKey(ship, privateKey, passphrase, seed, true)
 	if err != nil {
@@ -611,6 +629,14 @@ func breachWithPrivateKey(ship, privateKey, passphrase, seed string) (*perigeeTy
 		derivedPubkey,
 		privKey,
 	)
+}
+
+func defaultNetworkSeed() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate network seed: %v", err)
+	}
+	return hex.EncodeToString(buf), nil
 }
 
 func operationCredential(req keysOperationRequest) (string, error) {
