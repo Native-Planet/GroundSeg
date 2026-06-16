@@ -1,14 +1,18 @@
 package ws
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"groundseg/auth"
 	"groundseg/docker"
+	"groundseg/dockerclient"
 	"groundseg/logger"
 	"groundseg/structs"
 	"net/http"
+	"strings"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 )
@@ -19,6 +23,16 @@ type LogPayload struct {
 }
 
 func LogsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		setLogStreamCORS(w, r)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if strings.Contains(r.Header.Get("Accept"), "text/event-stream") || r.Method == http.MethodPost {
+		LogsStreamHandler(w, r)
+		return
+	}
+
 	// Upgrade the HTTP connection to a WebSocket connection
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -83,4 +97,151 @@ func LogsHandler(w http.ResponseWriter, r *http.Request) {
 			logger.DockerLogSessions[payload.Type][conn] = false
 		}
 	}
+}
+
+func LogsStreamHandler(w http.ResponseWriter, r *http.Request) {
+	setLogStreamCORS(w, r)
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+
+	var payload LogPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid log request", http.StatusBadRequest)
+		return
+	}
+
+	if authed := auth.LogTokenCheck(payload.Token, r); !authed {
+		zap.L().Info("log stream request unauthenticated")
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	if err := writeLogStreamComment(w, "connected"); err != nil {
+		return
+	}
+	flusher.Flush()
+
+	if payload.Type == "system" {
+		logHistory, err := logger.RetrieveSysLogHistory()
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("failed to retrieve log history: %v", err))
+			return
+		}
+		if err := writeLogStreamEvent(w, logHistory); err != nil {
+			return
+		}
+		flusher.Flush()
+
+		logs, cancel := logger.SubscribeSysLogStream()
+		defer cancel()
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case log, ok := <-logs:
+				if !ok {
+					return
+				}
+				if err := writeLogStreamEvent(w, log); err != nil {
+					return
+				}
+				flusher.Flush()
+			}
+		}
+	}
+
+	if _, err := docker.FindContainer(payload.Type); err != nil {
+		zap.L().Error(fmt.Sprintf("log stream retrieval failed: %v", err))
+		return
+	}
+	streamDockerLogs(w, flusher, r, payload.Type)
+}
+
+func streamDockerLogs(w http.ResponseWriter, flusher http.Flusher, r *http.Request, containerName string) {
+	cli, err := dockerclient.New()
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("failed to create Docker client: %v", err))
+		return
+	}
+	defer cli.Close()
+
+	options := container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+		Timestamps: true,
+	}
+	out, err := cli.ContainerLogs(r.Context(), containerName, options)
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("failed to get logs for container %s: %v", containerName, err))
+		return
+	}
+	defer out.Close()
+
+	scanner := bufio.NewScanner(out)
+	for scanner.Scan() {
+		line := ""
+		if len(scanner.Text()) > 8 {
+			line = scanner.Text()[8:]
+		}
+		logJSON, err := json.Marshal(map[string]any{
+			"type":    containerName,
+			"history": false,
+			"log":     line,
+		})
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("failed to marshal log line for %s: %v", containerName, err))
+			return
+		}
+		if err := writeLogStreamEvent(w, logJSON); err != nil {
+			return
+		}
+		flusher.Flush()
+	}
+	if err := scanner.Err(); err != nil && r.Context().Err() == nil {
+		zap.L().Error(fmt.Sprintf("error reading logs for %s: %v", containerName, err))
+	}
+}
+
+func setLogStreamCORS(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		origin = "*"
+	}
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Vary", "Origin")
+}
+
+func writeLogStreamEvent(w http.ResponseWriter, data []byte) error {
+	if _, err := fmt.Fprint(w, "event: log\n"); err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if _, err := fmt.Fprintf(w, "data: %s\n", line); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprint(w, "\n")
+	return err
+}
+
+func writeLogStreamComment(w http.ResponseWriter, text string) error {
+	_, err := fmt.Fprintf(w, ": %s\n\n", text)
+	return err
 }

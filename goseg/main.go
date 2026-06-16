@@ -152,6 +152,7 @@ func startServer() { // *http.Server {
 	}
 	w := mux.NewRouter()
 	w.HandleFunc("/ws", ws.WsHandler)
+	w.HandleFunc("/events", broadcast.EventsHandler)
 	w.HandleFunc("/logs", ws.LogsHandler)
 	w.HandleFunc("/shell", ws.ShellHandler)
 	w.HandleFunc("/export/{container}", exporter.ExportHandler)

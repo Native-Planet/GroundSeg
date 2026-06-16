@@ -10,16 +10,52 @@ export const isC2CMode = writable(false)
 export const ssids = writable([])
 export const loginError = writable('')
 
-let PENDING = new Set();
-let SESSION;
+let PENDING = new Set()
+let OUTBOX = []
+let SESSION
+let EVENTS_URL = ''
+let wsConnected = false
+let eventConnected = false
+let eventConnecting = false
+let reconnectTimer
+let eventReconnectTimer
+let eventController
+let eventTokenKey = ''
+let eventRetry = 1000
+
+const maxEventRetry = 10000
+
+const updateConnected = () => {
+  connected.set(wsConnected && (eventConnected || !eventTokenKey))
+}
+
+const eventsUrlFromSocket = url => {
+  const target = new URL(url)
+  target.protocol = target.protocol === 'wss:' ? 'https:' : 'http:'
+  target.pathname = '/events'
+  target.search = ''
+  target.hash = ''
+  return target.toString()
+}
 
 // Initialize connection
 export const connect = async url => {
-  SESSION = new WebSocket(url);
-  SESSION.onopen = () => handleOpen();
-  SESSION.onmessage = (message) => handleMessage(JSON.parse(message.data));
-  SESSION.onerror = (error) => console.log(error);
-  SESSION.onclose = () => reconnect(url);
+  EVENTS_URL = eventsUrlFromSocket(url)
+  if (SESSION && [WebSocket.CONNECTING, WebSocket.OPEN].includes(SESSION.readyState)) {
+    SESSION.onclose = null
+    SESSION.close(1000)
+  }
+  SESSION = new WebSocket(url)
+  SESSION.onopen = () => handleOpen()
+  SESSION.onmessage = message => {
+    try {
+      handleMessage(JSON.parse(message.data))
+    } catch (error) {
+      console.log(error)
+    }
+  }
+  SESSION.onerror = error => console.log(error)
+  SESSION.onclose = () => reconnect(url)
 }
 
 // WebSocket send wrapper
@@ -41,51 +77,76 @@ export const send = async payload => {
     }
     // Send the request
     console.log(id + ":" + payload.type + " sent")
-    SESSION.send(JSON.stringify(data));
+    sendSocket(JSON.stringify(data))
+  }
+}
+
+const sendSocket = data => {
+  if (SESSION?.readyState === WebSocket.OPEN) {
+    SESSION.send(data)
+  } else {
+    OUTBOX.push(data)
+  }
+}
+
+const flushOutbox = () => {
+  while (OUTBOX.length > 0 && SESSION?.readyState === WebSocket.OPEN) {
+    SESSION.send(OUTBOX.shift())
   }
 }
 
 // Reconnection
 export const reconnect = url => {
-  // Set connected store to false
-  connected.set(false)
+  wsConnected = false
+  updateConnected()
   console.log("reconnecting to api")
-  // Attempt to reconnect
-  setTimeout(()=>connect(url),1000)
+  if (reconnectTimer) return
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = undefined
+    connect(url)
+  }, 1000)
 }
 
 // Handle connection
 export const handleOpen = () => {
-  // Set connected store to true
-  connected.set(true)
+  wsConnected = true
+  updateConnected()
   // Verify session
   verify()
+  flushOutbox()
+  connectEvents()
 }
 
 // Message Handler
 export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
-  console.log("alive")
-  //console.log(data)
-  if (data.type === "c2c") {
-    if (Array.isArray(data.ssids)) {
-      ssids.set(data.ssids)
-      isC2CMode.set(true)
-    }
-  } else if (data.type === "activity") {
+  if (data.type === "activity") {
+    console.log("activity")
     handleActivity(data)
-    ssids.set([])
-    isC2CMode.set(false)
-  } else if (data.type == "structure") {
-    structure.set(data)
-    ssids.set([])
-    isC2CMode.set(false)
+    firstLoad.set(false)
   } else if (data.type == 'login-failed') {
     loginError.set(data.message);
     setTimeout(() => {
       loginError.set('');
     }, 2000);
+    firstLoad.set(false)
+  } else {
+    handleStreamMessage(data)
+  }
+}
+
+export const handleStreamMessage = data => {
+  console.log("event alive")
+  if (data.type === "c2c") {
+    if (Array.isArray(data.ssids)) {
+      ssids.set(data.ssids)
+      isC2CMode.set(true)
+    }
+  } else if (data.type == "structure") {
+    structure.set(data)
+    ssids.set([])
+    isC2CMode.set(false)
   } else if (data.hasOwnProperty('log')) {
     logs.update(l=>{
       let containerID = data.log.container_id
@@ -101,6 +162,113 @@ export const handleMessage = data => {
     console.log("server alive")
   }
   firstLoad.set(false)
+}
+
+export const connectEvents = async () => {
+  if (!EVENTS_URL) return
+  let token = await loadSession()
+  if (!token) return
+
+  const tokenKey = token.id + ":" + token.token
+  if (eventController && !eventController.signal.aborted) {
+    if (eventTokenKey === tokenKey && (eventConnected || eventConnecting)) return
+    eventController.abort()
+  }
+  if (eventReconnectTimer) {
+    clearTimeout(eventReconnectTimer)
+    eventReconnectTimer = undefined
+  }
+  eventTokenKey = tokenKey
+  eventController = new AbortController()
+  streamEvents(token, eventController)
+}
+
+const streamEvents = async (token, controller) => {
+  eventConnecting = true
+  try {
+    const response = await fetch(EVENTS_URL, {
+      method: 'POST',
+      headers: {
+        'Accept': 'text/event-stream',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ token }),
+      cache: 'no-store',
+      signal: controller.signal
+    })
+    if (!response.ok || !response.body) {
+      throw new Error(`event stream failed: ${response.status}`)
+    }
+    eventConnected = true
+    eventConnecting = false
+    eventRetry = 1000
+    updateConnected()
+    await readEventStream(response.body)
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      console.log(error)
+    }
+  } finally {
+    if (eventController === controller) {
+      eventConnecting = false
+      if (!controller.signal.aborted) {
+        eventConnected = false
+        updateConnected()
+        scheduleEventReconnect()
+      }
+    }
+  }
+}
+
+const scheduleEventReconnect = () => {
+  if (eventReconnectTimer) return
+  const retry = eventRetry
+  eventRetry = Math.min(eventRetry * 2, maxEventRetry)
+  eventReconnectTimer = setTimeout(() => {
+    eventReconnectTimer = undefined
+    connectEvents()
+  }, retry)
+}
+
+const readEventStream = async body => {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) return
+    buffer += decoder.decode(value, { stream: true })
+    let boundary = buffer.indexOf('\n\n')
+    while (boundary >= 0) {
+      const raw = buffer.slice(0, boundary)
+      buffer = buffer.slice(boundary + 2)
+      dispatchEventFrame(raw)
+      boundary = buffer.indexOf('\n\n')
+    }
+  }
+}
+
+const dispatchEventFrame = raw => {
+  if (!raw.trim() || raw.trim().startsWith(':')) return
+  const data = []
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line || line.startsWith(':')) continue
+    const separator = line.indexOf(':')
+    const field = separator >= 0 ? line.slice(0, separator) : line
+    let value = separator >= 0 ? line.slice(separator + 1) : ''
+    if (value.startsWith(' ')) value = value.slice(1)
+    if (field === 'data') data.push(value)
+    if (field === 'retry') {
+      const retry = Number.parseInt(value, 10)
+      if (!Number.isNaN(retry)) eventRetry = retry
+    }
+  }
+  if (data.length < 1) return
+  try {
+    handleStreamMessage(JSON.parse(data.join('\n')))
+  } catch (error) {
+    console.log(error)
+  }
 }
 
 // Activity Handler
@@ -119,7 +287,7 @@ export const handleActivity = data => {
     }
     // Set token
     if (data.hasOwnProperty('token')) {
-      saveSession(data.token)
+      saveSession(data.token).then(connectEvents)
     }
     // display result
     console.log(res)

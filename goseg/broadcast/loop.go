@@ -16,7 +16,7 @@ func BroadcastLoop() {
 		select {
 		case <-ticker.C:
 			cm := auth.GetClientManager()
-			if cm.HasAuthSession() || len(leak.GetLickStatuses()) > 0 {
+			if cm.HasAuthSession() || HasEventAuthSession() || len(leak.GetLickStatuses()) > 0 {
 				// refresh loop for host info
 				systemInfo := constructSystemInfo()
 

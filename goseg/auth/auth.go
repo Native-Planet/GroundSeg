@@ -163,6 +163,15 @@ func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
 	return exists
 }
 
+// is this tokenid in the unauth map?
+func TokenIdUnauthed(clientManager *structs.ClientManager, token string) bool {
+	clientManager.Mu.RLock()
+	defer clientManager.Mu.RUnlock()
+	_, exists := clientManager.UnauthClients[token]
+	zap.L().Debug(fmt.Sprintf("%s present in unauthmap: %v", token, exists))
+	return exists
+}
+
 // this takes a bool for auth/unauth
 // purge token/conn from opposite map
 // persists to config
@@ -245,6 +254,49 @@ func CheckToken(token map[string]string, r *http.Request) (string, bool) {
 		}
 	}
 	return token["token"], false
+}
+
+// CheckStreamToken validates a token for streamed HTTP transports such as SSE.
+// It returns the possibly refreshed token content, whether the token is known,
+// and whether the known token is authorized.
+func CheckStreamToken(token structs.WsTokenStruct, r *http.Request) (string, bool, bool) {
+	if token.Token == "" {
+		return "", false, false
+	}
+	conf := config.Conf()
+	key := conf.KeyFile
+	res, err := KeyfileDecrypt(token.Token, key)
+	if err != nil {
+		zap.L().Warn(fmt.Sprintf("Invalid stream token provided: %v", err))
+		return token.Token, false, false
+	}
+	var ip string
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		ip = strings.Split(forwarded, ",")[0]
+	} else {
+		ip, _, _ = net.SplitHostPort(r.RemoteAddr)
+	}
+	userAgent := r.Header.Get("User-Agent")
+	if ip != res["ip"] || userAgent != res["user_agent"] || res["id"] != token.ID {
+		zap.L().Warn("Stream token metadata doesn't match session")
+		return token.Token, false, false
+	}
+	if TokenIdAuthed(ClientManager, token.ID) {
+		if res["authorized"] == "true" {
+			return token.Token, true, true
+		}
+		res["authorized"] = "true"
+		encryptedText, err := KeyfileEncrypt(res, key)
+		if err != nil {
+			zap.L().Error("Error encrypting stream token")
+			return token.Token, false, false
+		}
+		return encryptedText, true, true
+	}
+	if TokenIdUnauthed(ClientManager, token.ID) {
+		return token.Token, true, false
+	}
+	return token.Token, false, false
 }
 
 // make a token authed

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -22,8 +23,10 @@ var (
 	LogPath             string
 	SysLogChannel       = make(chan []byte, 100)
 	SysLogSessions      []*websocket.Conn
+	SysLogStreams       = make(map[chan []byte]struct{})
 	DockerLogSessions   = make(map[string]map[*websocket.Conn]bool)
 	SysSessionsToRemove []*websocket.Conn
+	SysLogStreamsMu     sync.RWMutex
 )
 
 // File Writer
@@ -219,6 +222,39 @@ func RemoveSysSessions() {
 	SysLogSessions = result
 	// always clear remove list after running function
 	SysSessionsToRemove = []*websocket.Conn{}
+}
+
+func SubscribeSysLogStream() (<-chan []byte, func()) {
+	ch := make(chan []byte, 100)
+	SysLogStreamsMu.Lock()
+	SysLogStreams[ch] = struct{}{}
+	SysLogStreamsMu.Unlock()
+	cancel := func() {
+		SysLogStreamsMu.Lock()
+		delete(SysLogStreams, ch)
+		close(ch)
+		SysLogStreamsMu.Unlock()
+	}
+	return ch, cancel
+}
+
+func PublishSysLogStream(log []byte) {
+	SysLogStreamsMu.RLock()
+	defer SysLogStreamsMu.RUnlock()
+	for ch := range SysLogStreams {
+		select {
+		case ch <- log:
+		default:
+			select {
+			case <-ch:
+			default:
+			}
+			select {
+			case ch <- log:
+			default:
+			}
+		}
+	}
 }
 
 func getDockerLogs(name string) ([]byte, error) {
