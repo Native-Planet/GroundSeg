@@ -1,6 +1,6 @@
 ::  http-utils: HTTP/SSE encoding, error responses, and request utilities
 ::
-/+  server, multipart
+/+  server
 |%
 ::  General utilities
 ::
@@ -59,8 +59,6 @@
       [%from start=@ud]              :: bytes=1024-
       [%suffix length=@ud]           :: bytes=-500
   ==
-::
-+$  parts  (list [@t part:multipart])
 ::
 ::  Request detection
 ::
@@ -402,18 +400,6 @@
       ['accept-ranges' 'bytes']
       ['content-type' (rsh [3 1] (spat p.mime))]
   ==
-::
-::  Multipart form data
-::
-++  grab-part
-  =|  lead=(list [@t part:multipart])
-  |=  [key=@t parts=(list [@t part:multipart])]
-  ^-  [(unit part:multipart) (list [@t part:multipart])]
-  ?~  parts
-    [~ (flop lead)]
-  ?:  =(key -.i.parts)
-    [[~ +.i.parts] (weld (flop lead) t.parts)]
-  $(parts t.parts, lead [i.parts lead])
 ::
 ::  Gall card builders for HTTP/SSE
 ::

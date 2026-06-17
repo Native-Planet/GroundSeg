@@ -1,4 +1,4 @@
-/-  *groundseg, http-utils
+/-  *groundseg
 /+  default-agent, dbug
 |%
 +$  versioned-state
@@ -28,10 +28,9 @@
   u.target
 ::
 ++  fetch-roller
-  |=  $:  [for=@ta secure=?]
-          =request:http
-      ==
+  |=  [eid=@ta req=inbound-request:eyre]
   ^-  card
+  =/  request=request:http  request.req
   =.  url.request  (roller-target header-list.request)
   =.  header-list.request
     %+  skip  header-list.request
@@ -43,9 +42,37 @@
     =-  (set-header:http 'forwarded' - header-list.request)
     %+  rap  3
     :~  'for="groundseg";'
-        'proto='  ?:(secure 'https' 'http')
+        'proto='  ?:(secure.req 'https' 'http')
     ==
-  [%pass /roller-fetch/[for]/(scot %t url.request) %arvo %i %request request *outbound-config:iris]
+  [%pass /roller-fetch/[eid]/(scot %t url.request) %arvo %i %request request *outbound-config:iris]
+::
+++  give-http
+  |=  [eid=@ta =response-header:http data=(unit octs)]
+  ^-  (list card)
+  =/  =path  /http-response/[eid]
+  :~  [%give %fact ~[path] %http-response-header !>(response-header)]
+      [%give %fact ~[path] %http-response-data !>(data)]
+      [%give %kick ~[path] ~]
+  ==
+::
+++  give-status
+  |=  [eid=@ta status=@ud msg=@t]
+  ^-  (list card)
+  %^  give-http  eid
+    [status ~[['content-type' 'text/plain']]]
+  `(as-octs:mimes:html msg)
+::
+++  response-headers
+  |=  headers=(list [@t @t])
+  ^-  (list [@t @t])
+  =/  clean=(list [@t @t])
+    %+  skip  headers
+    |=  [key=@t value=@t]
+    ?|  =(key 'transfer-encoding')
+        =(key 'connection')
+    ==
+  %+  weld  clean
+  ~[['x-groundseg-roller' 'finished'] ['access-control-allow-origin' '*']]
 ::
 ++  on-init
   ^-  (quip card _this)
@@ -73,14 +100,13 @@
   ?>  =(src.bowl our.bowl)
   ?+    mark  (on-poke:def mark vase)
       %handle-http-request
-    =+  !<(order:http vase)
-    =+  (purse:http url.request)
-    ?.  ?=([%'~groundseg' %roller *] site)
+    =+  !<([eid=@ta req=inbound-request:eyre] vase)
+    ?:  =(%'OPTIONS' method.request.req)
       :_  this
-      %^  spout:http  id
-        [404 ~]
-      `(as-octs:mimes:html (cat 3 'bad route into ' dap.bowl))
-    [[(fetch-roller [id secure] request)]~ this]
+      %^  give-http  eid
+        [204 ~[['access-control-allow-origin' '*'] ['access-control-allow-methods' 'POST, OPTIONS'] ['access-control-allow-headers' 'Content-Type, X-Groundseg-Roller-URL'] ['access-control-max-age' '3600']]]
+      ~
+    [[(fetch-roller eid req)]~ this]
   ::  toggle lick port
       %port
     =^  cards  state
@@ -172,15 +198,11 @@
       [%cancel ~]
     ?:  ?=(%cancel -.res)
       :_  this
-      %+  spout:http  eid
-      :-  [502 'x-groundseg-roller'^'cancelled' ~]
-      ~
+      (give-status eid 502 'cancelled')
     ?>  ?=(%finished -.res)
     :_  this
-    %+  spout:http  eid
-    :-  =,  response-header.res
-        :-  status-code
-        (snoc headers 'x-groundseg-roller'^'finished')
+    %^  give-http  eid
+      [status-code.response-header.res (response-headers headers.response-header.res)]
     ?~  full-file.res  ~
     `data.u.full-file.res
   ==
