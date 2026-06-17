@@ -17,7 +17,7 @@
 ::
 ++  roller-bind
   ^-  card
-  [%pass /eyre/bind %arvo %e %connect [~ /~groundseg/roller] dap.bowl]
+  [%pass /eyre/bind %arvo %e %connect [~ /'~groundseg'/roller] dap.bowl]
 ::
 ++  roller-target
   |=  headers=(list [@t @t])
@@ -35,9 +35,10 @@
   =.  url.request  (roller-target header-list.request)
   =.  header-list.request
     %+  skip  header-list.request
-    |=([k=@t @t] ?|  =('cookie' k)
-                       =('x-groundseg-roller-url' k)
-                   ==)
+    |=  [k=@t @t]
+    ?|  =('cookie' k)
+        =('x-groundseg-roller-url' k)
+    ==
   =.  header-list.request
     =-  (set-header:http 'forwarded' - header-list.request)
     %+  rap  3
