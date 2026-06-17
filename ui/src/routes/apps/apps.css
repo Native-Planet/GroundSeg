@@ -75,7 +75,7 @@ h2 {
 .state-row span,
 .boot-row span,
 .advanced summary {
-  font-family: var(--title-font);
+  font-family: var(--log-font);
 }
 
 code,

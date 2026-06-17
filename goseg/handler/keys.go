@@ -157,6 +157,9 @@ func KeysPointHandler(w http.ResponseWriter, r *http.Request) {
 				writeKeysError(w, http.StatusBadGateway, err)
 				return
 			}
+			if err := point.ResolveSponsorPatp(); err != nil {
+				zap.L().Debug("Could not resolve point sponsor", zap.String("ship", ship), zap.Error(err))
+			}
 			resp.Ship = ship
 			resp.Point = point
 			if strings.TrimSpace(point.Ownership.Owner.Address) != "" {
