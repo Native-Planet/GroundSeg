@@ -28,7 +28,12 @@
     if (authLevel == "authorized") {
       wsRedirect()
     } else if (authLevel != "unauthorized") {
-      if (pageRouteID != "/[patp]") {
+      if (
+        (pageRouteID != "/[patp]") &&
+        (pageRouteID != "/apps") &&
+        (pageRouteID != "/profile") &&
+        (pageRouteID != "/system")
+      ) {
         goto(pfx + "/" + authLevel)
       }
     }
