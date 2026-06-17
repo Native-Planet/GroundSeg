@@ -1,4 +1,4 @@
-/-  *groundseg
+/-  *groundseg, http-utils
 /+  default-agent, dbug
 |%
 +$  versioned-state
@@ -15,9 +15,37 @@
 +*  this  .
     def   ~(. (default-agent this %.n) bowl)
 ::
+++  roller-target
+  |=  headers=(list [@t @t])
+  ^-  @t
+  =/  target  (get-header:http 'x-groundseg-roller-url' headers)
+  ?~  target
+    'https://roller.urbit.org/v1/roller'
+  u.target
+::
+++  fetch-roller
+  |=  $:  [for=@ta secure=?]
+          =request:http
+      ==
+  ^-  card
+  =.  url.request  (roller-target header-list.request)
+  =.  header-list.request
+    %+  skip  header-list.request
+    |=([k=@t @t] ?|  =('cookie' k)
+                       =('x-groundseg-roller-url' k)
+                   ==)
+  =.  header-list.request
+    =-  (set-header:http 'forwarded' - header-list.request)
+    %+  rap  3
+    :~  'for="groundseg";'
+        'proto='  ?:(secure 'https' 'http')
+    ==
+  [%pass /roller-fetch/[for]/(scot %t url.request) %arvo %i %request request *outbound-config:iris]
+::
 ++  on-init
   ^-  (quip card _this)
-  `this
+  :_  this
+  [%pass /eyre/bind %arvo %e %connect [~ /~groundseg/roller] dap.bowl]~
 ::  
 ++  on-save
   ^-  vase
@@ -37,6 +65,15 @@
   |^
   ?>  =(src.bowl our.bowl)
   ?+    mark  (on-poke:def mark vase)
+      %handle-http-request
+    =+  !<(order:http vase)
+    =+  (purse:http url.request)
+    ?.  ?=([%~groundseg %roller *] site)
+      :_  this
+      %^  spout:http  id
+        [404 ~]
+      `(as-octs:mimes:html (cat 3 'bad route into ' dap.bowl))
+    [[(fetch-roller [id secure] request)]~ this]
   ::  toggle lick port
       %port
     =^  cards  state
@@ -92,27 +129,53 @@
 ++  on-arvo
   |=  [=wire sign=sign-arvo]
   ^-  (quip card _this)
-  ?.  ?=([%lick %soak *] sign)  (on-arvo:def +<)
-  ?+    [mark noun]:sign        (on-arvo:def +<)
-      [%connect ~]
-    ((slog 'groundseg socket connected' ~) `this)
-    ::
-      [%disconnect ~]
-    ((slog 'groundseg socket disconnected' ~) `this)
-    ::
-      [%error *]
-    ((slog leaf+"socket {(trip ;;(@t noun.sign))}" ~) `this)
-    ::
-      [%broadcast *]
-    ?.  ?=(@ noun.sign)
-      ((slog 'invalid broadcast' ~) `this)
-    ?:  (gte `@dr`(sub now.bowl alive.state) ~s15)
+  ?+  wire
+    ?.  ?=([%lick %soak *] sign)  (on-arvo:def +<)
+    ?+    [mark noun]:sign        (on-arvo:def +<)
+        [%connect ~]
+      ((slog 'groundseg socket connected' ~) `this)
+      ::
+        [%disconnect ~]
+      ((slog 'groundseg socket disconnected' ~) `this)
+      ::
+        [%error *]
+      ((slog leaf+"socket {(trip ;;(@t noun.sign))}" ~) `this)
+      ::
+        [%broadcast *]
+      ?.  ?=(@ noun.sign)
+        ((slog 'invalid broadcast' ~) `this)
+      ?:  (gte `@dr`(sub now.bowl alive.state) ~s15)
+        :_  this
+        :~  [%pass /lick %arvo %l %shut /'groundseg.sock']
+        ==
       :_  this
-      :~  [%pass /lick %arvo %l %shut /'groundseg.sock']
+      :~  [%give %fact ~[/broadcast] %broadcast !>(`broadcast`noun.sign)]
       ==
-    :_  this
-    :~  [%give %fact ~[/broadcast] %broadcast !>(`broadcast`noun.sign)]
     ==
+      [%eyre %bind ~]
+    ?>  ?=(%bound +<.sign)
+    ?:  accepted.sign
+      ((slog 'groundseg roller proxy bound' ~) `this)
+    ((slog 'groundseg roller proxy bind failed' ~) `this)
+      [%roller-fetch @ @ ~]
+    =/  eid=@ta  i.t.wire
+    ?>  ?=([%iris %http-response *] sign)
+    =*  res  client-response.sign
+    =?  res  ?=(%progress -.res)
+      [%cancel ~]
+    ?:  ?=(%cancel -.res)
+      :_  this
+      %+  spout:http  eid
+      :-  [502 'x-groundseg-roller'^'cancelled' ~]
+      ~
+    ?>  ?=(%finished -.res)
+    :_  this
+    %+  spout:http  eid
+    :-  =,  response-header.res
+        :-  status-code
+        (snoc headers 'x-groundseg-roller'^'finished')
+    ?~  full-file.res  ~
+    `data.u.full-file.res
   ==
 ::
 ++  on-fail   on-fail:def

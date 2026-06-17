@@ -1,5 +1,7 @@
 import { get, writable } from 'svelte/store'
+import { URBIT_MODE } from './data'
 import { loadSession } from './gs-crypto'
+import { callPerigee } from './perigee-wasm'
 import { wsPort } from './websocket'
 
 const PENDING_KEY = 'groundseg:keys:pending'
@@ -22,7 +24,23 @@ const withToken = async payload => {
   return { ...payload, token }
 }
 
+const wasmMethods = {
+  '/keys/point': 'point',
+  '/keys/keyfile': 'keyfile',
+  '/keys/code': 'code',
+  '/keys/operation': 'operation',
+  '/keys/wallet/prepare': 'prepareWalletOperation',
+  '/keys/wallet/submit': 'submitWalletOperation'
+}
+
 export const keysRequest = async (path, payload = {}) => {
+  if (get(URBIT_MODE)) {
+    const method = wasmMethods[path]
+    if (!method) {
+      throw new Error(`Perigee WASM route unavailable: ${path}`)
+    }
+    return callPerigee(method, payload)
+  }
   const response = await fetch(`${apiBase()}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
