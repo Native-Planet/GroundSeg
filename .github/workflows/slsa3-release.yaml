@@ -97,7 +97,12 @@ jobs:
           mkdir -p /tmp/groundseg/version/wasm
           cd /tmp/perigee
           GOOS=js GOARCH=wasm go build -o /tmp/groundseg/version/wasm/perigee.wasm ./wasm
-          cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" /tmp/groundseg/version/wasm/wasm_exec.js
+          wasm_exec="$(go env GOROOT)/lib/wasm/wasm_exec.js"
+          if [ ! -f "$wasm_exec" ]; then
+            wasm_exec="$(go env GOROOT)/misc/wasm/wasm_exec.js"
+          fi
+          test -f "$wasm_exec"
+          cp "$wasm_exec" /tmp/groundseg/version/wasm/wasm_exec.js
           sha256sum /tmp/groundseg/version/wasm/perigee.wasm /tmp/groundseg/version/wasm/wasm_exec.js
       
       - name: Build Frontend

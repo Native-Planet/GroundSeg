@@ -1,4 +1,4 @@
-FROM node:23.6.0-bullseye-slim
+FROM node:24-bullseye-slim
 ARG GS_PERIGEE_WASM_URL=https://files.native.computer/wasm/perigee.wasm
 ARG GS_PERIGEE_WASM_EXEC_URL=https://files.native.computer/wasm/wasm_exec.js
 ENV GS_URBIT_MODE true
