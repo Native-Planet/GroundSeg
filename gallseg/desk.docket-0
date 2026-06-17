@@ -2,10 +2,10 @@
   title+'GroundSeg'
   info+'GroundSeg Wrapper'
   color+0x2c.3a2e
-  version+[1 0 0]
+  version+[2 7 2]
   website+'https://nativeplanet.io'
   license+'MIT'
   base+'groundseg'
   image+'https://files.native.computer/groundseg-logo-2.svg'
-glob-http+['gallseg-edge-2.4.6-rc0-0v3.2r5a0.o6gth.t28ur.02sbk.ed27r.glob' 0v3.2r5a0.o6gth.t28ur.02sbk.ed27r]
+  glob-http+['https://files.native.computer/glob/gallseg-edge-2.7.2-rc5-0v1.kpmbk.4v4t8.mnpmr.n7jcq.44sij.glob' 0v1.kpmbk.4v4t8.mnpmr.n7jcq.44sij]
 ==

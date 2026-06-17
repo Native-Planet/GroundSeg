@@ -1,5 +1,8 @@
 cd ./ui
-DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
+DOCKER_BUILDKIT=0 docker build \
+  --build-arg GS_PERIGEE_WASM_URL="${GS_PERIGEE_WASM_URL:-https://files.native.computer/wasm/perigee.wasm}" \
+  --build-arg GS_PERIGEE_WASM_EXEC_URL="${GS_PERIGEE_WASM_EXEC_URL:-https://files.native.computer/wasm/wasm_exec.js}" \
+  -t web-builder -f gallseg.Dockerfile .
 container_id=$(docker create web-builder)
 docker cp $container_id:/webui/build ./web
 curl https://bootstrap.urbit.org/globberv3.tgz | tar xzk

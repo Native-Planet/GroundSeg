@@ -16,7 +16,7 @@
     faXmark
   } from '@fortawesome/free-solid-svg-icons'
   import { structure } from '$lib/stores/data'
-  import { checkPatp, sigRemove } from '$lib/stores/patp'
+  import { checkPatp, patpFromNumber, sigRemove } from '$lib/stores/patp'
   import { bootShip } from '$lib/stores/websocket'
   import {
     addKeyPending,
@@ -109,7 +109,7 @@
   $: pointSpawn = point?.ownership?.spawnProxy?.address || ''
   $: pointLife = point?.network?.keys?.life || ''
   $: pointRift = point?.network?.rift || ''
-  $: pointSponsor = point?.network?.sponsor?.patp || ''
+  $: pointSponsor = isGalaxy(normalizedShip) ? '' : sponsorLabel(point?.network?.sponsor)
   $: credentialReady = credentialType === 'ticket'
     ? ticket.trim().length > 0
     : credentialType === 'private-key'
@@ -135,6 +135,37 @@
 
   function isMoon(patp) {
     return sigRemove(patp).split('-').length > 2
+  }
+
+  function isGalaxy(patp) {
+    const name = sigRemove(patp)
+    return name.length === 3 && !name.includes('-')
+  }
+
+  function displayShip(value) {
+    if (value === undefined || value === null || value === '') return ''
+    const text = String(value).trim()
+    if (!text) return ''
+    if (/^(0x[0-9a-f]+|[0-9]+)$/i.test(text)) {
+      const patp = patpFromNumber(text)
+      if (patp) return patp
+    }
+    return text.startsWith('~') ? text : `~${text}`
+  }
+
+  function sponsorLabel(sponsor) {
+    if (!sponsor || sponsor.has === false) return ''
+    if (typeof sponsor === 'string' || typeof sponsor === 'number') {
+      const text = String(sponsor).trim()
+      return text === '0' || /^0x0+$/i.test(text) ? '' : displayShip(sponsor)
+    }
+    if (sponsor.patp) return displayShip(sponsor.patp)
+    if (sponsor.ship) return displayShip(sponsor.ship)
+    if (sponsor.has !== true) {
+      const who = String(sponsor.who ?? '').trim()
+      if (who === '0' || /^0x0+$/i.test(who)) return ''
+    }
+    return displayShip(sponsor.who)
   }
 
   function randomSeed() {
@@ -367,11 +398,13 @@
           {/each}
         </div>
       </div>
-      {#if credentialType === 'wallet'}
-        <button class="btn secondary wallet-button" on:click={connectWallet} title={walletAddress}>
-          {walletAddress ? shortAddress(walletAddress) : 'CONNECT WALLET'}
-        </button>
-      {/if}
+      <div class="wallet-slot">
+        {#if credentialType === 'wallet'}
+          <button class="btn secondary wallet-button" on:click={connectWallet} title={walletAddress}>
+            {walletAddress ? shortAddress(walletAddress) : 'CONNECT WALLET'}
+          </button>
+        {/if}
+      </div>
       <datalist id="azimuth-ships">
         {#each localShips as patp}
           <option value={patp}></option>
@@ -489,15 +522,15 @@
         </div>
       {:else if activeSection === 'breach'}
         <div class="operation-body">
-          <div class="notice">
-            <span>EXPORT THE SHIP BEFORE BOOTING FROM BREACHED KEYS.</span>
-            {#if localShipExists}
+          {#if localShipExists}
+            <div class="notice">
+              <span>EXPORT THE SHIP BEFORE BOOTING FROM BREACHED KEYS.</span>
               <button class="btn secondary" on:click={exportShip}>
                 <Fa icon={faFileExport} size="1x" />
                 EXPORT
               </button>
-            {/if}
-          </div>
+            </div>
+          {/if}
           {#if credentialType !== 'ticket'}
             <details class="advanced seed-field">
               <summary>NETWORK KEY SEED</summary>

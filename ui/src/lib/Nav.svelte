@@ -9,10 +9,18 @@
   // Temp dev mode
   import DevToggle from '$lib/DevToggle.svelte'
 
-  $: registered = ($structure?.profile?.startram?.info?.registered) || false
-  $: running = ($structure?.profile?.startram?.info?.running) || false
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
   $: authLevel = ($structure?.auth_level) || "unauthorized"
+  $: hostShip = $URBIT_MODE && typeof window !== 'undefined' ? window.ship : ''
+  $: shipTabPath = $URBIT_MODE && hostShip ? `${pfx}/${hostShip}` : `${pfx}/`
+  $: shipTabLabel = $URBIT_MODE ? "SHIP" : "SHIPS"
+  $: routeId = $page.route.id || ""
+  $: shipTabCurrent = $URBIT_MODE
+    ? routeId == "/[patp]"
+    : routeId == (pfx+"/(home)")
+  $: keysTabCurrent = (routeId == "/apps") || (routeId == (pfx+"/apps"))
+  $: profileTabCurrent = (routeId == "/profile") || (routeId == (pfx+"/profile"))
+  $: systemTabCurrent = (routeId == "/system") || (routeId == (pfx+"/system"))
 
   const handleBack = () => {
     const bootExist = $page.route.id.includes("new")
@@ -27,7 +35,7 @@
 </script>
 
 <div class="wrapper {wide ? "wide" : "slim"}">
-  {#if ($page.route.id == '/[patp]') || ($page.route.id.includes('/boot'))}
+  {#if (!$URBIT_MODE && ($page.route.id == '/[patp]')) || ($page.route.id.includes('/boot'))}
     {#if authLevel == "authorized"}
       <div class="back" on:click={handleBack}></div>
     {/if}
@@ -38,37 +46,41 @@
           <div class="app-name">GROUNDSEG</div>
           <div class="app-version">{$version}</div>
         </div>
-        <SatelliteDish />
-        <DiskWarningIcon />
+        {#if !$URBIT_MODE}
+          <SatelliteDish />
+          <DiskWarningIcon />
+        {/if}
           <!--
         <DevToggle />
           -->
       </div>
       <div class="spacer"></div>
       <div
-        class:highlight={$page.route.id != (pfx+"/(home)")}
-        on:click={()=>goto(pfx+"/")}
+        class:highlight={!shipTabCurrent}
+        on:click={()=>goto(shipTabPath)}
         class="btn option"
-        >SHIPS
+        >{shipTabLabel}
       </div>
       <div
-        class:highlight={$page.route.id != (pfx+"/apps")}
+        class:highlight={!keysTabCurrent}
         on:click={()=>goto(pfx+"/apps")}
         class="btn option"
         >KEYS
       </div>
-      <div
-        class:highlight={$page.route.id != (pfx+"/profile")}
-        on:click={()=>goto(pfx+"/profile")}
-        class="btn option"
-        >PROFILE
-      </div>
-      <div
-        class:highlight={$page.route.id != (pfx+"/system")}
-        on:click={()=>goto(pfx+"/system")}
-        class="btn option"
-        >SYSTEM
-      </div>
+      {#if !$URBIT_MODE}
+        <div
+          class:highlight={!profileTabCurrent}
+          on:click={()=>goto(pfx+"/profile")}
+          class="btn option"
+          >PROFILE
+        </div>
+        <div
+          class:highlight={!systemTabCurrent}
+          on:click={()=>goto(pfx+"/system")}
+          class="btn option"
+          >SYSTEM
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

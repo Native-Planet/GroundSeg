@@ -80,6 +80,30 @@ jobs:
       glob: ${{ steps.fe.outputs.glob }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23.2'
+          cache: false
+
+      - name: Build Perigee WASM
+        env:
+          PERIGEE_WASM_REF: ${{ vars.PERIGEE_WASM_REF }}
+        run: |
+          set -euxo pipefail
+          ref="${PERIGEE_WASM_REF:-groundseg-wasm}"
+          git clone --depth 1 --branch "$ref" https://github.com/Native-Planet/perigee /tmp/perigee
+          mkdir -p /tmp/groundseg/version/wasm
+          cd /tmp/perigee
+          GOOS=js GOARCH=wasm go build -o /tmp/groundseg/version/wasm/perigee.wasm ./wasm
+          wasm_exec="$(go env GOROOT)/lib/wasm/wasm_exec.js"
+          if [ ! -f "$wasm_exec" ]; then
+            wasm_exec="$(go env GOROOT)/misc/wasm/wasm_exec.js"
+          fi
+          test -f "$wasm_exec"
+          cp "$wasm_exec" /tmp/groundseg/version/wasm/wasm_exec.js
+          sha256sum /tmp/groundseg/version/wasm/perigee.wasm /tmp/groundseg/version/wasm/wasm_exec.js
       
       - name: Build Frontend
         id: fe
@@ -113,6 +137,13 @@ jobs:
           path: |
             /tmp/groundseg/version/glob
 
+      - name: Upload Perigee WASM
+        uses: actions/upload-artifact@v4
+        with:
+          name: perigee-wasm
+          path: |
+            /tmp/groundseg/version/wasm
+
       - name: Upload web files
         uses: actions/upload-artifact@v4
         with:
@@ -139,7 +170,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.23.2'
+          go-version: '1.26.3'
           cache: false
             
       - name: Build binaries
@@ -250,6 +281,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: glob-output
+      - name: Download Perigee WASM
+        uses: actions/download-artifact@v4
+        with:
+          name: perigee-wasm
+          path: perigee-wasm
 
       - name: Deploy Files
         run: |
@@ -286,6 +322,15 @@ jobs:
               \"url\": \"https://files.native.computer/glob/${globfile}\"
             }" \
             https://glob.native.computer/update-glob
+          #
+          ### copy Perigee WASM into bucket
+          #
+          WASM_FILE=$(find perigee-wasm -type f -name perigee.wasm | head -n 1)
+          WASM_EXEC_FILE=$(find perigee-wasm -type f -name wasm_exec.js | head -n 1)
+          test -n "$WASM_FILE"
+          test -n "$WASM_EXEC_FILE"
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy "$WASM_FILE" r2:groundseg/wasm
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy "$WASM_EXEC_FILE" r2:groundseg/wasm
           #
           ### copy provenance into bucket
           #
@@ -387,6 +432,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: glob-output
+      - name: Download Perigee WASM
+        uses: actions/download-artifact@v4
+        with:
+          name: perigee-wasm
+          path: perigee-wasm
       - name: Upload glob to R2
         run: |
           mkdir -p ~/.config/rclone/
@@ -395,6 +445,12 @@ jobs:
           busybox unzip rclone.zip
           mv rclone-v*/rclone /usr/local/bin/
           chmod +x /usr/local/bin/rclone
+          WASM_FILE=$(find perigee-wasm -type f -name perigee.wasm | head -n 1)
+          WASM_EXEC_FILE=$(find perigee-wasm -type f -name wasm_exec.js | head -n 1)
+          test -n "$WASM_FILE"
+          test -n "$WASM_EXEC_FILE"
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy "$WASM_FILE" r2:groundseg/wasm
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy "$WASM_EXEC_FILE" r2:groundseg/wasm
           globfile=$(ls *.glob)
           rclone -vvv --config ~/.config/rclone/rclone.conf copy ${globfile} r2:groundseg/glob
           curl -X POST -w "%{http_code}" \

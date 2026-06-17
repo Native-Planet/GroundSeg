@@ -1,4 +1,4 @@
-FROM node:23.6.0-bullseye-slim
+FROM node:24-bullseye-slim
 ARG GS_VERSION
 ENV GS_VERSION=$GS_VERSION
 RUN npm install -g npm@9
