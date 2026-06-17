@@ -75,7 +75,7 @@
       %handle-http-request
     =+  !<(order:http vase)
     =+  (purse:http url.request)
-    ?.  ?=([%~groundseg %roller *] site)
+    ?.  ?=([%'~groundseg' %roller *] site)
       :_  this
       %^  spout:http  id
         [404 ~]
