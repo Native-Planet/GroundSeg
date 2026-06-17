@@ -15,6 +15,10 @@
 +*  this  .
     def   ~(. (default-agent this %.n) bowl)
 ::
+++  roller-bind
+  ^-  card
+  [%pass /eyre/bind %arvo %e %connect [~ /~groundseg/roller] dap.bowl]
+::
 ++  roller-target
   |=  headers=(list [@t @t])
   ^-  @t
@@ -45,7 +49,7 @@
 ++  on-init
   ^-  (quip card _this)
   :_  this
-  [%pass /eyre/bind %arvo %e %connect [~ /~groundseg/roller] dap.bowl]~
+  ~[roller-bind]
 ::  
 ++  on-save
   ^-  vase
@@ -54,10 +58,12 @@
 ++  on-load
   |=  old-state=vase
   ^-  (quip card _this)
-  =/  old  !<(versioned-state old-state)
-  ?-  -.old
-    %0  `this(state old)
-  ==
+  =/  old=state-0
+    =/  loaded  (mule |.(!<(state-0 old-state)))
+    ?:  ?=(%& -.loaded)  p.loaded
+    *state-0
+  :_  this(state old)
+  ~[roller-bind]
 ::
 ++  on-poke
   |=  [=mark =vase]
