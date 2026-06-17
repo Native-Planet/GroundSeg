@@ -145,8 +145,8 @@
   ^-  (quip card _this)
   |^
   ?+  wire
-    ?.  ?=([%lick %soak *] sign)  (on-arvo:def +<)
-    ?+    [mark noun]:sign        (on-arvo:def +<)
+    ?.  ?=([%lick %soak *] sign)  (on-arvo:def wire sign)
+    ?+    [mark noun]:sign        (on-arvo:def wire sign)
         [%connect ~]
       ((slog 'groundseg socket connected' ~) `this)
       ::
