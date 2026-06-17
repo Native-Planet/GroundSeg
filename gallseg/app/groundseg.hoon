@@ -15,69 +15,10 @@
 +*  this  .
     def   ~(. (default-agent this %.n) bowl)
 ::
-++  roller-bind
-  ^-  card
-  [%pass /eyre/bind %arvo %e %connect [~ /'~groundseg'/roller] dap.bowl]
-::
-++  roller-target
-  |=  headers=(list [@t @t])
-  ^-  @t
-  =/  target  (get-header:http 'x-groundseg-roller-url' headers)
-  ?~  target
-    'https://roller.urbit.org/v1/roller'
-  u.target
-::
-++  fetch-roller
-  |=  [eid=@ta req=inbound-request:eyre]
-  ^-  card
-  =/  request=request:http  request.req
-  =.  url.request  (roller-target header-list.request)
-  =.  header-list.request
-    %+  skip  header-list.request
-    |=  [k=@t @t]
-    ?|  =('cookie' k)
-        =('x-groundseg-roller-url' k)
-    ==
-  =.  header-list.request
-    =-  (set-header:http 'forwarded' - header-list.request)
-    %+  rap  3
-    :~  'for="groundseg";'
-        'proto='  ?:(secure.req 'https' 'http')
-    ==
-  [%pass /roller-fetch/[eid]/(scot %t url.request) %arvo %i %request request *outbound-config:iris]
-::
-++  give-http
-  |=  [eid=@ta =response-header:http data=(unit octs)]
-  ^-  (list card)
-  =/  =path  /http-response/[eid]
-  :~  [%give %fact ~[path] %http-response-header !>(response-header)]
-      [%give %fact ~[path] %http-response-data !>(data)]
-      [%give %kick ~[path] ~]
-  ==
-::
-++  give-status
-  |=  [eid=@ta status=@ud msg=@t]
-  ^-  (list card)
-  %^  give-http  eid
-    [status ~[['content-type' 'text/plain']]]
-  `(as-octs:mimes:html msg)
-::
-++  response-headers
-  |=  headers=(list [@t @t])
-  ^-  (list [@t @t])
-  =/  clean=(list [@t @t])
-    %+  skip  headers
-    |=  [key=@t value=@t]
-    ?|  =(key 'transfer-encoding')
-        =(key 'connection')
-    ==
-  %+  weld  clean
-  ~[['x-groundseg-roller' 'finished'] ['access-control-allow-origin' '*']]
-::
 ++  on-init
   ^-  (quip card _this)
   :_  this
-  ~[roller-bind]
+  ~[[%pass /eyre/bind %arvo %e %connect [~ /'~groundseg'/roller] dap.bowl]]
 ::  
 ++  on-save
   ^-  vase
@@ -91,7 +32,7 @@
     ?:  ?=(%& -.loaded)  p.loaded
     *state-0
   :_  this(state old)
-  ~[roller-bind]
+  ~[[%pass /eyre/bind %arvo %e %connect [~ /'~groundseg'/roller] dap.bowl]]
 ::
 ++  on-poke
   |=  [=mark =vase]
@@ -100,13 +41,7 @@
   ?>  =(src.bowl our.bowl)
   ?+    mark  (on-poke:def mark vase)
       %handle-http-request
-    =+  !<([eid=@ta req=inbound-request:eyre] vase)
-    ?:  =(%'OPTIONS' method.request.req)
-      :_  this
-      %^  give-http  eid
-        [204 ~[['access-control-allow-origin' '*'] ['access-control-allow-methods' 'POST, OPTIONS'] ['access-control-allow-headers' 'Content-Type, X-Groundseg-Roller-URL'] ['access-control-max-age' '3600']]]
-      ~
-    [[(fetch-roller eid req)]~ this]
+    (handle-http !<([@ta inbound-request:eyre] vase))
   ::  toggle lick port
       %port
     =^  cards  state
@@ -122,6 +57,16 @@
       (handle-heartbeat !<(@ vase))
     [cards this]
   ==
+  ::
+  ++  handle-http
+    |=  [eid=@ta req=inbound-request:eyre]
+    ^-  (quip card _this)
+    ?:  =(%'OPTIONS' method.request.req)
+      :_  this
+      %^  give-http  eid
+        [204 ~[['access-control-allow-origin' '*'] ['access-control-allow-methods' 'POST, OPTIONS'] ['access-control-allow-headers' 'Content-Type, X-Groundseg-Roller-URL'] ['access-control-max-age' '3600']]]
+      ~
+    [[(fetch-roller eid req)]~ this]
   ::
   ++  handle-port
     |=  open=?
@@ -142,6 +87,42 @@
     |=  b=@
     ^-  (quip card _state)
     `state(alive now.bowl)
+  ::
+  ++  roller-target
+    |=  headers=(list [@t @t])
+    ^-  @t
+    =/  target  (get-header:http 'x-groundseg-roller-url' headers)
+    ?~  target
+      'https://roller.urbit.org/v1/roller'
+    u.target
+  ::
+  ++  fetch-roller
+    |=  [eid=@ta req=inbound-request:eyre]
+    ^-  card
+    =/  request=request:http  request.req
+    =.  url.request  (roller-target header-list.request)
+    =.  header-list.request
+      %+  skip  header-list.request
+      |=  [k=@t @t]
+      ?|  =('cookie' k)
+          =('x-groundseg-roller-url' k)
+      ==
+    =.  header-list.request
+      =-  (set-header:http 'forwarded' - header-list.request)
+      %+  rap  3
+      :~  'for="groundseg";'
+          'proto='  ?:(secure.req 'https' 'http')
+      ==
+    [%pass /roller-fetch/[eid]/(scot %t url.request) %arvo %i %request request *outbound-config:iris]
+  ::
+  ++  give-http
+    |=  [eid=@ta =response-header:http data=(unit octs)]
+    ^-  (list card)
+    =/  =path  /http-response/[eid]
+    :~  [%give %fact ~[path] %http-response-header !>(response-header)]
+        [%give %fact ~[path] %http-response-data !>(data)]
+        [%give %kick ~[path] ~]
+    ==
   --
 ++  on-watch  ::  on-watch:def
   |=  =path
@@ -162,6 +143,7 @@
 ++  on-arvo
   |=  [=wire sign=sign-arvo]
   ^-  (quip card _this)
+  |^
   ?+  wire
     ?.  ?=([%lick %soak *] sign)  (on-arvo:def +<)
     ?+    [mark noun]:sign        (on-arvo:def +<)
@@ -206,6 +188,35 @@
     ?~  full-file.res  ~
     `data.u.full-file.res
   ==
+  ::
+  ++  give-http
+    |=  [eid=@ta =response-header:http data=(unit octs)]
+    ^-  (list card)
+    =/  =path  /http-response/[eid]
+    :~  [%give %fact ~[path] %http-response-header !>(response-header)]
+        [%give %fact ~[path] %http-response-data !>(data)]
+        [%give %kick ~[path] ~]
+    ==
+  ::
+  ++  give-status
+    |=  [eid=@ta status=@ud msg=@t]
+    ^-  (list card)
+    %^  give-http  eid
+      [status ~[['content-type' 'text/plain']]]
+    `(as-octs:mimes:html msg)
+  ::
+  ++  response-headers
+    |=  headers=(list [@t @t])
+    ^-  (list [@t @t])
+    =/  clean=(list [@t @t])
+      %+  skip  headers
+      |=  [key=@t value=@t]
+      ?|  =(key 'transfer-encoding')
+          =(key 'connection')
+      ==
+    %+  weld  clean
+    ~[['x-groundseg-roller' 'finished'] ['access-control-allow-origin' '*']]
+  --
 ::
 ++  on-fail   on-fail:def
 --
