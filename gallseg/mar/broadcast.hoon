@@ -8,7 +8,7 @@
   --
 ++  grab
   |%
-  ++  noun  broadcast
+  ++  noun  ^broadcast
   --
 ++  grad  %noun
 --
