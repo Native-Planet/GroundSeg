@@ -18,7 +18,7 @@
 ++  on-init
   ^-  (quip card _this)
   :_  this
-  ~[[%pass /eyre/bind %arvo %e %connect [~ /'~groundseg'/roller] dap.bowl]]
+  ~[[%pass /eyre/connect %arvo %e %connect [~ /'~groundseg'/roller] dap.bowl]]
 ::  
 ++  on-save
   ^-  vase
@@ -32,7 +32,7 @@
     ?:  ?=(%& -.loaded)  p.loaded
     *state-0
   :_  this(state old)
-  ~[[%pass /eyre/bind %arvo %e %connect [~ /'~groundseg'/roller] dap.bowl]]
+  ~[[%pass /eyre/connect %arvo %e %connect [~ /'~groundseg'/roller] dap.bowl]]
 ::
 ++  on-poke
   |=  [=mark =vase]
@@ -128,6 +128,8 @@
   |=  =path
   ^-  (quip card _this)
   ?+    path  (on-watch:def path)
+      [%http-response @ ~]
+    `this
       [%broadcast ~]
     :_  this(alive now.bowl)
     :~  
@@ -145,8 +147,8 @@
   ^-  (quip card _this)
   |^
   ?+  wire
-    ?.  ?=([%lick %soak *] sign)  (on-arvo:def wire sign)
-    ?+    [mark noun]:sign        (on-arvo:def wire sign)
+    ?.  ?=([%lick %soak *] sign)  `this
+    ?+    [mark noun]:sign        `this
         [%connect ~]
       ((slog 'groundseg socket connected' ~) `this)
       ::
@@ -167,7 +169,7 @@
       :~  [%give %fact ~[/broadcast] %broadcast !>(`broadcast`noun.sign)]
       ==
     ==
-      [%eyre %bind ~]
+      [%eyre %connect ~]
     ?>  ?=(%bound +<.sign)
     ?:  accepted.sign
       ((slog 'groundseg roller proxy bound' ~) `this)
