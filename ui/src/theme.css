@@ -1,53 +1,74 @@
-@font-face { font-family: 'BPdotsUnicase'; src: url("/font/BPdotsUnicaseBold.woff2") format('woff2'); }
-@font-face { font-family: Source; font-display: swap; src: url("/font/SourceCodeProRegular.woff2") format('woff2'); }
+@font-face {
+  font-family: 'BPdotsUnicase';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/font/BPdotsUnicaseBold.woff2") format('woff2');
+}
+
+@font-face {
+  font-family: Source;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/font/SourceCodeProRegular.woff2") format('woff2');
+}
+
+@font-face {
+  font-family: 'Source Code Pro';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/font/SourceCodeProRegular.woff2") format('woff2');
+}
 
 @font-face {
   font-family: Inter;
   font-style: normal;
   font-weight: 300;
   font-display: swap;
-  src: url("/font/InterLight.woff2") format('woff2');
-  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Light.woff2") format('woff2'); 
+  src: url("/font/InterLight.woff2") format('woff2'),
+       url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Light.woff2") format('woff2');
 }
 @font-face {
   font-family: Inter;
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/font/InterRegular.woff2") format('woff2');
-  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Regular.woff2") format('woff2'); 
+  src: url("/font/InterRegular.woff2") format('woff2'),
+       url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Regular.woff2") format('woff2');
  }
 @font-face {
   font-family: Inter;
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url("/font/InterMedium.woff2") format('woff2');
-  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Medium.woff2") format('woff2'); 
+  src: url("/font/InterMedium.woff2") format('woff2'),
+       url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Medium.woff2") format('woff2');
  }
 @font-face {
   font-family: Inter;
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url("/font/InterSemiBold.woff2") format('woff2');
-  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-SemiBold.woff2") format('woff2'); 
+  src: url("/font/InterSemiBold.woff2") format('woff2'),
+       url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-SemiBold.woff2") format('woff2');
  }
 @font-face {
   font-family: Inter;
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url("/font/InterBold.woff2") format('woff2');
-  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Bold.woff2") format('woff2'); 
+  src: url("/font/InterBold.woff2") format('woff2'),
+       url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Bold.woff2") format('woff2');
  }
 @font-face {
   font-family: Inter;
   font-style: normal;
   font-weight: 800;
   font-display: swap;
-  src: url("/font/InterExtraBold.woff2") format('woff2');
-  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-ExtraBold.woff2") format('woff2'); 
+  src: url("/font/InterExtraBold.woff2") format('woff2'),
+       url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-ExtraBold.woff2") format('woff2');
  }
 
 body {
@@ -59,9 +80,10 @@ body {
 }
 
 :root {
-  --log-font: Source;
-  --regular-font: Inter;
-  --title-font: BPdotsUnicase;
+  --mono-font: Source, 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  --log-font: var(--mono-font);
+  --regular-font: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --title-font: BPdotsUnicase, var(--mono-font);
   --bg-base: #E8E8E3CD;
   --bg-card: #161D17;
   --bg-modal: #DDE3DF;
@@ -76,4 +98,3 @@ body {
   --bg-boot-arrow: #ABBAAE;
   --locked-color: #A31708;
 }
-

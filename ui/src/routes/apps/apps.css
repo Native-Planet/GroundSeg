@@ -71,12 +71,15 @@ h2 {
 .wallet-status-row,
 .passphrase-field summary,
 .check-row,
-code,
-pre,
 .pending-status,
 .state-row span,
 .boot-row span,
 .advanced summary {
+  font-family: var(--title-font);
+}
+
+code,
+pre {
   font-family: var(--log-font);
 }
 
@@ -93,7 +96,7 @@ pre,
 
 .identity-row {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto minmax(360px, 440px) auto;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(360px, 440px) 180px;
   gap: 10px;
   align-items: center;
 }
@@ -212,8 +215,12 @@ select:focus {
   overflow-wrap: anywhere;
 }
 
+.wallet-slot {
+  min-width: 0;
+}
+
 .wallet-button {
-  max-width: 180px;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }

@@ -367,11 +367,13 @@
           {/each}
         </div>
       </div>
+      <div class="wallet-slot">
       {#if credentialType === 'wallet'}
         <button class="btn secondary wallet-button" on:click={connectWallet} title={walletAddress}>
           {walletAddress ? shortAddress(walletAddress) : 'CONNECT WALLET'}
         </button>
       {/if}
+      </div>
       <datalist id="azimuth-ships">
         {#each localShips as patp}
           <option value={patp}></option>

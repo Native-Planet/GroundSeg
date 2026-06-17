@@ -9,8 +9,6 @@
   // Temp dev mode
   import DevToggle from '$lib/DevToggle.svelte'
 
-  $: registered = ($structure?.profile?.startram?.info?.registered) || false
-  $: running = ($structure?.profile?.startram?.info?.running) || false
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
   $: authLevel = ($structure?.auth_level) || "unauthorized"
   $: hostShip = $URBIT_MODE && typeof window !== 'undefined' ? window.ship : ''
@@ -48,8 +46,10 @@
           <div class="app-name">GROUNDSEG</div>
           <div class="app-version">{$version}</div>
         </div>
-        <SatelliteDish />
-        <DiskWarningIcon />
+        {#if !$URBIT_MODE}
+          <SatelliteDish />
+          <DiskWarningIcon />
+        {/if}
           <!--
         <DevToggle />
           -->
@@ -67,18 +67,20 @@
         class="btn option"
         >KEYS
       </div>
-      <div
-        class:highlight={!profileTabCurrent}
-        on:click={()=>goto(pfx+"/profile")}
-        class="btn option"
-        >PROFILE
-      </div>
-      <div
-        class:highlight={!systemTabCurrent}
-        on:click={()=>goto(pfx+"/system")}
-        class="btn option"
-        >SYSTEM
-      </div>
+      {#if !$URBIT_MODE}
+        <div
+          class:highlight={!profileTabCurrent}
+          on:click={()=>goto(pfx+"/profile")}
+          class="btn option"
+          >PROFILE
+        </div>
+        <div
+          class:highlight={!systemTabCurrent}
+          on:click={()=>goto(pfx+"/system")}
+          class="btn option"
+          >SYSTEM
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
