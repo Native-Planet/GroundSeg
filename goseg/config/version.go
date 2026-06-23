@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"groundseg/defaults"
 	"groundseg/structs"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -48,7 +48,7 @@ func CheckVersion() (structs.Channel, bool) {
 			}
 		}
 		// read the body bytes
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
 			errmsg := fmt.Sprintf("Error reading version info: %v", err)
@@ -110,7 +110,7 @@ func CreateDefaultVersion() error {
 		return err
 	}
 	filePath := filepath.Join(BasePath, "settings", "version_info.json")
-	err = ioutil.WriteFile(filePath, prettyJSON, 0644)
+	err = os.WriteFile(filePath, prettyJSON, 0644)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func LocalVersion() structs.Version {
 			panic(errmsg)
 		}
 	}
-	file, err := ioutil.ReadFile(confPath)
+	file, err := os.ReadFile(confPath)
 	if err != nil {
 		errmsg := fmt.Sprintf("Unable to load version info: %v", err)
 		panic(errmsg)

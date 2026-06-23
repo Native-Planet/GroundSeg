@@ -7,7 +7,8 @@ import (
 	"groundseg/config"
 	"groundseg/defaults"
 	"groundseg/structs"
-	"io/ioutil"
+	"os"
+
 	"path/filepath"
 
 	"github.com/docker/docker/api/types/container"
@@ -132,7 +133,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 			scriptPath = filepath.Join(str, "start_urbit.sh")
 		}
 	}
-	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}

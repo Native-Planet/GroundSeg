@@ -9,7 +9,7 @@ import (
 	"groundseg/defaults"
 	"groundseg/dockerclient"
 	"groundseg/structs"
-	"io/ioutil"
+
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,7 +50,7 @@ func LoadUrbitConfig(pier string) error {
 	defer urbitMutex.Unlock()
 	// pull docker info from json
 	confPath := filepath.Join(BasePath, "settings", "pier", pier+".json")
-	file, err := ioutil.ReadFile(confPath)
+	file, err := os.ReadFile(confPath)
 	if err != nil {
 		return fmt.Errorf("Unable to load %s config: %w", pier, err)
 		// todo: write a new conf

@@ -9,7 +9,6 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -135,7 +134,7 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 		}
 		// Write content to the file
 		filePath := path + "/" + filename
-		if err := ioutil.WriteFile(filePath, []byte(key), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte(key), 0644); err != nil {
 			errmsg := fmt.Sprintf("Error writing to file: %v", err)
 			zap.L().Error(errmsg)
 			errorCleanup(patp, errmsg, customDrive)
@@ -191,7 +190,7 @@ func writeFirstBootArgs(patp string, customDrive string, encodedArgs string) err
 	if customDrive == "" {
 		return docker.WriteFileToVolume(patp, firstBootArgsFile, encodedArgs)
 	}
-	return ioutil.WriteFile(filepath.Join(customDrive, patp, firstBootArgsFile), []byte(encodedArgs), 0644)
+	return os.WriteFile(filepath.Join(customDrive, patp, firstBootArgsFile), []byte(encodedArgs), 0644)
 }
 
 func waitForShipReady(shipPayload structs.WsNewShipPayload, customDrive string) {

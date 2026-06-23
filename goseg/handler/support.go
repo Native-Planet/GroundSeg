@@ -137,7 +137,7 @@ func dumpDockerLogs(containerID string, path string) error {
 		return fmt.Errorf("Error dumping %v logs: %v", containerID, err)
 	}
 	defer existingLogs.Close()
-	allLogs, err := ioutil.ReadAll(existingLogs)
+	allLogs, err := io.ReadAll(existingLogs)
 	if err != nil {
 		return fmt.Errorf("Error reading logs: %v", err)
 	}
@@ -159,7 +159,7 @@ func dumpDockerLogs(containerID string, path string) error {
 		}
 		cleanedLogs.WriteString(string(line))
 	}
-	err = ioutil.WriteFile(path, []byte(cleanedLogs.String()), 0644)
+	err = os.WriteFile(path, []byte(cleanedLogs.String()), 0644)
 	if err != nil {
 		return fmt.Errorf("Error writing logs to file: %v", err)
 	}
@@ -170,7 +170,7 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 
 	// description.txt
 	descPath := filepath.Join(bugReportDir, "description.txt")
-	if err := ioutil.WriteFile(descPath, fmt.Appendf(nil, "Contact:\n%s\nDetails:\n%s", contact, description), 0644); err != nil {
+	if err := os.WriteFile(descPath, fmt.Appendf(nil, "Contact:\n%s\nDetails:\n%s", contact, description), 0644); err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't write details.txt"))
 		return err
 	}
@@ -304,7 +304,7 @@ func zipDir(directory, dest string) error {
 
 func sanitizeJSON(filePath string, keysToRemove ...string) error {
 	// Read the file
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
 	}
@@ -328,7 +328,7 @@ func sanitizeJSON(filePath string, keysToRemove ...string) error {
 	}
 
 	// Write back to the file
-	err = ioutil.WriteFile(filePath, sanitizedData, os.ModePerm)
+	err = os.WriteFile(filePath, sanitizedData, os.ModePerm)
 	if err != nil {
 		return err
 	}

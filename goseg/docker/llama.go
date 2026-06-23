@@ -5,7 +5,8 @@ import (
 	"groundseg/config"
 	"groundseg/defaults"
 	"groundseg/structs"
-	"io/ioutil"
+	"os"
+
 	"path/filepath"
 
 	"github.com/docker/docker/api/types/container"
@@ -64,7 +65,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v", err)
 	}
 	scriptPath := filepath.Join(config.DockerDir, apiContainerName+"_api", "_data", "run.sh")
-	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
 	var found *structs.Penpai

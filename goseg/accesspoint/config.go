@@ -2,7 +2,7 @@ package accesspoint
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"go.uber.org/zap"
 )
@@ -13,7 +13,7 @@ func writeHostapdConfig() error {
 		return err
 	}
 	// Write to file
-	err = ioutil.WriteFile(hostapdConfigPath, []byte(config), 0644)
+	err = os.WriteFile(hostapdConfigPath, []byte(config), 0644)
 	if err != nil {
 		return err
 	}
