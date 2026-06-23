@@ -43,9 +43,9 @@ func CheckVersionLoop() {
 }
 
 func callUpdater(releaseChannel string) {
+	currentChannelVersion := config.LocalVersion().Groundseg[releaseChannel]
 	// Get latest information
 	latestVersion, _ := config.CheckVersion()
-	currentChannelVersion := config.VersionInfo
 	latestChannelVersion := latestVersion
 	// check docker updates
 	if latestChannelVersion != currentChannelVersion {
@@ -277,7 +277,7 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 	typeOfVersion := valCurrent.Type()
 
 	for i := 0; i < valCurrent.NumField(); i++ {
-		sw := typeOfVersion.Field(i).Name
+		sw := strings.ToLower(typeOfVersion.Field(i).Name)
 		if sw != "groundseg" {
 			currentDetail := valCurrent.Field(i).Interface().(structs.VersionDetails)
 			latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)

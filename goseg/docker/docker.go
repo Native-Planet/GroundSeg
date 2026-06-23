@@ -303,6 +303,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	}
 	var imageInfo map[string]string
 	desiredImage := containerConfig.Image
+	desiredImageID := ""
 	if containerType == "minio" {
 		if desiredImage == "" {
 			return containerState, fmt.Errorf("empty image ref for %s", containerName)
@@ -322,6 +323,9 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		_, err = PullImageIfNotExist(desiredImage, imageInfo)
 		if err != nil {
 			return containerState, err
+		}
+		if desiredImageID, err = getLocalImageID(desiredImage, imageInfo); err != nil {
+			zap.L().Warn(fmt.Sprintf("Unable to inspect desired image %s: %v", desiredImage, err))
 		}
 	}
 	// check if container exists
@@ -376,7 +380,8 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if len(digestParts) > 1 {
 			currentDigest = digestParts[1]
 		}
-		if currentDigest != imageInfo["hash"] {
+		imageMatches := desiredImageID != "" && imageIDsEqual(existingContainer.ImageID, desiredImageID)
+		if !imageMatches && currentDigest != imageInfo["hash"] {
 			// if the hashes don't match, recreate the container with the new one
 			// for vere containers, gracefully stop with a 60s timeout before removing
 			if containerType == "vere" {
@@ -600,15 +605,12 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 		return false, err
 	}
 	defer cli.Close()
-	images, err := cli.ImageList(ctx, imagetypes.ListOptions{})
-	if err != nil {
-		return false, err
+
+	refs := imageRefCandidates(desiredImage, imageInfo)
+	if _, ok := inspectImageRefs(ctx, cli, refs); ok {
+		return true, nil
 	}
-	for _, img := range images {
-		if slices.Contains(img.RepoDigests, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"])) {
-			return true, nil
-		}
-	}
+
 	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), imagetypes.PullOptions{})
 	if err != nil {
 		return false, err
@@ -627,17 +629,8 @@ func PullImageByRef(imageRef string) error {
 	}
 	defer cli.Close()
 
-	images, err := cli.ImageList(ctx, imagetypes.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, img := range images {
-		if slices.Contains(img.RepoTags, imageRef) {
-			return nil
-		}
-		if slices.Contains(img.RepoDigests, imageRef) {
-			return nil
-		}
+	if _, ok := inspectImageRefs(ctx, cli, dockerHubRefAliases(imageRef)); ok {
+		return nil
 	}
 
 	resp, err := cli.ImagePull(ctx, imageRef, imagetypes.PullOptions{})
@@ -647,6 +640,85 @@ func PullImageByRef(imageRef string) error {
 	defer resp.Close()
 	_, _ = io.Copy(ioutil.Discard, resp)
 	return nil
+}
+
+func getLocalImageID(desiredImage string, imageInfo map[string]string) (string, error) {
+	ctx := context.Background()
+	cli, err := dockerclient.New()
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+	id, ok := inspectImageRefs(ctx, cli, imageRefCandidates(desiredImage, imageInfo))
+	if !ok {
+		return "", fmt.Errorf("image not found locally")
+	}
+	return id, nil
+}
+
+func inspectImageRefs(ctx context.Context, cli *client.Client, refs []string) (string, bool) {
+	for _, ref := range refs {
+		if ref == "" {
+			continue
+		}
+		img, _, err := cli.ImageInspectWithRaw(ctx, ref)
+		if err == nil {
+			return img.ID, true
+		}
+	}
+	return "", false
+}
+
+func imageRefCandidates(desiredImage string, imageInfo map[string]string) []string {
+	refs := dockerHubRefAliases(desiredImage)
+	repo := imageInfo["repo"]
+	tag := imageInfo["tag"]
+	hash := imageInfo["hash"]
+	for _, repoAlias := range dockerHubRepoAliases(repo) {
+		if hash != "" {
+			refs = appendUnique(refs, fmt.Sprintf("%s@sha256:%s", repoAlias, hash))
+			if tag != "" {
+				refs = appendUnique(refs, fmt.Sprintf("%s:%s@sha256:%s", repoAlias, tag, hash))
+			}
+		}
+		if tag != "" && hash == "" {
+			refs = appendUnique(refs, fmt.Sprintf("%s:%s", repoAlias, tag))
+		}
+	}
+	return refs
+}
+
+func dockerHubRefAliases(ref string) []string {
+	if ref == "" {
+		return nil
+	}
+	refs := []string{ref}
+	if strings.HasPrefix(ref, "registry.hub.docker.com/") {
+		trimmed := strings.TrimPrefix(ref, "registry.hub.docker.com/")
+		refs = appendUnique(refs, trimmed)
+		refs = appendUnique(refs, "docker.io/"+trimmed)
+	}
+	if strings.HasPrefix(ref, "docker.io/") {
+		trimmed := strings.TrimPrefix(ref, "docker.io/")
+		refs = appendUnique(refs, trimmed)
+		refs = appendUnique(refs, "registry.hub.docker.com/"+trimmed)
+	}
+	return refs
+}
+
+func dockerHubRepoAliases(repo string) []string {
+	return dockerHubRefAliases(repo)
+}
+
+func appendUnique(items []string, item string) []string {
+	if item == "" || slices.Contains(items, item) {
+		return items
+	}
+	return append(items, item)
+}
+
+func imageIDsEqual(a string, b string) bool {
+	return strings.TrimPrefix(a, "sha256:") == strings.TrimPrefix(b, "sha256:")
 }
 
 // looks for a container with the given name and returns it, or nil if not found
