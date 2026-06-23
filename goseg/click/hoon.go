@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker"
-	"io/ioutil"
+
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +19,7 @@ func createHoon(patp, file, hoon string) error {
 		}
 	}
 	hoonFile := filepath.Join(location, fmt.Sprintf("%s.hoon", file))
-	if err := ioutil.WriteFile(hoonFile, []byte(hoon), 0644); err != nil {
+	if err := os.WriteFile(hoonFile, []byte(hoon), 0644); err != nil {
 		return err
 	}
 	ClearLusCode(patp)

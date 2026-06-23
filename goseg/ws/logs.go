@@ -315,7 +315,7 @@ func writeLogStreamEvent(w http.ResponseWriter, data []byte) error {
 	if _, err := fmt.Fprint(w, "event: log\n"); err != nil {
 		return err
 	}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if _, err := fmt.Fprintf(w, "data: %s\n", line); err != nil {
 			return err
 		}

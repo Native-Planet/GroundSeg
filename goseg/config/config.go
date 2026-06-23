@@ -12,7 +12,6 @@ import (
 	"groundseg/structs"
 	"groundseg/system"
 	"io"
-	"io/ioutil"
 	"maps"
 	"math/rand"
 	"net"
@@ -100,7 +99,7 @@ func init() {
 		keyfile, err := os.Stat(keyPath)
 		if err != nil || keyfile.Size() == 0 {
 			keyContent := RandString(32)
-			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+			if err := os.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
 			}
 		}
@@ -159,7 +158,7 @@ func init() {
 		keyfile, err := os.Stat(keyPath)
 		if err != nil || keyfile.Size() == 0 {
 			keyContent := RandString(32)
-			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+			if err := os.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
 			}
 		}
@@ -282,7 +281,7 @@ func UpdateConf(values map[string]any) error {
 	// mutex lock to avoid race conditions
 	confMutex.Lock()
 	defer confMutex.Unlock()
-	file, err := ioutil.ReadFile(confPath)
+	file, err := os.ReadFile(confPath)
 	if err != nil {
 		return fmt.Errorf("Unable to load config: %v", err)
 	}

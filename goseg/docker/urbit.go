@@ -7,7 +7,8 @@ import (
 	"groundseg/config"
 	"groundseg/defaults"
 	"groundseg/structs"
-	"io/ioutil"
+	"os"
+
 	"path/filepath"
 
 	"github.com/docker/docker/api/types/container"
@@ -117,29 +118,13 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	default:
 		return containerConfig, hostConfig, fmt.Errorf("Unknown action: %s", act)
 	}
-	// reset ship status to boot for next time
-	switch act {
-	case "pack", "meld", "chop", "rollchop", "noboot":
-		// we'll set this to noboot because we want to manually control the boot
-		// status the next time handler (or other modules) decides to call this func
-		updateUrbitConf := shipConf
-		updateUrbitConf.BootStatus = "noboot"
-		newConfig := make(map[string]structs.UrbitDocker)
-		newConfig[containerName] = updateUrbitConf
-		err = config.UpdateUrbitConfig(newConfig)
-		if err != nil {
-			zap.L().Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
-		}
-	default:
-		// set everything else back to boot
-		updateUrbitConf := shipConf
-		updateUrbitConf.BootStatus = "boot"
-		newConfig := make(map[string]structs.UrbitDocker)
-		newConfig[containerName] = updateUrbitConf
-		err = config.UpdateUrbitConfig(newConfig)
-		if err != nil {
-			zap.L().Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
-		}
+	updateUrbitConf := shipConf
+	updateUrbitConf.BootStatus = PersistentBootStatusAfterContainerBuild(act)
+	newConfig := make(map[string]structs.UrbitDocker)
+	newConfig[containerName] = updateUrbitConf
+	err = config.UpdateUrbitConfig(newConfig)
+	if err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
 	}
 	// write the script
 	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", "start_urbit.sh")
@@ -148,7 +133,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 			scriptPath = filepath.Join(str, "start_urbit.sh")
 		}
 	}
-	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}

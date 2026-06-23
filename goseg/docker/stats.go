@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"groundseg/dockerclient"
 	"groundseg/structs"
-	"io/ioutil"
+	"io"
+
 	"os"
 	"path/filepath"
 	"time"
@@ -67,7 +68,7 @@ func getMemoryUsage(containerID string) uint64 {
 	}
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to read container stats: %v", err))
 		return 0

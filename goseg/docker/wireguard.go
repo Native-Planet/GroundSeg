@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/dockerclient"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -115,7 +114,7 @@ func WriteWgConf() error {
 	}
 	filePath := wireguardHostConfigPath()
 	if filePath != "" {
-		existingConf, err := ioutil.ReadFile(filePath)
+		existingConf, err := os.ReadFile(filePath)
 		switch {
 		case err == nil && string(existingConf) == newConf:
 			return nil
@@ -148,7 +147,7 @@ func writeWgConfToFile(filePath string, content string) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filePath, []byte(content), 0644)
+	return os.WriteFile(filePath, []byte(content), 0644)
 }
 
 func wgConfTarStream(fileName string, content string) (*bytes.Buffer, error) {

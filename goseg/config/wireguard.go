@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"groundseg/defaults"
 	"groundseg/structs"
-	"io/ioutil"
+	"io"
+
 	"os"
 	"path/filepath"
 
@@ -24,7 +25,7 @@ func GetWgConf() (structs.WgConfig, error) {
 	defer configFile.Close()
 
 	// Read file contents into byte slice
-	byteValue, _ := ioutil.ReadAll(configFile)
+	byteValue, _ := io.ReadAll(configFile)
 
 	if err := json.Unmarshal(byteValue, &wgConf); err != nil {
 		return wgConf, err

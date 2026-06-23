@@ -123,14 +123,14 @@ func GetTemp() float64 {
 	for _, hwmon := range hwmons {
 		path := filepath.Join(basePath, hwmon.Name())
 		devicePath := filepath.Join(path, "name")
-		device, err := ioutil.ReadFile(devicePath)
+		device, err := os.ReadFile(devicePath)
 		if err != nil {
 			continue
 		}
 		if strings.Contains(strings.ToLower(string(device)), "coretemp") {
 			tempInputs, _ := filepath.Glob(filepath.Join(path, "temp*_input"))
 			for _, tempInput := range tempInputs {
-				temp, err := ioutil.ReadFile(tempInput)
+				temp, err := os.ReadFile(tempInput)
 				if err != nil {
 					zap.L().Warn(fmt.Sprintf("Error reading temperature from %s: %v\n", tempInput, err))
 					continue
@@ -169,7 +169,7 @@ func FixerScript(basePath string) error {
 		fixer := filepath.Join(basePath, "fixer.sh")
 		if _, err := os.Stat(fixer); os.IsNotExist(err) {
 			zap.L().Info("Fixer script not detected, creating")
-			err := ioutil.WriteFile(fixer, []byte(defaults.Fixer), 0755)
+			err := os.WriteFile(fixer, []byte(defaults.Fixer), 0755)
 			if err != nil {
 				return err
 			}
@@ -199,7 +199,7 @@ func cronExists(fixerPath string) bool {
 }
 
 func addCron(job string) error {
-	tmpfile, err := ioutil.TempFile("", "cron")
+	tmpfile, err := os.CreateTemp("", "cron")
 	if err != nil {
 		return err
 	}

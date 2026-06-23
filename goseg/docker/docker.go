@@ -9,6 +9,7 @@ import (
 	"groundseg/structs"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -246,7 +247,7 @@ func WriteFileToVolume(name string, file string, content string) error {
 	// Get volume directory path
 	fullPath := filepath.Join(vol.Mountpoint, file)
 	// Write to file
-	err = ioutil.WriteFile(fullPath, []byte(content), 0644)
+	err = os.WriteFile(fullPath, []byte(content), 0644)
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to write to volume: %v : %v", name, err)
 		return errmsg
@@ -693,13 +694,13 @@ func dockerHubRefAliases(ref string) []string {
 		return nil
 	}
 	refs := []string{ref}
-	if strings.HasPrefix(ref, "registry.hub.docker.com/") {
-		trimmed := strings.TrimPrefix(ref, "registry.hub.docker.com/")
+	if after, ok := strings.CutPrefix(ref, "registry.hub.docker.com/"); ok {
+		trimmed := after
 		refs = appendUnique(refs, trimmed)
 		refs = appendUnique(refs, "docker.io/"+trimmed)
 	}
-	if strings.HasPrefix(ref, "docker.io/") {
-		trimmed := strings.TrimPrefix(ref, "docker.io/")
+	if after, ok := strings.CutPrefix(ref, "docker.io/"); ok {
+		trimmed := after
 		refs = appendUnique(refs, trimmed)
 		refs = appendUnique(refs, "registry.hub.docker.com/"+trimmed)
 	}
@@ -795,7 +796,7 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 
 	// Read the output
 	//stdout, err := ioutil.ReadAll(hijackedResp.Reader)
-	output, err := ioutil.ReadAll(hijackedResp.Reader)
+	output, err := io.ReadAll(hijackedResp.Reader)
 	if err != nil {
 		return "", err
 	}

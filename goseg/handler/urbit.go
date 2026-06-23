@@ -203,6 +203,13 @@ func WaitComplete(patp string) {
 	}
 }
 
+func updateDesiredContainerStatus(patp, desiredStatus string) {
+	if containerState, exists := config.GetContainerState()[patp]; exists {
+		containerState.DesiredStatus = desiredStatus
+		config.UpdateContainerState(patp, containerState)
+	}
+}
+
 func urbitCleanDelete(patp string) error {
 	getShipRunningStatus := func(patp string) (string, error) {
 		statuses, err := docker.GetShipStatus([]string{patp})
@@ -507,11 +514,9 @@ func packPier(patp string, shipConf structs.UrbitDocker) error {
 	}
 	// set last meld
 	now := time.Now().Unix()
-	shipConf.MeldLast = strconv.FormatInt(now, 10)
-	update := make(map[string]structs.UrbitDocker)
-	update[patp] = shipConf
-	err = config.UpdateUrbitConfig(update)
-	if err != nil {
+	if err := config.UpdateUrbitConfigForPier(patp, func(shipConf *structs.UrbitDocker) {
+		shipConf.MeldLast = strconv.FormatInt(now, 10)
+	}); err != nil {
 		return packError(fmt.Errorf("Failed to update %s urbit config with last meld time: %v", patp, err))
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
@@ -860,6 +865,10 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 	defer func() {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 	}()
+	if err := config.LoadUrbitConfig(patp); err != nil {
+		return fmt.Errorf("Failed to load fresh urbit config for %s: %v", patp, err)
+	}
+	shipConf = config.UrbitConf(patp)
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
 		return fmt.Errorf("Failed to get ship status for %s: %v", patp, err)
@@ -869,28 +878,25 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 		return fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp)
 	}
 	isRunning := strings.Contains(status, "Up")
-	update := make(map[string]structs.UrbitDocker)
-	if shipConf.BootStatus == "noboot" {
-		shipConf.BootStatus = "boot"
+	transition, err := docker.PlanPowerTransition(shipConf.BootStatus, isRunning)
+	if err != nil {
+		return fmt.Errorf("Couldn't toggle power for %s: %v", patp, err)
+	}
+	if transition.UpdateBootStatus {
+		if docker.IsMaintenanceBootStatus(shipConf.BootStatus) && !isRunning {
+			zap.L().Warn(fmt.Sprintf("Recovering stale maintenance boot status %s for %s", shipConf.BootStatus, patp))
+		}
+		shipConf.BootStatus = transition.BootStatus
+		update := make(map[string]structs.UrbitDocker)
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
-		_, err := docker.StartContainer(patp, "vere")
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
-		}
-	} else if shipConf.BootStatus == "boot" && isRunning {
-		// set DesiredStatus before stopping to prevent auto-restart from die/stop event handlers
-		if containerState, exists := config.GetContainerState()[patp]; exists {
-			containerState.DesiredStatus = "stopped"
-			config.UpdateContainerState(patp, containerState)
-		}
-		shipConf.BootStatus = "noboot"
-		update[patp] = shipConf
-		if err := config.UpdateUrbitConfig(update); err != nil {
-			return fmt.Errorf("Couldn't update urbit config: %v", err)
-		}
+	}
+	if transition.DesiredStatus != "" {
+		updateDesiredContainerStatus(patp, transition.DesiredStatus)
+	}
+	if transition.Stop {
 		err := click.BarExit(patp)
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
@@ -898,11 +904,13 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 				zap.L().Error(fmt.Sprintf("%v", err))
 			}
 		}
-	} else if shipConf.BootStatus == "boot" && !isRunning {
-		_, err := docker.StartContainer(patp, "vere")
+	}
+	if transition.Start {
+		info, err := docker.StartContainer(patp, "vere")
 		if err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
+			return fmt.Errorf("Failed to start %s: %v", patp, err)
 		}
+		config.UpdateContainerState(patp, info)
 	}
 	return nil
 }

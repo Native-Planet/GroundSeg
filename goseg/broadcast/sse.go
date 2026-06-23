@@ -304,7 +304,7 @@ func writeStreamEvent(w io.Writer, event streamEvent) error {
 			return err
 		}
 	}
-	for _, line := range strings.Split(string(event.Data), "\n") {
+	for line := range strings.SplitSeq(string(event.Data), "\n") {
 		if _, err := fmt.Fprintf(w, "data: %s\n", line); err != nil {
 			return err
 		}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/dockerclient"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -100,7 +99,7 @@ func netdataContainerConf() (container.Config, container.HostConfig, error) {
 func WriteNDConf() error {
 	newConf := "[plugins]\n     apps = no\n"
 	filePath := filepath.Join(config.DockerDir, "netdataconfig", "_data", "netdata.conf")
-	existingConf, err := ioutil.ReadFile(filePath)
+	existingConf, err := os.ReadFile(filePath)
 	if err != nil {
 		// assume it doesn't exist, so write the current config
 		zap.L().Info("Creating ND config")
@@ -117,7 +116,7 @@ func WriteNDConf() error {
 // either write directly or create volumes
 func writeNDConfToFile(filePath string, content string) error {
 	// try writing
-	err := ioutil.WriteFile(filePath, []byte(content), 0644)
+	err := os.WriteFile(filePath, []byte(content), 0644)
 	if err == nil {
 		return nil
 	}
@@ -127,7 +126,7 @@ func writeNDConfToFile(filePath string, content string) error {
 		return err
 	}
 	// try writing again
-	err = ioutil.WriteFile(filePath, []byte(content), 0644)
+	err = os.WriteFile(filePath, []byte(content), 0644)
 	if err != nil {
 		err = copyNDFileToVolume(filePath, "/etc/netdata/", "netdata")
 		// otherwise create the volume

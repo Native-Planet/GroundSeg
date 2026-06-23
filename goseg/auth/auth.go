@@ -43,9 +43,9 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/structs"
-	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -393,7 +393,7 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 
 // encrypt the token contents using stored keyfile val
 func KeyfileEncrypt(contents map[string]string, keyStr string) (string, error) {
-	fileBytes, err := ioutil.ReadFile(keyStr)
+	fileBytes, err := os.ReadFile(keyStr)
 	if err != nil {
 		return "", err
 	}
@@ -413,7 +413,7 @@ func KeyfileEncrypt(contents map[string]string, keyStr string) (string, error) {
 }
 
 func KeyfileDecrypt(tokenStr string, keyStr string) (map[string]string, error) {
-	fileBytes, err := ioutil.ReadFile(keyStr)
+	fileBytes, err := os.ReadFile(keyStr)
 	if err != nil {
 		return nil, err
 	}
