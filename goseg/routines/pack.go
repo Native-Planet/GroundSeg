@@ -259,11 +259,9 @@ func setScheduledPackTimer(patp string, delay time.Duration) {
 	}
 	// set last meld
 	now := time.Now().Unix()
-	shipConf.MeldLast = strconv.FormatInt(now, 10)
-	update := make(map[string]structs.UrbitDocker)
-	update[patp] = shipConf
-	err = config.UpdateUrbitConfig(update)
-	if err != nil {
+	if err := config.UpdateUrbitConfigForPier(patp, func(shipConf *structs.UrbitDocker) {
+		shipConf.MeldLast = strconv.FormatInt(now, 10)
+	}); err != nil {
 		packError(fmt.Errorf("Failed to update %s urbit config with last meld time: %v", patp, err))
 		return
 	}

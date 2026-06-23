@@ -129,6 +129,15 @@ func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
 	return nil
 }
 
+func UpdateUrbitConfigForPier(pier string, mutate func(*structs.UrbitDocker)) error {
+	if err := LoadUrbitConfig(pier); err != nil {
+		return err
+	}
+	urbConf := UrbitConf(pier)
+	mutate(&urbConf)
+	return UpdateUrbitConfig(map[string]structs.UrbitDocker{pier: urbConf})
+}
+
 func getImageTagByContainerName(containerName string) (string, error) {
 	ctx := context.Background()
 
