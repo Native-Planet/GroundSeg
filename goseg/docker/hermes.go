@@ -367,6 +367,11 @@ cp /opt/data/.env /workspace/.env
 chmod 600 /workspace/.env
 echo "Hermes Tlon runtime files: env=/opt/data/.env workspace_env=/workspace/.env config=$config_file"
 echo "Hermes Tlon CLI: ${TLON_CLI:-tlon} ($(command -v "${TLON_CLI:-tlon}" || true))"
+if ! "${TLON_CLI:-tlon}" --help >/dev/null 2>&1; then
+  echo "ERROR: tlon CLI failed its startup smoke check" >&2
+  "${TLON_CLI:-tlon}" --help >/dev/null
+  exit 1
+fi
 exec hermes gateway run --replace --accept-hooks`,
 		hermesConfigYAML(hermesConf),
 	)

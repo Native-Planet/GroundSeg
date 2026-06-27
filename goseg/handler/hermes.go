@@ -321,28 +321,6 @@ func recreateHermesContainer() error {
 	return nil
 }
 
-func restartHermesContainer() error {
-	if _, err := docker.FindContainer(docker.HermesContainerName); err != nil {
-		zap.L().Warn(fmt.Sprintf("Hermes container missing during restart, creating a new one: %v", err))
-		return recreateHermesContainer()
-	}
-	zap.L().Info("Restarting Hermes container")
-	if err := docker.RestartContainerByName(docker.HermesContainerName); err != nil {
-		return fmt.Errorf("couldn't restart Hermes: %v", err)
-	}
-	if info, err := docker.FindContainer(docker.HermesContainerName); err == nil && info != nil {
-		config.UpdateContainerState(docker.HermesContainerName, structs.ContainerState{
-			ID:           info.ID,
-			Name:         docker.HermesContainerName,
-			Image:        info.Image,
-			Type:         "hermes",
-			ActualStatus: info.State,
-		})
-	}
-	zap.L().Info("Hermes container restarted")
-	return nil
-}
-
 func restartHermesForShipIfEnabled(patp string) {
 	if err := config.LoadHermesConfig(); err != nil {
 		zap.L().Warn(fmt.Sprintf("Unable to load Hermes config for ship restart check: %v", err))

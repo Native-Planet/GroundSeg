@@ -39,6 +39,12 @@ if [ ! -x "$TLON_CLI" ]; then
   exit 1
 fi
 
+if ! "$TLON_CLI" --help >/dev/null 2>&1; then
+  echo "ERROR: tlon CLI failed its startup smoke check" >&2
+  "$TLON_CLI" --help >/dev/null
+  exit 1
+fi
+
 mkdir -p "$HERMES_HOME/plugins/platforms" "$HERMES_HOME/logs" "$HERMES_HOME/memories" "$HERMES_WORKSPACE" "$HERMES_CONTAINER_HOME"
 ln -sfn "$TLON_ADAPTER_DIR" "$HERMES_HOME/plugins/platforms/tlon"
 
