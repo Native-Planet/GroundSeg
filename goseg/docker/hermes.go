@@ -6,6 +6,7 @@ import (
 	"groundseg/structs"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -18,6 +19,7 @@ const (
 	HermesContainerName             = "hermes"
 	HermesDataVolumeName            = "hermes"
 	HermesWorkspaceVolumeName       = "hermes_workspace"
+	HermesUrbitHostName             = "groundseg-urbit.local"
 	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
@@ -28,6 +30,11 @@ const (
 	DefaultHermesDashboardHostPort  = 19119
 	HermesDashboardContainerPort    = 9119
 )
+
+type hermesShipTarget struct {
+	URL        string
+	ExtraHosts []string
+}
 
 func HermesImageOrDefault(image string) string {
 	if image = strings.TrimSpace(image); image != "" {
@@ -183,18 +190,25 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		return containerConfig, hostConfig, err
 	}
 	shipConf := config.UrbitConf(patp)
-	shipURL, err := hermesShipURL(shipConf)
+	shipTarget, err := hermesShipTargetForContainer(shipConf)
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
+	shipURL := shipTarget.URL
+	attachedShipBare := strings.TrimPrefix(attachedShip, "~")
 	environment := []string{
 		"HERMES_HOME=/opt/data",
 		"HERMES_WORKSPACE=/workspace",
+		"HERMES_WORKSPACE_DIR=/workspace",
 		"HERMES_CONTAINER_HOME=/workspace/home",
+		"HERMES_INTERACTIVE=true",
+		"HERMES_GATEWAY_SESSION=true",
+		"HERMES_EXEC_ASK=true",
 		"HOME=/workspace/home",
 		"HERMES_DASHBOARD=1",
 		"HERMES_DASHBOARD_HOST=0.0.0.0",
 		fmt.Sprintf("HERMES_DASHBOARD_PORT=%d", HermesDashboardContainerPort),
+		fmt.Sprintf("HERMES_INFERENCE_PROVIDER=%s", HermesModelProviderOrDefault(hermesConf.ModelProvider)),
 		fmt.Sprintf("HERMES_MODEL_PROVIDER=%s", HermesModelProviderOrDefault(hermesConf.ModelProvider)),
 		fmt.Sprintf("HERMES_MODEL=%s", HermesModelOrDefault(hermesConf.Model)),
 		fmt.Sprintf("HERMES_AGENT_VERSION=%s", HermesVersionOrDefault(hermesConf.HermesVersion)),
@@ -202,7 +216,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		fmt.Sprintf("HERMES_TLON_ADAPTER_VERSION=%s", HermesTlonAdapterVersionOrDefault(hermesConf.TlonAdapterVersion)),
 		fmt.Sprintf("HERMES_TLON_ADAPTER_REF=%s", HermesTlonAdapterRefOrDefault(hermesConf.TlonAdapterRef)),
 		"TLON_TELEMETRY=false",
-		"HERMES_TLON_TOOLSET=hermes-tlon",
+		"HERMES_TLON_TOOLSETS=tlon,file,cronjob",
 		"TERMINAL_ENV=local",
 		"TERMINAL_CWD=/workspace",
 		"TERMINAL_LOCAL_PERSISTENT=true",
@@ -210,27 +224,33 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		"TERMINAL_MAX_FOREGROUND_TIMEOUT=900",
 		"TLON_SKILL_PATH=/opt/tlon-apps/packages/tlon-skill/SKILL.md",
 		"TLON_CLI=/usr/local/bin/tlon",
-		"TLON_HOSTING=true",
 		fmt.Sprintf("TLON_NODE_URL=%s", shipURL),
 		fmt.Sprintf("TLON_NODE_ID=%s", attachedShip),
 		fmt.Sprintf("TLON_ACCESS_CODE=%s", accessCode),
+		fmt.Sprintf("TLON_OWNER=%s", owner),
 		fmt.Sprintf("TLON_OWNER_SHIP=%s", owner),
+		fmt.Sprintf("TLON_OWNER_URL=%s", shipURL),
 		fmt.Sprintf("TLON_HOME_CHANNEL=%s", owner),
 		fmt.Sprintf("TLON_ALLOWED_USERS=%s", owner),
 		fmt.Sprintf("TLON_DM_ALLOWLIST=%s", owner),
 		fmt.Sprintf("TLON_DEFAULT_AUTHORIZED_SHIPS=%s", owner),
+		fmt.Sprintf("TLON_GROUP_INVITE_ALLOWLIST=%s", owner),
+		"TLON_CHANNEL_RULES={}",
 		"TLON_AUTO_DISCOVER=true",
 		"TLON_AUTO_ACCEPT_DM_INVITES=true",
 		"TLON_AUTO_ACCEPT_GROUP_INVITES=true",
 		"TLON_ALLOW_ALL_USERS=false",
 		"TLON_DM_POLL_ENABLED=true",
+		"TLON_OWNER_LISTEN=true",
 		"TLON_OWNER_LISTEN_ENABLED=true",
+		"TLON_REQUIRE_MENTION=true",
+		"TLON_MAX_CONSECUTIVE_BOT_RESPONSES=2",
 		fmt.Sprintf("URBIT_URL=%s", shipURL),
 		fmt.Sprintf("URBIT_SHIP=%s", attachedShip),
 		fmt.Sprintf("URBIT_CODE=%s", accessCode),
 		fmt.Sprintf("TLON_URL=%s", shipURL),
 		fmt.Sprintf("TLON_CODE=%s", accessCode),
-		fmt.Sprintf("TLON_SHIP=%s", attachedShip),
+		fmt.Sprintf("TLON_SHIP=%s", attachedShipBare),
 		fmt.Sprintf("TLON_SHIP_URL=%s", shipURL),
 		fmt.Sprintf("TLON_SHIP_NAME=%s", attachedShip),
 		fmt.Sprintf("TLON_SHIP_CODE=%s", accessCode),
@@ -250,12 +270,12 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 	containerConfig = container.Config{
 		Image:        HermesImageOrDefault(hermesConf.Image),
 		Env:          environment,
-		Cmd:          []string{"gateway", "run", "--replace", "--accept-hooks"},
+		Cmd:          []string{"sh", "-lc", hermesGatewayCommand(hermesConf)},
 		ExposedPorts: nat.PortSet{dashboardPort: struct{}{}},
 	}
 	hostConfig = container.HostConfig{
 		NetworkMode: "default",
-		ExtraHosts:  []string{"host.docker.internal:host-gateway"},
+		ExtraHosts:  shipTarget.ExtraHosts,
 		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeVolume,
@@ -277,17 +297,88 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 	return containerConfig, hostConfig, nil
 }
 
-func hermesShipURL(shipConf structs.UrbitDocker) (string, error) {
+func hermesGatewayCommand(hermesConf structs.HermesConfig) string {
+	return fmt.Sprintf(
+		"cat > /opt/data/config.yaml <<'EOF'\n%s\nEOF\nexec gateway run --replace --accept-hooks",
+		hermesConfigYAML(hermesConf),
+	)
+}
+
+func hermesConfigYAML(hermesConf structs.HermesConfig) string {
+	provider := HermesModelProviderOrDefault(hermesConf.ModelProvider)
+	model := HermesModelOrDefault(hermesConf.Model)
+	apiMode := ""
+	if provider == "openrouter" || provider == "openai" {
+		apiMode = "\n  api_mode: \"chat_completions\""
+	}
+	return fmt.Sprintf(`model:
+  default: %s
+  provider: %s%s
+
+openrouter:
+  response_cache: false
+
+plugins:
+  enabled:
+    - "platforms/tlon"
+
+toolsets:
+  - "tlon"
+  - "file"
+  - "cronjob"
+
+platform_toolsets:
+  tlon:
+    - "tlon"
+    - "file"
+    - "cronjob"
+
+platforms:
+  tlon:
+    enabled: true
+    gateway_restart_notification: false
+
+display:
+  tool_progress: off
+  interim_assistant_messages: false
+
+terminal:
+  backend: "local"
+  cwd: "/workspace"
+  timeout: 180
+
+agent:
+  max_turns: 90
+  gateway_timeout: 1800
+  disabled_toolsets: []
+`, yamlString(model), yamlString(provider), apiMode)
+}
+
+func yamlString(value string) string {
+	return strconv.Quote(value)
+}
+
+func hermesShipTargetForContainer(shipConf structs.UrbitDocker) (hermesShipTarget, error) {
 	if shipConf.Network == "wireguard" {
 		if shipConf.WgHTTPPort <= 0 {
-			return "", fmt.Errorf("wireguard HTTP port is not configured for Hermes")
+			return hermesShipTarget{}, fmt.Errorf("wireguard HTTP port is not configured for Hermes")
 		}
-		return wireguardEndpoint(shipConf.WgHTTPPort)
+		ip, err := getContainerIPv4("wireguard")
+		if err != nil {
+			return hermesShipTarget{}, err
+		}
+		return hermesShipTarget{
+			URL:        fmt.Sprintf("http://%s:%d", HermesUrbitHostName, shipConf.WgHTTPPort),
+			ExtraHosts: []string{fmt.Sprintf("%s:%s", HermesUrbitHostName, ip)},
+		}, nil
 	}
 	if shipConf.HTTPPort <= 0 {
-		return "", fmt.Errorf("HTTP port is not configured for Hermes")
+		return hermesShipTarget{}, fmt.Errorf("HTTP port is not configured for Hermes")
 	}
-	return fmt.Sprintf("http://host.docker.internal:%d", shipConf.HTTPPort), nil
+	return hermesShipTarget{
+		URL:        fmt.Sprintf("http://host.docker.internal:%d", shipConf.HTTPPort),
+		ExtraHosts: []string{"host.docker.internal:host-gateway"},
+	}, nil
 }
 
 func hermesDashboardHostIP() string {

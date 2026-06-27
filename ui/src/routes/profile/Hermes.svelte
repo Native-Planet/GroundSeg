@@ -279,6 +279,7 @@
     gap: 16px;
     flex-wrap: wrap;
     justify-content: flex-end;
+    min-height: 65px;
   }
   .grid {
     display: grid;
@@ -345,6 +346,7 @@
     display: flex;
     justify-content: flex-end;
     margin-top: 32px;
+    min-height: 65px;
   }
   .save, .restart, .install, .dashboard {
     border-radius: 16px;
@@ -357,6 +359,25 @@
     height: 65px;
     padding: 0 48px;
     cursor: pointer;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .install {
+    width: 230px;
+  }
+  .restart {
+    width: 190px;
+  }
+  .dashboard {
+    width: 120px;
+    justify-content: center;
+    padding: 0;
+  }
+  .save {
+    width: 180px;
+    padding: 0;
   }
   .dashboard {
     display: flex;
@@ -410,7 +431,6 @@
     }
     .save, .restart, .install, .dashboard {
       font-size: 20px;
-      padding: 0 24px;
     }
   }
 </style>

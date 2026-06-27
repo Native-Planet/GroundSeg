@@ -11,7 +11,10 @@ import (
 	"time"
 )
 
-const dockerHubTagCacheTTL = 30 * time.Minute
+const (
+	dockerHubTagCacheTTL      = 30 * time.Minute
+	dockerHubTagErrorCacheTTL = 30 * time.Second
+)
 
 var (
 	vereTagsMu       sync.Mutex
@@ -30,7 +33,11 @@ type dockerHubTagsResponse struct {
 func GetVereImageTags() ([]string, error) {
 	vereTagsMu.Lock()
 	defer vereTagsMu.Unlock()
-	if time.Since(vereTagsCacheAt) < dockerHubTagCacheTTL {
+	cacheAge := time.Since(vereTagsCacheAt)
+	if vereTagsCacheErr == nil && cacheAge < dockerHubTagCacheTTL {
+		return append([]string{}, vereTagsCache...), nil
+	}
+	if vereTagsCacheErr != nil && cacheAge < dockerHubTagErrorCacheTTL {
 		return append([]string{}, vereTagsCache...), vereTagsCacheErr
 	}
 	info, err := GetLatestContainerInfo("vere")
@@ -43,8 +50,10 @@ func GetVereImageTags() ([]string, error) {
 	if err == nil {
 		tags = appendUnique(tags, info["tag"])
 		sort.Strings(tags)
+		vereTagsCache = append([]string{}, tags...)
+	} else if len(vereTagsCache) > 0 {
+		tags = append([]string{}, vereTagsCache...)
 	}
-	vereTagsCache = append([]string{}, tags...)
 	vereTagsCacheErr = err
 	vereTagsCacheAt = time.Now()
 	return tags, err
@@ -89,12 +98,20 @@ func DockerHubTags(repo string) ([]string, error) {
 
 func dockerHubRepoPath(repo string) string {
 	repo = strings.TrimSpace(repo)
+	repo = strings.TrimPrefix(repo, "https://")
+	repo = strings.TrimPrefix(repo, "http://")
 	for _, prefix := range []string{
 		"registry.hub.docker.com/",
 		"docker.io/",
 		"index.docker.io/",
 	} {
 		repo = strings.TrimPrefix(repo, prefix)
+	}
+	if at := strings.Index(repo, "@"); at >= 0 {
+		repo = repo[:at]
+	}
+	if lastSlash, lastColon := strings.LastIndex(repo, "/"), strings.LastIndex(repo, ":"); lastColon > lastSlash {
+		repo = repo[:lastColon]
 	}
 	repo = strings.TrimPrefix(repo, "library/")
 	if strings.Count(repo, "/") != 1 {
