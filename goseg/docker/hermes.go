@@ -312,140 +312,58 @@ func hermesGatewayCommand(hermesConf structs.HermesConfig) string {
 		`cat > /opt/data/config.yaml <<'EOF'
 %s
 EOF
-python3 <<'PY'
-import json
-import os
-from pathlib import Path
-
-home = Path(os.environ.get("HERMES_HOME") or "/opt/data")
-skill_dir = Path(os.environ.get("TLON_SKILL_DIR") or home / "tlon-skill")
-ship = (
-    os.environ.get("TLON_NODE_ID")
-    or os.environ.get("TLON_SHIP_NAME")
-    or os.environ.get("URBIT_SHIP")
-    or os.environ.get("TLON_SHIP")
-    or ""
-).strip()
-if ship and not ship.startswith("~"):
-    ship = "~" + ship
-bare_ship = ship.lstrip("~") or "ship"
-config_file = Path(os.environ.get("TLON_CONFIG_FILE") or skill_dir / "ships" / f"{bare_ship}.json")
-config_file.parent.mkdir(parents=True, exist_ok=True)
-
-ship_config = {
-    "url": (
-        os.environ.get("TLON_NODE_URL")
-        or os.environ.get("TLON_SHIP_URL")
-        or os.environ.get("TLON_URL")
-        or os.environ.get("URBIT_URL")
-        or ""
-    ),
-    "ship": ship,
-    "code": (
-        os.environ.get("TLON_ACCESS_CODE")
-        or os.environ.get("TLON_SHIP_CODE")
-        or os.environ.get("TLON_CODE")
-        or os.environ.get("URBIT_CODE")
-        or ""
-    ),
+skill_dir="${TLON_SKILL_DIR:-/opt/data/tlon-skill}"
+ship="${TLON_NODE_ID:-${TLON_SHIP_NAME:-${URBIT_SHIP:-${TLON_SHIP:-}}}}"
+case "$ship" in
+  "~"*) ;;
+  "") ship="~ship" ;;
+  *) ship="~$ship" ;;
+esac
+bare_ship="${ship#~}"
+config_file="${TLON_CONFIG_FILE:-$skill_dir/ships/$bare_ship.json}"
+mkdir -p "$(dirname "$config_file")" /opt/data /workspace
+url="${TLON_NODE_URL:-${TLON_SHIP_URL:-${TLON_URL:-${URBIT_URL:-}}}}"
+code="${TLON_ACCESS_CODE:-${TLON_SHIP_CODE:-${TLON_CODE:-${URBIT_CODE:-}}}}"
+cat > "$config_file" <<EOF
+{
+  "url": "$url",
+  "ship": "$ship",
+  "code": "$code"
 }
-config_file.write_text(json.dumps(ship_config, indent=2) + "\n", encoding="utf-8")
-config_file.chmod(0o600)
+EOF
+chmod 600 "$config_file"
 
-env_names = [
-    "ANTHROPIC_API_KEY",
-    "BRAVE_API_KEY",
-    "BRAVE_SEARCH_API_KEY",
-    "DEEPSEEK_API_KEY",
-    "GROQ_API_KEY",
-    "HERMES_CONTAINER_HOME",
-    "HERMES_DASHBOARD",
-    "HERMES_DASHBOARD_HOST",
-    "HERMES_DASHBOARD_PORT",
-    "HERMES_EXEC_ASK",
-    "HERMES_GATEWAY_SESSION",
-    "HERMES_HOME",
-    "HERMES_INFERENCE_PROVIDER",
-    "HERMES_INTERACTIVE",
-    "HERMES_MODEL",
-    "HERMES_MODEL_PROVIDER",
-    "HERMES_OPENROUTER_CACHE",
-    "HERMES_TLON_ADAPTER_DIR",
-    "HERMES_TLON_TOOLSET",
-    "HERMES_TLON_TOOLSETS",
-    "HERMES_WORKSPACE",
-    "HERMES_WORKSPACE_DIR",
-    "HOME",
-    "LCM_DATABASE_PATH",
-    "MISTRAL_API_KEY",
-    "NOUS_API_KEY",
-    "OPENAI_API_KEY",
-    "OPENROUTER_API_KEY",
-    "TERMINAL_CWD",
-    "TERMINAL_ENV",
-    "TERMINAL_LOCAL_PERSISTENT",
-    "TERMINAL_MAX_FOREGROUND_TIMEOUT",
-    "TERMINAL_TIMEOUT",
-    "TLON_ACCESS_CODE",
-    "TLON_ALLOWED_USERS",
-    "TLON_ALLOW_ALL_USERS",
-    "TLON_AUTO_ACCEPT_DM_INVITES",
-    "TLON_AUTO_ACCEPT_GROUP_INVITES",
-    "TLON_AUTO_DISCOVER",
-    "TLON_BOT_ALIASES",
-    "TLON_BOT_MENTIONS",
-    "TLON_CHANNELS",
-    "TLON_CHANNEL_RULES",
-    "TLON_CLI",
-    "TLON_CODE",
-    "TLON_CONFIG_FILE",
-    "TLON_DEFAULT_AUTHORIZED_SHIPS",
-    "TLON_DM_ALLOWLIST",
-    "TLON_DM_POLL_ENABLED",
-    "TLON_GROUP_INVITE_ALLOWLIST",
-    "TLON_HOME_CHANNEL",
-    "TLON_MAX_CONSECUTIVE_BOT_RESPONSES",
-    "TLON_NODE_ID",
-    "TLON_NODE_URL",
-    "TLON_OWNER",
-    "TLON_OWNER_LISTEN",
-    "TLON_OWNER_LISTEN_ENABLED",
-    "TLON_OWNER_SHIP",
-    "TLON_OWNER_URL",
-    "TLON_REQUIRE_MENTION",
-    "TLON_SHIP",
-    "TLON_SHIP_CODE",
-    "TLON_SHIP_NAME",
-    "TLON_SHIP_URL",
-    "TLON_SKILL_DIR",
-    "TLON_SKILL_PATH",
-    "TLON_TELEMETRY",
-    "TLON_URL",
-    "URBIT_CODE",
-    "URBIT_SHIP",
-    "URBIT_URL",
-    "XAI_API_KEY",
-]
-values = {}
-for name in env_names:
-    value = os.environ.get(name)
-    if value is not None:
-        values[name] = value
-values["TLON_CONFIG_FILE"] = str(config_file)
-values["TLON_SKILL_DIR"] = str(skill_dir)
-
-env_file = home / ".env"
-env_file.parent.mkdir(parents=True, exist_ok=True)
-env_text = "".join(f"{key}={str(value).replace(chr(10), r'\n')}\n" for key, value in sorted(values.items()))
-env_file.write_text(env_text, encoding="utf-8")
-env_file.chmod(0o600)
-workspace_env = Path(os.environ.get("HERMES_WORKSPACE") or "/workspace") / ".env"
-workspace_env.write_text(env_text, encoding="utf-8")
-workspace_env.chmod(0o600)
-print(f"Hermes Tlon runtime files: env={env_file} workspace_env={workspace_env} config={config_file}")
-PY
+{
+  for name in \
+    ANTHROPIC_API_KEY BRAVE_API_KEY BRAVE_SEARCH_API_KEY DEEPSEEK_API_KEY GROQ_API_KEY \
+    HERMES_CONTAINER_HOME HERMES_DASHBOARD HERMES_DASHBOARD_HOST HERMES_DASHBOARD_PORT \
+    HERMES_EXEC_ASK HERMES_GATEWAY_SESSION HERMES_HOME HERMES_INFERENCE_PROVIDER \
+    HERMES_INTERACTIVE HERMES_MODEL HERMES_MODEL_PROVIDER HERMES_OPENROUTER_CACHE \
+    HERMES_TLON_ADAPTER_DIR HERMES_TLON_TOOLSET HERMES_TLON_TOOLSETS HERMES_WORKSPACE \
+    HERMES_WORKSPACE_DIR HOME LCM_DATABASE_PATH MISTRAL_API_KEY NOUS_API_KEY OPENAI_API_KEY \
+    OPENROUTER_API_KEY TERMINAL_CWD TERMINAL_ENV TERMINAL_LOCAL_PERSISTENT \
+    TERMINAL_MAX_FOREGROUND_TIMEOUT TERMINAL_TIMEOUT TLON_ACCESS_CODE TLON_ALLOWED_USERS \
+    TLON_ALLOW_ALL_USERS TLON_AUTO_ACCEPT_DM_INVITES TLON_AUTO_ACCEPT_GROUP_INVITES \
+    TLON_AUTO_DISCOVER TLON_BOT_ALIASES TLON_BOT_MENTIONS TLON_CHANNELS TLON_CHANNEL_RULES \
+    TLON_CLI TLON_CODE TLON_DEFAULT_AUTHORIZED_SHIPS TLON_DM_ALLOWLIST \
+    TLON_DM_POLL_ENABLED TLON_GROUP_INVITE_ALLOWLIST TLON_HOME_CHANNEL \
+    TLON_MAX_CONSECUTIVE_BOT_RESPONSES TLON_NODE_ID TLON_NODE_URL TLON_OWNER \
+    TLON_OWNER_LISTEN TLON_OWNER_LISTEN_ENABLED TLON_OWNER_SHIP TLON_OWNER_URL \
+    TLON_REQUIRE_MENTION TLON_SHIP TLON_SHIP_CODE TLON_SHIP_NAME TLON_SHIP_URL \
+    TLON_SKILL_PATH TLON_TELEMETRY TLON_URL URBIT_CODE URBIT_SHIP \
+    URBIT_URL XAI_API_KEY
+  do
+    eval "value=\${$name-}"
+    printf '%%s=%%s\n' "$name" "$value"
+  done
+  printf 'TLON_CONFIG_FILE=%%s\n' "$config_file"
+  printf 'TLON_SKILL_DIR=%%s\n' "$skill_dir"
+} > /opt/data/.env
+chmod 600 /opt/data/.env
+cp /opt/data/.env /workspace/.env
+chmod 600 /workspace/.env
+echo "Hermes Tlon runtime files: env=/opt/data/.env workspace_env=/workspace/.env config=$config_file"
 echo "Hermes Tlon CLI: ${TLON_CLI:-tlon} ($(command -v "${TLON_CLI:-tlon}" || true))"
-"${TLON_CLI:-tlon}" --version || true
 exec hermes gateway run --replace --accept-hooks`,
 		hermesConfigYAML(hermesConf),
 	)

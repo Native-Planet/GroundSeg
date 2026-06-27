@@ -5,7 +5,9 @@ ARG HERMES_AGENT_REPO=https://github.com/NousResearch/hermes-agent.git
 ARG HERMES_AGENT_REF=2ffa1c97c09317c1d066aa5708b8ad961a4ca589
 ARG TLON_APPS_REPO=https://github.com/tloncorp/tlon-apps.git
 ARG TLON_APPS_REF=b9180da6491d29933a98f6e4f1b1458ce61ca576
+ARG TLON_SKILL_CLI_VERSION=0.4.0
 ARG PNPM_VERSION=9.15.9
+ARG TARGETARCH
 
 LABEL org.opencontainers.image.title="NativePlanet Hermes Tlon"
 LABEL org.opencontainers.image.description="Hermes Agent with the Tlon platform adapter and tlon CLI"
@@ -89,10 +91,20 @@ RUN cd "${TLON_APPS_DIR}" \
   && pnpm install --filter @tloncorp/tlon-skill... --frozen-lockfile --ignore-scripts \
   && pnpm --filter @tloncorp/api build \
   && pnpm --filter @tloncorp/tlon-skill build \
-  && cp "${TLON_SKILL_DIR}/dist/tlon-run" "${TLON_CLI}" \
-  && chmod +x "${TLON_CLI}" \
-  && "${TLON_CLI}" --version \
   && pnpm store prune
+
+RUN set -eux; \
+  arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \
+  case "$arch" in \
+    amd64|x86_64) tlon_pkg_arch="linux-x64" ;; \
+    arm64|aarch64) tlon_pkg_arch="linux-arm64" ;; \
+    *) echo "Unsupported tlon CLI architecture: $arch" >&2; exit 1 ;; \
+  esac; \
+  tmp="$(mktemp -d)"; \
+  curl -fsSL "https://registry.npmjs.org/@tloncorp/tlon-skill-${tlon_pkg_arch}/-/tlon-skill-${tlon_pkg_arch}-${TLON_SKILL_CLI_VERSION}.tgz" \
+    | tar -xz -C "$tmp"; \
+  install -m 0755 "$tmp/package/tlon" "${TLON_CLI}"; \
+  rm -rf "$tmp"
 
 RUN mkdir -p "${HERMES_HOME}" "${HERMES_WORKSPACE}" "${HERMES_CONTAINER_HOME}" \
   && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
