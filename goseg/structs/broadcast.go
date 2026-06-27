@@ -138,6 +138,7 @@ type Hermes struct {
 		ModelProvider      string   `json:"modelProvider"`
 		Model              string   `json:"model"`
 		ProviderAPIKeySet  bool     `json:"providerApiKeySet"`
+		ImageInstalled     bool     `json:"imageInstalled"`
 		Ships              []string `json:"ships"`
 	} `json:"info"`
 	Transition HermesTransition `json:"transition"`
@@ -147,6 +148,8 @@ type HermesTransition struct {
 	Toggle  string `json:"toggle"`
 	Save    string `json:"save"`
 	Restart string `json:"restart"`
+	Install string `json:"install"`
+	Error   string `json:"error"`
 }
 
 // broadcast payload subobject
@@ -166,6 +169,11 @@ type Urbit struct {
 		SnapTime                 int            `json:"snapTime"`
 		ExtraArgs                string         `json:"extraArgs"`
 		BootCommandBase          string         `json:"bootCommandBase"`
+		UrbitVersion             string         `json:"urbitVersion"`
+		UrbitRepo                string         `json:"urbitRepo"`
+		UrbitImageTagOverride    string         `json:"urbitImageTagOverride"`
+		VereTags                 []string       `json:"vereTags"`
+		VersionServerVereTag     string         `json:"versionServerVereTag"`
 		DevMode                  bool           `json:"devMode"`
 		DetectBootStatus         bool           `json:"detectBootStatus"`
 		Remote                   bool           `json:"remote"`
@@ -228,6 +236,7 @@ type UrbitTransitionBroadcast struct {
 	HandleRestoreTlonBackup   string `json:"handleRestoreTlonBackup"`
 	SnapTime                  string `json:"snapTime"`
 	ExtraArgs                 string `json:"extraArgs"`
+	VereTag                   string `json:"vereTag"`
 }
 
 // used to construct broadcast pier info subobject

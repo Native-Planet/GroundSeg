@@ -526,6 +526,14 @@ export const setAllStartramReminder = remind => {
 //  Hermes
 //
 
+export const hermesInstall = config => {
+  send({
+    "type":"hermes",
+    "action":"install",
+    ...config
+  })
+}
+
 export const hermesToggle = config => {
   send({
     "type":"hermes",
@@ -879,6 +887,16 @@ export const setUrbitExtraArgs = (patp, extraArgs) => {
     "action":"extra-args",
     "patp":patp,
     "extraArgs": extraArgs
+  }
+  send(payload)
+}
+
+export const setVereTag = (patp, vereTag) => {
+  let payload = {
+    "type":"urbit",
+    "action":"vere-tag",
+    "patp":patp,
+    "vereTag": vereTag
   }
   send(payload)
 }

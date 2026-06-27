@@ -8,6 +8,7 @@ import (
 	"groundseg/defaults"
 	"groundseg/structs"
 	"os"
+	"strings"
 
 	"path/filepath"
 
@@ -68,16 +69,26 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	// sorry this is ugly
 	shipConf := config.UrbitConf(containerName)
 	newConf := shipConf
-	if config.Architecture == "amd64" {
-		if containerInfo["hash"] != shipConf.UrbitAmd64Sha256 {
-			newConf.UrbitAmd64Sha256 = containerInfo["hash"]
-		}
-	} else if config.Architecture == "arm64" {
-		if containerInfo["hash"] != shipConf.UrbitArm64Sha256 {
-			newConf.UrbitArm64Sha256 = containerInfo["hash"]
+	overrideTag := strings.TrimSpace(shipConf.UrbitImageTagOverride)
+	effectiveTag := containerInfo["tag"]
+	effectiveHash := containerInfo["hash"]
+	if overrideTag != "" {
+		effectiveTag = overrideTag
+		effectiveHash = ""
+		newConf.UrbitAmd64Sha256 = ""
+		newConf.UrbitArm64Sha256 = ""
+	} else {
+		if config.Architecture == "amd64" {
+			if containerInfo["hash"] != shipConf.UrbitAmd64Sha256 {
+				newConf.UrbitAmd64Sha256 = containerInfo["hash"]
+			}
+		} else if config.Architecture == "arm64" {
+			if containerInfo["hash"] != shipConf.UrbitArm64Sha256 {
+				newConf.UrbitArm64Sha256 = containerInfo["hash"]
+			}
 		}
 	}
-	newConf.UrbitVersion = containerInfo["tag"]
+	newConf.UrbitVersion = effectiveTag
 	newConf.UrbitRepo = containerInfo["repo"]
 	newConf.MinioVersion = objectStoreTag
 	newConf.MinioRepo = objectStoreRepo
@@ -86,7 +97,10 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 			zap.L().Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v", err))
 		}
 	}
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
+	desiredImage := fmt.Sprintf("%s:%s", containerInfo["repo"], effectiveTag)
+	if effectiveHash != "" {
+		desiredImage = fmt.Sprintf("%s@sha256:%s", desiredImage, effectiveHash)
+	}
 	// reload urbit conf from disk
 	err = config.LoadUrbitConfig(containerName)
 	if err != nil {

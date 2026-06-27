@@ -89,7 +89,7 @@ var (
 		Ship:               "",
 		Owner:              "",
 		Port:               19119,
-		Image:              "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.13.0",
+		Image:              "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0",
 		HermesVersion:      "0.14.0",
 		HermesAgentRef:     "2ffa1c97c09317c1d066aa5708b8ad961a4ca589",
 		TlonAdapterVersion: "0.13.0",

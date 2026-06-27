@@ -17,6 +17,7 @@
   import MinIO from './Section/MinIO.svelte'
   import Loom from './Section/Loom.svelte'
   import SnapTime from './Section/SnapTime.svelte'
+  import VereImage from './Section/VereImage.svelte'
   import AdditionalArgs from './Section/AdditionalArgs.svelte'
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
@@ -61,6 +62,10 @@
   $: snapTime = (ship?.snapTime)
   $: extraArgs = (ship?.extraArgs) || ""
   $: bootCommandBase = (ship?.bootCommandBase) || ""
+  $: urbitVersion = (ship?.urbitVersion) || ""
+  $: urbitImageTagOverride = (ship?.urbitImageTagOverride) || ""
+  $: versionServerVereTag = (ship?.versionServerVereTag) || ""
+  $: vereTags = (ship?.vereTags) || []
   $: lusCode = (ship?.lusCode) || ""
   $: url = (ship?.url) || "#"
   $: showUrbAlias = (ship?.showUrbAlias) || false
@@ -190,6 +195,15 @@
     {snapTime} 
     {ownShip}
     />
+
+  <VereImage
+    {patp}
+    {ownShip}
+    {urbitVersion}
+    {urbitImageTagOverride}
+    {versionServerVereTag}
+    {vereTags}
+  />
 
   <AdditionalArgs
     {patp}

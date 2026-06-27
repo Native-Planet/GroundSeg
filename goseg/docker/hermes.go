@@ -18,7 +18,7 @@ const (
 	HermesContainerName             = "hermes"
 	HermesDataVolumeName            = "hermes"
 	HermesWorkspaceVolumeName       = "hermes_workspace"
-	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.13.0"
+	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
 	DefaultHermesVersion            = "0.14.0"
@@ -244,6 +244,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		return containerConfig, hostConfig, fmt.Errorf("Hermes provider API key is not configured")
 	}
 	environment = append(environment, fmt.Sprintf("%s=%s", apiKeyEnv, apiKey))
+	zap.L().Info(fmt.Sprintf("Configuring Hermes for %s via %s with owner %s", attachedShip, shipURL, owner))
 
 	dashboardPort := nat.Port(fmt.Sprintf("%d/tcp", HermesDashboardContainerPort))
 	containerConfig = container.Config{

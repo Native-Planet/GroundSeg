@@ -39,6 +39,8 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.SnapTime = event.Event
 			case "extraArgs":
 				urbitStruct.Transition.ExtraArgs = event.Event
+			case "vereTag":
+				urbitStruct.Transition.VereTag = event.Event
 			case "urbitDomain":
 				urbitStruct.Transition.UrbitDomain = event.Event
 			case "minioDomain":
@@ -99,6 +101,10 @@ func HermesTransitionHandler() {
 			current.Profile.Hermes.Transition.Save = fmt.Sprintf("%v", event.Data)
 		case "restart":
 			current.Profile.Hermes.Transition.Restart = fmt.Sprintf("%v", event.Data)
+		case "install":
+			current.Profile.Hermes.Transition.Install = fmt.Sprintf("%v", event.Data)
+		case "error":
+			current.Profile.Hermes.Transition.Error = fmt.Sprintf("%v", event.Data)
 		default:
 			zap.L().Warn(fmt.Sprintf("Urecognized Hermes transition: %v", event.Type))
 			continue
@@ -111,6 +117,10 @@ func HermesTransitionHandler() {
 				current.Profile.Hermes.Transition.Save = ""
 			case "restart":
 				current.Profile.Hermes.Transition.Restart = ""
+			case "install":
+				current.Profile.Hermes.Transition.Install = ""
+			case "error":
+				current.Profile.Hermes.Transition.Error = ""
 			}
 		}
 		broadcast.UpdateBroadcast(current)

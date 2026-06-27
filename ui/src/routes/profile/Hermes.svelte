@@ -1,6 +1,6 @@
 <script>
   import ToggleButton from '$lib/ToggleButton.svelte'
-  import { hermesRestart, hermesSave, hermesToggle } from '$lib/stores/websocket'
+  import { hermesInstall, hermesRestart, hermesSave, hermesToggle } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
 
   $: info = ($structure?.profile?.hermes?.info) || {}
@@ -9,19 +9,30 @@
   $: enabled = info?.enabled || false
   $: running = info?.running || false
   $: url = info?.url || "#"
+  $: imageInstalled = info?.imageInstalled || false
+  $: savedImage = info?.image || ""
+  $: selectedImageInstalled = imageInstalled && image.trim() == savedImage
   $: providerApiKeySaved = info?.providerApiKeySet || false
   $: savedModelProvider = info?.modelProvider || "openrouter"
   $: providerApiKeyPlaceholder = providerApiKeySaved && modelProvider == savedModelProvider ? "Saved" : ""
   $: providerApiKeyReady = providerApiKey.trim().length > 0 || providerApiKeyPlaceholder.length > 0
+  $: tInstall = transition?.install || ""
   $: tToggle = transition?.toggle || ""
   $: tSave = transition?.save || ""
   $: tRestart = transition?.restart || ""
+  $: tError = transition?.error || ""
+  $: imageReady = selectedImageInstalled || tInstall == "success" || tInstall == "installed"
+  $: installing = tInstall.length > 0 && tInstall != "success" && tInstall != "error"
   $: selectedShipKey = selectedShip.replace(/^~/, "")
   $: attachedRunning = ($structure?.urbits?.[selectedShipKey]?.info?.running) || false
   $: canConfigure = selectedShip.length > 0 && owner.trim().length > 0 && providerApiKeyReady
-  $: canToggle = enabled || (canConfigure && attachedRunning)
-  $: busy = tToggle.length > 0 || tSave.length > 0 || tRestart.length > 0
+  $: canToggle = enabled || (canConfigure && attachedRunning && imageReady)
+  $: busy = tInstall.length > 0 || tToggle.length > 0 || tSave.length > 0 || tRestart.length > 0
   $: dashboardReady = running && url != "#"
+  $: activity = tInstall || tToggle || tSave || tRestart
+  $: activityText = transitionText(activity)
+  $: installLabel = imageReady && tInstall.length < 1 ? "Installed" : transitionText(tInstall) || "Install"
+  $: canInstall = image.trim().length > 0 && !imageReady && !busy
 
   let selectedShip = ""
   let owner = ""
@@ -39,7 +50,30 @@
     { value: "anthropic", label: "Anthropic" }
   ]
 
-  $: if (tSave == "success" || tToggle == "success") {
+  const transitionLabels = {
+    "preparing": "Preparing",
+    "pulling": "Pulling image",
+    "installed": "Installed",
+    "loading": "Working",
+    "saving": "Saving",
+    "validating": "Validating",
+    "fetching-code": "Fetching +code",
+    "starting": "Starting",
+    "stopping": "Stopping",
+    "restarting": "Restarting",
+    "success": "Success",
+    "error": "Error"
+  }
+
+  const transitionText = value => {
+    if (!value) return ""
+    if (value.startsWith("pulling ")) {
+      return `Pulling image ${value.replace("pulling ", "")}`
+    }
+    return transitionLabels[value] || value
+  }
+
+  $: if (tInstall == "success" || tSave == "success" || tToggle == "success") {
     dirty = false
   }
 
@@ -73,11 +107,18 @@
   })
 
   const save = () => {
+    if (busy) return
     hermesSave(payload())
   }
 
+  const install = () => {
+    if (!canInstall) return
+    hermesInstall(payload())
+  }
+
   const toggle = () => {
-    if (!canToggle || busy) return
+    if (!canToggle || tToggle.length > 0) return
+    if (!enabled && busy) return
     hermesToggle(payload())
   }
 </script>
@@ -89,31 +130,41 @@
       <div class="status-row">
         <div class="status" class:on={enabled}>{enabled ? "Enabled" : "Disabled"}</div>
         <div class="status" class:on={running}>{running ? "Running" : "Stopped"}</div>
+        <div class="status" class:on={imageReady}>{imageReady ? "Installed" : "Not installed"}</div>
       </div>
     </div>
     <div class="spacer"></div>
     <div class="controls">
-      <ToggleButton on:click={toggle} loading={busy} disabled={!canToggle} on={enabled} />
+      <button
+        class="install"
+        disabled={!canInstall}
+        class:success={imageReady}
+        on:click={install}>
+        {installLabel}
+      </button>
+      <ToggleButton on:click={toggle} loading={tToggle.length > 0} disabled={!canToggle} on={enabled} />
       {#if dashboardReady}
         <a class="dashboard" href={url} target="_blank">Open</a>
       {/if}
       <button
         class="restart"
-        disabled={!enabled || !providerApiKeySaved || tRestart.length > 0}
+        disabled={!enabled || !providerApiKeySaved || !imageReady || tRestart.length > 0}
         class:success={tRestart == "success"}
         on:click={hermesRestart}>
-        {#if tRestart == "loading"}
-          Restarting
-        {:else if tRestart == "success"}
-          Success
-        {:else if tRestart == "error"}
-          Error
+        {#if tRestart.length > 0}
+          {transitionText(tRestart)}
         {:else}
           Restart
         {/if}
       </button>
     </div>
   </div>
+
+  {#if tError.length > 0 || activityText.length > 0}
+    <div class="message" class:error={tError.length > 0 || activity == "error"}>
+      {tError || activityText}
+    </div>
+  {/if}
 
   <div class="grid">
     <label>
@@ -166,7 +217,7 @@
     <div class="advanced">
       <label>
         <span>Image</span>
-        <input bind:value={image} on:input={markDirty} />
+        <input bind:value={image} on:input={markDirty} disabled={installing} />
       </label>
       <label>
         <span>Port</span>
@@ -182,15 +233,11 @@
   <div class="actions">
     <button
       class="save"
-      disabled={!dirty || !canConfigure || tSave.length > 0}
+      disabled={!dirty || !canConfigure || busy}
       class:success={tSave == "success"}
       on:click={save}>
-      {#if tSave == "loading"}
-        Saving
-      {:else if tSave == "success"}
-        Saved
-      {:else if tSave == "error"}
-        Error
+      {#if tSave.length > 0}
+        {transitionText(tSave)}
       {:else}
         Save
       {/if}
@@ -299,7 +346,7 @@
     justify-content: flex-end;
     margin-top: 32px;
   }
-  .save, .restart, .dashboard {
+  .save, .restart, .install, .dashboard {
     border-radius: 16px;
     background: black;
     color: #fff;
@@ -316,9 +363,22 @@
     align-items: center;
     text-decoration: none;
   }
-  .save:disabled, .restart:disabled {
+  .save:disabled, .restart:disabled, .install:disabled {
     opacity: .5;
     pointer-events: none;
+  }
+  .message {
+    margin-top: 24px;
+    border-radius: 12px;
+    background: var(--Gray-100, #DDE3DF);
+    color: var(--text-color);
+    font-family: Inter;
+    font-size: 16px;
+    padding: 14px 18px;
+  }
+  .message.error {
+    background: #F9D2D2;
+    color: #8A1111;
   }
   .success {
     opacity: .7;
@@ -348,7 +408,7 @@
       justify-content: flex-start;
       width: 100%;
     }
-    .save, .restart, .dashboard {
+    .save, .restart, .install, .dashboard {
       font-size: 20px;
       padding: 0 24px;
     }

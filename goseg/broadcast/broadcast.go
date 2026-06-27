@@ -141,6 +141,14 @@ func LoadStartramRegions() error {
 	return nil
 }
 
+func appendUniqueString(items []string, item string) []string {
+	item = strings.TrimSpace(item)
+	if item == "" || slices.Contains(items, item) {
+		return items
+	}
+	return append(items, item)
+}
+
 // this is for building the broadcast objects describing piers
 func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	// get a list of piers
@@ -217,6 +225,19 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	if hostName == "" {
 		zap.L().Debug("Defaulting to `nativeplanet.local`")
 		hostName = "nativeplanet.local"
+	}
+	vereTags, err := docker.GetVereImageTags()
+	if err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to fetch Vere image tags: %v", err))
+	}
+	versionServerVereTag := ""
+	versionServerVereRepo := ""
+	if containerInfo, infoErr := docker.GetLatestContainerInfo("vere"); infoErr == nil {
+		versionServerVereTag = containerInfo["tag"]
+		versionServerVereRepo = containerInfo["repo"]
+		vereTags = appendUniqueString(vereTags, versionServerVereTag)
+	} else {
+		zap.L().Warn(fmt.Sprintf("Unable to read version-server Vere info: %v", infoErr))
 	}
 	// convert the running status into bools
 	for pier, status := range pierStatus {
@@ -332,6 +353,14 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.MemUsage = dockerStats.MemoryUsage
 		urbit.Info.ExtraArgs = dockerConfig.ExtraArgs
 		urbit.Info.BootCommandBase = bootCommandBase
+		urbit.Info.UrbitVersion = dockerConfig.UrbitVersion
+		urbit.Info.UrbitRepo = dockerConfig.UrbitRepo
+		if urbit.Info.UrbitRepo == "" {
+			urbit.Info.UrbitRepo = versionServerVereRepo
+		}
+		urbit.Info.UrbitImageTagOverride = dockerConfig.UrbitImageTagOverride
+		urbit.Info.VereTags = appendUniqueString(append([]string{}, vereTags...), dockerConfig.UrbitImageTagOverride)
+		urbit.Info.VersionServerVereTag = versionServerVereTag
 		urbit.Info.DevMode = dockerConfig.DevMode
 		urbit.Info.Vere = dockerConfig.UrbitVersion
 		urbit.Info.DetectBootStatus = bootStatus
@@ -475,6 +504,11 @@ func constructProfileInfo() structs.Profile {
 	hermesInfo.Info.ModelProvider = docker.HermesModelProviderOrDefault(hermesConf.ModelProvider)
 	hermesInfo.Info.Model = docker.HermesModelOrDefault(hermesConf.Model)
 	hermesInfo.Info.ProviderAPIKeySet = strings.TrimSpace(hermesConf.ProviderAPIKey) != ""
+	if installed, err := docker.ImageRefExists(hermesInfo.Info.Image); err == nil {
+		hermesInfo.Info.ImageInstalled = installed
+	} else {
+		zap.L().Warn(fmt.Sprintf("Unable to inspect Hermes image %s: %v", hermesInfo.Info.Image, err))
+	}
 	for _, pier := range conf.Piers {
 		hermesInfo.Info.Ships = append(hermesInfo.Info.Ships, docker.NormalizeHermesShip(pier))
 	}

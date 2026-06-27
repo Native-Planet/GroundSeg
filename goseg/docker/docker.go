@@ -306,7 +306,19 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	var imageInfo map[string]string
 	desiredImage := containerConfig.Image
 	desiredImageID := ""
-	if containerType == "minio" || containerType == "hermes" {
+	if containerType == "hermes" {
+		if desiredImage == "" {
+			return containerState, fmt.Errorf("empty image ref for %s", containerName)
+		}
+		installed, err := ImageRefExists(desiredImage)
+		if err != nil {
+			return containerState, err
+		}
+		if !installed {
+			return containerState, fmt.Errorf("Hermes image %s is not installed", desiredImage)
+		}
+		imageInfo = map[string]string{"hash": ""}
+	} else if containerType == "minio" {
 		if desiredImage == "" {
 			return containerState, fmt.Errorf("empty image ref for %s", containerName)
 		}
@@ -320,11 +332,21 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
+		versionServerImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+		if strings.TrimSpace(desiredImage) == "" {
+			desiredImage = versionServerImage
+		}
+		imageInfo = imageInfoFromImageRef(desiredImage, imageInfo)
 		// check if the desired image is available locally
-		desiredImage = fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
-		_, err = PullImageIfNotExist(desiredImage, imageInfo)
-		if err != nil {
-			return containerState, err
+		if desiredImage == versionServerImage && imageInfo["hash"] != "" {
+			_, err = PullImageIfNotExist(desiredImage, imageInfo)
+			if err != nil {
+				return containerState, err
+			}
+		} else {
+			if err := PullImageByRef(desiredImage); err != nil {
+				return containerState, err
+			}
 		}
 		if desiredImageID, err = getLocalImageID(desiredImage, imageInfo); err != nil {
 			zap.L().Warn(fmt.Sprintf("Unable to inspect desired image %s: %v", desiredImage, err))
@@ -473,7 +495,19 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		return containerState, errmsg
 	}
 	var desiredImage string
-	if containerType == "minio" || containerType == "hermes" {
+	if containerType == "hermes" {
+		desiredImage = containerConfig.Image
+		if desiredImage == "" {
+			return containerState, fmt.Errorf("empty image ref for %s", containerName)
+		}
+		installed, err := ImageRefExists(desiredImage)
+		if err != nil {
+			return containerState, err
+		}
+		if !installed {
+			return containerState, fmt.Errorf("Hermes image %s is not installed", desiredImage)
+		}
+	} else if containerType == "minio" {
 		desiredImage = containerConfig.Image
 		if desiredImage == "" {
 			return containerState, fmt.Errorf("empty image ref for %s", containerName)
@@ -486,11 +520,21 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		if err != nil {
 			return containerState, err
 		}
+		versionServerImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+		if strings.TrimSpace(desiredImage) == "" {
+			desiredImage = versionServerImage
+		}
+		imageInfo = imageInfoFromImageRef(desiredImage, imageInfo)
 		// check if the desired image is available locally
-		desiredImage = fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
-		_, err = PullImageIfNotExist(desiredImage, imageInfo)
-		if err != nil {
-			return containerState, err
+		if desiredImage == versionServerImage && imageInfo["hash"] != "" {
+			_, err = PullImageIfNotExist(desiredImage, imageInfo)
+			if err != nil {
+				return containerState, err
+			}
+		} else {
+			if err := PullImageByRef(desiredImage); err != nil {
+				return containerState, err
+			}
 		}
 	}
 	ctx := context.Background()
@@ -592,6 +636,21 @@ func StopContainerByName(containerName string) error {
 	return fmt.Errorf("container with name %s not found", containerName)
 }
 
+func RestartContainerByName(containerName string) error {
+	ctx := context.Background()
+	cli, err := dockerclient.New()
+	if err != nil {
+		return err
+	}
+	defer cli.Close()
+	timeout := 10
+	if err := cli.ContainerRestart(ctx, containerName, container.StopOptions{Timeout: &timeout}); err != nil {
+		return fmt.Errorf("failed to restart container %s: %v", containerName, err)
+	}
+	zap.L().Info(fmt.Sprintf("Successfully restarted container %s", containerName))
+	return nil
+}
+
 // pull the image if it doesn't exist locally
 func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
 	ctx := context.Background()
@@ -617,6 +676,45 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 
 // pull image by reference (tag or digest) if missing locally
 func PullImageByRef(imageRef string) error {
+	return PullImageByRefWithProgress(imageRef, nil)
+}
+
+type imagePullMessage struct {
+	Status         string `json:"status"`
+	ID             string `json:"id"`
+	Error          string `json:"error"`
+	ProgressDetail struct {
+		Current int64 `json:"current"`
+		Total   int64 `json:"total"`
+	} `json:"progressDetail"`
+}
+
+type imageLayerProgress struct {
+	current int64
+	total   int64
+}
+
+func ImageRefExists(imageRef string) (bool, error) {
+	if strings.TrimSpace(imageRef) == "" {
+		return false, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cli, err := dockerclient.New()
+	if err != nil {
+		return false, err
+	}
+	defer cli.Close()
+	_, ok := inspectImageRefs(ctx, cli, dockerHubRefAliases(imageRef))
+	return ok, nil
+}
+
+// PullImageByRefWithProgress pulls an image by tag or digest and reports coarse progress.
+func PullImageByRefWithProgress(imageRef string, progress func(string)) error {
+	imageRef = strings.TrimSpace(imageRef)
+	if imageRef == "" {
+		return fmt.Errorf("empty image ref")
+	}
 	ctx := context.Background()
 	cli, err := dockerclient.New()
 	if err != nil {
@@ -625,16 +723,101 @@ func PullImageByRef(imageRef string) error {
 	defer cli.Close()
 
 	if _, ok := inspectImageRefs(ctx, cli, dockerHubRefAliases(imageRef)); ok {
+		emitImagePullProgress(progress, "installed")
 		return nil
 	}
 
+	zap.L().Info(fmt.Sprintf("Pulling Docker image %s", imageRef))
+	emitImagePullProgress(progress, "pulling")
 	resp, err := cli.ImagePull(ctx, imageRef, imagetypes.PullOptions{})
 	if err != nil {
 		return err
 	}
 	defer resp.Close()
-	_, _ = io.Copy(ioutil.Discard, resp)
+	layers := map[string]imageLayerProgress{}
+	lastPercent := -1
+	decoder := json.NewDecoder(resp)
+	for {
+		var msg imagePullMessage
+		if err := decoder.Decode(&msg); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("error reading image pull progress for %s: %v", imageRef, err)
+		}
+		if msg.Error != "" {
+			return fmt.Errorf("failed to pull image %s: %s", imageRef, msg.Error)
+		}
+		if msg.ID != "" && msg.ProgressDetail.Total > 0 {
+			layers[msg.ID] = imageLayerProgress{
+				current: msg.ProgressDetail.Current,
+				total:   msg.ProgressDetail.Total,
+			}
+			percent := max(imagePullPercent(layers), lastPercent)
+			if percent != lastPercent {
+				lastPercent = percent
+				emitImagePullProgress(progress, fmt.Sprintf("pulling %d%%", percent))
+			}
+			continue
+		}
+		status := strings.ToLower(strings.TrimSpace(msg.Status))
+		if msg.ID == "" && status != "" {
+			emitImagePullProgress(progress, status)
+		}
+	}
+	emitImagePullProgress(progress, "installed")
+	zap.L().Info(fmt.Sprintf("Docker image %s installed", imageRef))
 	return nil
+}
+
+func imagePullPercent(layers map[string]imageLayerProgress) int {
+	var current int64
+	var total int64
+	for _, layer := range layers {
+		current += layer.current
+		total += layer.total
+	}
+	if total <= 0 {
+		return 0
+	}
+	percent := int(float64(current) / float64(total) * 100)
+	if percent > 100 {
+		return 100
+	}
+	return percent
+}
+
+func emitImagePullProgress(progress func(string), status string) {
+	if progress != nil && strings.TrimSpace(status) != "" {
+		progress(status)
+	}
+}
+
+func imageInfoFromImageRef(imageRef string, fallback map[string]string) map[string]string {
+	info := map[string]string{
+		"repo": fallback["repo"],
+		"tag":  fallback["tag"],
+		"hash": fallback["hash"],
+	}
+	ref := strings.TrimSpace(imageRef)
+	if ref == "" {
+		return info
+	}
+	if beforeDigest, digest, ok := strings.Cut(ref, "@sha256:"); ok {
+		ref = beforeDigest
+		info["hash"] = digest
+	} else {
+		info["hash"] = ""
+	}
+	lastSlash := strings.LastIndex(ref, "/")
+	lastColon := strings.LastIndex(ref, ":")
+	if lastColon > lastSlash {
+		info["repo"] = ref[:lastColon]
+		info["tag"] = ref[lastColon+1:]
+	} else if ref != "" {
+		info["repo"] = ref
+	}
+	return info
 }
 
 func getLocalImageID(desiredImage string, imageInfo map[string]string) (string, error) {

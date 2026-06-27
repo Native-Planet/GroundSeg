@@ -21,6 +21,8 @@ func HermesHandler(msg []byte) error {
 		return fmt.Errorf("couldn't unmarshal Hermes payload: %v", err)
 	}
 	switch hermesPayload.Payload.Action {
+	case "install":
+		go handleHermesInstall(hermesPayload)
 	case "toggle":
 		go handleHermesToggle(hermesPayload)
 	case "save":
@@ -33,7 +35,37 @@ func HermesHandler(msg []byte) error {
 	return nil
 }
 
+func handleHermesInstall(hermesPayload structs.WsHermesPayload) {
+	clearHermesError()
+	docker.HermesTransBus <- structs.Event{Type: "install", Data: "preparing"}
+	defer clearHermesTransition("install")
+	if err := config.LoadHermesConfig(); err != nil {
+		failHermesTransition("install", err)
+		return
+	}
+	hermesConf := config.HermesConf()
+	if err := applyHermesPayload(hermesPayload.Payload, &hermesConf); err != nil {
+		failHermesTransition("install", err)
+		return
+	}
+	if err := config.UpdateHermesConfig(hermesConf); err != nil {
+		failHermesTransition("install", err)
+		return
+	}
+	image := docker.HermesImageOrDefault(hermesConf.Image)
+	zap.L().Info(fmt.Sprintf("Installing Hermes image %s", image))
+	if err := docker.PullImageByRefWithProgress(image, func(status string) {
+		docker.HermesTransBus <- structs.Event{Type: "install", Data: status}
+	}); err != nil {
+		failHermesTransition("install", err)
+		return
+	}
+	zap.L().Info(fmt.Sprintf("Hermes image %s installed", image))
+	docker.HermesTransBus <- structs.Event{Type: "install", Data: "success"}
+}
+
 func handleHermesToggle(hermesPayload structs.WsHermesPayload) {
+	clearHermesError()
 	docker.HermesTransBus <- structs.Event{Type: "toggle", Data: "loading"}
 	defer clearHermesTransition("toggle")
 	if err := config.LoadHermesConfig(); err != nil {
@@ -42,6 +74,7 @@ func handleHermesToggle(hermesPayload structs.WsHermesPayload) {
 	}
 	hermesConf := config.HermesConf()
 	if hermesConf.Enabled {
+		docker.HermesTransBus <- structs.Event{Type: "toggle", Data: "stopping"}
 		hermesConf.Enabled = false
 		hermesConf.AccessCode = ""
 		if err := config.UpdateHermesConfig(hermesConf); err != nil {
@@ -52,6 +85,7 @@ func handleHermesToggle(hermesPayload structs.WsHermesPayload) {
 		docker.HermesTransBus <- structs.Event{Type: "toggle", Data: "success"}
 		return
 	}
+	docker.HermesTransBus <- structs.Event{Type: "toggle", Data: "validating"}
 	if err := applyHermesPayload(hermesPayload.Payload, &hermesConf); err != nil {
 		failHermesTransition("toggle", err)
 		return
@@ -60,6 +94,7 @@ func handleHermesToggle(hermesPayload structs.WsHermesPayload) {
 		failHermesTransition("toggle", err)
 		return
 	}
+	docker.HermesTransBus <- structs.Event{Type: "toggle", Data: "fetching-code"}
 	if err := refreshHermesAccessCode(&hermesConf); err != nil {
 		failHermesTransition("toggle", err)
 		return
@@ -69,6 +104,7 @@ func handleHermesToggle(hermesPayload structs.WsHermesPayload) {
 		failHermesTransition("toggle", err)
 		return
 	}
+	docker.HermesTransBus <- structs.Event{Type: "toggle", Data: "starting"}
 	if err := recreateHermesContainer(); err != nil {
 		failHermesTransition("toggle", err)
 		return
@@ -77,7 +113,8 @@ func handleHermesToggle(hermesPayload structs.WsHermesPayload) {
 }
 
 func handleHermesSave(hermesPayload structs.WsHermesPayload) {
-	docker.HermesTransBus <- structs.Event{Type: "save", Data: "loading"}
+	clearHermesError()
+	docker.HermesTransBus <- structs.Event{Type: "save", Data: "saving"}
 	defer clearHermesTransition("save")
 	if err := config.LoadHermesConfig(); err != nil {
 		failHermesTransition("save", err)
@@ -89,10 +126,12 @@ func handleHermesSave(hermesPayload structs.WsHermesPayload) {
 		return
 	}
 	if hermesConf.Enabled {
+		docker.HermesTransBus <- structs.Event{Type: "save", Data: "validating"}
 		if err := validateRunnableHermes(hermesConf); err != nil {
 			failHermesTransition("save", err)
 			return
 		}
+		docker.HermesTransBus <- structs.Event{Type: "save", Data: "fetching-code"}
 		if err := refreshHermesAccessCode(&hermesConf); err != nil {
 			failHermesTransition("save", err)
 			return
@@ -105,6 +144,7 @@ func handleHermesSave(hermesPayload structs.WsHermesPayload) {
 		return
 	}
 	if hermesConf.Enabled {
+		docker.HermesTransBus <- structs.Event{Type: "save", Data: "restarting"}
 		if err := recreateHermesContainer(); err != nil {
 			failHermesTransition("save", err)
 			return
@@ -114,7 +154,8 @@ func handleHermesSave(hermesPayload structs.WsHermesPayload) {
 }
 
 func handleHermesRestart() {
-	docker.HermesTransBus <- structs.Event{Type: "restart", Data: "loading"}
+	clearHermesError()
+	docker.HermesTransBus <- structs.Event{Type: "restart", Data: "validating"}
 	defer clearHermesTransition("restart")
 	if err := config.LoadHermesConfig(); err != nil {
 		failHermesTransition("restart", err)
@@ -129,6 +170,7 @@ func handleHermesRestart() {
 		failHermesTransition("restart", err)
 		return
 	}
+	docker.HermesTransBus <- structs.Event{Type: "restart", Data: "fetching-code"}
 	if err := refreshHermesAccessCode(&hermesConf); err != nil {
 		failHermesTransition("restart", err)
 		return
@@ -137,7 +179,8 @@ func handleHermesRestart() {
 		failHermesTransition("restart", err)
 		return
 	}
-	if err := recreateHermesContainer(); err != nil {
+	docker.HermesTransBus <- structs.Event{Type: "restart", Data: "restarting"}
+	if err := restartHermesContainer(); err != nil {
 		failHermesTransition("restart", err)
 		return
 	}
@@ -231,6 +274,13 @@ func validateRunnableHermes(hermesConf structs.HermesConfig) error {
 	if strings.TrimSpace(hermesConf.ProviderAPIKey) == "" {
 		return fmt.Errorf("Hermes provider API key is required for %s", docker.HermesModelProviderOrDefault(hermesConf.ModelProvider))
 	}
+	installed, err := docker.ImageRefExists(docker.HermesImageOrDefault(hermesConf.Image))
+	if err != nil {
+		return fmt.Errorf("failed to inspect Hermes image: %v", err)
+	}
+	if !installed {
+		return fmt.Errorf("install the Hermes image before enabling Hermes")
+	}
 	return nil
 }
 
@@ -248,21 +298,48 @@ func refreshHermesAccessCode(hermesConf *structs.HermesConfig) error {
 	if !exists || !strings.Contains(status, "Up") {
 		return fmt.Errorf("ship %s must be running before Hermes can start", patp)
 	}
+	click.ClearLusCode(patp)
 	code, err := click.GetLusCode(patp)
 	if err != nil {
 		return fmt.Errorf("failed to fetch +code for Hermes %s: %v", patp, err)
 	}
+	zap.L().Info(fmt.Sprintf("Fetched fresh +code for Hermes %s", patp))
 	hermesConf.AccessCode = code
 	return nil
 }
 
 func recreateHermesContainer() error {
+	zap.L().Info("Recreating Hermes container")
 	stopAndDeleteHermes(false)
+	zap.L().Info("Starting Hermes container")
 	info, err := docker.StartContainer(docker.HermesContainerName, "hermes")
 	if err != nil {
 		return fmt.Errorf("couldn't start Hermes: %v", err)
 	}
 	config.UpdateContainerState(docker.HermesContainerName, info)
+	zap.L().Info("Hermes container started")
+	return nil
+}
+
+func restartHermesContainer() error {
+	if _, err := docker.FindContainer(docker.HermesContainerName); err != nil {
+		zap.L().Warn(fmt.Sprintf("Hermes container missing during restart, creating a new one: %v", err))
+		return recreateHermesContainer()
+	}
+	zap.L().Info("Restarting Hermes container")
+	if err := docker.RestartContainerByName(docker.HermesContainerName); err != nil {
+		return fmt.Errorf("couldn't restart Hermes: %v", err)
+	}
+	if info, err := docker.FindContainer(docker.HermesContainerName); err == nil && info != nil {
+		config.UpdateContainerState(docker.HermesContainerName, structs.ContainerState{
+			ID:           info.ID,
+			Name:         docker.HermesContainerName,
+			Image:        info.Image,
+			Type:         "hermes",
+			ActualStatus: info.State,
+		})
+	}
+	zap.L().Info("Hermes container restarted")
 	return nil
 }
 
@@ -297,6 +374,7 @@ func disableHermesIfAssignedTo(patp string) {
 
 func stopAndDeleteHermes(deleteVolume bool) {
 	if existing, err := docker.FindContainer(docker.HermesContainerName); err == nil && existing != nil {
+		zap.L().Info("Stopping existing Hermes container")
 		if existing.State == "running" {
 			if err := docker.StopContainerByName(docker.HermesContainerName); err != nil {
 				zap.L().Warn(fmt.Sprintf("Couldn't stop Hermes container: %v", err))
@@ -348,7 +426,12 @@ func isPinnedImageRef(ref string) bool {
 
 func failHermesTransition(kind string, err error) {
 	zap.L().Error(fmt.Sprintf("Hermes %s failed: %v", kind, err))
+	docker.HermesTransBus <- structs.Event{Type: "error", Data: err.Error()}
 	docker.HermesTransBus <- structs.Event{Type: kind, Data: "error"}
+}
+
+func clearHermesError() {
+	docker.HermesTransBus <- structs.Event{Type: "error", Data: nil}
 }
 
 func clearHermesTransition(kind string) {

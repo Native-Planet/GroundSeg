@@ -6,6 +6,7 @@
 
   import Sigil from './Sigil.svelte'
   import StartramToggle from './StartramToggle.svelte'
+  import VereTagSelect from './VereTagSelect.svelte'
   import NameBar from './NameBar.svelte'
   import ContainerInfo from './ContainerInfo.svelte'
   import ShipButtons from './ShipButtons.svelte'
@@ -19,6 +20,10 @@
   $: remoteReady = (ship?.remoteReady) || false
   $: showUrbAlias = (ship?.showUrbAlias) || false
   $: urbitAlias = (ship?.urbitAlias) || ""
+  $: urbitVersion = (ship?.urbitVersion) || ""
+  $: urbitImageTagOverride = (ship?.urbitImageTagOverride) || ""
+  $: versionServerVereTag = (ship?.versionServerVereTag) || ""
+  $: vereTags = (ship?.vereTags) || []
 
   $: url = (ship?.url) || "#"
   let urlType;
@@ -62,6 +67,15 @@
   </div>
   <div class="container-info">
     <ContainerInfo {running} {memUsage} {diskUsage} loom={loomActual} />
+  </div>
+  <div class="vere-tag">
+    <VereTagSelect
+      {patp}
+      {urbitVersion}
+      {urbitImageTagOverride}
+      {versionServerVereTag}
+      {vereTags}
+    />
   </div>
   <div class="buttons">
     <ShipButtons {patp} url={displayedUrl} />
@@ -107,6 +121,11 @@
   .container-info {
     position: absolute;
     bottom: 12px;
+    left: 14px;
+  }
+  .vere-tag {
+    position: absolute;
+    top: 102px;
     left: 14px;
   }
   .buttons {
