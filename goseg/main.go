@@ -251,7 +251,10 @@ func main() {
 	} else {
 		versionStruct := config.LocalVersion()
 		releaseChannel := conf.UpdateBranch
-		targetChan := versionStruct.Groundseg[releaseChannel]
+		targetChan, selectedChannel, exactChannel := config.SelectVersionChannel(versionStruct, releaseChannel)
+		if !exactChannel {
+			zap.L().Warn(fmt.Sprintf("Version channel %q not found locally; using %q", releaseChannel, selectedChannel))
+		}
 		config.VersionInfo = targetChan
 	}
 	// routines/version.go
@@ -316,7 +319,10 @@ func main() {
 			zap.L().Warn("Could not retrieve version info after 10 seconds!")
 			versionStruct := config.LocalVersion()
 			releaseChannel := conf.UpdateBranch
-			targetChan := versionStruct.Groundseg[releaseChannel]
+			targetChan, selectedChannel, exactChannel := config.SelectVersionChannel(versionStruct, releaseChannel)
+			if !exactChannel {
+				zap.L().Warn(fmt.Sprintf("Version channel %q not found locally; using %q", releaseChannel, selectedChannel))
+			}
 			config.VersionInfo = targetChan
 		}
 	}

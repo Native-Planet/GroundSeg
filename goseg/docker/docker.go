@@ -568,43 +568,67 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 // convert the version info back into json then a map lol
 // so we can easily get the correct repo/release channel/tag/hash
 func GetLatestContainerInfo(containerType string) (map[string]string, error) {
-	var res map[string]string
-	res = make(map[string]string)
 	arch := config.Architecture
 	hashLabel := arch + "_sha256"
-	versionInfo := config.VersionInfo
-	jsonData, err := json.Marshal(versionInfo)
-	if err != nil {
-		return res, err
+	detail, ok := containerVersionDetails(config.VersionInfo, containerType)
+	if !ok || strings.TrimSpace(detail.Tag) == "" || strings.TrimSpace(detail.Repo) == "" {
+		localVersion := config.LocalVersion()
+		releaseChannel := config.Conf().UpdateBranch
+		channel, selectedChannel, exactChannel := config.SelectVersionChannel(localVersion, releaseChannel)
+		if !exactChannel {
+			zap.L().Warn(fmt.Sprintf("Version channel %q not found locally; using %q", releaseChannel, selectedChannel))
+		}
+		detail, ok = containerVersionDetails(channel, containerType)
 	}
-	// Convert JSON to map
-	var m map[string]any
-	err = json.Unmarshal(jsonData, &m)
-	if err != nil {
-		return res, err
-	}
-	containerData, ok := m[containerType].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("%s data is not a map", containerType)
+		return nil, fmt.Errorf("%s data is not configured", containerType)
 	}
-	tag, ok := containerData["tag"].(string)
-	if !ok {
-		return nil, fmt.Errorf("'tag' is not a string")
+	tag := strings.TrimSpace(detail.Tag)
+	if tag == "" {
+		return nil, fmt.Errorf("%s tag is empty", containerType)
 	}
-	hashValue, ok := containerData[hashLabel].(string)
-	if !ok {
-		return nil, fmt.Errorf("'%s' is not a string", hashLabel)
+	repo := strings.TrimSpace(detail.Repo)
+	if repo == "" {
+		return nil, fmt.Errorf("%s repo is empty", containerType)
 	}
-	repo, ok := containerData["repo"].(string)
-	if !ok {
-		return nil, fmt.Errorf("'repo' is not a string")
+	hashValue := strings.TrimSpace(detail.Amd64Sha256)
+	if arch != "amd64" {
+		hashValue = strings.TrimSpace(detail.Arm64Sha256)
 	}
-	res = make(map[string]string)
-	res["tag"] = tag
-	res["hash"] = hashValue
-	res["repo"] = repo
-	res["type"] = containerType
-	return res, nil
+	if hashValue == "" {
+		return nil, fmt.Errorf("%s %s is empty", containerType, hashLabel)
+	}
+	return map[string]string{
+		"tag":  tag,
+		"hash": hashValue,
+		"repo": repo,
+		"type": containerType,
+	}, nil
+}
+
+func containerVersionDetails(channel structs.Channel, containerType string) (structs.VersionDetails, bool) {
+	switch strings.ToLower(strings.TrimSpace(containerType)) {
+	case "groundseg":
+		return channel.Groundseg, true
+	case "manual":
+		return channel.Manual, true
+	case "rustfs":
+		return channel.Rustfs, true
+	case "minio":
+		return channel.Minio, true
+	case "miniomc", "mc":
+		return channel.Miniomc, true
+	case "netdata":
+		return channel.Netdata, true
+	case "vere":
+		return channel.Vere, true
+	case "webui":
+		return channel.Webui, true
+	case "wireguard":
+		return channel.Wireguard, true
+	default:
+		return structs.VersionDetails{}, false
+	}
 }
 
 // stop a container with the name

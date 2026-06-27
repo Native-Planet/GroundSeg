@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -74,7 +75,11 @@ func CheckVersion() (structs.Channel, bool) {
 				return VersionInfo, false
 			}
 		}
-		VersionInfo = fetchedVersion.Groundseg[releaseChannel]
+		targetChannel, selectedChannel, exactChannel := SelectVersionChannel(fetchedVersion, releaseChannel)
+		if !exactChannel {
+			zap.L().Warn(fmt.Sprintf("Version channel %q not found; using %q", releaseChannel, selectedChannel))
+		}
+		VersionInfo = targetChannel
 		// debug: re-marshal and write the entire fetched version to disk
 		confPath := filepath.Join(BasePath, "settings", "version_info.json")
 		file, err := os.Create(confPath)
@@ -96,6 +101,26 @@ func CheckVersion() (structs.Channel, bool) {
 	}
 	VersionServerReady = false
 	return VersionInfo, false
+}
+
+func SelectVersionChannel(versionStruct structs.Version, releaseChannel string) (structs.Channel, string, bool) {
+	releaseChannel = strings.TrimSpace(releaseChannel)
+	if releaseChannel == "" {
+		releaseChannel = "latest"
+	}
+	if versionStruct.Groundseg == nil {
+		return structs.Channel{}, releaseChannel, false
+	}
+	if channel, ok := versionStruct.Groundseg[releaseChannel]; ok {
+		return channel, releaseChannel, true
+	}
+	if channel, ok := versionStruct.Groundseg["latest"]; ok {
+		return channel, "latest", false
+	}
+	for channelName, channel := range versionStruct.Groundseg {
+		return channel, channelName, false
+	}
+	return structs.Channel{}, releaseChannel, false
 }
 
 // write the defaults.VersionInfo value to disk

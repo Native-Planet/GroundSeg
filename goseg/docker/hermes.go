@@ -299,7 +299,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 
 func hermesGatewayCommand(hermesConf structs.HermesConfig) string {
 	return fmt.Sprintf(
-		"cat > /opt/data/config.yaml <<'EOF'\n%s\nEOF\nexec gateway run --replace --accept-hooks",
+		"cat > /opt/data/config.yaml <<'EOF'\n%s\nEOF\nexec hermes gateway run --replace --accept-hooks",
 		hermesConfigYAML(hermesConf),
 	)
 }

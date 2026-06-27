@@ -20,8 +20,10 @@
   $: isSavingVere = tVereTag == "loading"
   $: vereError = tVereTag.length > 0 && tVereTag != "loading" && tVereTag != "success" ? tVereTag : ""
   $: defaultVereTag = versionServerVereTag || urbitVersion || vere
-  $: selectableVereTags = [...new Set([urbitImageTagOverride, ...vereTags].filter(Boolean))]
-    .filter(tag => tag != defaultVereTag)
+  $: displayedVereTag = urbitImageTagOverride || defaultVereTag || "current"
+  $: versionOptions = [...new Set([defaultVereTag, urbitImageTagOverride, ...vereTags].filter(Boolean))]
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }))
+    .map(tag => ({ tag, value: tag == defaultVereTag ? "" : tag }))
   $: versionTitle = vereError || (urbitImageTagOverride
     ? `Vere image tag override: ${urbitImageTagOverride}`
     : `Vere image tag: ${defaultVereTag || "current"}`)
@@ -33,15 +35,25 @@
   let copied = false
   let draftVereTag = urbitImageTagOverride
   let lastVereTag = urbitImageTagOverride
+  let versionMenu
+  let versionMenuOpen = false
 
   $: if (urbitImageTagOverride !== lastVereTag) {
     draftVereTag = urbitImageTagOverride
     lastVereTag = urbitImageTagOverride
   }
 
-  const changeVereTag = () => {
-    if (draftVereTag !== urbitImageTagOverride) {
-      setVereTag(patp, draftVereTag)
+  const toggleVersionMenu = () => {
+    if (!isSavingVere && versionOptions.length > 0) {
+      versionMenuOpen = !versionMenuOpen
+    }
+  }
+
+  const selectVereTag = value => {
+    versionMenuOpen = false
+    draftVereTag = value
+    if (value !== urbitImageTagOverride) {
+      setVereTag(patp, value)
     }
   }
 
@@ -51,6 +63,14 @@
       copied = true;
       setTimeout(()=> copied = false, 1000)
     })
+
+    const closeVersionMenu = event => {
+      if (versionMenu && !versionMenu.contains(event.target)) {
+        versionMenuOpen = false
+      }
+    }
+    document.addEventListener('click', closeVersionMenu)
+    return () => document.removeEventListener('click', closeVersionMenu)
   })
 
 </script>
@@ -58,18 +78,34 @@
 <div class="header">
   <div class="patp-wrapper">
     <div class="ship-class">{shipClass}
-      <span class="version-control" class:override={urbitImageTagOverride.length > 0} class:error={vereError.length > 0}>
-        <select
-          bind:value={draftVereTag}
-          disabled={isSavingVere}
+      <span
+        class="version-control"
+        class:open={versionMenuOpen}
+        class:override={urbitImageTagOverride.length > 0}
+        class:error={vereError.length > 0}
+        bind:this={versionMenu}>
+        <button
+          type="button"
+          disabled={isSavingVere || versionOptions.length == 0}
           title={versionTitle}
           aria-label="Vere image tag"
-          on:change={changeVereTag}>
-          <option value="">{(defaultVereTag || "current").toUpperCase()}</option>
-          {#each selectableVereTags as tag}
-            <option value={tag}>{tag.toUpperCase()}</option>
-          {/each}
-        </select>
+          aria-expanded={versionMenuOpen}
+          on:click|stopPropagation={toggleVersionMenu}>
+          {displayedVereTag.toUpperCase()}
+        </button>
+        {#if versionMenuOpen}
+          <div class="version-menu" role="listbox" aria-label="Vere image tags">
+            {#each versionOptions as option}
+              <button
+                type="button"
+                class:active={option.value == draftVereTag}
+                class:default={option.value == ""}
+                on:click={() => selectVereTag(option.value)}>
+                {option.tag.toUpperCase()}
+              </button>
+            {/each}
+          </div>
+        {/if}
       </span>
       {#if isSavingVere}
         <sup class="version-status">SAVING</sup>
@@ -136,12 +172,13 @@
     position: relative;
     vertical-align: super;
     margin-left: 5px;
+    z-index: 10;
   }
   .version-control::after {
     content: "";
     position: absolute;
-    right: 5px;
-    top: 9px;
+    right: 7px;
+    top: 12px;
     width: 0;
     height: 0;
     border-left: 3px solid transparent;
@@ -149,36 +186,80 @@
     border-top: 4px solid var(--text-card-color);
     pointer-events: none;
   }
-  .version-control select {
-    appearance: none;
+  .version-control.open::after {
+    transform: rotate(180deg);
+  }
+  .version-control > button {
     background: transparent;
     border: 1px solid var(--Gray-400, #5C7060);
     border-radius: 4px;
     color: var(--text-card-color);
     cursor: pointer;
     font-family: var(--title-font);
-    font-size: 11px;
+    font-size: 18px;
     font-weight: 700;
-    height: 22px;
+    height: 30px;
     letter-spacing: 0;
-    max-width: 134px;
-    min-width: 58px;
+    line-height: 28px;
+    max-width: 150px;
+    min-width: 74px;
     overflow: hidden;
-    padding: 0 15px 0 5px;
+    padding: 0 20px 0 7px;
     text-overflow: ellipsis;
     text-transform: uppercase;
     white-space: nowrap;
   }
-  .version-control.override select {
+  .version-control.override > button {
     background: var(--Gray-400, #5C7060);
   }
-  .version-control.error select {
+  .version-control.error > button {
     border-color: #d45151;
     color: #ffd4d4;
   }
-  .version-control select:disabled {
+  .version-control > button:disabled {
     cursor: default;
     opacity: .6;
+  }
+  .version-menu {
+    position: absolute;
+    top: 34px;
+    left: 0;
+    width: 162px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--Gray-400, #5C7060);
+    border-radius: 6px;
+    background: var(--bg-modal, #F5F1E8);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .22);
+    padding: 4px;
+  }
+  .version-menu button {
+    display: block;
+    width: 100%;
+    height: 29px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--NP_Black, #313933);
+    cursor: pointer;
+    font-family: var(--title-font);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0;
+    overflow: hidden;
+    padding: 0 8px;
+    text-align: left;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .version-menu button:hover,
+  .version-menu button.active {
+    background: var(--Gray-400, #5C7060);
+    color: #fff;
+  }
+  .version-menu button.default {
+    border-bottom: 1px solid rgba(49, 57, 51, .18);
   }
   .version-status {
     margin-left: 5px;

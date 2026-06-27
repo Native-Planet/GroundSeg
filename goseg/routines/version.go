@@ -43,7 +43,10 @@ func CheckVersionLoop() {
 }
 
 func callUpdater(releaseChannel string) {
-	currentChannelVersion := config.LocalVersion().Groundseg[releaseChannel]
+	currentChannelVersion, selectedChannel, exactChannel := config.SelectVersionChannel(config.LocalVersion(), releaseChannel)
+	if !exactChannel {
+		zap.L().Warn(fmt.Sprintf("Version channel %q not found locally; using %q", releaseChannel, selectedChannel))
+	}
 	// Get latest information
 	latestVersion, _ := config.CheckVersion()
 	latestChannelVersion := latestVersion
