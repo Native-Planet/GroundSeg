@@ -80,8 +80,8 @@ jobs:
         if: steps.args.outputs.push == 'true'
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: nativeplanet
+          password: ${{ secrets.DOCKER_PAT }}
 
       - name: Build Hermes image
         uses: docker/build-push-action@v6
