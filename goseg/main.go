@@ -164,6 +164,7 @@ func startServer() { // *http.Server {
 	w.HandleFunc("/keys/operation", handler.KeysOperationHandler)
 	w.HandleFunc("/keys/wallet/prepare", handler.KeysPrepareWalletHandler)
 	w.HandleFunc("/keys/wallet/submit", handler.KeysSubmitWalletHandler)
+	w.HandleFunc("/config/files", handler.ConfigFilesHandler)
 	wsServer := &http.Server{
 		Addr:    ":3000",
 		Handler: w,

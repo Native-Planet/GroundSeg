@@ -78,3 +78,38 @@ func TestLoadAndUpdateUrbitConfigKeepsLegacyCustomS3Field(t *testing.T) {
 		t.Fatalf("expected remote field to persist, got %q", saved.CustomS3WebRemote)
 	}
 }
+
+func TestReplaceUrbitConfigJSONValidatesAndUpdatesMemory(t *testing.T) {
+	oldBasePath := BasePath
+	oldConfigs := UrbitsConfig
+	t.Cleanup(func() {
+		BasePath = oldBasePath
+		UrbitsConfig = oldConfigs
+	})
+
+	BasePath = t.TempDir()
+	UrbitsConfig = make(map[string]structs.UrbitDocker)
+	pier := "sampel-palnet"
+
+	if _, err := ReplaceUrbitConfigJSON(pier, []byte(`{"pier_name":"wrong-palnet"}`)); err == nil {
+		t.Fatalf("expected mismatched pier_name to fail")
+	}
+	if _, err := ReplaceUrbitConfigJSON(pier, []byte(`{"minio_linked":"not-a-bool"}`)); err == nil {
+		t.Fatalf("expected invalid field type to fail")
+	}
+
+	formatted, err := ReplaceUrbitConfigJSON(pier, []byte(`{"pier_name":"sampel-palnet","http_port":8080,"ames_port":34343}`))
+	if err != nil {
+		t.Fatalf("failed to replace urbit config: %v", err)
+	}
+	if !json.Valid(formatted) {
+		t.Fatalf("formatted config is not valid JSON: %s", string(formatted))
+	}
+	conf := UrbitConf(pier)
+	if conf.PierName != pier {
+		t.Fatalf("in-memory pier_name = %q, want %q", conf.PierName, pier)
+	}
+	if conf.HTTPPort != 8080 {
+		t.Fatalf("in-memory http_port = %d, want 8080", conf.HTTPPort)
+	}
+}

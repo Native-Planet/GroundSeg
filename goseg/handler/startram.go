@@ -110,14 +110,8 @@ func handleStartramRestart() {
 				if err := click.BarExit(patp); err != nil {
 					zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
 				} else {
-					for {
-						exited, err := shipExited(patp)
-						if err == nil {
-							if !exited {
-								continue
-							}
-						}
-						break
+					if _, err := shipExited(patp); err != nil {
+						zap.L().Warn(fmt.Sprintf("Timed out waiting for %s to exit cleanly: %v", patp, err))
 					}
 				}
 			}
@@ -447,6 +441,7 @@ func handleNotImplement(action string) {
 }
 
 func shipExited(patp string) (bool, error) {
+	deadline := time.Now().Add(90 * time.Second)
 	for {
 		statuses, err := docker.GetShipStatus([]string{patp})
 		if err != nil {
@@ -457,6 +452,10 @@ func shipExited(patp string) (bool, error) {
 			return false, fmt.Errorf("%s status doesn't exist", patp)
 		}
 		if strings.Contains(status, "Up") {
+			if time.Now().After(deadline) {
+				return false, fmt.Errorf("%s is still %s", patp, status)
+			}
+			time.Sleep(500 * time.Millisecond)
 			continue
 		}
 		return true, nil
