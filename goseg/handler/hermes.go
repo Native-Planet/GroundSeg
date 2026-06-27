@@ -179,7 +179,7 @@ func handleHermesRestart() {
 		failHermesTransition("restart", err)
 		return
 	}
-	docker.HermesTransBus <- structs.Event{Type: "restart", Data: "restarting"}
+	docker.HermesTransBus <- structs.Event{Type: "restart", Data: "recreating"}
 	if err := recreateHermesContainer(); err != nil {
 		failHermesTransition("restart", err)
 		return

@@ -21,6 +21,8 @@ const (
 	HermesWorkspaceVolumeName       = "hermes_workspace"
 	HermesUrbitHostName             = "groundseg-urbit.local"
 	HermesTlonSkillDir              = "/opt/data/tlon-skill"
+	hermesConfigVersionLabel        = "nativeplanet.groundseg.hermes.config-version"
+	hermesConfigVersion             = "2026-06-27-shell-env"
 	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
@@ -281,6 +283,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		Image:        HermesImageOrDefault(hermesConf.Image),
 		Env:          environment,
 		Cmd:          []string{"sh", "-lc", hermesGatewayCommand(hermesConf)},
+		Labels:       map[string]string{hermesConfigVersionLabel: hermesConfigVersion},
 		ExposedPorts: nat.PortSet{dashboardPort: struct{}{}},
 	}
 	hostConfig = container.HostConfig{

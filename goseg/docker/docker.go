@@ -374,6 +374,21 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		}
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
 		zap.L().Info(msg)
+	case containerConfigChanged(existingContainer, containerConfig):
+		err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
+		if err != nil {
+			return containerState, err
+		}
+		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		if err != nil {
+			return containerState, err
+		}
+		err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
+		if err != nil {
+			return containerState, err
+		}
+		msg := fmt.Sprintf("Recreated %s with updated container config", containerName)
+		zap.L().Info(msg)
 	case existingContainer.State == "exited":
 		err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
 		if err != nil {
@@ -455,6 +470,18 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		Host:          hostConfig,                    // host.Config struct constructed above
 	}
 	return containerState, err
+}
+
+func containerConfigChanged(existingContainer *container.Summary, desiredConfig container.Config) bool {
+	if existingContainer == nil || len(desiredConfig.Labels) == 0 {
+		return false
+	}
+	for key, desiredValue := range desiredConfig.Labels {
+		if existingContainer.Labels[key] != desiredValue {
+			return true
+		}
+	}
+	return false
 }
 
 // create a stopped container

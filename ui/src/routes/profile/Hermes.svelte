@@ -60,6 +60,7 @@
     "fetching-code": "Fetching +code",
     "starting": "Starting",
     "stopping": "Stopping",
+    "recreating": "Recreating",
     "restarting": "Restarting",
     "success": "Success",
     "error": "Error"
@@ -260,9 +261,9 @@
   }
   .top {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 585px;
+    grid-template-columns: 1fr;
     align-items: flex-start;
-    gap: 24px;
+    gap: 20px;
   }
   .status-row {
     display: flex;
@@ -283,11 +284,14 @@
   .controls {
     display: grid;
     grid-template-columns: 168px 135px 96px 150px;
+    grid-auto-rows: 65px;
     align-items: center;
     gap: 12px;
     justify-content: stretch;
-    min-height: 65px;
+    height: 65px;
     width: 585px;
+    max-width: 100%;
+    overflow: hidden;
   }
   .grid {
     display: grid;
@@ -414,15 +418,6 @@
     display: none;
   }
 
-  @media (max-width: 1080px) {
-    .top {
-      grid-template-columns: 1fr;
-    }
-    .controls {
-      max-width: 100%;
-    }
-  }
-
   @media (max-width: 760px) {
     .container {
       padding: 32px 16px;
@@ -439,7 +434,9 @@
     }
     .controls {
       grid-template-columns: minmax(0, 1fr) 135px;
-      gap: 12px;
+      grid-auto-rows: 65px;
+      height: 142px;
+      overflow: visible;
     }
     .save, .restart, .install, .dashboard {
       font-size: 20px;
