@@ -19,10 +19,9 @@ const (
 	HermesContainerName             = "hermes"
 	HermesDataVolumeName            = "hermes"
 	HermesWorkspaceVolumeName       = "hermes_workspace"
-	HermesUrbitHostName             = "groundseg-urbit.local"
 	HermesTlonSkillDir              = "/opt/data/tlon-skill"
 	hermesConfigVersionLabel        = "nativeplanet.groundseg.hermes.config-version"
-	hermesConfigVersion             = "2026-06-27-shell-env"
+	hermesConfigVersion             = "2026-06-27-remote-url"
 	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
@@ -432,16 +431,13 @@ func yamlString(value string) string {
 
 func hermesShipTargetForContainer(shipConf structs.UrbitDocker) (hermesShipTarget, error) {
 	if shipConf.Network == "wireguard" {
-		if shipConf.WgHTTPPort <= 0 {
-			return hermesShipTarget{}, fmt.Errorf("wireguard HTTP port is not configured for Hermes")
+		remoteURL := UrbitRemoteWebURL(shipConf)
+		if remoteURL == "" {
+			return hermesShipTarget{}, fmt.Errorf("remote URL is not configured for Hermes")
 		}
-		ip, err := getContainerIPv4("wireguard")
-		if err != nil {
-			return hermesShipTarget{}, err
-		}
+
 		return hermesShipTarget{
-			URL:        fmt.Sprintf("http://%s:%d", HermesUrbitHostName, shipConf.WgHTTPPort),
-			ExtraHosts: []string{fmt.Sprintf("%s:%s", HermesUrbitHostName, ip)},
+			URL: remoteURL,
 		}, nil
 	}
 	if shipConf.HTTPPort <= 0 {
@@ -451,6 +447,43 @@ func hermesShipTargetForContainer(shipConf structs.UrbitDocker) (hermesShipTarge
 		URL:        fmt.Sprintf("http://host.docker.internal:%d", shipConf.HTTPPort),
 		ExtraHosts: []string{"host.docker.internal:host-gateway"},
 	}, nil
+}
+
+func UrbitWebURL(localHost string, shipConf structs.UrbitDocker) string {
+	if remoteURL := UrbitRemoteWebURL(shipConf); remoteURL != "" {
+		return remoteURL
+	}
+	localHost = strings.TrimSpace(localHost)
+	if localHost == "" || shipConf.HTTPPort <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("http://%s:%d", localHost, shipConf.HTTPPort)
+}
+
+func UrbitRemoteWebURL(shipConf structs.UrbitDocker) string {
+	if shipConf.Network != "wireguard" {
+		return ""
+	}
+	remoteURL := strings.TrimSpace(shipConf.WgURL)
+	customURL := strings.TrimSpace(shipConf.CustomUrbitWeb)
+	if strings.EqualFold(customURL, "null") {
+		customURL = ""
+	}
+	if shipConf.ShowUrbitWeb == "custom" && customURL != "" {
+		remoteURL = customURL
+	}
+	return normalizeHermesURL(remoteURL)
+}
+
+func normalizeHermesURL(rawURL string) string {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return ""
+	}
+	if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
+		return rawURL
+	}
+	return "https://" + rawURL
 }
 
 func hermesDashboardHostIP() string {

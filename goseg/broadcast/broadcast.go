@@ -263,9 +263,11 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			bootStatus = false
 		}
 		setRemote := false
-		urbitURL := fmt.Sprintf("http://%s:%d", hostName, dockerConfig.HTTPPort)
+		urbitURL := docker.UrbitWebURL(hostName, dockerConfig)
+		if urbitURL == "" {
+			urbitURL = "#"
+		}
 		if dockerConfig.Network == "wireguard" {
-			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 			setRemote = true
 		}
 		remoteReady := false
