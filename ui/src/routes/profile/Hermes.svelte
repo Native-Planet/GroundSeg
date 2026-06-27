@@ -9,12 +9,16 @@
   $: enabled = info?.enabled || false
   $: running = info?.running || false
   $: url = info?.url || "#"
+  $: providerApiKeySaved = info?.providerApiKeySet || false
+  $: savedModelProvider = info?.modelProvider || "openrouter"
+  $: providerApiKeyPlaceholder = providerApiKeySaved && modelProvider == savedModelProvider ? "Saved" : ""
+  $: providerApiKeyReady = providerApiKey.trim().length > 0 || providerApiKeyPlaceholder.length > 0
   $: tToggle = transition?.toggle || ""
   $: tSave = transition?.save || ""
   $: tRestart = transition?.restart || ""
   $: selectedShipKey = selectedShip.replace(/^~/, "")
   $: attachedRunning = ($structure?.urbits?.[selectedShipKey]?.info?.running) || false
-  $: canConfigure = selectedShip.length > 0 && owner.trim().length > 0
+  $: canConfigure = selectedShip.length > 0 && owner.trim().length > 0 && providerApiKeyReady
   $: canToggle = enabled || (canConfigure && attachedRunning)
   $: busy = tToggle.length > 0 || tSave.length > 0 || tRestart.length > 0
   $: dashboardReady = running && url != "#"
@@ -25,8 +29,15 @@
   let image = ""
   let modelProvider = "openrouter"
   let model = "deepseek/deepseek-v4-flash"
+  let providerApiKey = ""
   let dirty = false
   let showAdvanced = false
+
+  const providers = [
+    { value: "openrouter", label: "OpenRouter" },
+    { value: "openai", label: "OpenAI" },
+    { value: "anthropic", label: "Anthropic" }
+  ]
 
   $: if (tSave == "success" || tToggle == "success") {
     dirty = false
@@ -39,10 +50,16 @@
     image = info?.image || ""
     modelProvider = info?.modelProvider || "openrouter"
     model = info?.model || "deepseek/deepseek-v4-flash"
+    providerApiKey = ""
   }
 
   const markDirty = () => {
     dirty = true
+  }
+
+  const changeProvider = () => {
+    providerApiKey = ""
+    markDirty()
   }
 
   const payload = () => ({
@@ -51,7 +68,8 @@
     port: Number(port),
     image: image.trim(),
     modelProvider: modelProvider.trim(),
-    model: model.trim()
+    model: model.trim(),
+    providerApiKey: providerApiKey.trim()
   })
 
   const save = () => {
@@ -81,7 +99,7 @@
       {/if}
       <button
         class="restart"
-        disabled={!enabled || tRestart.length > 0}
+        disabled={!enabled || !providerApiKeySaved || tRestart.length > 0}
         class:success={tRestart == "success"}
         on:click={hermesRestart}>
         {#if tRestart == "loading"}
@@ -115,12 +133,28 @@
 
   <div class="grid">
     <label>
+      <span>Provider</span>
+      <select bind:value={modelProvider} on:change={changeProvider}>
+        {#each providers as provider}
+          <option value={provider.value}>{provider.label}</option>
+        {/each}
+      </select>
+    </label>
+    <label>
       <span>Model</span>
       <input bind:value={model} on:input={markDirty} />
     </label>
+  </div>
+
+  <div class="grid key-grid">
     <label>
-      <span>Provider</span>
-      <input bind:value={modelProvider} on:input={markDirty} />
+      <span>API Key</span>
+      <input
+        type="password"
+        autocomplete="off"
+        bind:value={providerApiKey}
+        on:input={markDirty}
+        placeholder={providerApiKeyPlaceholder} />
     </label>
   </div>
 
@@ -170,7 +204,6 @@
     width: calc(1104px - (56px * 2));
     max-width: 98vw;
     padding: 56px;
-    box-sizing: border-box;
   }
   .top {
     display: flex;
@@ -205,6 +238,9 @@
     grid-template-columns: 1fr 1fr;
     gap: 24px;
     margin-top: 32px;
+  }
+  .key-grid {
+    grid-template-columns: 1fr;
   }
   label {
     display: flex;

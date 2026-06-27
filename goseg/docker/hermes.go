@@ -37,10 +37,36 @@ func HermesImageOrDefault(image string) string {
 }
 
 func HermesModelProviderOrDefault(provider string) string {
-	if provider = strings.TrimSpace(provider); provider != "" {
+	if provider = NormalizeHermesModelProvider(provider); provider != "" {
 		return provider
 	}
 	return DefaultHermesModelProvider
+}
+
+func NormalizeHermesModelProvider(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "openrouter":
+		return "openrouter"
+	case "openai":
+		return "openai"
+	case "anthropic":
+		return "anthropic"
+	default:
+		return ""
+	}
+}
+
+func HermesProviderAPIKeyEnv(provider string) string {
+	switch NormalizeHermesModelProvider(provider) {
+	case "openrouter":
+		return "OPENROUTER_API_KEY"
+	case "openai":
+		return "OPENAI_API_KEY"
+	case "anthropic":
+		return "ANTHROPIC_API_KEY"
+	default:
+		return ""
+	}
 }
 
 func HermesModelOrDefault(model string) string {
@@ -209,7 +235,15 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		fmt.Sprintf("TLON_SHIP_NAME=%s", attachedShip),
 		fmt.Sprintf("TLON_SHIP_CODE=%s", accessCode),
 	}
-	environment = append(environment, inheritedHermesEnv()...)
+	apiKeyEnv := HermesProviderAPIKeyEnv(hermesConf.ModelProvider)
+	apiKey := strings.TrimSpace(hermesConf.ProviderAPIKey)
+	if apiKeyEnv == "" {
+		return containerConfig, hostConfig, fmt.Errorf("unsupported Hermes provider %q", hermesConf.ModelProvider)
+	}
+	if apiKey == "" {
+		return containerConfig, hostConfig, fmt.Errorf("Hermes provider API key is not configured")
+	}
+	environment = append(environment, fmt.Sprintf("%s=%s", apiKeyEnv, apiKey))
 
 	dashboardPort := nat.Port(fmt.Sprintf("%d/tcp", HermesDashboardContainerPort))
 	containerConfig = container.Config{
@@ -253,23 +287,6 @@ func hermesShipURL(shipConf structs.UrbitDocker) (string, error) {
 		return "", fmt.Errorf("HTTP port is not configured for Hermes")
 	}
 	return fmt.Sprintf("http://host.docker.internal:%d", shipConf.HTTPPort), nil
-}
-
-func inheritedHermesEnv() []string {
-	keys := []string{
-		"OPENAI_API_KEY",
-		"OPENROUTER_API_KEY",
-		"ANTHROPIC_API_KEY",
-		"BRAVE_API_KEY",
-		"BRAVE_SEARCH_API_KEY",
-	}
-	var env []string
-	for _, key := range keys {
-		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-			env = append(env, fmt.Sprintf("%s=%s", key, value))
-		}
-	}
-	return env
 }
 
 func hermesDashboardHostIP() string {

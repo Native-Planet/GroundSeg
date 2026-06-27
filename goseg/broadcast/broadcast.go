@@ -474,6 +474,7 @@ func constructProfileInfo() structs.Profile {
 	hermesInfo.Info.TlonAdapterRef = docker.HermesTlonAdapterRefOrDefault(hermesConf.TlonAdapterRef)
 	hermesInfo.Info.ModelProvider = docker.HermesModelProviderOrDefault(hermesConf.ModelProvider)
 	hermesInfo.Info.Model = docker.HermesModelOrDefault(hermesConf.Model)
+	hermesInfo.Info.ProviderAPIKeySet = strings.TrimSpace(hermesConf.ProviderAPIKey) != ""
 	for _, pier := range conf.Piers {
 		hermesInfo.Info.Ships = append(hermesInfo.Info.Ships, docker.NormalizeHermesShip(pier))
 	}

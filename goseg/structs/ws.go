@@ -320,14 +320,15 @@ type WsHermesPayload struct {
 }
 
 type WsHermesAction struct {
-	Type          string `json:"type"`
-	Action        string `json:"action"`
-	Ship          string `json:"ship"`
-	Owner         string `json:"owner"`
-	Port          int    `json:"port"`
-	Image         string `json:"image"`
-	Model         string `json:"model"`
-	ModelProvider string `json:"modelProvider"`
+	Type           string `json:"type"`
+	Action         string `json:"action"`
+	Ship           string `json:"ship"`
+	Owner          string `json:"owner"`
+	Port           int    `json:"port"`
+	Image          string `json:"image"`
+	Model          string `json:"model"`
+	ModelProvider  string `json:"modelProvider"`
+	ProviderAPIKey string `json:"providerApiKey"`
 }
 
 type WsDevAction struct {

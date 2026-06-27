@@ -137,6 +137,7 @@ type Hermes struct {
 		TlonAdapterRef     string   `json:"tlonAdapterRef"`
 		ModelProvider      string   `json:"modelProvider"`
 		Model              string   `json:"model"`
+		ProviderAPIKeySet  bool     `json:"providerApiKeySet"`
 		Ships              []string `json:"ships"`
 	} `json:"info"`
 	Transition HermesTransition `json:"transition"`

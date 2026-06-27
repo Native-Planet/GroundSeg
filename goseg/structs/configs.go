@@ -317,6 +317,7 @@ type HermesConfig struct {
 	TlonAdapterRef     string `json:"tlon_adapter_ref"`
 	ModelProvider      string `json:"model_provider"`
 	Model              string `json:"model"`
+	ProviderAPIKey     string `json:"provider_api_key"`
 	AccessCode         string `json:"access_code"`
 }
 

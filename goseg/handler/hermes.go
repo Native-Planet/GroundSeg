@@ -177,10 +177,20 @@ func applyHermesPayload(payload structs.WsHermesAction, hermesConf *structs.Herm
 		return fmt.Errorf("Hermes image must be pinned by non-latest tag or sha256 digest")
 	}
 	if provider := strings.TrimSpace(payload.ModelProvider); provider != "" {
-		hermesConf.ModelProvider = provider
+		normalizedProvider := docker.NormalizeHermesModelProvider(provider)
+		if normalizedProvider == "" {
+			return fmt.Errorf("unsupported Hermes provider %q", provider)
+		}
+		if normalizedProvider != hermesConf.ModelProvider && strings.TrimSpace(payload.ProviderAPIKey) == "" {
+			hermesConf.ProviderAPIKey = ""
+		}
+		hermesConf.ModelProvider = normalizedProvider
 	}
 	if model := strings.TrimSpace(payload.Model); model != "" {
 		hermesConf.Model = model
+	}
+	if providerAPIKey := strings.TrimSpace(payload.ProviderAPIKey); providerAPIKey != "" {
+		hermesConf.ProviderAPIKey = providerAPIKey
 	}
 	if strings.TrimSpace(hermesConf.ModelProvider) == "" {
 		hermesConf.ModelProvider = docker.DefaultHermesModelProvider
@@ -213,6 +223,13 @@ func validateRunnableHermes(hermesConf structs.HermesConfig) error {
 	}
 	if !pierExists(ship) {
 		return fmt.Errorf("Hermes ship %s is not managed by GroundSeg", docker.NormalizeHermesShip(ship))
+	}
+	apiKeyEnv := docker.HermesProviderAPIKeyEnv(hermesConf.ModelProvider)
+	if apiKeyEnv == "" {
+		return fmt.Errorf("unsupported Hermes provider %q", hermesConf.ModelProvider)
+	}
+	if strings.TrimSpace(hermesConf.ProviderAPIKey) == "" {
+		return fmt.Errorf("Hermes provider API key is required for %s", docker.HermesModelProviderOrDefault(hermesConf.ModelProvider))
 	}
 	return nil
 }

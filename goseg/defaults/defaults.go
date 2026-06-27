@@ -96,6 +96,7 @@ var (
 		TlonAdapterRef:     "b9180da6491d29933a98f6e4f1b1458ce61ca576",
 		ModelProvider:      "openrouter",
 		Model:              "deepseek/deepseek-v4-flash",
+		ProviderAPIKey:     "",
 		AccessCode:         "",
 	}
 
