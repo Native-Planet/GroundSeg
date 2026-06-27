@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+set -eu
+
+exec node /opt/tlon-apps/packages/tlon-skill/dist/tlon.cjs "$@"
