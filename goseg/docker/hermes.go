@@ -17,6 +17,7 @@ import (
 const (
 	HermesContainerName             = "hermes"
 	HermesDataVolumeName            = "hermes"
+	HermesWorkspaceVolumeName       = "hermes_workspace"
 	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.13.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
@@ -162,6 +163,9 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 	}
 	environment := []string{
 		"HERMES_HOME=/opt/data",
+		"HERMES_WORKSPACE=/workspace",
+		"HERMES_CONTAINER_HOME=/workspace/home",
+		"HOME=/workspace/home",
 		"HERMES_DASHBOARD=1",
 		"HERMES_DASHBOARD_HOST=0.0.0.0",
 		fmt.Sprintf("HERMES_DASHBOARD_PORT=%d", HermesDashboardContainerPort),
@@ -172,6 +176,12 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		fmt.Sprintf("HERMES_TLON_ADAPTER_VERSION=%s", HermesTlonAdapterVersionOrDefault(hermesConf.TlonAdapterVersion)),
 		fmt.Sprintf("HERMES_TLON_ADAPTER_REF=%s", HermesTlonAdapterRefOrDefault(hermesConf.TlonAdapterRef)),
 		"TLON_TELEMETRY=false",
+		"HERMES_TLON_TOOLSET=hermes-tlon",
+		"TERMINAL_ENV=local",
+		"TERMINAL_CWD=/workspace",
+		"TERMINAL_LOCAL_PERSISTENT=true",
+		"TERMINAL_TIMEOUT=180",
+		"TERMINAL_MAX_FOREGROUND_TIMEOUT=900",
 		"TLON_SKILL_PATH=/opt/tlon-apps/packages/tlon-skill/SKILL.md",
 		"TLON_CLI=/usr/local/bin/tlon",
 		"TLON_HOSTING=true",
@@ -216,6 +226,11 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 				Type:   mount.TypeVolume,
 				Source: HermesDataVolumeName,
 				Target: "/opt/data",
+			},
+			{
+				Type:   mount.TypeVolume,
+				Source: HermesWorkspaceVolumeName,
+				Target: "/workspace",
 			},
 		},
 		PortBindings: nat.PortMap{

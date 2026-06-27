@@ -2,13 +2,24 @@
 set -euo pipefail
 
 HERMES_HOME="${HERMES_HOME:-/opt/data}"
+HERMES_WORKSPACE="${HERMES_WORKSPACE:-/workspace}"
+HERMES_CONTAINER_HOME="${HERMES_CONTAINER_HOME:-$HERMES_WORKSPACE/home}"
+HOME="$HERMES_CONTAINER_HOME"
 HERMES_AGENT_DIR="${HERMES_AGENT_DIR:-/opt/hermes-agent}"
 TLON_ADAPTER_DIR="${TLON_ADAPTER_DIR:-/opt/tlon-apps/packages/hermes-tlon-adapter}"
 TLON_SKILL_DIR="${TLON_SKILL_DIR:-/opt/tlon-apps/packages/tlon-skill}"
 TLON_CLI="${TLON_CLI:-/usr/local/bin/tlon}"
-TERMINAL_CWD="${TERMINAL_CWD:-$HERMES_HOME}"
+TERMINAL_ENV="${TERMINAL_ENV:-local}"
+TERMINAL_CWD="${TERMINAL_CWD:-$HERMES_WORKSPACE}"
+TERMINAL_LOCAL_PERSISTENT="${TERMINAL_LOCAL_PERSISTENT:-true}"
+TERMINAL_TIMEOUT="${TERMINAL_TIMEOUT:-180}"
+TERMINAL_MAX_FOREGROUND_TIMEOUT="${TERMINAL_MAX_FOREGROUND_TIMEOUT:-900}"
+HERMES_TLON_TOOLSET="${HERMES_TLON_TOOLSET:-hermes-tlon}"
 
-export HERMES_HOME HERMES_AGENT_DIR TLON_ADAPTER_DIR TLON_SKILL_DIR TLON_CLI TERMINAL_CWD
+export HERMES_HOME HERMES_WORKSPACE HERMES_CONTAINER_HOME HOME
+export HERMES_AGENT_DIR TLON_ADAPTER_DIR TLON_SKILL_DIR TLON_CLI
+export TERMINAL_ENV TERMINAL_CWD TERMINAL_LOCAL_PERSISTENT TERMINAL_TIMEOUT TERMINAL_MAX_FOREGROUND_TIMEOUT
+export HERMES_TLON_TOOLSET
 
 if [ -z "${BRAVE_SEARCH_API_KEY:-}" ] && [ -n "${BRAVE_API_KEY:-}" ]; then
   export BRAVE_SEARCH_API_KEY="$BRAVE_API_KEY"
@@ -28,7 +39,7 @@ if [ ! -x "$TLON_CLI" ]; then
   exit 1
 fi
 
-mkdir -p "$HERMES_HOME/plugins/platforms" "$HERMES_HOME/logs" "$HERMES_HOME/memories"
+mkdir -p "$HERMES_HOME/plugins/platforms" "$HERMES_HOME/logs" "$HERMES_HOME/memories" "$HERMES_WORKSPACE" "$HERMES_CONTAINER_HOME"
 ln -sfn "$TLON_ADAPTER_DIR" "$HERMES_HOME/plugins/platforms/tlon"
 
 python3 - <<'PY'
@@ -39,6 +50,7 @@ from pathlib import Path
 import yaml
 
 home = Path(os.environ["HERMES_HOME"])
+workspace = Path(os.environ.get("HERMES_WORKSPACE") or "/workspace")
 adapter_dir = Path(os.environ["TLON_ADAPTER_DIR"])
 prompts_dir = adapter_dir / "prompts"
 prompts_root = prompts_dir.resolve()
@@ -51,6 +63,13 @@ def env_any(names, default):
         if value:
             return value
     return default
+
+
+def env_int(name, default):
+    try:
+        return int(os.environ.get(name) or default)
+    except (TypeError, ValueError):
+        return default
 
 
 values = {
@@ -133,8 +152,31 @@ tlon["enabled"] = True
 terminal = config.get("terminal")
 if not isinstance(terminal, dict):
     terminal = {}
-terminal["cwd"] = os.environ.get("TERMINAL_CWD") or str(home)
+terminal["backend"] = os.environ.get("TERMINAL_ENV") or "local"
+terminal["cwd"] = os.environ.get("TERMINAL_CWD") or str(workspace)
+terminal["timeout"] = env_int("TERMINAL_TIMEOUT", 180)
+terminal["persistent_shell"] = str(os.environ.get("TERMINAL_LOCAL_PERSISTENT") or "true").lower() in {"true", "1", "yes"}
 config["terminal"] = terminal
+
+toolset = (os.environ.get("HERMES_TLON_TOOLSET") or "hermes-tlon").strip()
+if toolset:
+    toolsets = config.get("toolsets")
+    if not isinstance(toolsets, list):
+        toolsets = []
+    if toolset not in toolsets:
+        toolsets.append(toolset)
+    config["toolsets"] = toolsets
+
+    platform_toolsets = config.get("platform_toolsets")
+    if not isinstance(platform_toolsets, dict):
+        platform_toolsets = {}
+    tlon_toolsets = platform_toolsets.get("tlon")
+    if not isinstance(tlon_toolsets, list):
+        tlon_toolsets = []
+    if toolset not in tlon_toolsets:
+        tlon_toolsets.append(toolset)
+    platform_toolsets["tlon"] = tlon_toolsets
+    config["platform_toolsets"] = platform_toolsets
 
 home_channel = (
     os.environ.get("TLON_HOME_CHANNEL")

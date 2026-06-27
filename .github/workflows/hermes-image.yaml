@@ -14,7 +14,7 @@ on:
       tlon_apps_ref:
         description: tlon-apps git ref
         required: false
-        default: b9180da6491d29933a98f6e4f1b1458ce61ca576
+        default: 1f098d21aff413c55e2abffcfe32b58f158e6846
       push:
         description: Push image to Docker Hub
         required: false
@@ -37,9 +37,9 @@ permissions:
 
 env:
   DEFAULT_IMAGE: nativeplanet/hermes-tlon
-  HERMES_IMAGE_TAG: 0.14.0-0.13.0
+  HERMES_IMAGE_TAG: 0.14.0-0.14.0
   HERMES_AGENT_REF: 2ffa1c97c09317c1d066aa5708b8ad961a4ca589
-  TLON_APPS_REF: b9180da6491d29933a98f6e4f1b1458ce61ca576
+  TLON_APPS_REF: 1f098d21aff413c55e2abffcfe32b58f158e6846
 
 jobs:
   build:

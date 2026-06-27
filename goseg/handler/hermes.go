@@ -293,6 +293,9 @@ func stopAndDeleteHermes(deleteVolume bool) {
 		if err := docker.DeleteVolume(docker.HermesDataVolumeName); err != nil {
 			zap.L().Warn(fmt.Sprintf("Couldn't delete Hermes volume: %v", err))
 		}
+		if err := docker.DeleteVolume(docker.HermesWorkspaceVolumeName); err != nil {
+			zap.L().Warn(fmt.Sprintf("Couldn't delete Hermes workspace volume: %v", err))
+		}
 	}
 	config.DeleteContainerState(docker.HermesContainerName)
 }

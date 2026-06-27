@@ -15,12 +15,15 @@ LABEL org.nativeplanet.hermes.tlon-apps-ref="${TLON_APPS_REF}"
 
 ENV HERMES_AGENT_DIR=/opt/hermes-agent
 ENV HERMES_VENV=/opt/hermes-venv
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright
 ENV TLON_APPS_DIR=/opt/tlon-apps
 ENV TLON_ADAPTER_DIR=/opt/tlon-apps/packages/hermes-tlon-adapter
 ENV TLON_SKILL_DIR=/opt/tlon-apps/packages/tlon-skill
 ENV TLON_CLI=/usr/local/bin/tlon
 ENV TLON_SKILL_PATH=/opt/tlon-apps/packages/tlon-skill/SKILL.md
 ENV HERMES_HOME=/opt/data
+ENV HERMES_WORKSPACE=/workspace
+ENV HERMES_CONTAINER_HOME=/workspace/home
 ENV HERMES_WEB_DIST=/opt/hermes-agent/hermes_cli/web_dist
 ENV HERMES_DASHBOARD=1
 ENV HERMES_DASHBOARD_HOST=0.0.0.0
@@ -28,7 +31,11 @@ ENV HERMES_DASHBOARD_PORT=9119
 ENV HERMES_MODEL_PROVIDER=openrouter
 ENV HERMES_MODEL=deepseek/deepseek-v4-flash
 ENV TLON_TELEMETRY=false
-ENV TERMINAL_CWD=/opt/data
+ENV TERMINAL_ENV=local
+ENV TERMINAL_CWD=/workspace
+ENV TERMINAL_LOCAL_PERSISTENT=true
+ENV TERMINAL_TIMEOUT=180
+ENV TERMINAL_MAX_FOREGROUND_TIMEOUT=900
 ENV PATH="/opt/hermes-venv/bin:/root/.bun/bin:${PATH}"
 
 RUN apt-get update \
@@ -47,6 +54,7 @@ RUN apt-get update \
     python3-pip \
     python3-venv \
     ripgrep \
+    tini \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
@@ -59,6 +67,7 @@ RUN git clone --filter=blob:none "${HERMES_AGENT_REPO}" "${HERMES_AGENT_DIR}" \
 
 RUN cd "${HERMES_AGENT_DIR}" \
   && npm install --prefer-offline --no-audit \
+  && npx playwright install --with-deps chromium --only-shell \
   && cd web \
   && npm install --prefer-offline --no-audit \
   && npm run build \
@@ -85,11 +94,17 @@ RUN cd "${TLON_APPS_DIR}" \
   && "${TLON_CLI}" --version \
   && pnpm store prune
 
-RUN mkdir -p "${HERMES_HOME}"
-VOLUME [ "/opt/data" ]
+RUN mkdir -p "${HERMES_HOME}" "${HERMES_WORKSPACE}" "${HERMES_CONTAINER_HOME}" \
+  && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
+  && ln -sf /root/.bun/bin/bun /usr/local/bin/bunx \
+  && ln -sf /usr/bin/python3 /usr/local/bin/python \
+  && ln -sf "${HERMES_VENV}/bin/hermes" /usr/local/bin/hermes \
+  && ln -sf "${HERMES_VENV}/bin/hermes-agent" /usr/local/bin/hermes-agent
+VOLUME [ "/opt/data", "/workspace" ]
+WORKDIR /workspace
 
 COPY entrypoint.sh /usr/local/bin/hermes-tlon-entrypoint
 RUN chmod +x /usr/local/bin/hermes-tlon-entrypoint
 
-ENTRYPOINT ["/usr/local/bin/hermes-tlon-entrypoint"]
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/hermes-tlon-entrypoint"]
 CMD ["gateway", "run", "--replace", "--accept-hooks"]
