@@ -1,0 +1,100 @@
+name: Hermes image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Docker image name to push
+        required: false
+        default: nativeplanet/hermes-tlon
+      hermes_agent_ref:
+        description: Hermes Agent git ref
+        required: false
+        default: 2ffa1c97c09317c1d066aa5708b8ad961a4ca589
+      tlon_apps_ref:
+        description: tlon-apps git ref
+        required: false
+        default: b9180da6491d29933a98f6e4f1b1458ce61ca576
+      push:
+        description: Push image to Docker Hub
+        required: false
+        type: boolean
+        default: true
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - containers/hermes/**
+      - .github/workflows/hermes-image.yaml
+  pull_request:
+    paths:
+      - containers/hermes/**
+      - .github/workflows/hermes-image.yaml
+
+permissions:
+  contents: read
+
+env:
+  DEFAULT_IMAGE: nativeplanet/hermes-tlon
+  HERMES_IMAGE_TAG: 0.14.0-0.13.0
+  HERMES_AGENT_REF: 2ffa1c97c09317c1d066aa5708b8ad961a4ca589
+  TLON_APPS_REF: b9180da6491d29933a98f6e4f1b1458ce61ca576
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: args
+        name: Resolve build arguments
+        run: |
+          set -euo pipefail
+          image="${{ github.event.inputs.image }}"
+          hermes_ref="${{ github.event.inputs.hermes_agent_ref }}"
+          tlon_ref="${{ github.event.inputs.tlon_apps_ref }}"
+          push_image="true"
+
+          if [ -z "$image" ]; then image="$DEFAULT_IMAGE"; fi
+          if [ -z "$hermes_ref" ]; then hermes_ref="$HERMES_AGENT_REF"; fi
+          if [ -z "$tlon_ref" ]; then tlon_ref="$TLON_APPS_REF"; fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            push_image="false"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.push }}" != "true" ]; then
+            push_image="false"
+          fi
+
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "hermes-ref=$hermes_ref" >> "$GITHUB_OUTPUT"
+          echo "tlon-ref=$tlon_ref" >> "$GITHUB_OUTPUT"
+          echo "push=$push_image" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: steps.args.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Hermes image
+        uses: docker/build-push-action@v6
+        with:
+          context: containers/hermes
+          file: containers/hermes/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ steps.args.outputs.push == 'true' }}
+          build-args: |
+            HERMES_AGENT_REF=${{ steps.args.outputs.hermes-ref }}
+            TLON_APPS_REF=${{ steps.args.outputs.tlon-ref }}
+          tags: |
+            ${{ steps.args.outputs.image }}:${{ env.HERMES_IMAGE_TAG }}
+            ${{ steps.args.outputs.image }}:${{ env.HERMES_IMAGE_TAG }}-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

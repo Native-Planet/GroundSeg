@@ -15,7 +15,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -285,16 +284,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 
 		minioLinked := config.GetMinIOLinkedStatus(pier)
 
-		var penpaiCompanionInstalled bool
-		if strings.Contains(pierStatus[pier], "Up") {
-			deskStatus, err := click.GetDesk(pier, "penpai", false)
-			if err != nil {
-				penpaiCompanionInstalled = false
-				zap.L().Debug(fmt.Sprintf("Broadcast failed to get penpai desk info for %v: %v", pier, err))
-			}
-			penpaiCompanionInstalled = deskStatus == "running"
-		}
-
 		var gallsegInstalled bool
 		if strings.Contains(pierStatus[pier], "Up") {
 			deskStatus, err := click.GetDesk(pier, "groundseg", false)
@@ -364,7 +353,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.NextPack = strconv.FormatInt(GetScheduledPack(pier).Unix(), 10)
 		urbit.Info.PackIntervalType = dockerConfig.MeldScheduleType
 		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
-		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
 		urbit.Info.Gallseg = gallsegInstalled
 		urbit.Info.StartramReminder = startramReminder
 		urbit.Info.ChopOnUpgrade = chopOnUpgrade
@@ -399,26 +387,13 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 
 func constructAppsInfo() structs.Apps {
 	var apps structs.Apps
-	conf := config.Conf()
-
-	// penpai
-	var modelTitles []string
-	// Iterate through penpais to extract modelTitle
-	for _, penpaiInfo := range conf.PenpaiModels {
-		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
-	}
-	apps.Penpai.Info.Models = modelTitles
-	apps.Penpai.Info.Allowed = conf.PenpaiAllow
-	apps.Penpai.Info.ActiveModel = conf.PenpaiActive
-	apps.Penpai.Info.Running = conf.PenpaiRunning
-	apps.Penpai.Info.MaxCores = runtime.NumCPU() - 1
-	apps.Penpai.Info.ActiveCores = conf.PenpaiCores
 	return apps
 }
 
 func constructProfileInfo() structs.Profile {
 	// Build startram struct
 	var startramInfo structs.Startram
+	var hermesInfo structs.Hermes
 	// Information from config
 	conf := config.Conf()
 	startramInfo.Info.Registered = conf.WgRegistered
@@ -469,9 +444,44 @@ func constructProfileInfo() structs.Profile {
 
 	// Get Regions
 	startramInfo.Info.Regions = broadcastState.Profile.Startram.Info.Regions
+
+	if err := config.LoadHermesConfig(); err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to load Hermes profile config: %v", err))
+	}
+	hermesConf := config.HermesConf()
+	hermesRunning := false
+	if hermesContainer, err := docker.FindContainer(docker.HermesContainerName); err == nil && hermesContainer != nil {
+		hermesRunning = hermesContainer.State == "running"
+	}
+	hermesURL := "#"
+	hostName := system.LocalUrl
+	if hostName == "" {
+		hostName = "nativeplanet.local"
+	}
+	if hermesConf.Port > 0 {
+		hermesURL = fmt.Sprintf("http://%s:%d", hostName, hermesConf.Port)
+	}
+	hermesInfo.Info.Enabled = hermesConf.Enabled
+	hermesInfo.Info.Running = hermesRunning
+	hermesInfo.Info.URL = hermesURL
+	hermesInfo.Info.Ship = docker.NormalizeHermesShip(hermesConf.Ship)
+	hermesInfo.Info.Owner = docker.NormalizeHermesShip(hermesConf.Owner)
+	hermesInfo.Info.Port = hermesConf.Port
+	hermesInfo.Info.Image = docker.HermesImageOrDefault(hermesConf.Image)
+	hermesInfo.Info.HermesVersion = docker.HermesVersionOrDefault(hermesConf.HermesVersion)
+	hermesInfo.Info.HermesAgentRef = docker.HermesAgentRefOrDefault(hermesConf.HermesAgentRef)
+	hermesInfo.Info.TlonAdapterVersion = docker.HermesTlonAdapterVersionOrDefault(hermesConf.TlonAdapterVersion)
+	hermesInfo.Info.TlonAdapterRef = docker.HermesTlonAdapterRefOrDefault(hermesConf.TlonAdapterRef)
+	hermesInfo.Info.ModelProvider = docker.HermesModelProviderOrDefault(hermesConf.ModelProvider)
+	hermesInfo.Info.Model = docker.HermesModelOrDefault(hermesConf.Model)
+	for _, pier := range conf.Piers {
+		hermesInfo.Info.Ships = append(hermesInfo.Info.Ships, docker.NormalizeHermesShip(pier))
+	}
+
 	// Build profile struct
 	var profile structs.Profile
 	profile.Startram = startramInfo
+	profile.Hermes = hermesInfo
 	return profile
 }
 

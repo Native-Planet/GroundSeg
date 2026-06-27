@@ -141,6 +141,16 @@ func DockerSubscriptionHandler() {
 					} else {
 						zap.L().Info(fmt.Sprintf("Ship desired status: %s", containerState.DesiredStatus))
 					}
+				} else if containerState.Type == "hermes" && containerState.DesiredStatus != "died" && containerState.DesiredStatus != "stopped" {
+					zap.L().Info("Attempting to restart Hermes after death")
+					go func(name, containerType string) {
+						time.Sleep(2 * time.Second)
+						if _, err := docker.StartContainer(name, containerType); err != nil {
+							zap.L().Error(fmt.Sprintf("Failed to restart %s after death: %v", name, err))
+						} else {
+							zap.L().Info(fmt.Sprintf("Successfully restarted %s after death", name))
+						}
+					}(contName, containerState.Type)
 				}
 				makeBroadcast(contName, string(dockerEvent.Action))
 			} else {
@@ -175,6 +185,10 @@ func makeBroadcast(contName string, status string) {
 		// update profile
 		current := broadcast.GetState()
 		current.Profile.Startram.Info.Running = wgOn
+		broadcast.UpdateBroadcast(current)
+	case docker.HermesContainerName:
+		current := broadcast.GetState()
+		current.Profile.Hermes.Info.Running = status == "start"
 		broadcast.UpdateBroadcast(current)
 	}
 	broadcast.BroadcastToClients()

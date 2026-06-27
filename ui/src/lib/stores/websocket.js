@@ -523,6 +523,33 @@ export const setAllStartramReminder = remind => {
 }
 
 //
+//  Hermes
+//
+
+export const hermesToggle = config => {
+  send({
+    "type":"hermes",
+    "action":"toggle",
+    ...config
+  })
+}
+
+export const hermesSave = config => {
+  send({
+    "type":"hermes",
+    "action":"save",
+    ...config
+  })
+}
+
+export const hermesRestart = () => {
+  send({
+    "type":"hermes",
+    "action":"restart"
+  })
+}
+
+//
 //  Upload Pier
 //
 
@@ -947,15 +974,14 @@ export const setStartramReminder = (patp, remind) => {
 //  Support
 //
 
-export const submitReport = (contact,description,ships,cpuProfile,penpai) => {
+export const submitReport = (contact,description,ships,cpuProfile) => {
   let payload = {
     "type":"support",
     "action":"bug-report",
     "contact":contact,
     "description":description,
     "ships":ships,
-    "cpu_profile":cpuProfile,
-    "penpai":penpai
+    "cpu_profile":cpuProfile
   }
   send(payload)
 }
@@ -982,70 +1008,6 @@ export const submitNetwork = (ssid,password) => {
     "type":"c2c",
     "ssid":ssid,
     "password": password
-  }
-  send(payload)
-}
-
-//
-// Penpai
-//
-
-export const toggleExperimentalPenpai = () => {
-  let payload = {
-    "type":"system",
-    "action": "toggle-penpai-feature",
-  }
-  send(payload)
-}
-
-export const togglePenpai = () => {
-  let payload = {
-    "type":"penpai",
-    "action": "toggle",
-  }
-  send(payload)
-}
-
-export const setPenpaiModel = model => {
-  let payload = {
-    "type":"penpai",
-    "action": "set-model",
-    "model": model
-  }
-  send(payload)
-}
-
-export const setPenpaiCores = cores => {
-  let payload = {
-    "type":"penpai",
-    "action": "set-cores",
-    "cores": cores
-  }
-  send(payload)
-}
-
-export const removePenpai = () => {
-  let payload = {
-    "type":"penpai",
-    "action": "remove"
-  }
-  send(payload)
-}
-
-export const installPenpaiCompanion = patp => {
-  let payload = {
-    "type":"urbit",
-    "action":"install-penpai-companion",
-    "patp":patp,
-  }
-  send(payload)
-}
-
-export const uninstallPenpaiCompanion = patp => {
-  let payload = {
-    "type":"urbit",
-    "action":"uninstall-penpai-companion",
-    "patp":patp,
   }
   send(payload)
 }

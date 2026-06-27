@@ -59,6 +59,7 @@ func BroadcastLoop() {
 
 func PreserveProfileTransitions(oldState structs.AuthBroadcast, newProfile structs.Profile) structs.Profile {
 	newProfile.Startram.Transition = oldState.Profile.Startram.Transition
+	newProfile.Hermes.Transition = oldState.Profile.Hermes.Transition
 	return newProfile
 }
 

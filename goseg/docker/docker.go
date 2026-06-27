@@ -27,6 +27,7 @@ import (
 var (
 	VolumeDir          = config.DockerDir
 	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
+	HermesTransBus     = make(chan structs.Event, 100)             // hermes profile transition bus
 	SysTransBus        = make(chan structs.SystemTransition, 100)  // system transition bus
 	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus
 	ImportShipTransBus = make(chan structs.UploadTransition, 100)  // transition event bus
@@ -288,13 +289,13 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-	case "wireguard":
-		containerConfig, hostConfig, err = wgContainerConf()
+	case "hermes":
+		containerConfig, hostConfig, err = hermesContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
-	case "llama-api":
-		containerConfig, hostConfig, err = llamaApiContainerConf()
+	case "wireguard":
+		containerConfig, hostConfig, err = wgContainerConf()
 		if err != nil {
 			return containerState, err
 		}
@@ -305,7 +306,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	var imageInfo map[string]string
 	desiredImage := containerConfig.Image
 	desiredImageID := ""
-	if containerType == "minio" {
+	if containerType == "minio" || containerType == "hermes" {
 		if desiredImage == "" {
 			return containerState, fmt.Errorf("empty image ref for %s", containerName)
 		}
@@ -457,13 +458,13 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		if err != nil {
 			return containerState, err
 		}
-	case "wireguard":
-		containerConfig, hostConfig, err = wgContainerConf()
+	case "hermes":
+		containerConfig, hostConfig, err = hermesContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
-	case "llama-api":
-		containerConfig, hostConfig, err = llamaApiContainerConf()
+	case "wireguard":
+		containerConfig, hostConfig, err = wgContainerConf()
 		if err != nil {
 			return containerState, err
 		}
@@ -472,7 +473,7 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		return containerState, errmsg
 	}
 	var desiredImage string
-	if containerType == "minio" {
+	if containerType == "minio" || containerType == "hermes" {
 		desiredImage = containerConfig.Image
 		if desiredImage == "" {
 			return containerState, fmt.Errorf("empty image ref for %s", containerName)
@@ -524,14 +525,7 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 // so we can easily get the correct repo/release channel/tag/hash
 func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	var res map[string]string
-	// hardcoded llama stuff for testing
 	res = make(map[string]string)
-	if containerType == "llama-api" {
-		res["tag"] = "dev"
-		res["hash"] = "ac2dcfac72bc3d8ee51ee255edecc10072ef9c0f958120971c00be5f4944a6fa"
-		res["repo"] = "nativeplanet/llama-gpt"
-		return res, nil
-	}
 	arch := config.Architecture
 	hashLabel := arch + "_sha256"
 	versionInfo := config.VersionInfo

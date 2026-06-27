@@ -63,8 +63,6 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.DeleteShip = event.Event
 			case "toggleMinIOLink":
 				urbitStruct.Transition.ToggleMinIOLink = event.Event
-			case "penpaiCompanion":
-				urbitStruct.Transition.PenpaiCompanion = event.Event
 			case "gallseg":
 				urbitStruct.Transition.Gallseg = event.Event
 			case "deleteService":
@@ -87,6 +85,36 @@ func UrbitTransitionHandler() {
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		}
+	}
+}
+
+func HermesTransitionHandler() {
+	for {
+		event := <-docker.HermesTransBus
+		current := broadcast.GetState()
+		switch event.Type {
+		case "toggle":
+			current.Profile.Hermes.Transition.Toggle = fmt.Sprintf("%v", event.Data)
+		case "save":
+			current.Profile.Hermes.Transition.Save = fmt.Sprintf("%v", event.Data)
+		case "restart":
+			current.Profile.Hermes.Transition.Restart = fmt.Sprintf("%v", event.Data)
+		default:
+			zap.L().Warn(fmt.Sprintf("Urecognized Hermes transition: %v", event.Type))
+			continue
+		}
+		if event.Data == nil {
+			switch event.Type {
+			case "toggle":
+				current.Profile.Hermes.Transition.Toggle = ""
+			case "save":
+				current.Profile.Hermes.Transition.Save = ""
+			case "restart":
+				current.Profile.Hermes.Transition.Restart = ""
+			}
+		}
+		broadcast.UpdateBroadcast(current)
+		broadcast.BroadcastToClients()
 	}
 }
 

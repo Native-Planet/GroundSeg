@@ -3,6 +3,7 @@
   const dispatch = createEventDispatcher()
   export let on = false
   export let loading = false
+  export let disabled = false
   let lastUserAction = null;
   let lastActionTime = 0;
   $: effectiveState = shouldIgnoreBackendState() ? lastUserAction : on;
@@ -12,7 +13,7 @@
   }
   
   function handleClick() {
-    if (!loading) {
+    if (!loading && !disabled) {
       lastUserAction = !on;
       lastActionTime = Date.now();
       dispatch('click');
@@ -26,6 +27,7 @@
 <div
   class:on={effectiveState} 
   class:loading={loading}
+  class:disabled={disabled}
   class="wrapper">
   <div class="text on-text">On</div>
   <div class="text off-text">Off</div>
@@ -96,12 +98,17 @@
     font-style: normal;
     font-weight: 300;
     line-height: 32px; /* 133.333% */
-    letter-spacing: -1.44px;
+    letter-spacing: 0;
     width: 47px;
     height: 47px;
   }
   .loading {
     opacity: .6;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .disabled {
+    opacity: .45;
     pointer-events: none;
     transition: opacity 0.3s ease;
   }

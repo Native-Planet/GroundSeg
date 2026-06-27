@@ -49,11 +49,6 @@ type SysConfig struct {
 	Pubkey         string                 `json:"pubkey"`
 	Privkey        string                 `json:"privkey"`
 	Salt           string                 `json:"salt"`
-	PenpaiAllow    bool                   `json:"penpaiAllow"`
-	PenpaiRunning  bool                   `json:"penpaiRunning"`
-	PenpaiCores    int                    `json:"penpaiCores"`
-	PenpaiModels   []Penpai               `json:"penpaiModels"`
-	PenpaiActive   string                 `json:"penpaiActive"`
 	DisableSlsa    bool                   `json:"disableSlsa"`
 	Disable502     bool                   `json:"disable502"`
 	SnapTime       int                    `json:"snapTime"`
@@ -66,12 +61,6 @@ type DiskWarning struct {
 	Eighty     bool      `json:"eighty"`
 	Ninety     bool      `json:"ninety"`
 	NinetyFive time.Time `json:"ninetyFive"`
-}
-
-type Penpai struct {
-	ModelTitle string `json:"modelTitle"`
-	ModelName  string `json:"modelName"`
-	ModelUrl   string `json:"modelUrl"`
 }
 
 // authenticated browser sessions
@@ -314,6 +303,21 @@ type McConfig struct {
 	Repo        string `json:"repo"`
 	Amd64Sha256 string `json:"amd64_sha256"`
 	Arm64Sha256 string `json:"arm64_sha256"`
+}
+
+type HermesConfig struct {
+	Enabled            bool   `json:"enabled"`
+	Ship               string `json:"ship"`
+	Owner              string `json:"owner"`
+	Port               int    `json:"port"`
+	Image              string `json:"image"`
+	HermesVersion      string `json:"hermes_version"`
+	HermesAgentRef     string `json:"hermes_agent_ref"`
+	TlonAdapterVersion string `json:"tlon_adapter_version"`
+	TlonAdapterRef     string `json:"tlon_adapter_ref"`
+	ModelProvider      string `json:"model_provider"`
+	Model              string `json:"model"`
+	AccessCode         string `json:"access_code"`
 }
 
 // nedata config json

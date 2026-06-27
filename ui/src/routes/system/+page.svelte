@@ -10,7 +10,6 @@
   import SystemDetails from './SystemDetails.svelte'
   import Power from './Power.svelte'
   import Logs from './Logs.svelte'
-  import Penpai from './Penpai.svelte'
   import Support from './Support.svelte'
   import ConfigEditor from './ConfigEditor.svelte'
 
@@ -27,7 +26,6 @@
   {#if !$URBIT_MODE}
     <Logs />
   {/if}
-  <Penpai />
   <Support />
   <ConfigEditor />
 </div>

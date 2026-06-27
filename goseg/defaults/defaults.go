@@ -84,6 +84,21 @@ var (
 		Arm64Sha256: "6825aecd2f123c9d4408e660aba8a72f9e547a3774350b8f4d2d9b674e99e424",
 	}
 
+	HermesConfig = structs.HermesConfig{
+		Enabled:            false,
+		Ship:               "",
+		Owner:              "",
+		Port:               19119,
+		Image:              "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.13.0",
+		HermesVersion:      "0.14.0",
+		HermesAgentRef:     "2ffa1c97c09317c1d066aa5708b8ad961a4ca589",
+		TlonAdapterVersion: "0.13.0",
+		TlonAdapterRef:     "b9180da6491d29933a98f6e4f1b1458ce61ca576",
+		ModelProvider:      "openrouter",
+		Model:              "deepseek/deepseek-v4-flash",
+		AccessCode:         "",
+	}
+
 	WgConfig = structs.WgConfig{
 		WireguardName:    "wireguard",
 		WireguardVersion: "latest",
@@ -162,52 +177,7 @@ func SysConfig(basePath string) structs.SysConfig {
 		Pubkey:         "",
 		Privkey:        "",
 		Salt:           "",
-		PenpaiRunning:  false,
-		PenpaiCores:    1,
 		SnapTime:       60,
-		PenpaiActive:   "TinyLlama-1.1B",
-		PenpaiModels: []structs.Penpai{
-			{
-				ModelTitle: "TinyLlama 1.1B",
-				ModelName:  "TinyLlama-1.1B",
-				ModelUrl:   "https://huggingface.co/jartine/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "Mistral 7B Instruct",
-				ModelName:  "Mistral 7B Instruct",
-				ModelUrl:   "https://huggingface.co/jartine/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "Mixtral 8x7B Instruct",
-				ModelName:  "Mixtral-8x7B-Instruct",
-				ModelUrl:   "https://huggingface.co/jartine/Mixtral-8x7B-Instruct-v0.1-llamafile/resolve/main/mixtral-8x7b-instruct-v0.1.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "WizardCoder Python 13B",
-				ModelName:  "WizardCoder-Python-13B",
-				ModelUrl:   "https://huggingface.co/jartine/wizardcoder-13b-python/resolve/main/wizardcoder-python-13b.llamafile?download=true",
-			},
-			{
-				ModelTitle: "WizardCoder Python 34B",
-				ModelName:  "WizardCoder-Python-34B",
-				ModelUrl:   "https://huggingface.co/jartine/WizardCoder-Python-34B-V1.0-llamafile/resolve/main/wizardcoder-python-34b-v1.0.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "LLaVA 1.5",
-				ModelName:  "LLaVA-1.5",
-				ModelUrl:   "https://huggingface.co/jartine/llava-v1.5-7B-GGUF/resolve/main/llava-v1.5-7b-q4.llamafile?download=true",
-			},
-			{
-				ModelTitle: "TinyLlama 1.1B",
-				ModelName:  "TinyLlama-1.1B",
-				ModelUrl:   "https://huggingface.co/jartine/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q5_K_M.llamafile?download=true",
-			},
-			{
-				ModelTitle: "Rocket 3B",
-				ModelName:  "Rocket-3B",
-				ModelUrl:   "https://huggingface.co/jartine/rocket-3B-llamafile/resolve/main/rocket-3b.Q5_K_M.llamafile?download=true",
-			},
-		},
 	}
 	return sysConfig
 }

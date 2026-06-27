@@ -8,12 +8,8 @@
   let contact = ''
   let description = ''
   let cpuProfile = false
-  let penpaiSelect = false
   let all = false
   const selectedShips = new Set()
-
-  $: penpai = ($structure?.apps?.penpai?.info) || {}
-  $: penpaiAllowed = (penpai?.allowed) || false
 
   $: urbits = ($structure?.urbits) || {}
   $: urbitKeys = Object.keys(urbits)
@@ -84,16 +80,6 @@
       {/if}
       <h2>Addtional Information</h2>
       <div class="extra-check-wrapper">
-        {#if penpaiAllowed}
-          <div class="check-wrapper extra" on:click={()=>penpaiSelect=!penpaiSelect}>
-            <div class="checkbox">
-              {#if penpaiSelect}
-                <img class="checkmark" src="/checkmark.svg" alt="checkmark"  />
-              {/if}
-            </div>
-            <div class="check-label">Send Penpai Container Logs</div>
-          </div>
-        {/if}
         <div class="check-wrapper extra" on:click={()=>cpuProfile=!cpuProfile}>
           <div class="checkbox">
             {#if cpuProfile}
@@ -108,7 +94,7 @@
       {:else}
         <button
           disabled={sendCondition}
-          on:click={()=>submitReport(contact,description,Array.from(selectedShips),cpuProfile,penpaiSelect)}
+          on:click={()=>submitReport(contact,description,Array.from(selectedShips),cpuProfile)}
           >
           {#if tBugReport == "success"}
             Success!

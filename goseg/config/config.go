@@ -44,9 +44,16 @@ var (
 	// representation of desired/actual container states
 	GSContainers = make(map[string]structs.ContainerState)
 	// channel for log stream requests
-	DockerDir     = defaults.DockerData("volumes") + "/"
-	confPath      = filepath.Join(BasePath, "settings", "system.json")
-	keyPath       = filepath.Join(BasePath, "settings", "session.key")
+	DockerDir            = defaults.DockerData("volumes") + "/"
+	confPath             = filepath.Join(BasePath, "settings", "system.json")
+	keyPath              = filepath.Join(BasePath, "settings", "session.key")
+	removedSysConfigKeys = []string{
+		"penpaiAllow",
+		"penpaiRunning",
+		"penpaiCores",
+		"penpaiModels",
+		"penpaiActive",
+	}
 	isEMMCMachine bool
 	confMutex     sync.Mutex
 	contMutex     sync.Mutex
@@ -111,6 +118,9 @@ func init() {
 	}
 	// add mising fields
 	globalConfig = mergeConfigs(defaults.SysConfig(BasePath), globalConfig)
+	if err := pruneRemovedSysConfigKeysOnDisk(); err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to prune removed config keys: %v", err))
+	}
 	// wipe the sessions on each startup
 	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
 	globalConfig.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
@@ -292,6 +302,7 @@ func UpdateConf(values map[string]any) error {
 	}
 	// update our unmarshaled struct
 	maps.Copy(configMap, values)
+	pruneRemovedSysConfigKeys(configMap)
 	if err = persistConf(configMap); err != nil {
 		return fmt.Errorf("Unable to persist config update: %v", err)
 	}
@@ -308,6 +319,7 @@ func ReplaceConfJSON(raw []byte) ([]byte, error) {
 	if len(configMap) == 0 {
 		return nil, fmt.Errorf("refusing to persist empty system configuration")
 	}
+	pruneRemovedSysConfigKeys(configMap)
 	formatted, err := json.MarshalIndent(configMap, "", "    ")
 	if err != nil {
 		return nil, fmt.Errorf("error encoding system config: %v", err)
@@ -319,6 +331,7 @@ func ReplaceConfJSON(raw []byte) ([]byte, error) {
 }
 
 func persistConf(configMap map[string]any) error {
+	pruneRemovedSysConfigKeys(configMap)
 	BasePath := getBasePath()
 	confPath := filepath.Join(BasePath, "settings", "system.json")
 	tmpFile, err := os.CreateTemp(filepath.Dir(confPath), "system.json.*")
@@ -355,6 +368,54 @@ func persistConf(configMap map[string]any) error {
 		return fmt.Errorf("error moving temp file: %v", err)
 	}
 	return nil
+}
+
+func pruneRemovedSysConfigKeys(configMap map[string]any) {
+	for _, key := range removedSysConfigKeys {
+		delete(configMap, key)
+	}
+}
+
+func pruneRemovedSysConfigKeysOnDisk() error {
+	file, err := os.ReadFile(confPath)
+	if err != nil {
+		return err
+	}
+	var configMap map[string]any
+	if err := json.Unmarshal(file, &configMap); err != nil {
+		return err
+	}
+	changed := false
+	for _, key := range removedSysConfigKeys {
+		if _, ok := configMap[key]; ok {
+			delete(configMap, key)
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	tmpFile, err := os.CreateTemp(filepath.Dir(confPath), "system.json.*")
+	if err != nil {
+		return fmt.Errorf("error creating temp file: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	encoder := json.NewEncoder(tmpFile)
+	encoder.SetIndent("", "    ")
+	if err := encoder.Encode(configMap); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("error encoding config: %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("error closing temp file: %v", err)
+	}
+	if fi, err := os.Stat(tmpPath); err != nil {
+		return fmt.Errorf("error checking temp file: %v", err)
+	} else if fi.Size() == 0 {
+		return fmt.Errorf("refusing to persist empty configuration file")
+	}
+	return os.Rename(tmpPath, confPath)
 }
 
 // we keep map[string]structs.ContainerState in memory to keep track of the containers
@@ -667,36 +728,6 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	// Salt
 	if mergedConfig.Salt == "" {
 		mergedConfig.Salt = customConfig.Salt
-	}
-
-	// PenpaiAllow
-	mergedConfig.PenpaiAllow = customConfig.PenpaiAllow || defaultConfig.PenpaiAllow
-
-	// PenpaiCores
-	if customConfig.PenpaiCores != 0 {
-		mergedConfig.PenpaiCores = customConfig.PenpaiCores
-	} else {
-		mergedConfig.PenpaiCores = defaultConfig.PenpaiCores
-	}
-
-	// PenpaiModels
-	// always use defaults as newest
-	mergedConfig.PenpaiModels = defaultConfig.PenpaiModels
-
-	// PenpaiRunning
-	mergedConfig.PenpaiRunning = customConfig.PenpaiRunning
-
-	// PenpaiActive
-	validModel := false
-	for _, model := range defaultConfig.PenpaiModels {
-		if strings.EqualFold(model.ModelName, customConfig.PenpaiActive) {
-			validModel = true
-		}
-	}
-	if customConfig.PenpaiActive != "" && validModel {
-		mergedConfig.PenpaiActive = customConfig.PenpaiActive
-	} else {
-		mergedConfig.PenpaiActive = defaultConfig.PenpaiActive
 	}
 
 	// 502 checker

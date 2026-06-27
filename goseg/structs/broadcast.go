@@ -17,18 +17,6 @@ type AuthBroadcast struct {
 
 // third party integrations
 type Apps struct {
-	Penpai PenpaiBroadcast `json:"penpai"`
-}
-
-type PenpaiBroadcast struct {
-	Info struct {
-		Allowed     bool     `json:"allowed"`
-		Running     bool     `json:"running"`
-		ActiveCores int      `json:"activeCores"`
-		MaxCores    int      `json:"maxCores"`
-		Models      []string `json:"models"`
-		ActiveModel string   `json:"activeModel"`
-	} `json:"info"`
 }
 
 // new ship
@@ -100,6 +88,7 @@ type SystemDrive struct {
 // broadcast payload subobject
 type Profile struct {
 	Startram Startram `json:"startram"`
+	Hermes   Hermes   `json:"hermes"`
 }
 
 // broadcast payload subobject
@@ -131,6 +120,32 @@ type StartramTransition struct {
 	Register any    `json:"register"`
 	Toggle   any    `json:"toggle"`
 	Restart  string `json:"restart"`
+}
+
+type Hermes struct {
+	Info struct {
+		Enabled            bool     `json:"enabled"`
+		Running            bool     `json:"running"`
+		URL                string   `json:"url"`
+		Ship               string   `json:"ship"`
+		Owner              string   `json:"owner"`
+		Port               int      `json:"port"`
+		Image              string   `json:"image"`
+		HermesVersion      string   `json:"hermesVersion"`
+		HermesAgentRef     string   `json:"hermesAgentRef"`
+		TlonAdapterVersion string   `json:"tlonAdapterVersion"`
+		TlonAdapterRef     string   `json:"tlonAdapterRef"`
+		ModelProvider      string   `json:"modelProvider"`
+		Model              string   `json:"model"`
+		Ships              []string `json:"ships"`
+	} `json:"info"`
+	Transition HermesTransition `json:"transition"`
+}
+
+type HermesTransition struct {
+	Toggle  string `json:"toggle"`
+	Save    string `json:"save"`
+	Restart string `json:"restart"`
 }
 
 // broadcast payload subobject
@@ -165,7 +180,6 @@ type Urbit struct {
 		PackTime                 string         `json:"packTime"`
 		PackDay                  string         `json:"packDay"`
 		PackDate                 int            `json:"packDate"`
-		PenpaiCompanion          bool           `json:"penpaiCompanion"`
 		Gallseg                  bool           `json:"gallseg"`
 		MinIOLinked              bool           `json:"minioLinked"`
 		StartramReminder         bool           `json:"startramReminder"`
@@ -202,7 +216,6 @@ type UrbitTransitionBroadcast struct {
 	Loom                      string `json:"loom"`
 	UrbitDomain               string `json:"urbitDomain"`
 	MinIODomain               string `json:"minioDomain"`
-	PenpaiCompanion           string `json:"penpaiCompanion"`
 	Gallseg                   string `json:"gallseg"`
 	ChopOnUpgrade             string `json:"chopOnUpgrade"`
 	RollChop                  string `json:"rollChop"`

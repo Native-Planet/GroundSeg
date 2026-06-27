@@ -49,10 +49,6 @@ func gallsegAuthedHandler(action leakchannel.ActionChannel) {
 		if err := UrbitHandler(action.Content); err != nil {
 			zap.L().Error(fmt.Sprintf("%+v", err))
 		}
-	case "penpai":
-		if err := PenpaiHandler(action.Content); err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
-		}
 	case "new_ship":
 		if err := NewShipHandler(action.Content); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))

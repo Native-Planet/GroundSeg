@@ -52,10 +52,6 @@ func UrbitHandler(msg []byte) error {
 	case "delete-service":
 		return urbitDeleteStartramService(patp, urbitPayload.Payload.Service, shipConf)
 		// urbit desks
-	case "install-penpai-companion":
-		return installPenpaiCompanion(patp, shipConf)
-	case "uninstall-penpai-companion":
-		return uninstallPenpaiCompanion(patp, shipConf)
 	case "install-gallseg": // vere 3.0
 		return installGallseg(patp, shipConf) // vere 3.0
 	case "uninstall-gallseg": // vere 3.0
@@ -244,90 +240,6 @@ func urbitCleanDelete(patp string) error {
 	}
 	if err := docker.DeleteContainer(patp); err != nil {
 		return fmt.Errorf("Failed to delete container %s", patp)
-	}
-	return nil
-}
-
-func installPenpaiCompanion(patp string, shipConf structs.UrbitDocker) error {
-	// run after complete
-	defer func(patp string) {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: ""}
-	}(patp)
-
-	// initial transition
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "loading"}
-
-	// error handling
-	handleError := func(patp, errMsg string, err error) error {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "error"}
-		time.Sleep(3 * time.Second)
-		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
-	}
-
-	// if not-found, |install, if suspended, |revive
-	status, err := click.GetDesk(patp, "penpai", true)
-	if err != nil {
-		return handleError(patp, "Handler failed to get penpai desk info", err)
-	}
-	if status == "not-found" {
-		err := click.InstallDesk(patp, "~nattyv", "penpai")
-		if err != nil {
-			return handleError(patp, "Handler failed to get install penpai desk", err)
-		}
-	} else if status == "suspended" {
-		err := click.ReviveDesk(patp, "penpai")
-		if err != nil {
-			return handleError(patp, "Handler failed to revive penpai desk", err)
-		}
-	}
-	// wait for complete
-	for {
-		time.Sleep(5 * time.Second)
-		status, err := click.GetDesk(patp, "penpai", true)
-		if err != nil {
-			return handleError(patp, "Handler failed to get penpai desk info after installation succeeded", err)
-		}
-		if status == "running" {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "success"}
-			time.Sleep(3 * time.Second)
-			break
-		}
-	}
-	return nil
-}
-
-func uninstallPenpaiCompanion(patp string, shipConf structs.UrbitDocker) error {
-	// run after complete
-	defer func(patp string) {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: ""}
-	}(patp)
-
-	// initial transition
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "loading"}
-
-	// error handling
-	handleError := func(patp, errMsg string, err error) error {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "error"}
-		time.Sleep(3 * time.Second)
-		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
-	}
-
-	// uninstall
-	err := click.UninstallDesk(patp, "penpai")
-	if err != nil {
-		return handleError(patp, "Handler failed to install uninstall the penpai desk", err)
-	}
-	for {
-		time.Sleep(5 * time.Second)
-		status, err := click.GetDesk(patp, "penpai", true)
-		if err != nil {
-			return handleError(patp, "Handler failed to get penpai desk info after uninstallation succeeded", err)
-		}
-		if status != "running" {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "success"}
-			time.Sleep(3 * time.Second)
-			break
-		}
 	}
 	return nil
 }
@@ -758,6 +670,7 @@ func toggleChopOnVereUpdate(patp string, shipConf structs.UrbitDocker) error {
 
 func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 	conf := config.Conf()
+	disableHermesIfAssignedTo(patp)
 	// update DesiredStatus to 'stopped'
 	contConf := config.GetContainerState()
 	patpConf := contConf[patp]
@@ -1003,6 +916,7 @@ func toggleNetwork(patp string, shipConf structs.UrbitDocker) error {
 	if err := recreateObjectStoreContainer(patp); err != nil {
 		return err
 	}
+	restartHermesForShipIfEnabled(patp)
 	return nil
 }
 

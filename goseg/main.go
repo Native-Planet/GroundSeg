@@ -263,6 +263,8 @@ func main() {
 
 	// digest urbit transition events
 	go rectify.UrbitTransitionHandler()
+	// digest hermes profile transition events
+	go rectify.HermesTransitionHandler()
 	// digest system transition events
 	go rectify.SystemTransitionHandler()
 	// digest new ship transition events
@@ -342,9 +344,9 @@ func main() {
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
+	// Load Hermes sidecars after ships so code-derived sidecars can connect.
+	loadService(docker.LoadHermes, "Unable to load Hermes containers!")
 	// Auto-link S3 for ships that are still unlinked after RustFS provisioning.
 	go routines.AutoConfigureObjectStoreLinks()
-	// Load Penpai
-	loadService(docker.LoadLlama, "Unable to load Llama GPT!")
 	startServer()
 }
