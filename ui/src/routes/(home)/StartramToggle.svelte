@@ -3,10 +3,11 @@
   const dispatch = createEventDispatcher()
   export let on
   export let remoteReady
+  $: disabled = !remoteReady && !on
 </script>
 <div class="wrapper" class:on={on}>
   <div class="title">StarTram</div>
-  <div on:click={()=>dispatch('click')} class="outer" class:disabled={!remoteReady} >
+  <div on:click={()=>!disabled && dispatch('click')} class="outer" class:disabled>
     <div class="inner" style="margin-left:{on ? 20 : 4}px"></div>
   </div>
 </div>
