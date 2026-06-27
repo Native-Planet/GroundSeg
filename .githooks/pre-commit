@@ -1,0 +1,68 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+goseg_dir="$repo_root/goseg"
+
+if [ ! -d "$goseg_dir" ]; then
+	echo "pre-commit: missing goseg directory at $goseg_dir" >&2
+	exit 1
+fi
+
+if ! command -v go >/dev/null 2>&1; then
+	echo "pre-commit: go is not available on PATH" >&2
+	exit 1
+fi
+
+run_goimports() {
+	go_files="$(git ls-files -- '*.go')"
+	if [ -z "$go_files" ]; then
+		return 0
+	fi
+
+	if command -v goimports >/dev/null 2>&1; then
+		printf '%s\n' "$go_files" | xargs goimports -w
+	else
+		printf '%s\n' "$go_files" | xargs go run golang.org/x/tools/cmd/goimports@v0.39.0 -w
+	fi
+}
+
+staged_go_files="$(git diff --cached --name-only --diff-filter=ACMR -- goseg | sed -n '/\.go$/p')"
+
+if [ -z "$staged_go_files" ]; then
+	exit 0
+fi
+
+unstaged_go_files="$(git diff --name-only -- goseg | sed -n '/\.go$/p')"
+untracked_go_files="$(git ls-files --others --exclude-standard -- goseg | sed -n '/\.go$/p')"
+
+if [ -n "$unstaged_go_files" ] || [ -n "$untracked_go_files" ]; then
+	echo "pre-commit: go fix/fmt rewrites package files, but goseg has unstaged or untracked Go changes." >&2
+	echo "pre-commit: stage or stash these files before committing:" >&2
+	{
+		printf '%s\n' "$unstaged_go_files"
+		printf '%s\n' "$untracked_go_files"
+	} | sed '/^$/d' | sed 's/^/  /' >&2
+	exit 1
+fi
+
+echo "pre-commit: running go fix ./... in goseg"
+(cd "$goseg_dir" && go fix ./...)
+
+echo "pre-commit: cleaning Go imports in goseg"
+(cd "$goseg_dir" && run_goimports)
+
+echo "pre-commit: running go fmt ./... in goseg"
+(cd "$goseg_dir" && go fmt ./...)
+
+printf '%s\n' "$staged_go_files" | while IFS= read -r file; do
+	[ -n "$file" ] && git add -- "$file"
+done
+
+remaining_unstaged_go_files="$(git diff --name-only -- goseg | sed -n '/\.go$/p')"
+
+if [ -n "$remaining_unstaged_go_files" ]; then
+	echo "pre-commit: go fix/fmt changed additional Go files. Review and stage them before committing:" >&2
+	printf '%s\n' "$remaining_unstaged_go_files" | sed 's/^/  /' >&2
+	exit 1
+fi
