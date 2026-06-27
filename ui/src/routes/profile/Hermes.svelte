@@ -143,9 +143,15 @@
         {installLabel}
       </button>
       <ToggleButton on:click={toggle} loading={tToggle.length > 0} disabled={!canToggle} on={enabled} />
-      {#if dashboardReady}
-        <a class="dashboard" href={url} target="_blank">Open</a>
-      {/if}
+      <a
+        class="dashboard"
+        class:hidden={!dashboardReady}
+        href={dashboardReady ? url : "#"}
+        target="_blank"
+        tabindex={dashboardReady ? 0 : -1}
+        aria-disabled={!dashboardReady}>
+        Open
+      </a>
       <button
         class="restart"
         disabled={!enabled || !providerApiKeySaved || !imageReady || tRestart.length > 0}
@@ -253,9 +259,10 @@
     padding: 56px;
   }
   .top {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 585px;
+    align-items: flex-start;
     gap: 24px;
-    flex-wrap: wrap;
   }
   .status-row {
     display: flex;
@@ -274,12 +281,13 @@
     color: #fff;
   }
   .controls {
-    display: flex;
+    display: grid;
+    grid-template-columns: 168px 135px 96px 150px;
     align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    gap: 12px;
+    justify-content: stretch;
     min-height: 65px;
+    width: 585px;
   }
   .grid {
     display: grid;
@@ -353,36 +361,33 @@
     background: black;
     color: #fff;
     font-family: Inter;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 300;
     letter-spacing: 0;
     height: 65px;
-    padding: 0 48px;
+    padding: 0 12px;
     cursor: pointer;
     overflow: hidden;
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .install {
-    width: 230px;
-  }
-  .restart {
-    width: 190px;
-  }
-  .dashboard {
-    width: 120px;
-    justify-content: center;
-    padding: 0;
+    box-sizing: border-box;
+    width: 100%;
   }
   .save {
     width: 180px;
     padding: 0;
+    font-size: 24px;
   }
   .dashboard {
     display: flex;
     align-items: center;
+    justify-content: center;
     text-decoration: none;
+  }
+  .dashboard.hidden {
+    visibility: hidden;
+    pointer-events: none;
   }
   .save:disabled, .restart:disabled, .install:disabled {
     opacity: .5;
@@ -406,7 +411,16 @@
     pointer-events: none;
   }
   .spacer {
-    flex: 1;
+    display: none;
+  }
+
+  @media (max-width: 1080px) {
+    .top {
+      grid-template-columns: 1fr;
+    }
+    .controls {
+      max-width: 100%;
+    }
   }
 
   @media (max-width: 760px) {
@@ -418,16 +432,14 @@
     .advanced {
       grid-template-columns: 1fr;
     }
-    .top {
-      align-items: flex-start;
-    }
-    .spacer {
-      display: none;
-    }
     .controls,
     .actions {
       justify-content: flex-start;
       width: 100%;
+    }
+    .controls {
+      grid-template-columns: minmax(0, 1fr) 135px;
+      gap: 12px;
     }
     .save, .restart, .install, .dashboard {
       font-size: 20px;
