@@ -4,7 +4,7 @@ FROM node:${NODE_VERSION}-bookworm-slim
 ARG HERMES_AGENT_REPO=https://github.com/NousResearch/hermes-agent.git
 ARG HERMES_AGENT_REF=2ffa1c97c09317c1d066aa5708b8ad961a4ca589
 ARG TLON_APPS_REPO=https://github.com/tloncorp/tlon-apps.git
-ARG TLON_APPS_REF=b9180da6491d29933a98f6e4f1b1458ce61ca576
+ARG TLON_APPS_REF=33112008b1f3e83816dee61020dc5d4c57770c15
 ARG PNPM_VERSION=9.15.9
 
 LABEL org.opencontainers.image.title="NativePlanet Hermes Tlon"
@@ -36,7 +36,7 @@ ENV TERMINAL_CWD=/workspace
 ENV TERMINAL_LOCAL_PERSISTENT=true
 ENV TERMINAL_TIMEOUT=180
 ENV TERMINAL_MAX_FOREGROUND_TIMEOUT=900
-ENV PATH="/opt/hermes-venv/bin:/root/.bun/bin:${PATH}"
+ENV PATH="/opt/hermes-venv/bin:${PATH}"
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -58,8 +58,7 @@ RUN apt-get update \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g "pnpm@${PNPM_VERSION}" \
-  && curl -fsSL https://bun.sh/install | bash
+RUN npm install -g "pnpm@${PNPM_VERSION}"
 
 RUN git clone --filter=blob:none "${HERMES_AGENT_REPO}" "${HERMES_AGENT_DIR}" \
   && cd "${HERMES_AGENT_DIR}" \
@@ -88,23 +87,22 @@ RUN git clone --filter=blob:none "${TLON_APPS_REPO}" "${TLON_APPS_DIR}" \
 RUN cd "${TLON_APPS_DIR}" \
   && pnpm install --filter @tloncorp/tlon-skill... --frozen-lockfile --ignore-scripts \
   && pnpm --filter @tloncorp/api build \
-  && pnpm --filter @tloncorp/tlon-skill build \
-  && cp "${TLON_SKILL_DIR}/dist/tlon-run" "${TLON_CLI}" \
-  && chmod +x "${TLON_CLI}" \
-  && "${TLON_CLI}" --help >/dev/null \
+  && cd "${TLON_SKILL_DIR}" \
+  && version="$(node -p "require('./package.json').version")" \
+  && pnpm exec esbuild scripts/main.ts --bundle --platform=node --format=cjs --target=node22 --outfile=dist/tlon.cjs --define:__VERSION__=\"${version}\" \
   && pnpm store prune
 
 RUN mkdir -p "${HERMES_HOME}" "${HERMES_WORKSPACE}" "${HERMES_CONTAINER_HOME}" \
-  && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
-  && ln -sf /root/.bun/bin/bun /usr/local/bin/bunx \
   && ln -sf /usr/bin/python3 /usr/local/bin/python \
   && ln -sf "${HERMES_VENV}/bin/hermes" /usr/local/bin/hermes \
   && ln -sf "${HERMES_VENV}/bin/hermes-agent" /usr/local/bin/hermes-agent
 VOLUME [ "/opt/data", "/workspace" ]
 WORKDIR /workspace
 
+COPY tlon /usr/local/bin/tlon
 COPY entrypoint.sh /usr/local/bin/hermes-tlon-entrypoint
-RUN chmod +x /usr/local/bin/hermes-tlon-entrypoint
+RUN chmod +x /usr/local/bin/tlon /usr/local/bin/hermes-tlon-entrypoint \
+  && "${TLON_CLI}" --help >/dev/null
 
 ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/hermes-tlon-entrypoint"]
 CMD ["gateway", "run", "--replace", "--accept-hooks"]

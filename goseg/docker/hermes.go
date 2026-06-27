@@ -21,14 +21,14 @@ const (
 	HermesWorkspaceVolumeName       = "hermes_workspace"
 	HermesTlonSkillDir              = "/opt/data/tlon-skill"
 	hermesConfigVersionLabel        = "nativeplanet.groundseg.hermes.config-version"
-	hermesConfigVersion             = "2026-06-27-remote-url"
+	hermesConfigVersion             = "2026-06-27-node-tlon-cli"
 	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
 	DefaultHermesVersion            = "0.14.0"
 	DefaultHermesAgentRef           = "2ffa1c97c09317c1d066aa5708b8ad961a4ca589"
-	DefaultHermesTlonAdapterVersion = "0.13.0"
-	DefaultHermesTlonAdapterRef     = "b9180da6491d29933a98f6e4f1b1458ce61ca576"
+	DefaultHermesTlonAdapterVersion = "0.14.0"
+	DefaultHermesTlonAdapterRef     = "33112008b1f3e83816dee61020dc5d4c57770c15"
 	DefaultHermesDashboardHostPort  = 19119
 	HermesDashboardContainerPort    = 9119
 )
@@ -252,6 +252,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		"TLON_AUTO_ACCEPT_GROUP_INVITES=true",
 		"TLON_ALLOW_ALL_USERS=false",
 		"TLON_DM_POLL_ENABLED=true",
+		"TLON_HOSTING=true",
 		"TLON_OWNER_LISTEN=true",
 		"TLON_OWNER_LISTEN_ENABLED=true",
 		"TLON_REQUIRE_MENTION=true",
@@ -347,9 +348,9 @@ chmod 600 "$config_file"
     TERMINAL_MAX_FOREGROUND_TIMEOUT TERMINAL_TIMEOUT TLON_ACCESS_CODE TLON_ALLOWED_USERS \
     TLON_ALLOW_ALL_USERS TLON_AUTO_ACCEPT_DM_INVITES TLON_AUTO_ACCEPT_GROUP_INVITES \
     TLON_AUTO_DISCOVER TLON_BOT_ALIASES TLON_BOT_MENTIONS TLON_CHANNELS TLON_CHANNEL_RULES \
-    TLON_CLI TLON_CODE TLON_DEFAULT_AUTHORIZED_SHIPS TLON_DM_ALLOWLIST \
-    TLON_DM_POLL_ENABLED TLON_GROUP_INVITE_ALLOWLIST TLON_HOME_CHANNEL \
-    TLON_MAX_CONSECUTIVE_BOT_RESPONSES TLON_NODE_ID TLON_NODE_URL TLON_OWNER \
+	TLON_CLI TLON_CODE TLON_DEFAULT_AUTHORIZED_SHIPS TLON_DM_ALLOWLIST \
+	TLON_DM_POLL_ENABLED TLON_GROUP_INVITE_ALLOWLIST TLON_HOME_CHANNEL TLON_HOSTING \
+	TLON_MAX_CONSECUTIVE_BOT_RESPONSES TLON_NODE_ID TLON_NODE_URL TLON_OWNER \
     TLON_OWNER_LISTEN TLON_OWNER_LISTEN_ENABLED TLON_OWNER_SHIP TLON_OWNER_URL \
     TLON_REQUIRE_MENTION TLON_SHIP TLON_SHIP_CODE TLON_SHIP_NAME TLON_SHIP_URL \
     TLON_SKILL_PATH TLON_TELEMETRY TLON_URL URBIT_CODE URBIT_SHIP \
