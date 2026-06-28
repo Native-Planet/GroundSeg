@@ -28,6 +28,7 @@
   {/if}
   <ConfigEditor />
   <Support />
+  <ConfigEditor />
 </div>
 
 <style>
