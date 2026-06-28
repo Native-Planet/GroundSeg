@@ -1,9 +1,10 @@
 <script>
-  import { base } from '$app/paths'
   import ToggleButton from '$lib/ToggleButton.svelte'
   import { readConfigFile, saveConfigFile } from '$lib/stores/config-files'
   import { hermesInstall, hermesRestart, hermesSave, hermesToggle } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
+
+  const hermesIcon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAYCAYAAADtaU2/AAAACXBIWXMAAABtAAAAbgDSdnyfAAAAAXNSR0IB2cksfwAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAABGdBTUEAALGPC/xhBQAABG5JREFUeJyllltIXFcUhkdnvM541zrebx0DGivaor4Eb2gfRBChKAj1wXqp+uKLCo6KgtpRK4goXhJEQRSKVvoiGtNJGySGgjI1GvqgoPRB7MPUCG2Sybjyrx3PMJozdqbZsDn7HM5e315r/Wudo1C4MDw8PBRxcXF3cnJyvo6Pjzd4eXnd9/b2/s7Pz+8rX19frSu2nBowrvb396+LiIjYKioqet3f308mk4nGx8cJQMIrpNFo/goODh7EYdQfDXRzc1MEBASUBAYGvlCpVAIgzYSEBNrd3aWtrS3CwcQzd3d3wgGfKZXKTz4KDCN6T0/Pa0BphoWFUUVFBZ2entLExITtOTynkpKSx9jn/r+gOp2uOTQ0lBA6ioqKopCQEEpJSRH31dXVtLm5SX19fdTV1UUWi4VKS0spNzeXpqenRQp8fHzqXYbitNqVlRXz0tIS1dbWCkPt7e00OjpKAwMDdHBwQDU1NcLD6Ohouri4oIWFBcrMzKS0tDSKiYlhz5/DjtIlMETSmpWVRQUFBaTVagl5Fp4yiEMPFZN9zjs7O6mpqelaKq7ey3UaCmFwbo2KGzll4SQlJcnmm1MCxbOwxIQoxfOgoKAhp8GoVSU2H9gDcRix5iiEh4dfgzJEAl3BbCqHncfsiNMeI7Q/S4YSExNpbGyM6urqqLCwkBoaGkiv19Pg4CBlZ2d/4D1ERUiVWKPG/4QjGqe9xoYvcfJXXDIsruPjY+LBcPZoZGRE3E9NTQkAjFN+fr6obb5nXfAVurBCZOlOg3nA6y9QRpNcQkajUYC4WxkMBtrZ2RH37LXiKtwMlwTH6WAxcprQfL5xCcwDG6taW1sF5PLykm6OxsZGWbFxE2GR8RoOPHAZjHLQz83N0fn5uQBZrVYxpUPk5eXJgtlzeCrWENrvuHeti+Hkkx0dHTQ0NER7e3s2OA+z2SyahxxYcSUyTgH08hZ27joNRZi5g/3EJYQuRkdHRzaPeezv74sy4xqWU7fivaotqO83arX62/8EQrWfY0MUg7HBxAZWV1c/yO/a2powziVWXl4uC8bB/4VAn8HjH7C+HQwP+qHISOQmBNcLNsAda3FxkWZnZ6mnp4fOzs5oeXlZGMdPAVVWVjoC/43SegChmWJjYysRepXD8OKr9AuUuIaXH2FyHVpvGiwuLqbh4WGxrq+vp5aWFlkwxHmI0voVNvYiIyMNOMinDj1OTk6eRHheo/s8R9cyYrNVaoH2kz8KqampDsXFE59SM2BvYeMhPP8Ra51DMPKrw3/VE4R8H2XwEiF6AYW+kYxxU2CV8zg5OaGMjAxbE5Hekflb+Q32uG+73ZpnvKBCuxzFAbZx/eNmuHt7ewV4Y2OD2traqKqqSohsZmZGiG5+fp7KysqE6rmeYecUNvJvhUoDYdEg199D2SPI01N7MPfr5uZm8fFfX18XfySHh4fXVM9/KOnp6Qx+iCh+5hTUfgByDyL7h3svhCdmd3e36GYMZe+3t7dlOxvesyA1yXJ23wFhL8w2DPf/cAAAAABJRU5ErkJggg=="
 
   $: info = ($structure?.profile?.hermes?.info) || {}
   $: transition = ($structure?.profile?.hermes?.transition) || {}
@@ -230,7 +231,7 @@
   <div class="top">
     <div>
       <div class="title-row">
-        <img src={base + "/hermes.png"} alt="" aria-hidden="true" />
+        <img src={hermesIcon} alt="" aria-hidden="true" />
         <div class="prof-title">HERMES</div>
       </div>
       <div class="status-row">
