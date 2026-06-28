@@ -37,7 +37,7 @@
   |=  [=mark =vase]
   ?>  =(our.bowl src.bowl)
   ^-  (quip card _this)
-  ?>  ?=(%penpai-do mark)
+  ?>  ?=(%groundseg-do mark)
   ?>  =(our.bol src.bol)
   =+  !<(=do vase)
   ?-    -.do

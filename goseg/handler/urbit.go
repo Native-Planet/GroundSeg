@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,8 @@ func UrbitHandler(msg []byte) error {
 		return setUrbitDomain(patp, urbitPayload, shipConf)
 	case "set-minio-domain":
 		return setMinIODomain(patp, urbitPayload, shipConf)
+	case "remove-minio-domain":
+		return removeMinIODomain(patp, shipConf)
 		// set whether or not ship wants startram reminders
 	case "startram-reminder":
 		return startramReminder(patp, urbitPayload.Payload.Remind, shipConf)
@@ -52,10 +55,6 @@ func UrbitHandler(msg []byte) error {
 	case "delete-service":
 		return urbitDeleteStartramService(patp, urbitPayload.Payload.Service, shipConf)
 		// urbit desks
-	case "install-penpai-companion":
-		return installPenpaiCompanion(patp, shipConf)
-	case "uninstall-penpai-companion":
-		return uninstallPenpaiCompanion(patp, shipConf)
 	case "install-gallseg": // vere 3.0
 		return installGallseg(patp, shipConf) // vere 3.0
 	case "uninstall-gallseg": // vere 3.0
@@ -84,6 +83,8 @@ func UrbitHandler(msg []byte) error {
 		return handleSnapTime(patp, urbitPayload, shipConf)
 	case "extra-args":
 		return handleExtraArgs(patp, urbitPayload, shipConf)
+	case "vere-tag":
+		return handleVereTag(patp, urbitPayload, shipConf)
 	case "toggle-boot-status":
 		return toggleBootStatus(patp, shipConf)
 	case "toggle-auto-reboot":
@@ -244,90 +245,6 @@ func urbitCleanDelete(patp string) error {
 	}
 	if err := docker.DeleteContainer(patp); err != nil {
 		return fmt.Errorf("Failed to delete container %s", patp)
-	}
-	return nil
-}
-
-func installPenpaiCompanion(patp string, shipConf structs.UrbitDocker) error {
-	// run after complete
-	defer func(patp string) {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: ""}
-	}(patp)
-
-	// initial transition
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "loading"}
-
-	// error handling
-	handleError := func(patp, errMsg string, err error) error {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "error"}
-		time.Sleep(3 * time.Second)
-		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
-	}
-
-	// if not-found, |install, if suspended, |revive
-	status, err := click.GetDesk(patp, "penpai", true)
-	if err != nil {
-		return handleError(patp, "Handler failed to get penpai desk info", err)
-	}
-	if status == "not-found" {
-		err := click.InstallDesk(patp, "~nattyv", "penpai")
-		if err != nil {
-			return handleError(patp, "Handler failed to get install penpai desk", err)
-		}
-	} else if status == "suspended" {
-		err := click.ReviveDesk(patp, "penpai")
-		if err != nil {
-			return handleError(patp, "Handler failed to revive penpai desk", err)
-		}
-	}
-	// wait for complete
-	for {
-		time.Sleep(5 * time.Second)
-		status, err := click.GetDesk(patp, "penpai", true)
-		if err != nil {
-			return handleError(patp, "Handler failed to get penpai desk info after installation succeeded", err)
-		}
-		if status == "running" {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "success"}
-			time.Sleep(3 * time.Second)
-			break
-		}
-	}
-	return nil
-}
-
-func uninstallPenpaiCompanion(patp string, shipConf structs.UrbitDocker) error {
-	// run after complete
-	defer func(patp string) {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: ""}
-	}(patp)
-
-	// initial transition
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "loading"}
-
-	// error handling
-	handleError := func(patp, errMsg string, err error) error {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "error"}
-		time.Sleep(3 * time.Second)
-		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
-	}
-
-	// uninstall
-	err := click.UninstallDesk(patp, "penpai")
-	if err != nil {
-		return handleError(patp, "Handler failed to install uninstall the penpai desk", err)
-	}
-	for {
-		time.Sleep(5 * time.Second)
-		status, err := click.GetDesk(patp, "penpai", true)
-		if err != nil {
-			return handleError(patp, "Handler failed to get penpai desk info after uninstallation succeeded", err)
-		}
-		if status != "running" {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "success"}
-			time.Sleep(3 * time.Second)
-			break
-		}
 	}
 	return nil
 }
@@ -730,6 +647,50 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 	return nil
 }
 
+func removeMinIODomain(patp string, shipConf structs.UrbitDocker) error {
+	defer func() {
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: ""}
+	}()
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "loading"}
+
+	conf := config.Conf()
+	oldShipConf := shipConf
+	alias := strings.TrimSpace(docker.ObjectStoreCustomDomain(conf, shipConf))
+	if alias == "" {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return fmt.Errorf("RustFS custom domain is not configured for %s", patp)
+	}
+
+	if docker.ObjectStoreUsesRemoteDomain(conf, shipConf) {
+		if err := startram.AliasDelete(fmt.Sprintf("s3.%s", patp), alias); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return err
+		}
+	}
+
+	docker.ClearObjectStoreCustomDomain(conf, &shipConf)
+	update := map[string]structs.UrbitDocker{patp: shipConf}
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	if err := recreateObjectStoreContainer(patp); err != nil {
+		rollback := map[string]structs.UrbitDocker{patp: oldShipConf}
+		if rollbackErr := config.UpdateUrbitConfig(rollback); rollbackErr != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't roll back RustFS domain removal for %s after recreate failure: %v", patp, rollbackErr))
+		} else if rollbackStartErr := recreateObjectStoreContainer(patp); rollbackStartErr != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't restore RustFS container for %s after recreate failure: %v", patp, rollbackStartErr))
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return err
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"}
+	time.Sleep(3 * time.Second)
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "done"}
+	return nil
+}
+
 func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 	return performChop(patp, shipConf, "chop", false, false)
 }
@@ -758,6 +719,7 @@ func toggleChopOnVereUpdate(patp string, shipConf structs.UrbitDocker) error {
 
 func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 	conf := config.Conf()
+	disableHermesIfAssignedTo(patp)
 	// update DesiredStatus to 'stopped'
 	contConf := config.GetContainerState()
 	patpConf := contConf[patp]
@@ -1003,6 +965,7 @@ func toggleNetwork(patp string, shipConf structs.UrbitDocker) error {
 	if err := recreateObjectStoreContainer(patp); err != nil {
 		return err
 	}
+	restartHermesForShipIfEnabled(patp)
 	return nil
 }
 
@@ -1216,6 +1179,53 @@ func handleExtraArgs(patp string, urbitPayload structs.WsUrbitPayload, shipConf 
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "extraArgs", Event: "success"}
 	time.Sleep(3 * time.Second)
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "extraArgs", Event: ""}
+	return nil
+}
+
+func handleVereTag(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "vereTag", Event: "loading"}
+	fail := func(message string, err error) error {
+		text := fmt.Sprintf("%s: %v", message, err)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "vereTag", Event: text}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "vereTag", Event: ""}
+		return err
+	}
+
+	tag := strings.TrimSpace(urbitPayload.Payload.VereTag)
+	if tag != "" {
+		tags, err := docker.GetVereImageTags()
+		if err != nil {
+			return fail("Couldn't fetch Vere image tags", err)
+		}
+		if !slices.Contains(tags, tag) {
+			return fail("Invalid Vere image tag", fmt.Errorf("%q is not present on Docker Hub", tag))
+		}
+	}
+
+	shipConf.UrbitImageTagOverride = tag
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		return fail("Couldn't update urbit config", err)
+	}
+	if err := urbitCleanDelete(patp); err != nil {
+		zap.L().Error(fmt.Sprintf("Container deletion for Vere tag rebuild failed: %v", err))
+	}
+
+	if shipConf.BootStatus != "noboot" {
+		if _, err := docker.StartContainer(patp, "vere"); err != nil {
+			return fail(fmt.Sprintf("Couldn't start %s", patp), err)
+		}
+	} else {
+		if _, err := docker.CreateContainer(patp, "vere"); err != nil {
+			return fail(fmt.Sprintf("Couldn't create %s", patp), err)
+		}
+	}
+	restartHermesForShipIfEnabled(patp)
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "vereTag", Event: "success"}
+	time.Sleep(3 * time.Second)
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "vereTag", Event: ""}
 	return nil
 }
 

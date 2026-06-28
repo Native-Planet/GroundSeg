@@ -291,26 +291,13 @@ type WsDevPayload struct {
 	Token   WsTokenStruct `json:"token"`
 }
 
-type WsPenpaiPayload struct {
-	ID      string         `json:"id"`
-	Type    string         `json:"type"`
-	Payload WsPenpaiAction `json:"payload"`
-	Token   WsTokenStruct  `json:"token"`
-}
-
-type WsPenpaiAction struct {
-	Type   string `json:"type"`
-	Action string `json:"action"`
-	Model  string `json:"model"`
-	Cores  int    `json:"cores"`
-}
-
 type WsUrbitAction struct {
 	Type         string `json:"type"`
 	Action       string `json:"action"`
 	Patp         string `json:"patp"`
 	Value        int    `json:value"`
 	ExtraArgs    string `json:"extraArgs"`
+	VereTag      string `json:"vereTag"`
 	Domain       string `json:"domain"`
 	Frequency    int    `json:"frequency"`
 	IntervalType string `json:"intervalType"`
@@ -324,6 +311,30 @@ type WsUrbitAction struct {
 	MD5          string `json:"md5"`
 	BackupTime   string `json:"backupTime"`
 	BakType      string `json:"bakType"`
+}
+
+type WsHermesPayload struct {
+	ID      string         `json:"id"`
+	Type    string         `json:"type"`
+	Payload WsHermesAction `json:"payload"`
+	Token   WsTokenStruct  `json:"token"`
+}
+
+type WsHermesAction struct {
+	Type           string `json:"type"`
+	Action         string `json:"action"`
+	Ship           string `json:"ship"`
+	Owner          string `json:"owner"`
+	Port           int    `json:"port"`
+	Image          string `json:"image"`
+	Model          string `json:"model"`
+	ModelProvider  string `json:"modelProvider"`
+	ProviderAPIKey string `json:"providerApiKey"`
+	WebProvider    string `json:"webProvider"`
+	WebAPIKey      string `json:"webApiKey"`
+	WebURL         string `json:"webUrl"`
+	APIEnabled     bool   `json:"apiEnabled"`
+	APIKey         string `json:"apiKey"`
 }
 
 type WsDevAction struct {
@@ -510,7 +521,6 @@ type WsSupportAction struct {
 	Description string   `json:"description"`
 	Ships       []string `json:"ships"`
 	CPUProfile  bool     `json:"cpu_profile"`
-	Penpai      bool     `json:"penpai"`
 }
 
 type WsC2cPayload struct {

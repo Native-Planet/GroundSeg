@@ -11,12 +11,43 @@ on:
         description: Hermes Agent git ref
         required: false
         default: 2ffa1c97c09317c1d066aa5708b8ad961a4ca589
+      hermes_lcm_ref:
+        description: Hermes LCM git ref
+        required: false
+        default: 34043036d12f69d0089c4630eb9acfb2d9424b4c
       tlon_apps_ref:
         description: tlon-apps git ref
         required: false
-        default: b9180da6491d29933a98f6e4f1b1458ce61ca576
+        default: 33112008b1f3e83816dee61020dc5d4c57770c15
       push:
         description: Push image to Docker Hub
+        required: false
+        type: boolean
+        default: true
+      release_channel:
+        description: Version-server channel to update
+        required: false
+        type: choice
+        options:
+          - edge
+          - canary
+          - latest
+        default: edge
+      to_canary:
+        description: Also update canary when release_channel is edge
+        required: false
+        type: boolean
+        default: false
+      version_server:
+        description: Version server to update
+        required: false
+        type: choice
+        options:
+          - staging.version.groundseg.app
+          - version.groundseg.app
+        default: staging.version.groundseg.app
+      update_version_server:
+        description: Update selected version server after pushing
         required: false
         type: boolean
         default: true
@@ -37,9 +68,11 @@ permissions:
 
 env:
   DEFAULT_IMAGE: nativeplanet/hermes-tlon
-  HERMES_IMAGE_TAG: 0.14.0-0.13.0
+  HERMES_IMAGE_TAG: 0.14.0-0.14.0
   HERMES_AGENT_REF: 2ffa1c97c09317c1d066aa5708b8ad961a4ca589
-  TLON_APPS_REF: b9180da6491d29933a98f6e4f1b1458ce61ca576
+  HERMES_LCM_REF: 34043036d12f69d0089c4630eb9acfb2d9424b4c
+  TLON_APPS_REF: 33112008b1f3e83816dee61020dc5d4c57770c15
+  VERSION_AUTH: ${{ secrets.VERSION_AUTH }}
 
 jobs:
   build:
@@ -53,22 +86,40 @@ jobs:
           set -euo pipefail
           image="${{ github.event.inputs.image }}"
           hermes_ref="${{ github.event.inputs.hermes_agent_ref }}"
+          lcm_ref="${{ github.event.inputs.hermes_lcm_ref }}"
           tlon_ref="${{ github.event.inputs.tlon_apps_ref }}"
+          release_channel="${{ github.event.inputs.release_channel }}"
+          to_canary="${{ github.event.inputs.to_canary }}"
+          version_server="${{ github.event.inputs.version_server }}"
+          update_version_server="${{ github.event.inputs.update_version_server }}"
           push_image="true"
 
           if [ -z "$image" ]; then image="$DEFAULT_IMAGE"; fi
           if [ -z "$hermes_ref" ]; then hermes_ref="$HERMES_AGENT_REF"; fi
+          if [ -z "$lcm_ref" ]; then lcm_ref="$HERMES_LCM_REF"; fi
           if [ -z "$tlon_ref" ]; then tlon_ref="$TLON_APPS_REF"; fi
+          if [ -z "$release_channel" ]; then release_channel="edge"; fi
+          if [ -z "$to_canary" ]; then to_canary="false"; fi
+          if [ -z "$version_server" ]; then version_server="staging.version.groundseg.app"; fi
+          if [ -z "$update_version_server" ]; then update_version_server="false"; fi
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             push_image="false"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.push }}" != "true" ]; then
             push_image="false"
           fi
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "$push_image" != "true" ]; then
+            update_version_server="false"
+          fi
 
           echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "hermes-ref=$hermes_ref" >> "$GITHUB_OUTPUT"
+          echo "lcm-ref=$lcm_ref" >> "$GITHUB_OUTPUT"
           echo "tlon-ref=$tlon_ref" >> "$GITHUB_OUTPUT"
           echo "push=$push_image" >> "$GITHUB_OUTPUT"
+          echo "release-channel=$release_channel" >> "$GITHUB_OUTPUT"
+          echo "to-canary=$to_canary" >> "$GITHUB_OUTPUT"
+          echo "version-server=$version_server" >> "$GITHUB_OUTPUT"
+          echo "update-version-server=$update_version_server" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -80,8 +131,8 @@ jobs:
         if: steps.args.outputs.push == 'true'
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: nativeplanet
+          password: ${{ secrets.DOCKER_PAT }}
 
       - name: Build Hermes image
         uses: docker/build-push-action@v6
@@ -92,9 +143,90 @@ jobs:
           push: ${{ steps.args.outputs.push == 'true' }}
           build-args: |
             HERMES_AGENT_REF=${{ steps.args.outputs.hermes-ref }}
+            HERMES_LCM_REF=${{ steps.args.outputs.lcm-ref }}
             TLON_APPS_REF=${{ steps.args.outputs.tlon-ref }}
           tags: |
             ${{ steps.args.outputs.image }}:${{ env.HERMES_IMAGE_TAG }}
             ${{ steps.args.outputs.image }}:${{ env.HERMES_IMAGE_TAG }}-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Install version update tools
+        if: steps.args.outputs.update-version-server == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Update version server
+        if: steps.args.outputs.update-version-server == 'true'
+        run: |
+          set -euo pipefail
+
+          if [ -z "${VERSION_AUTH:-}" ]; then
+            echo "VERSION_AUTH secret is required to update the version server"
+            exit 1
+          fi
+
+          image="${{ steps.args.outputs.image }}"
+          tag="${{ env.HERMES_IMAGE_TAG }}-${{ github.sha }}"
+          image_ref="${image}:${tag}"
+          version_server="${{ steps.args.outputs.version-server }}"
+
+          repo="$image"
+          case "$repo" in
+            registry.hub.docker.com/*)
+              ;;
+            docker.io/*)
+              repo="registry.hub.docker.com/${repo#docker.io/}"
+              ;;
+            */*)
+              repo="registry.hub.docker.com/${repo}"
+              ;;
+            *)
+              echo "Unsupported image name for version server repo: $repo"
+              exit 1
+              ;;
+          esac
+
+          manifest="$(docker buildx imagetools inspect --raw "$image_ref")"
+          amd64_sha="$(echo "$manifest" | jq -r '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "amd64") | .digest' | sed 's/^sha256://')"
+          arm64_sha="$(echo "$manifest" | jq -r '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "arm64") | .digest' | sed 's/^sha256://')"
+
+          if [ -z "$amd64_sha" ] || [ "$amd64_sha" = "null" ]; then
+            echo "Unable to resolve amd64 image digest for $image_ref"
+            exit 1
+          fi
+          if [ -z "$arm64_sha" ] || [ "$arm64_sha" = "null" ]; then
+            echo "Unable to resolve arm64 image digest for $image_ref"
+            exit 1
+          fi
+
+          update_channel() {
+            channel="$1"
+            echo "Updating ${version_server} groundseg.${channel}.hermes -> ${repo}:${tag}"
+
+            curl -f -X PUT \
+              -H "X-Api-Key: ${VERSION_AUTH}" \
+              -H 'Content-Type: application/json' \
+              "https://${version_server}/modify/groundseg/${channel}/hermes/repo/payload" \
+              -d "{\"value\":\"${repo}\"}"
+
+            curl -f -X PUT \
+              -H "X-Api-Key: ${VERSION_AUTH}" \
+              "https://${version_server}/modify/groundseg/${channel}/hermes/tag/${tag}"
+
+            curl -f -X PUT \
+              -H "X-Api-Key: ${VERSION_AUTH}" \
+              "https://${version_server}/modify/groundseg/${channel}/hermes/amd64_sha256/${amd64_sha}"
+
+            curl -f -X PUT \
+              -H "X-Api-Key: ${VERSION_AUTH}" \
+              "https://${version_server}/modify/groundseg/${channel}/hermes/arm64_sha256/${arm64_sha}"
+          }
+
+          release_channel="${{ steps.args.outputs.release-channel }}"
+          update_channel "$release_channel"
+
+          if [ "$release_channel" = "edge" ] && [ "${{ steps.args.outputs.to-canary }}" = "true" ]; then
+            update_channel "canary"
+          fi

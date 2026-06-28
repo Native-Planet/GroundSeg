@@ -18,11 +18,14 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier/verify"
 	"go.uber.org/zap"
 )
+
+var versionUpdateMu sync.Mutex
 
 func CheckVersionLoop() {
 	conf := config.Conf()
@@ -30,33 +33,64 @@ func CheckVersionLoop() {
 	updateInterval = max(conf.UpdateInterval, 60)
 	checkInterval := time.Duration(updateInterval) * time.Second
 	ticker := time.NewTicker(checkInterval)
-	releaseChannel := conf.UpdateBranch
 	if conf.UpdateMode == "auto" {
-		callUpdater(releaseChannel)
-		for {
-			select {
-			case <-ticker.C:
-				callUpdater(releaseChannel)
+		callUpdater(conf.UpdateBranch)
+	}
+	for {
+		select {
+		case <-ticker.C:
+			if config.Conf().UpdateMode == "auto" {
+				callUpdater(config.Conf().UpdateBranch)
 			}
+		case <-docker.UpdateCheckBus:
+			callUpdaterWithStatus(config.Conf().UpdateBranch)
 		}
 	}
 }
 
 func callUpdater(releaseChannel string) {
-	currentChannelVersion := config.LocalVersion().Groundseg[releaseChannel]
+	runUpdater(releaseChannel, false)
+}
+
+func callUpdaterWithStatus(releaseChannel string) {
+	runUpdater(releaseChannel, true)
+}
+
+func runUpdater(releaseChannel string, reportStatus bool) {
+	versionUpdateMu.Lock()
+	defer versionUpdateMu.Unlock()
+	reportUpdateStatus(reportStatus, "checking")
+	defer func() {
+		if reportStatus {
+			time.Sleep(3 * time.Second)
+			reportUpdateStatus(true, "")
+		}
+	}()
+	currentChannelVersion, selectedChannel, exactChannel := config.SelectVersionChannel(config.LocalVersion(), releaseChannel)
+	if !exactChannel {
+		zap.L().Warn(fmt.Sprintf("Version channel %q not found locally; using %q", releaseChannel, selectedChannel))
+	}
 	// Get latest information
-	latestVersion, _ := config.CheckVersion()
+	latestVersion, ok := config.CheckVersion()
+	if !ok {
+		reportUpdateStatus(reportStatus, "error")
+		return
+	}
 	latestChannelVersion := latestVersion
+	dockerChanged := latestChannelVersion != currentChannelVersion
 	// check docker updates
-	if latestChannelVersion != currentChannelVersion {
-		updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+	if dockerChanged {
+		updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion, reportStatus)
 		config.VersionInfo = latestVersion
+	} else {
+		reportUpdateStatus(reportStatus, "up-to-date")
 	}
 	// Check for gs binary updates based on hash
 	binPath := filepath.Join(config.BasePath, "groundseg")
 	currentHash, err := getSha256(binPath)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't hash binary: %v", err))
+		reportUpdateStatus(reportStatus, "error")
 		return
 	}
 	latestHash := latestVersion.Groundseg.Amd64Sha256
@@ -65,9 +99,20 @@ func callUpdater(releaseChannel string) {
 	}
 	if currentHash != latestHash {
 		zap.L().Info("GroundSeg Binary update!")
+		reportUpdateStatus(reportStatus, "updating groundseg")
 		// updateBinary will likely restart the program, so
 		// we don't have to care about the docker updates.
 		updateBinary(releaseChannel, latestVersion)
+		return
+	}
+	if dockerChanged {
+		reportUpdateStatus(reportStatus, "success")
+	}
+}
+
+func reportUpdateStatus(enabled bool, status string) {
+	if enabled {
+		docker.SysTransBus <- structs.SystemTransition{Type: "checkUpdates", Event: status}
 	}
 }
 
@@ -256,7 +301,7 @@ func contains(slice []string, item string) bool {
 	return slices.Contains(slice, item)
 }
 
-func updateDocker(release string, currentVersion structs.Channel, latestVersion structs.Channel) {
+func updateDocker(release string, currentVersion structs.Channel, latestVersion structs.Channel, reportStatus bool) {
 	zap.L().Info(fmt.Sprintf("update docker called: Current: %v , Latest %v", currentVersion, latestVersion))
 	zap.L().Info(fmt.Sprintf(
 		"New version available in %s channel! Current: %+v, Latest: %+v\n",
@@ -278,14 +323,16 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 
 	for i := 0; i < valCurrent.NumField(); i++ {
 		sw := strings.ToLower(typeOfVersion.Field(i).Name)
-		if sw != "groundseg" {
+		if sw != "groundseg" && sw != "hermes" {
 			currentDetail := valCurrent.Field(i).Interface().(structs.VersionDetails)
 			latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
 			if config.Architecture == "amd64" {
 				if latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256 {
 					if contains([]string{"netdata", "wireguard"}, sw) {
+						reportUpdateStatus(reportStatus, "updating "+sw)
 						docker.StartContainer(sw, sw)
 					} else if sw == "vere" {
+						reportUpdateStatus(reportStatus, "updating vere")
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							urbConf := config.UrbitConf(pier)
@@ -353,6 +400,7 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 							}
 						}
 					} else if sw == "minio" || sw == "rustfs" {
+						reportUpdateStatus(reportStatus, "updating "+sw)
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
@@ -364,8 +412,10 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 			} else {
 				if latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256 {
 					if contains([]string{"netdata", "wireguard"}, sw) {
+						reportUpdateStatus(reportStatus, "updating "+sw)
 						docker.StartContainer(sw, sw)
 					} else if sw == "vere" {
+						reportUpdateStatus(reportStatus, "updating vere")
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							urbConf := config.UrbitConf(pier)
@@ -433,6 +483,7 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 							}
 						}
 					} else if sw == "minio" || sw == "rustfs" {
+						reportUpdateStatus(reportStatus, "updating "+sw)
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {

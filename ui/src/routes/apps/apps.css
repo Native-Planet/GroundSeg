@@ -1,7 +1,7 @@
 .keys-shell {
   width: 1104px;
   max-width: 98vw;
-  margin: 0 auto 48px auto;
+  margin: 0 auto 64px auto;
   color: var(--text-color);
   font-family: var(--regular-font);
 }
@@ -12,14 +12,14 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  min-height: 420px;
-  padding: 32px 40px;
+  min-height: 560px;
+  padding: 44px 48px;
 }
 
 .keys-row {
   border-top: 1px solid rgba(22, 29, 23, 0.16);
   box-sizing: border-box;
-  padding: 18px 0;
+  padding: 26px 0;
 }
 
 .keys-row:first-child {
@@ -32,7 +32,7 @@
   grid-template-columns: minmax(160px, 1fr) minmax(280px, 420px);
   gap: 24px;
   align-items: end;
-  padding-bottom: 22px;
+  padding-bottom: 30px;
 }
 
 h1,
@@ -52,11 +52,12 @@ h2 {
 }
 
 h1 {
-  font-size: 48px;
+  font-size: 36px;
+  letter-spacing: 0;
 }
 
 h2 {
-  font-size: 26px;
+  font-size: 22px;
 }
 
 .roller-control {
@@ -75,7 +76,7 @@ h2 {
 .state-row span,
 .boot-row span,
 .advanced summary {
-  font-family: var(--log-font);
+  font-family: var(--regular-font);
 }
 
 code,
@@ -90,14 +91,14 @@ pre {
 .state-row span,
 .boot-row span {
   color: rgba(49, 57, 51, 0.72);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .identity-row {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto minmax(360px, 440px) 180px;
-  gap: 10px;
+  grid-template-columns: 76px minmax(260px, 1fr) auto minmax(360px, 440px) 180px;
+  gap: 16px;
   align-items: center;
 }
 
@@ -105,7 +106,7 @@ pre {
   min-width: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
   align-items: center;
 }
 
@@ -116,15 +117,15 @@ pre {
 input,
 select {
   width: 100%;
-  min-height: 42px;
+  min-height: 48px;
   box-sizing: border-box;
   border: 1px solid rgba(22, 29, 23, 0.24);
   border-radius: 4px;
   background: #f8f8f6;
   color: var(--text-color);
   font-family: var(--regular-font);
-  font-size: 15px;
-  padding: 0 12px;
+  font-size: 16px;
+  padding: 0 14px;
   outline: none;
 }
 
@@ -139,14 +140,14 @@ select:focus {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 42px;
+  min-height: 48px;
   border: 0;
   border-radius: 4px;
   font-family: var(--regular-font);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  padding: 0 16px;
+  padding: 0 18px;
   white-space: nowrap;
 }
 
@@ -167,7 +168,7 @@ select:focus {
 
 .secondary,
 .icon-button {
-  background: var(--btn-secondary);
+  background: var(--btn-secondary, #5C7060);
   color: var(--text-card-color);
 }
 
@@ -186,19 +187,39 @@ select:focus {
 }
 
 .icon-button {
-  width: 42px;
+  width: 48px;
   padding: 0;
 }
 
 .icon-button.small {
-  width: 34px;
-  min-height: 34px;
+  width: 38px;
+  min-height: 38px;
+}
+
+.sigil-preview {
+  width: 64px;
+  height: 64px;
+  box-sizing: border-box;
+  border: 1px solid rgba(22, 29, 23, 0.16);
+  border-radius: 8px;
+  background: var(--btn-secondary);
+  overflow: hidden;
+}
+
+.sigil-preview.empty {
+  background: var(--btn-secondary, #5C7060);
+}
+
+.sigil-preview :global(svg) {
+  display: block;
+  width: 64px;
+  height: 64px;
 }
 
 .state-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0 18px;
+  gap: 8px 22px;
 }
 
 .state-row div {
@@ -211,7 +232,8 @@ select:focus {
 .state-row strong,
 .state-row code {
   min-width: 0;
-  font-size: 12px;
+  font-family: var(--log-font);
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
 
@@ -227,7 +249,7 @@ select:focus {
 
 .wallet-status-row {
   color: rgba(49, 57, 51, 0.76);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .passphrase-field summary,
@@ -239,7 +261,7 @@ select:focus {
 .credential-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) minmax(180px, 340px);
-  gap: 10px;
+  gap: 16px;
   align-items: center;
 }
 
@@ -266,7 +288,7 @@ select:focus {
 
 .operation-tabs {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin-bottom: 18px;
+  margin-bottom: 26px;
 }
 
 .segmented button,
@@ -293,13 +315,13 @@ select:focus {
 
 .operation-body {
   display: grid;
-  gap: 14px;
+  gap: 20px;
 }
 
 .operation-line {
   display: grid;
   grid-template-columns: minmax(280px, 420px) auto minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 16px;
   align-items: center;
 }
 
@@ -315,7 +337,7 @@ select:focus {
 .pending-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
 }
 
 .button-row {
@@ -325,7 +347,7 @@ select:focus {
 .output-row {
   justify-content: space-between;
   border-top: 1px solid rgba(22, 29, 23, 0.12);
-  padding-top: 12px;
+  padding-top: 18px;
 }
 
 .output-row code {
@@ -339,10 +361,10 @@ select:focus {
 }
 
 pre {
-  max-height: 220px;
+  max-height: 260px;
   overflow: auto;
   margin: 0;
-  padding: 12px 0 0 0;
+  padding: 18px 0 0 0;
   border-top: 1px solid rgba(22, 29, 23, 0.12);
   white-space: pre-wrap;
   font-size: 12px;
@@ -351,7 +373,7 @@ pre {
 .boot-row {
   flex-wrap: wrap;
   border-top: 1px solid rgba(22, 29, 23, 0.12);
-  padding-top: 12px;
+  padding-top: 18px;
 }
 
 .boot-row select {
@@ -359,10 +381,10 @@ pre {
 }
 
 .check-row {
-  min-height: 42px;
+  min-height: 48px;
   color: rgba(49, 57, 51, 0.78);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .check-row input {
@@ -379,13 +401,13 @@ pre {
 
 .advanced {
   border-top: 1px solid rgba(22, 29, 23, 0.12);
-  padding-top: 12px;
+  padding-top: 18px;
 }
 
 .passphrase-field {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
   align-items: center;
 }
 
@@ -394,7 +416,7 @@ pre {
 }
 
 .passphrase-field summary {
-  min-height: 42px;
+  min-height: 48px;
   display: flex;
   align-items: center;
 }
@@ -411,8 +433,8 @@ pre {
 .success-line {
   border-left: 4px solid;
   font-family: var(--log-font);
-  font-size: 12px;
-  padding-left: 12px;
+  font-size: 13px;
+  padding-left: 14px;
 }
 
 .error-line {
@@ -450,7 +472,7 @@ pre {
 }
 
 .pending-main strong {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .pending-main code,
@@ -466,14 +488,14 @@ pre {
 
 .pending-status {
   color: rgba(49, 57, 51, 0.7);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
 @media (max-width: 760px) {
   .keys-panel {
-    padding: 22px;
+    padding: 28px 22px;
   }
 
   .top-row,
@@ -483,6 +505,10 @@ pre {
   .operation-line,
   .state-row {
     grid-template-columns: 1fr;
+  }
+
+  .sigil-preview {
+    justify-self: start;
   }
 
   .operation-tabs {

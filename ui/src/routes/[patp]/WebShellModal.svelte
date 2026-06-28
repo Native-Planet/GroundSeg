@@ -10,7 +10,12 @@
 
   import '@xterm/xterm/css/xterm.css'
 
-  export let patp
+  export let patp = ""
+  export let target = "ship"
+  export let title = "Web Shell"
+  export let width = 980
+  export let height = "60vh"
+  export let minHeight = 420
 
   const customHostname = process.env.GS_CUSTOM_HOSTNAME
 
@@ -149,6 +154,7 @@
         status = "Connecting shell..."
         sendMessage({
           patp,
+          target,
           cols: terminal.cols,
           rows: terminal.rows,
           token,
@@ -198,13 +204,16 @@
   })
 </script>
 
-<Modal width={980}>
+<Modal {width}>
   <div class="wrapper">
     <div class="header">
-      <div class="title">Web Shell</div>
+      <div class="title">{title}</div>
       <div class="status">{status}</div>
     </div>
-    <div class="terminal" bind:this={terminalEl}></div>
+    <div
+      class="terminal"
+      style={`--terminal-height: ${height}; --terminal-min-height: ${minHeight}px;`}
+      bind:this={terminalEl}></div>
   </div>
 </Modal>
 
@@ -237,8 +246,8 @@
     text-align: right;
   }
   .terminal {
-    height: 60vh;
-    min-height: 420px;
+    height: var(--terminal-height, 60vh);
+    min-height: var(--terminal-min-height, 420px);
     border-radius: 16px;
     overflow: hidden;
     border: 1px solid #3E5142;

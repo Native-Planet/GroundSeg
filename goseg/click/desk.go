@@ -115,7 +115,7 @@ func getDesk(patp, desk string, bypass bool) (string, error) {
 	vats, _, err := filterResponse("desk", response)
 	if err != nil {
 		storeDeskError(patp, desk)
-		return "", fmt.Errorf("Click penpai desk info failed to get exec: %v", err)
+		return "", fmt.Errorf("Click get desk %%%v failed to parse response: %v", desk, err)
 	}
 	storeDesk(patp, desk, vats)
 	return vats, nil
@@ -217,7 +217,7 @@ func fetchDeskFromMemory(patp, desk string) (string, error) {
 }
 
 func storeDeskError(patp, desk string) {
-	zap.L().Debug(fmt.Sprintf("Recording penpai desk info failure for %s", patp))
+	zap.L().Debug(fmt.Sprintf("Recording %%%v desk info failure for %s", desk, patp))
 	desksMutex.Lock()
 	defer desksMutex.Unlock()
 	deskInfo, exists := shipDesks[patp]

@@ -14,6 +14,7 @@ type Channel struct {
 	Miniomc   VersionDetails `json:"miniomc"`
 	Netdata   VersionDetails `json:"netdata"`
 	Vere      VersionDetails `json:"vere"`
+	Hermes    VersionDetails `json:"hermes"`
 	Webui     VersionDetails `json:"webui"`
 	Wireguard VersionDetails `json:"wireguard"`
 }

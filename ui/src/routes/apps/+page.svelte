@@ -1,8 +1,9 @@
 <script>
   import './apps.css'
-  import { onDestroy, onMount } from 'svelte'
+  import { afterUpdate, onDestroy, onMount } from 'svelte'
   import { openModal } from 'svelte-modals'
   import Fa from 'svelte-fa'
+  import { sigil, stringRenderer } from '@tlon/sigil-js'
   import {
     faCheck,
     faCircleNotch,
@@ -93,6 +94,7 @@
   let remote = true
   let selectedDrive = 'system-drive'
   let pollTimer
+  let sigilMarkup = ''
 
   $: urbits = ($structure?.urbits) || {}
   $: drives = ($structure?.system?.info?.drives) || {}
@@ -100,6 +102,7 @@
   $: startramReady = Boolean($structure?.profile?.startram?.info?.registered && $structure?.profile?.startram?.info?.running)
   $: localShips = Object.keys(urbits).filter(patp => !isMoon(patp)).sort()
   $: normalizedShip = normalizeShip(ship)
+  $: sigilShip = sigilPoint(normalizedShip)
   $: localShipExists = Boolean(normalizedShip && urbits[normalizedShip])
   $: validShip = Boolean(normalizedShip && checkPatp(sigRemove(normalizedShip)))
   $: roller = rollerEndpoint.trim() || 'roller.urbit.org'
@@ -127,6 +130,13 @@
     if (pollTimer) clearInterval(pollTimer)
   })
 
+  afterUpdate(() => {
+    const nextSigil = renderSigil(sigilShip)
+    if (nextSigil !== sigilMarkup) {
+      sigilMarkup = nextSigil
+    }
+  })
+
   function normalizeShip(value) {
     const trimmed = value.trim()
     if (!trimmed) return ''
@@ -140,6 +150,29 @@
   function isGalaxy(patp) {
     const name = sigRemove(patp)
     return name.length === 3 && !name.includes('-')
+  }
+
+  function sigilPoint(patp) {
+    const name = sigRemove(patp)
+    if (!name || !checkPatp(name)) return ''
+    const parts = name.split('-')
+    if (parts.length > 2) return parts.slice(-2).join('-')
+    if (parts.length === 1 && ![3, 6].includes(name.length)) return ''
+    if (parts.length === 2 || parts.length === 1) return name
+    return ''
+  }
+
+  function renderSigil(patp) {
+    if (!patp) return ''
+    const root = getComputedStyle(document.documentElement)
+    const bg = root.getPropertyValue('--btn-secondary').trim() || '#5C7060'
+    const fg = root.getPropertyValue('--text-card-color').trim() || '#F8F8F6'
+    return sigil({
+      patp,
+      renderer: stringRenderer,
+      size: 120,
+      colors: [bg, fg]
+    })
   }
 
   function displayShip(value) {
@@ -380,6 +413,9 @@
     </div>
 
     <div class="keys-row identity-row">
+      <div class="sigil-preview" class:empty={!sigilMarkup} aria-hidden="true">
+        {@html sigilMarkup}
+      </div>
       <div class="inline-control ship-control">
         <label class="field-label" for="ship">SHIP</label>
         <input id="ship" bind:value={ship} list="azimuth-ships" placeholder="~sampel-palnet" on:change={loadPoint} />

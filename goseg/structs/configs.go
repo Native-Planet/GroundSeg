@@ -49,11 +49,6 @@ type SysConfig struct {
 	Pubkey         string                 `json:"pubkey"`
 	Privkey        string                 `json:"privkey"`
 	Salt           string                 `json:"salt"`
-	PenpaiAllow    bool                   `json:"penpaiAllow"`
-	PenpaiRunning  bool                   `json:"penpaiRunning"`
-	PenpaiCores    int                    `json:"penpaiCores"`
-	PenpaiModels   []Penpai               `json:"penpaiModels"`
-	PenpaiActive   string                 `json:"penpaiActive"`
 	DisableSlsa    bool                   `json:"disableSlsa"`
 	Disable502     bool                   `json:"disable502"`
 	SnapTime       int                    `json:"snapTime"`
@@ -68,12 +63,6 @@ type DiskWarning struct {
 	NinetyFive time.Time `json:"ninetyFive"`
 }
 
-type Penpai struct {
-	ModelTitle string `json:"modelTitle"`
-	ModelName  string `json:"modelName"`
-	ModelUrl   string `json:"modelUrl"`
-}
-
 // authenticated browser sessions
 type SessionInfo struct {
 	Hash    string `json:"hash"`
@@ -82,52 +71,53 @@ type SessionInfo struct {
 
 // pier json struct
 type UrbitDocker struct {
-	PierName            string `json:"pier_name"`
-	HTTPPort            int    `json:"http_port"`
-	AmesPort            int    `json:"ames_port"`
-	LoomSize            int    `json:"loom_size"`
-	ExtraArgs           string `json:"extra_args"`
-	UrbitVersion        string `json:"urbit_version"`
-	MinioVersion        string `json:"minio_version"`
-	UrbitRepo           string `json:"urbit_repo"`
-	MinioRepo           string `json:"minio_repo"`
-	UrbitAmd64Sha256    string `json:"urbit_amd64_sha256"`
-	UrbitArm64Sha256    string `json:"urbit_arm64_sha256"`
-	MinioAmd64Sha256    string `json:"minio_amd64_sha256"`
-	MinioArm64Sha256    string `json:"minio_arm64_sha256"`
-	MinioPassword       string `json:"minio_password"`
-	Network             string `json:"network"`
-	WgURL               string `json:"wg_url"`
-	WgHTTPPort          int    `json:"wg_http_port"`
-	WgAmesPort          int    `json:"wg_ames_port"`
-	WgS3Port            int    `json:"wg_s3_port"`
-	WgConsolePort       int    `json:"wg_console_port"`
-	MeldSchedule        bool   `json:"meld_schedule"`
-	MeldScheduleType    string `json:"meld_schedule_type"`
-	MeldDay             string `json:"meld_day"`
-	MeldDate            int    `json:"meld_date"`
-	MeldFrequency       int    `json:"meld_frequency"`
-	MeldTime            string `json:"meld_time"`
-	MeldLast            string `json:"meld_last"`
-	MeldNext            string `json:"meld_next"`
-	BootStatus          string `json:"boot_status"`
-	CustomPierLocation  any    `json:"custom_pier_location"`
-	CustomUrbitWeb      string `json:"custom_urbit_web"`
-	CustomS3Web         string `json:"custom_s3_web"`
-	CustomS3WebLocal    string `json:"custom_s3_web_local"`
-	CustomS3WebRemote   string `json:"custom_s3_web_remote"`
-	ShowUrbitWeb        string `json:"show_urbit_web"`
-	DevMode             bool   `json:"dev_mode"`
-	Click               bool   `json:"click"`
-	MinIOLinked         bool   `json:"minio_linked"`
-	StartramReminder    any    `json:"startram_reminder"`
-	ChopOnUpgrade       any    `json:"chop_on_upgrade"`
-	SizeLimit           int    `json:"size_limit"`
-	RemoteTlonBackup    bool   `json:"remote_tlon_backup"`
-	LocalTlonBackup     bool   `json:"local_tlon_backup"`
-	BackupTime          string `json:"backup_time"`
-	DisableShipRestarts any    `json:"disable_ship_restarts"`
-	SnapTime            int    `json:"snap_time"`
+	PierName              string `json:"pier_name"`
+	HTTPPort              int    `json:"http_port"`
+	AmesPort              int    `json:"ames_port"`
+	LoomSize              int    `json:"loom_size"`
+	ExtraArgs             string `json:"extra_args"`
+	UrbitVersion          string `json:"urbit_version"`
+	UrbitImageTagOverride string `json:"urbit_image_tag_override"`
+	MinioVersion          string `json:"minio_version"`
+	UrbitRepo             string `json:"urbit_repo"`
+	MinioRepo             string `json:"minio_repo"`
+	UrbitAmd64Sha256      string `json:"urbit_amd64_sha256"`
+	UrbitArm64Sha256      string `json:"urbit_arm64_sha256"`
+	MinioAmd64Sha256      string `json:"minio_amd64_sha256"`
+	MinioArm64Sha256      string `json:"minio_arm64_sha256"`
+	MinioPassword         string `json:"minio_password"`
+	Network               string `json:"network"`
+	WgURL                 string `json:"wg_url"`
+	WgHTTPPort            int    `json:"wg_http_port"`
+	WgAmesPort            int    `json:"wg_ames_port"`
+	WgS3Port              int    `json:"wg_s3_port"`
+	WgConsolePort         int    `json:"wg_console_port"`
+	MeldSchedule          bool   `json:"meld_schedule"`
+	MeldScheduleType      string `json:"meld_schedule_type"`
+	MeldDay               string `json:"meld_day"`
+	MeldDate              int    `json:"meld_date"`
+	MeldFrequency         int    `json:"meld_frequency"`
+	MeldTime              string `json:"meld_time"`
+	MeldLast              string `json:"meld_last"`
+	MeldNext              string `json:"meld_next"`
+	BootStatus            string `json:"boot_status"`
+	CustomPierLocation    any    `json:"custom_pier_location"`
+	CustomUrbitWeb        string `json:"custom_urbit_web"`
+	CustomS3Web           string `json:"custom_s3_web"`
+	CustomS3WebLocal      string `json:"custom_s3_web_local"`
+	CustomS3WebRemote     string `json:"custom_s3_web_remote"`
+	ShowUrbitWeb          string `json:"show_urbit_web"`
+	DevMode               bool   `json:"dev_mode"`
+	Click                 bool   `json:"click"`
+	MinIOLinked           bool   `json:"minio_linked"`
+	StartramReminder      any    `json:"startram_reminder"`
+	ChopOnUpgrade         any    `json:"chop_on_upgrade"`
+	SizeLimit             int    `json:"size_limit"`
+	RemoteTlonBackup      bool   `json:"remote_tlon_backup"`
+	LocalTlonBackup       bool   `json:"local_tlon_backup"`
+	BackupTime            string `json:"backup_time"`
+	DisableShipRestarts   any    `json:"disable_ship_restarts"`
+	SnapTime              int    `json:"snap_time"`
 }
 
 // Define the interface
@@ -186,6 +176,8 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			u.ExtraArgs, _ = v.(string)
 		case "urbit_version":
 			u.UrbitVersion, _ = v.(string)
+		case "urbit_image_tag_override":
+			u.UrbitImageTagOverride, _ = v.(string)
 		case "minio_version":
 			u.MinioVersion, _ = v.(string)
 		case "urbit_repo":
@@ -314,6 +306,27 @@ type McConfig struct {
 	Repo        string `json:"repo"`
 	Amd64Sha256 string `json:"amd64_sha256"`
 	Arm64Sha256 string `json:"arm64_sha256"`
+}
+
+type HermesConfig struct {
+	Enabled            bool   `json:"enabled"`
+	Ship               string `json:"ship"`
+	Owner              string `json:"owner"`
+	Port               int    `json:"port"`
+	Image              string `json:"image"`
+	HermesVersion      string `json:"hermes_version"`
+	HermesAgentRef     string `json:"hermes_agent_ref"`
+	TlonAdapterVersion string `json:"tlon_adapter_version"`
+	TlonAdapterRef     string `json:"tlon_adapter_ref"`
+	ModelProvider      string `json:"model_provider"`
+	Model              string `json:"model"`
+	ProviderAPIKey     string `json:"provider_api_key"`
+	WebProvider        string `json:"web_provider"`
+	WebAPIKey          string `json:"web_api_key"`
+	WebURL             string `json:"web_url"`
+	APIEnabled         bool   `json:"api_enabled"`
+	APIKey             string `json:"api_key"`
+	AccessCode         string `json:"access_code"`
 }
 
 // nedata config json

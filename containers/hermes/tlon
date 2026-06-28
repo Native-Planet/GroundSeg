@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+set -eu
+
+bundle="${TLON_CLI_BUNDLE:-/opt/tlon-apps/packages/tlon-skill/dist/tlon.cjs}"
+
+if [ ! -f "$bundle" ]; then
+  cat >&2 <<EOF
+ERROR: missing tlon CLI bundle at $bundle
+EOF
+  exit 127
+fi
+
+exec node "$bundle" "$@"

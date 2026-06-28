@@ -15,7 +15,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -142,6 +141,14 @@ func LoadStartramRegions() error {
 	return nil
 }
 
+func appendUniqueString(items []string, item string) []string {
+	item = strings.TrimSpace(item)
+	if item == "" || slices.Contains(items, item) {
+		return items
+	}
+	return append(items, item)
+}
+
 // this is for building the broadcast objects describing piers
 func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	// get a list of piers
@@ -219,6 +226,19 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		zap.L().Debug("Defaulting to `nativeplanet.local`")
 		hostName = "nativeplanet.local"
 	}
+	vereTags, err := docker.GetVereImageTags()
+	if err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to fetch Vere image tags: %v", err))
+	}
+	versionServerVereTag := ""
+	versionServerVereRepo := ""
+	if containerInfo, infoErr := docker.GetLatestContainerInfo("vere"); infoErr == nil {
+		versionServerVereTag = containerInfo["tag"]
+		versionServerVereRepo = containerInfo["repo"]
+		vereTags = appendUniqueString(vereTags, versionServerVereTag)
+	} else {
+		zap.L().Warn(fmt.Sprintf("Unable to read version-server Vere info: %v", infoErr))
+	}
 	// convert the running status into bools
 	for pier, status := range pierStatus {
 		// pull urbit info from json
@@ -243,9 +263,11 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			bootStatus = false
 		}
 		setRemote := false
-		urbitURL := fmt.Sprintf("http://%s:%d", hostName, dockerConfig.HTTPPort)
+		urbitURL := docker.UrbitWebURL(hostName, dockerConfig)
+		if urbitURL == "" {
+			urbitURL = "#"
+		}
 		if dockerConfig.Network == "wireguard" {
-			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 			setRemote = true
 		}
 		remoteReady := false
@@ -284,16 +306,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 
 		minioLinked := config.GetMinIOLinkedStatus(pier)
-
-		var penpaiCompanionInstalled bool
-		if strings.Contains(pierStatus[pier], "Up") {
-			deskStatus, err := click.GetDesk(pier, "penpai", false)
-			if err != nil {
-				penpaiCompanionInstalled = false
-				zap.L().Debug(fmt.Sprintf("Broadcast failed to get penpai desk info for %v: %v", pier, err))
-			}
-			penpaiCompanionInstalled = deskStatus == "running"
-		}
 
 		var gallsegInstalled bool
 		if strings.Contains(pierStatus[pier], "Up") {
@@ -343,6 +355,14 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.MemUsage = dockerStats.MemoryUsage
 		urbit.Info.ExtraArgs = dockerConfig.ExtraArgs
 		urbit.Info.BootCommandBase = bootCommandBase
+		urbit.Info.UrbitVersion = dockerConfig.UrbitVersion
+		urbit.Info.UrbitRepo = dockerConfig.UrbitRepo
+		if urbit.Info.UrbitRepo == "" {
+			urbit.Info.UrbitRepo = versionServerVereRepo
+		}
+		urbit.Info.UrbitImageTagOverride = dockerConfig.UrbitImageTagOverride
+		urbit.Info.VereTags = appendUniqueString(append([]string{}, vereTags...), dockerConfig.UrbitImageTagOverride)
+		urbit.Info.VersionServerVereTag = versionServerVereTag
 		urbit.Info.DevMode = dockerConfig.DevMode
 		urbit.Info.Vere = dockerConfig.UrbitVersion
 		urbit.Info.DetectBootStatus = bootStatus
@@ -364,7 +384,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.NextPack = strconv.FormatInt(GetScheduledPack(pier).Unix(), 10)
 		urbit.Info.PackIntervalType = dockerConfig.MeldScheduleType
 		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
-		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
 		urbit.Info.Gallseg = gallsegInstalled
 		urbit.Info.StartramReminder = startramReminder
 		urbit.Info.ChopOnUpgrade = chopOnUpgrade
@@ -399,26 +418,13 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 
 func constructAppsInfo() structs.Apps {
 	var apps structs.Apps
-	conf := config.Conf()
-
-	// penpai
-	var modelTitles []string
-	// Iterate through penpais to extract modelTitle
-	for _, penpaiInfo := range conf.PenpaiModels {
-		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
-	}
-	apps.Penpai.Info.Models = modelTitles
-	apps.Penpai.Info.Allowed = conf.PenpaiAllow
-	apps.Penpai.Info.ActiveModel = conf.PenpaiActive
-	apps.Penpai.Info.Running = conf.PenpaiRunning
-	apps.Penpai.Info.MaxCores = runtime.NumCPU() - 1
-	apps.Penpai.Info.ActiveCores = conf.PenpaiCores
 	return apps
 }
 
 func constructProfileInfo() structs.Profile {
 	// Build startram struct
 	var startramInfo structs.Startram
+	var hermesInfo structs.Hermes
 	// Information from config
 	conf := config.Conf()
 	startramInfo.Info.Registered = conf.WgRegistered
@@ -469,9 +475,61 @@ func constructProfileInfo() structs.Profile {
 
 	// Get Regions
 	startramInfo.Info.Regions = broadcastState.Profile.Startram.Info.Regions
+
+	if err := config.LoadHermesConfig(); err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to load Hermes profile config: %v", err))
+	}
+	hermesConf := config.HermesConf()
+	hermesRunning := false
+	if hermesContainer, err := docker.FindContainer(docker.HermesContainerName); err == nil && hermesContainer != nil {
+		hermesRunning = hermesContainer.State == "running"
+	}
+	hermesURL := "#"
+	hostName := system.LocalUrl
+	if hostName == "" {
+		hostName = "nativeplanet.local"
+	}
+	if hermesConf.Port > 0 {
+		hermesURL = fmt.Sprintf("http://%s:%d", hostName, hermesConf.Port)
+	}
+	hermesInfo.Info.Enabled = hermesConf.Enabled
+	hermesInfo.Info.Running = hermesRunning
+	hermesInfo.Info.URL = hermesURL
+	hermesInfo.Info.Ship = docker.NormalizeHermesShip(hermesConf.Ship)
+	hermesInfo.Info.Owner = docker.NormalizeHermesShip(hermesConf.Owner)
+	hermesInfo.Info.Port = hermesConf.Port
+	hermesInfo.Info.Image = docker.HermesImageOrDefault(hermesConf.Image)
+	if versionServerImage, err := docker.HermesVersionServerImage(); err == nil {
+		hermesInfo.Info.VersionServerImage = versionServerImage
+		hermesInfo.Info.UpdateAvailable = docker.HermesUpdateAvailable(hermesConf.Image)
+	} else {
+		zap.L().Debug(fmt.Sprintf("Unable to read version-server Hermes info: %v", err))
+	}
+	hermesInfo.Info.HermesVersion = docker.HermesVersionOrDefault(hermesConf.HermesVersion)
+	hermesInfo.Info.HermesAgentRef = docker.HermesAgentRefOrDefault(hermesConf.HermesAgentRef)
+	hermesInfo.Info.TlonAdapterVersion = docker.HermesTlonAdapterVersionOrDefault(hermesConf.TlonAdapterVersion)
+	hermesInfo.Info.TlonAdapterRef = docker.HermesTlonAdapterRefOrDefault(hermesConf.TlonAdapterRef)
+	hermesInfo.Info.ModelProvider = docker.HermesModelProviderOrDefault(hermesConf.ModelProvider)
+	hermesInfo.Info.Model = docker.HermesModelOrDefault(hermesConf.Model)
+	hermesInfo.Info.ProviderAPIKeySet = strings.TrimSpace(hermesConf.ProviderAPIKey) != ""
+	hermesInfo.Info.WebProvider = docker.HermesWebProviderOrEmpty(hermesConf.WebProvider)
+	hermesInfo.Info.WebAPIKeySet = strings.TrimSpace(hermesConf.WebAPIKey) != ""
+	hermesInfo.Info.WebURL = strings.TrimSpace(hermesConf.WebURL)
+	hermesInfo.Info.APIEnabled = hermesConf.APIEnabled
+	hermesInfo.Info.APIKeySet = strings.TrimSpace(hermesConf.APIKey) != ""
+	if installed, err := docker.ImageRefExists(hermesInfo.Info.Image); err == nil {
+		hermesInfo.Info.ImageInstalled = installed
+	} else {
+		zap.L().Warn(fmt.Sprintf("Unable to inspect Hermes image %s: %v", hermesInfo.Info.Image, err))
+	}
+	for _, pier := range conf.Piers {
+		hermesInfo.Info.Ships = append(hermesInfo.Info.Ships, docker.NormalizeHermesShip(pier))
+	}
+
 	// Build profile struct
 	var profile structs.Profile
 	profile.Startram = startramInfo
+	profile.Hermes = hermesInfo
 	return profile
 }
 

@@ -178,14 +178,25 @@ func startServer() { // *http.Server {
 }
 
 func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
+	fileServer := http.FileServer(fs)
 	return func(w http.ResponseWriter, r *http.Request) {
 		file, err := fs.Open(r.URL.Path)
-		if err != nil {
-			r.URL.Path = "/index.html"
-		} else {
+		if err == nil {
 			defer file.Close()
+			fileServer.ServeHTTP(w, r)
+			return
 		}
-		http.FileServer(fs).ServeHTTP(w, r)
+		if filepath.Ext(r.URL.Path) != "" {
+			http.NotFound(w, r)
+			return
+		}
+		indexReq := new(http.Request)
+		*indexReq = *r
+		indexURL := *r.URL
+		indexURL.Path = "/"
+		indexURL.RawPath = ""
+		indexReq.URL = &indexURL
+		fileServer.ServeHTTP(w, indexReq)
 	}
 }
 
@@ -251,7 +262,10 @@ func main() {
 	} else {
 		versionStruct := config.LocalVersion()
 		releaseChannel := conf.UpdateBranch
-		targetChan := versionStruct.Groundseg[releaseChannel]
+		targetChan, selectedChannel, exactChannel := config.SelectVersionChannel(versionStruct, releaseChannel)
+		if !exactChannel {
+			zap.L().Warn(fmt.Sprintf("Version channel %q not found locally; using %q", releaseChannel, selectedChannel))
+		}
 		config.VersionInfo = targetChan
 	}
 	// routines/version.go
@@ -263,6 +277,8 @@ func main() {
 
 	// digest urbit transition events
 	go rectify.UrbitTransitionHandler()
+	// digest hermes profile transition events
+	go rectify.HermesTransitionHandler()
 	// digest system transition events
 	go rectify.SystemTransitionHandler()
 	// digest new ship transition events
@@ -314,7 +330,10 @@ func main() {
 			zap.L().Warn("Could not retrieve version info after 10 seconds!")
 			versionStruct := config.LocalVersion()
 			releaseChannel := conf.UpdateBranch
-			targetChan := versionStruct.Groundseg[releaseChannel]
+			targetChan, selectedChannel, exactChannel := config.SelectVersionChannel(versionStruct, releaseChannel)
+			if !exactChannel {
+				zap.L().Warn(fmt.Sprintf("Version channel %q not found locally; using %q", releaseChannel, selectedChannel))
+			}
 			config.VersionInfo = targetChan
 		}
 	}
@@ -342,9 +361,9 @@ func main() {
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
+	// Load Hermes sidecars after ships so code-derived sidecars can connect.
+	loadService(docker.LoadHermes, "Unable to load Hermes containers!")
 	// Auto-link S3 for ships that are still unlinked after RustFS provisioning.
 	go routines.AutoConfigureObjectStoreLinks()
-	// Load Penpai
-	loadService(docker.LoadLlama, "Unable to load Llama GPT!")
 	startServer()
 }

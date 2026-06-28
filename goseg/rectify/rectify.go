@@ -39,6 +39,8 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.SnapTime = event.Event
 			case "extraArgs":
 				urbitStruct.Transition.ExtraArgs = event.Event
+			case "vereTag":
+				urbitStruct.Transition.VereTag = event.Event
 			case "urbitDomain":
 				urbitStruct.Transition.UrbitDomain = event.Event
 			case "minioDomain":
@@ -63,8 +65,6 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.DeleteShip = event.Event
 			case "toggleMinIOLink":
 				urbitStruct.Transition.ToggleMinIOLink = event.Event
-			case "penpaiCompanion":
-				urbitStruct.Transition.PenpaiCompanion = event.Event
 			case "gallseg":
 				urbitStruct.Transition.Gallseg = event.Event
 			case "deleteService":
@@ -87,6 +87,44 @@ func UrbitTransitionHandler() {
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		}
+	}
+}
+
+func HermesTransitionHandler() {
+	for {
+		event := <-docker.HermesTransBus
+		current := broadcast.GetState()
+		switch event.Type {
+		case "toggle":
+			current.Profile.Hermes.Transition.Toggle = fmt.Sprintf("%v", event.Data)
+		case "save":
+			current.Profile.Hermes.Transition.Save = fmt.Sprintf("%v", event.Data)
+		case "restart":
+			current.Profile.Hermes.Transition.Restart = fmt.Sprintf("%v", event.Data)
+		case "install":
+			current.Profile.Hermes.Transition.Install = fmt.Sprintf("%v", event.Data)
+		case "error":
+			current.Profile.Hermes.Transition.Error = fmt.Sprintf("%v", event.Data)
+		default:
+			zap.L().Warn(fmt.Sprintf("Urecognized Hermes transition: %v", event.Type))
+			continue
+		}
+		if event.Data == nil {
+			switch event.Type {
+			case "toggle":
+				current.Profile.Hermes.Transition.Toggle = ""
+			case "save":
+				current.Profile.Hermes.Transition.Save = ""
+			case "restart":
+				current.Profile.Hermes.Transition.Restart = ""
+			case "install":
+				current.Profile.Hermes.Transition.Install = ""
+			case "error":
+				current.Profile.Hermes.Transition.Error = ""
+			}
+		}
+		broadcast.UpdateBroadcast(current)
+		broadcast.BroadcastToClients()
 	}
 }
 
@@ -311,6 +349,8 @@ func SystemTransitionHandler() {
 		switch event.Type {
 		case "wifiConnect":
 			current.System.Transition.WifiConnect = event.Event
+		case "checkUpdates":
+			current.System.Transition.CheckUpdates = event.Event
 		case "swap":
 			current.System.Transition.Swap = event.BoolEvent
 		case "bugReport":

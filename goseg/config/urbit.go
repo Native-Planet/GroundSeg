@@ -60,13 +60,7 @@ func LoadUrbitConfig(pier string) error {
 	if err := json.Unmarshal(file, &targetStruct); err != nil {
 		return fmt.Errorf("Error decoding %s JSON: %w", pier, err)
 	}
-	// set startram reminder
-	if targetStruct.StartramReminder == nil {
-		targetStruct.StartramReminder = defaults.UrbitConfig.StartramReminder
-	}
-	if targetStruct.SnapTime == 0 {
-		targetStruct.SnapTime = 60
-	}
+	applyUrbitDefaults(&targetStruct)
 	structs.SyncCustomS3Domains(&targetStruct)
 	// Store in var
 	UrbitsConfig[pier] = targetStruct
@@ -90,6 +84,7 @@ func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
 	defer urbitMutex.Unlock()
 	// update UrbitsConfig with the values from inputConfig
 	for pier, config := range inputConfig {
+		applyUrbitDefaults(&config)
 		structs.SyncCustomS3Domains(&config)
 		ver, err := getImageTagByContainerName(pier)
 		if err == nil {
@@ -148,12 +143,7 @@ func ReplaceUrbitConfigJSON(pier string, raw []byte) ([]byte, error) {
 	if targetStruct.PierName != "" && targetStruct.PierName != pier {
 		return nil, fmt.Errorf("pier_name %q does not match %q", targetStruct.PierName, pier)
 	}
-	if targetStruct.StartramReminder == nil {
-		targetStruct.StartramReminder = defaults.UrbitConfig.StartramReminder
-	}
-	if targetStruct.SnapTime == 0 {
-		targetStruct.SnapTime = 60
-	}
+	applyUrbitDefaults(&targetStruct)
 	structs.SyncCustomS3Domains(&targetStruct)
 
 	urbitMutex.Lock()
@@ -194,6 +184,15 @@ func unmarshalUrbitDockerSafe(data []byte, target *structs.UrbitDocker) (err err
 		}
 	}()
 	return json.Unmarshal(data, target)
+}
+
+func applyUrbitDefaults(target *structs.UrbitDocker) {
+	if target.StartramReminder == nil {
+		target.StartramReminder = defaults.UrbitConfig.StartramReminder
+	}
+	if target.SnapTime == 0 {
+		target.SnapTime = defaults.UrbitConfig.SnapTime
+	}
 }
 
 func UpdateUrbitConfigForPier(pier string, mutate func(*structs.UrbitDocker)) error {

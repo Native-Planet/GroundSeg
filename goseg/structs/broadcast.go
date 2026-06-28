@@ -17,18 +17,6 @@ type AuthBroadcast struct {
 
 // third party integrations
 type Apps struct {
-	Penpai PenpaiBroadcast `json:"penpai"`
-}
-
-type PenpaiBroadcast struct {
-	Info struct {
-		Allowed     bool     `json:"allowed"`
-		Running     bool     `json:"running"`
-		ActiveCores int      `json:"activeCores"`
-		MaxCores    int      `json:"maxCores"`
-		Models      []string `json:"models"`
-		ActiveModel string   `json:"activeModel"`
-	} `json:"info"`
 }
 
 // new ship
@@ -60,6 +48,7 @@ type SystemTransitionBroadcast struct {
 	BugReport      string   `json:"bugReport"`
 	BugReportError string   `json:"bugReportError"`
 	WifiConnect    string   `json:"wifiConnect"`
+	CheckUpdates   string   `json:"checkUpdates"`
 }
 
 // broadcast payload subobject
@@ -100,6 +89,7 @@ type SystemDrive struct {
 // broadcast payload subobject
 type Profile struct {
 	Startram Startram `json:"startram"`
+	Hermes   Hermes   `json:"hermes"`
 }
 
 // broadcast payload subobject
@@ -133,6 +123,43 @@ type StartramTransition struct {
 	Restart  string `json:"restart"`
 }
 
+type Hermes struct {
+	Info struct {
+		Enabled            bool     `json:"enabled"`
+		Running            bool     `json:"running"`
+		URL                string   `json:"url"`
+		Ship               string   `json:"ship"`
+		Owner              string   `json:"owner"`
+		Port               int      `json:"port"`
+		Image              string   `json:"image"`
+		HermesVersion      string   `json:"hermesVersion"`
+		HermesAgentRef     string   `json:"hermesAgentRef"`
+		TlonAdapterVersion string   `json:"tlonAdapterVersion"`
+		TlonAdapterRef     string   `json:"tlonAdapterRef"`
+		ModelProvider      string   `json:"modelProvider"`
+		Model              string   `json:"model"`
+		ProviderAPIKeySet  bool     `json:"providerApiKeySet"`
+		WebProvider        string   `json:"webProvider"`
+		WebAPIKeySet       bool     `json:"webApiKeySet"`
+		WebURL             string   `json:"webUrl"`
+		APIEnabled         bool     `json:"apiEnabled"`
+		APIKeySet          bool     `json:"apiKeySet"`
+		ImageInstalled     bool     `json:"imageInstalled"`
+		VersionServerImage string   `json:"versionServerImage"`
+		UpdateAvailable    bool     `json:"updateAvailable"`
+		Ships              []string `json:"ships"`
+	} `json:"info"`
+	Transition HermesTransition `json:"transition"`
+}
+
+type HermesTransition struct {
+	Toggle  string `json:"toggle"`
+	Save    string `json:"save"`
+	Restart string `json:"restart"`
+	Install string `json:"install"`
+	Error   string `json:"error"`
+}
+
 // broadcast payload subobject
 type Urbit struct {
 	Info struct {
@@ -150,6 +177,11 @@ type Urbit struct {
 		SnapTime                 int            `json:"snapTime"`
 		ExtraArgs                string         `json:"extraArgs"`
 		BootCommandBase          string         `json:"bootCommandBase"`
+		UrbitVersion             string         `json:"urbitVersion"`
+		UrbitRepo                string         `json:"urbitRepo"`
+		UrbitImageTagOverride    string         `json:"urbitImageTagOverride"`
+		VereTags                 []string       `json:"vereTags"`
+		VersionServerVereTag     string         `json:"versionServerVereTag"`
 		DevMode                  bool           `json:"devMode"`
 		DetectBootStatus         bool           `json:"detectBootStatus"`
 		Remote                   bool           `json:"remote"`
@@ -165,7 +197,6 @@ type Urbit struct {
 		PackTime                 string         `json:"packTime"`
 		PackDay                  string         `json:"packDay"`
 		PackDate                 int            `json:"packDate"`
-		PenpaiCompanion          bool           `json:"penpaiCompanion"`
 		Gallseg                  bool           `json:"gallseg"`
 		MinIOLinked              bool           `json:"minioLinked"`
 		StartramReminder         bool           `json:"startramReminder"`
@@ -202,7 +233,6 @@ type UrbitTransitionBroadcast struct {
 	Loom                      string `json:"loom"`
 	UrbitDomain               string `json:"urbitDomain"`
 	MinIODomain               string `json:"minioDomain"`
-	PenpaiCompanion           string `json:"penpaiCompanion"`
 	Gallseg                   string `json:"gallseg"`
 	ChopOnUpgrade             string `json:"chopOnUpgrade"`
 	RollChop                  string `json:"rollChop"`
@@ -214,6 +244,7 @@ type UrbitTransitionBroadcast struct {
 	HandleRestoreTlonBackup   string `json:"handleRestoreTlonBackup"`
 	SnapTime                  string `json:"snapTime"`
 	ExtraArgs                 string `json:"extraArgs"`
+	VereTag                   string `json:"vereTag"`
 }
 
 // used to construct broadcast pier info subobject

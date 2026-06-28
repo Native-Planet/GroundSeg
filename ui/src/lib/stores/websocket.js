@@ -421,6 +421,15 @@ export const updateLinux = () => {
   send(payload)
 }
 
+export const checkUpdates = () => {
+  let payload = {
+    "type":"system",
+    "action":"update",
+    "update":"check"
+  }
+  send(payload)
+}
+
 export const setSwap = val => {
   let payload = {
     "type":"system",
@@ -520,6 +529,49 @@ export const setAllStartramReminder = remind => {
     "remind": remind
   }
   send(payload)
+}
+
+//
+//  Hermes
+//
+
+export const hermesInstall = config => {
+  send({
+    "type":"hermes",
+    "action":"install",
+    ...config
+  })
+}
+
+export const hermesUpdate = config => {
+  send({
+    "type":"hermes",
+    "action":"update",
+    ...config
+  })
+}
+
+export const hermesToggle = config => {
+  send({
+    "type":"hermes",
+    "action":"toggle",
+    ...config
+  })
+}
+
+export const hermesSave = config => {
+  send({
+    "type":"hermes",
+    "action":"save",
+    ...config
+  })
+}
+
+export const hermesRestart = () => {
+  send({
+    "type":"hermes",
+    "action":"restart"
+  })
 }
 
 //
@@ -729,6 +781,15 @@ export const setRustFSDomain = (patp, domain) => {
   setMinIODomain(patp, domain)
 }
 
+export const removeRustFSDomain = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"remove-minio-domain",
+    "patp":patp,
+  }
+  send(payload)
+}
+
 export const setUrbitDomain = (patp, domain) => {
   let payload = {
     "type":"urbit",
@@ -856,6 +917,16 @@ export const setUrbitExtraArgs = (patp, extraArgs) => {
   send(payload)
 }
 
+export const setVereTag = (patp, vereTag) => {
+  let payload = {
+    "type":"urbit",
+    "action":"vere-tag",
+    "patp":patp,
+    "vereTag": vereTag
+  }
+  send(payload)
+}
+
 export const setPackSchedule = (patp, frequency, intervalType, time, day, date) => {
   let payload = {
     "type":"urbit",
@@ -947,15 +1018,14 @@ export const setStartramReminder = (patp, remind) => {
 //  Support
 //
 
-export const submitReport = (contact,description,ships,cpuProfile,penpai) => {
+export const submitReport = (contact,description,ships,cpuProfile) => {
   let payload = {
     "type":"support",
     "action":"bug-report",
     "contact":contact,
     "description":description,
     "ships":ships,
-    "cpu_profile":cpuProfile,
-    "penpai":penpai
+    "cpu_profile":cpuProfile
   }
   send(payload)
 }
@@ -982,70 +1052,6 @@ export const submitNetwork = (ssid,password) => {
     "type":"c2c",
     "ssid":ssid,
     "password": password
-  }
-  send(payload)
-}
-
-//
-// Penpai
-//
-
-export const toggleExperimentalPenpai = () => {
-  let payload = {
-    "type":"system",
-    "action": "toggle-penpai-feature",
-  }
-  send(payload)
-}
-
-export const togglePenpai = () => {
-  let payload = {
-    "type":"penpai",
-    "action": "toggle",
-  }
-  send(payload)
-}
-
-export const setPenpaiModel = model => {
-  let payload = {
-    "type":"penpai",
-    "action": "set-model",
-    "model": model
-  }
-  send(payload)
-}
-
-export const setPenpaiCores = cores => {
-  let payload = {
-    "type":"penpai",
-    "action": "set-cores",
-    "cores": cores
-  }
-  send(payload)
-}
-
-export const removePenpai = () => {
-  let payload = {
-    "type":"penpai",
-    "action": "remove"
-  }
-  send(payload)
-}
-
-export const installPenpaiCompanion = patp => {
-  let payload = {
-    "type":"urbit",
-    "action":"install-penpai-companion",
-    "patp":patp,
-  }
-  send(payload)
-}
-
-export const uninstallPenpaiCompanion = patp => {
-  let payload = {
-    "type":"urbit",
-    "action":"uninstall-penpai-companion",
-    "patp":patp,
   }
   send(payload)
 }

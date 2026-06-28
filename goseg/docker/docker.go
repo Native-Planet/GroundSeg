@@ -27,7 +27,9 @@ import (
 var (
 	VolumeDir          = config.DockerDir
 	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
+	HermesTransBus     = make(chan structs.Event, 100)             // hermes profile transition bus
 	SysTransBus        = make(chan structs.SystemTransition, 100)  // system transition bus
+	UpdateCheckBus     = make(chan struct{}, 1)                    // manual version-server update checks
 	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus
 	ImportShipTransBus = make(chan structs.UploadTransition, 100)  // transition event bus
 	ContainerStats     = make(map[string]structs.ContainerStats)   // used for broadcast
@@ -238,15 +240,17 @@ func WriteFileToVolume(name string, file string, content string) error {
 		return errmsg
 	}
 	defer cli.Close()
-	// Inspect volume
 	vol, err := cli.VolumeInspect(context.Background(), name)
 	if err != nil {
-		errmsg := fmt.Errorf("Failed to inspect volume: %v : %v", name, err)
-		return errmsg
+		if _, createErr := cli.VolumeCreate(context.Background(), volumetypes.CreateOptions{Name: name}); createErr != nil {
+			return fmt.Errorf("Failed to create docker volume: %v : %v", name, createErr)
+		}
+		vol, err = cli.VolumeInspect(context.Background(), name)
+		if err != nil {
+			return fmt.Errorf("Failed to inspect volume: %v : %v", name, err)
+		}
 	}
-	// Get volume directory path
 	fullPath := filepath.Join(vol.Mountpoint, file)
-	// Write to file
 	err = os.WriteFile(fullPath, []byte(content), 0644)
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to write to volume: %v : %v", name, err)
@@ -254,6 +258,25 @@ func WriteFileToVolume(name string, file string, content string) error {
 	}
 	zap.L().Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
 	return nil
+}
+
+// ReadFileFromVolume reads a file from a Docker volume.
+func ReadFileFromVolume(name string, file string) ([]byte, error) {
+	cli, err := dockerclient.New()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create docker client: %v : %v", name, err)
+	}
+	defer cli.Close()
+	vol, err := cli.VolumeInspect(context.Background(), name)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to inspect volume: %v : %v", name, err)
+	}
+	fullPath := filepath.Join(vol.Mountpoint, file)
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read from volume: %v : %v", name, err)
+	}
+	return content, nil
 }
 
 // start a container by name + type
@@ -288,13 +311,13 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-	case "wireguard":
-		containerConfig, hostConfig, err = wgContainerConf()
+	case "hermes":
+		containerConfig, hostConfig, err = hermesContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
-	case "llama-api":
-		containerConfig, hostConfig, err = llamaApiContainerConf()
+	case "wireguard":
+		containerConfig, hostConfig, err = wgContainerConf()
 		if err != nil {
 			return containerState, err
 		}
@@ -305,7 +328,19 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	var imageInfo map[string]string
 	desiredImage := containerConfig.Image
 	desiredImageID := ""
-	if containerType == "minio" {
+	if containerType == "hermes" {
+		if desiredImage == "" {
+			return containerState, fmt.Errorf("empty image ref for %s", containerName)
+		}
+		installed, err := ImageRefExists(desiredImage)
+		if err != nil {
+			return containerState, err
+		}
+		if !installed {
+			return containerState, fmt.Errorf("Hermes image %s is not installed", desiredImage)
+		}
+		imageInfo = map[string]string{"hash": ""}
+	} else if containerType == "minio" {
 		if desiredImage == "" {
 			return containerState, fmt.Errorf("empty image ref for %s", containerName)
 		}
@@ -319,11 +354,21 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
+		versionServerImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+		if strings.TrimSpace(desiredImage) == "" {
+			desiredImage = versionServerImage
+		}
+		imageInfo = imageInfoFromImageRef(desiredImage, imageInfo)
 		// check if the desired image is available locally
-		desiredImage = fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
-		_, err = PullImageIfNotExist(desiredImage, imageInfo)
-		if err != nil {
-			return containerState, err
+		if desiredImage == versionServerImage && imageInfo["hash"] != "" {
+			_, err = PullImageIfNotExist(desiredImage, imageInfo)
+			if err != nil {
+				return containerState, err
+			}
+		} else {
+			if err := PullImageByRef(desiredImage); err != nil {
+				return containerState, err
+			}
 		}
 		if desiredImageID, err = getLocalImageID(desiredImage, imageInfo); err != nil {
 			zap.L().Warn(fmt.Sprintf("Unable to inspect desired image %s: %v", desiredImage, err))
@@ -350,6 +395,21 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
+		zap.L().Info(msg)
+	case containerConfigChanged(existingContainer, containerConfig):
+		err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
+		if err != nil {
+			return containerState, err
+		}
+		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		if err != nil {
+			return containerState, err
+		}
+		err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
+		if err != nil {
+			return containerState, err
+		}
+		msg := fmt.Sprintf("Recreated %s with updated container config", containerName)
 		zap.L().Info(msg)
 	case existingContainer.State == "exited":
 		err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
@@ -434,6 +494,18 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	return containerState, err
 }
 
+func containerConfigChanged(existingContainer *container.Summary, desiredConfig container.Config) bool {
+	if existingContainer == nil || len(desiredConfig.Labels) == 0 {
+		return false
+	}
+	for key, desiredValue := range desiredConfig.Labels {
+		if existingContainer.Labels[key] != desiredValue {
+			return true
+		}
+	}
+	return false
+}
+
 // create a stopped container
 func CreateContainer(containerName string, containerType string) (structs.ContainerState, error) {
 	var containerState structs.ContainerState
@@ -457,13 +529,13 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		if err != nil {
 			return containerState, err
 		}
-	case "wireguard":
-		containerConfig, hostConfig, err = wgContainerConf()
+	case "hermes":
+		containerConfig, hostConfig, err = hermesContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
-	case "llama-api":
-		containerConfig, hostConfig, err = llamaApiContainerConf()
+	case "wireguard":
+		containerConfig, hostConfig, err = wgContainerConf()
 		if err != nil {
 			return containerState, err
 		}
@@ -472,7 +544,19 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		return containerState, errmsg
 	}
 	var desiredImage string
-	if containerType == "minio" {
+	if containerType == "hermes" {
+		desiredImage = containerConfig.Image
+		if desiredImage == "" {
+			return containerState, fmt.Errorf("empty image ref for %s", containerName)
+		}
+		installed, err := ImageRefExists(desiredImage)
+		if err != nil {
+			return containerState, err
+		}
+		if !installed {
+			return containerState, fmt.Errorf("Hermes image %s is not installed", desiredImage)
+		}
+	} else if containerType == "minio" {
 		desiredImage = containerConfig.Image
 		if desiredImage == "" {
 			return containerState, fmt.Errorf("empty image ref for %s", containerName)
@@ -485,11 +569,21 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		if err != nil {
 			return containerState, err
 		}
+		versionServerImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+		if strings.TrimSpace(desiredImage) == "" {
+			desiredImage = versionServerImage
+		}
+		imageInfo = imageInfoFromImageRef(desiredImage, imageInfo)
 		// check if the desired image is available locally
-		desiredImage = fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
-		_, err = PullImageIfNotExist(desiredImage, imageInfo)
-		if err != nil {
-			return containerState, err
+		if desiredImage == versionServerImage && imageInfo["hash"] != "" {
+			_, err = PullImageIfNotExist(desiredImage, imageInfo)
+			if err != nil {
+				return containerState, err
+			}
+		} else {
+			if err := PullImageByRef(desiredImage); err != nil {
+				return containerState, err
+			}
 		}
 	}
 	ctx := context.Background()
@@ -523,50 +617,69 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 // convert the version info back into json then a map lol
 // so we can easily get the correct repo/release channel/tag/hash
 func GetLatestContainerInfo(containerType string) (map[string]string, error) {
-	var res map[string]string
-	// hardcoded llama stuff for testing
-	res = make(map[string]string)
-	if containerType == "llama-api" {
-		res["tag"] = "dev"
-		res["hash"] = "ac2dcfac72bc3d8ee51ee255edecc10072ef9c0f958120971c00be5f4944a6fa"
-		res["repo"] = "nativeplanet/llama-gpt"
-		return res, nil
-	}
 	arch := config.Architecture
 	hashLabel := arch + "_sha256"
-	versionInfo := config.VersionInfo
-	jsonData, err := json.Marshal(versionInfo)
-	if err != nil {
-		return res, err
+	detail, ok := containerVersionDetails(config.VersionInfo, containerType)
+	if !ok || strings.TrimSpace(detail.Tag) == "" || strings.TrimSpace(detail.Repo) == "" {
+		localVersion := config.LocalVersion()
+		releaseChannel := config.Conf().UpdateBranch
+		channel, selectedChannel, exactChannel := config.SelectVersionChannel(localVersion, releaseChannel)
+		if !exactChannel {
+			zap.L().Warn(fmt.Sprintf("Version channel %q not found locally; using %q", releaseChannel, selectedChannel))
+		}
+		detail, ok = containerVersionDetails(channel, containerType)
 	}
-	// Convert JSON to map
-	var m map[string]any
-	err = json.Unmarshal(jsonData, &m)
-	if err != nil {
-		return res, err
-	}
-	containerData, ok := m[containerType].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("%s data is not a map", containerType)
+		return nil, fmt.Errorf("%s data is not configured", containerType)
 	}
-	tag, ok := containerData["tag"].(string)
-	if !ok {
-		return nil, fmt.Errorf("'tag' is not a string")
+	tag := strings.TrimSpace(detail.Tag)
+	if tag == "" {
+		return nil, fmt.Errorf("%s tag is empty", containerType)
 	}
-	hashValue, ok := containerData[hashLabel].(string)
-	if !ok {
-		return nil, fmt.Errorf("'%s' is not a string", hashLabel)
+	repo := strings.TrimSpace(detail.Repo)
+	if repo == "" {
+		return nil, fmt.Errorf("%s repo is empty", containerType)
 	}
-	repo, ok := containerData["repo"].(string)
-	if !ok {
-		return nil, fmt.Errorf("'repo' is not a string")
+	hashValue := strings.TrimSpace(detail.Amd64Sha256)
+	if arch != "amd64" {
+		hashValue = strings.TrimSpace(detail.Arm64Sha256)
 	}
-	res = make(map[string]string)
-	res["tag"] = tag
-	res["hash"] = hashValue
-	res["repo"] = repo
-	res["type"] = containerType
-	return res, nil
+	if hashValue == "" {
+		return nil, fmt.Errorf("%s %s is empty", containerType, hashLabel)
+	}
+	return map[string]string{
+		"tag":  tag,
+		"hash": hashValue,
+		"repo": repo,
+		"type": containerType,
+	}, nil
+}
+
+func containerVersionDetails(channel structs.Channel, containerType string) (structs.VersionDetails, bool) {
+	switch strings.ToLower(strings.TrimSpace(containerType)) {
+	case "groundseg":
+		return channel.Groundseg, true
+	case "manual":
+		return channel.Manual, true
+	case "rustfs":
+		return channel.Rustfs, true
+	case "minio":
+		return channel.Minio, true
+	case "miniomc", "mc":
+		return channel.Miniomc, true
+	case "netdata":
+		return channel.Netdata, true
+	case "vere":
+		return channel.Vere, true
+	case "hermes":
+		return channel.Hermes, true
+	case "webui":
+		return channel.Webui, true
+	case "wireguard":
+		return channel.Wireguard, true
+	default:
+		return structs.VersionDetails{}, false
+	}
 }
 
 // stop a container with the name
@@ -598,6 +711,21 @@ func StopContainerByName(containerName string) error {
 	return fmt.Errorf("container with name %s not found", containerName)
 }
 
+func RestartContainerByName(containerName string) error {
+	ctx := context.Background()
+	cli, err := dockerclient.New()
+	if err != nil {
+		return err
+	}
+	defer cli.Close()
+	timeout := 10
+	if err := cli.ContainerRestart(ctx, containerName, container.StopOptions{Timeout: &timeout}); err != nil {
+		return fmt.Errorf("failed to restart container %s: %v", containerName, err)
+	}
+	zap.L().Info(fmt.Sprintf("Successfully restarted container %s", containerName))
+	return nil
+}
+
 // pull the image if it doesn't exist locally
 func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
 	ctx := context.Background()
@@ -623,6 +751,45 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 
 // pull image by reference (tag or digest) if missing locally
 func PullImageByRef(imageRef string) error {
+	return PullImageByRefWithProgress(imageRef, nil)
+}
+
+type imagePullMessage struct {
+	Status         string `json:"status"`
+	ID             string `json:"id"`
+	Error          string `json:"error"`
+	ProgressDetail struct {
+		Current int64 `json:"current"`
+		Total   int64 `json:"total"`
+	} `json:"progressDetail"`
+}
+
+type imageLayerProgress struct {
+	current int64
+	total   int64
+}
+
+func ImageRefExists(imageRef string) (bool, error) {
+	if strings.TrimSpace(imageRef) == "" {
+		return false, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cli, err := dockerclient.New()
+	if err != nil {
+		return false, err
+	}
+	defer cli.Close()
+	_, ok := inspectImageRefs(ctx, cli, dockerHubRefAliases(imageRef))
+	return ok, nil
+}
+
+// PullImageByRefWithProgress pulls an image by tag or digest and reports coarse progress.
+func PullImageByRefWithProgress(imageRef string, progress func(string)) error {
+	imageRef = strings.TrimSpace(imageRef)
+	if imageRef == "" {
+		return fmt.Errorf("empty image ref")
+	}
 	ctx := context.Background()
 	cli, err := dockerclient.New()
 	if err != nil {
@@ -631,16 +798,101 @@ func PullImageByRef(imageRef string) error {
 	defer cli.Close()
 
 	if _, ok := inspectImageRefs(ctx, cli, dockerHubRefAliases(imageRef)); ok {
+		emitImagePullProgress(progress, "installed")
 		return nil
 	}
 
+	zap.L().Info(fmt.Sprintf("Pulling Docker image %s", imageRef))
+	emitImagePullProgress(progress, "pulling")
 	resp, err := cli.ImagePull(ctx, imageRef, imagetypes.PullOptions{})
 	if err != nil {
 		return err
 	}
 	defer resp.Close()
-	_, _ = io.Copy(ioutil.Discard, resp)
+	layers := map[string]imageLayerProgress{}
+	lastPercent := -1
+	decoder := json.NewDecoder(resp)
+	for {
+		var msg imagePullMessage
+		if err := decoder.Decode(&msg); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("error reading image pull progress for %s: %v", imageRef, err)
+		}
+		if msg.Error != "" {
+			return fmt.Errorf("failed to pull image %s: %s", imageRef, msg.Error)
+		}
+		if msg.ID != "" && msg.ProgressDetail.Total > 0 {
+			layers[msg.ID] = imageLayerProgress{
+				current: msg.ProgressDetail.Current,
+				total:   msg.ProgressDetail.Total,
+			}
+			percent := max(imagePullPercent(layers), lastPercent)
+			if percent != lastPercent {
+				lastPercent = percent
+				emitImagePullProgress(progress, fmt.Sprintf("pulling %d%%", percent))
+			}
+			continue
+		}
+		status := strings.ToLower(strings.TrimSpace(msg.Status))
+		if msg.ID == "" && status != "" {
+			emitImagePullProgress(progress, status)
+		}
+	}
+	emitImagePullProgress(progress, "installed")
+	zap.L().Info(fmt.Sprintf("Docker image %s installed", imageRef))
 	return nil
+}
+
+func imagePullPercent(layers map[string]imageLayerProgress) int {
+	var current int64
+	var total int64
+	for _, layer := range layers {
+		current += layer.current
+		total += layer.total
+	}
+	if total <= 0 {
+		return 0
+	}
+	percent := int(float64(current) / float64(total) * 100)
+	if percent > 100 {
+		return 100
+	}
+	return percent
+}
+
+func emitImagePullProgress(progress func(string), status string) {
+	if progress != nil && strings.TrimSpace(status) != "" {
+		progress(status)
+	}
+}
+
+func imageInfoFromImageRef(imageRef string, fallback map[string]string) map[string]string {
+	info := map[string]string{
+		"repo": fallback["repo"],
+		"tag":  fallback["tag"],
+		"hash": fallback["hash"],
+	}
+	ref := strings.TrimSpace(imageRef)
+	if ref == "" {
+		return info
+	}
+	if beforeDigest, digest, ok := strings.Cut(ref, "@sha256:"); ok {
+		ref = beforeDigest
+		info["hash"] = digest
+	} else {
+		info["hash"] = ""
+	}
+	lastSlash := strings.LastIndex(ref, "/")
+	lastColon := strings.LastIndex(ref, ":")
+	if lastColon > lastSlash {
+		info["repo"] = ref[:lastColon]
+		info["tag"] = ref[lastColon+1:]
+	} else if ref != "" {
+		info["repo"] = ref
+	}
+	return info
 }
 
 func getLocalImageID(desiredImage string, imageInfo map[string]string) (string, error) {

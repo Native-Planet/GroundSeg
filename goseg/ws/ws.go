@@ -181,11 +181,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
-			case "penpai":
-				if err = handler.PenpaiHandler(msg); err != nil {
-					zap.L().Error(fmt.Sprintf("%v", err))
-					ack = "nack"
-				}
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
@@ -214,6 +209,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			case "startram":
 				if err = handler.StartramHandler(msg); err != nil {
+					zap.L().Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
+			case "hermes":
+				if err = handler.HermesHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}

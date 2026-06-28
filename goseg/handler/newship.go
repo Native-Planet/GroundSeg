@@ -170,15 +170,6 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 		// Register Services
 		go newShipRegisterService(patp)
 	}
-	if conf.PenpaiAllow {
-		if err := docker.StopContainerByName("llama"); err != nil {
-			zap.L().Error(fmt.Sprintf("Couldn't stop Llama: %v", err))
-		}
-		_, err = docker.StartContainer("llama", "llama")
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("Couldn't restart Llama: %v", err))
-		}
-	}
 	// check for +code
 	go waitForShipReady(shipPayload, customDrive)
 }
@@ -241,10 +232,6 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload, customDrive string) 
 		}
 		startram.Retrieve()
 		docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "completed"}
-		// restart llama if it's enabled to reload avail ships
-		if conf.PenpaiAllow {
-			docker.StartContainer("llama-gpt-api", "llama-api")
-		}
 		return
 	}
 }

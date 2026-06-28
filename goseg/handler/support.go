@@ -71,7 +71,6 @@ func SupportHandler(msg []byte) error {
 	description := supportPayload.Payload.Description
 	ships := supportPayload.Payload.Ships
 	cpuProfile := supportPayload.Payload.CPUProfile
-	penpai := supportPayload.Payload.Penpai
 
 	// set bug report dir
 	bugReportDir := filepath.Join(bugReportPath, timestamp)
@@ -82,7 +81,7 @@ func SupportHandler(msg []byte) error {
 	}
 
 	// write bug report to disk
-	if err := dumpBugReport(bugReportDir, timestamp, contact, description, ships, penpai); err != nil {
+	if err := dumpBugReport(bugReportDir, timestamp, contact, description, ships); err != nil {
 		return handleError(fmt.Errorf("Failed to dump logs: %v", err))
 	}
 
@@ -166,20 +165,13 @@ func dumpDockerLogs(containerID string, path string) error {
 	return nil
 }
 
-func dumpBugReport(bugReportDir, timestamp, contact, description string, piers []string, llama bool) error {
+func dumpBugReport(bugReportDir, timestamp, contact, description string, piers []string) error {
 
 	// description.txt
 	descPath := filepath.Join(bugReportDir, "description.txt")
 	if err := os.WriteFile(descPath, fmt.Appendf(nil, "Contact:\n%s\nDetails:\n%s", contact, description), 0644); err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't write details.txt"))
 		return err
-	}
-
-	// llama bug dump
-	if llama {
-		if err := dumpDockerLogs("llama-gpt-api", bugReportDir+"/"+"llama.log"); err != nil {
-			zap.L().Warn(fmt.Sprintf("Couldn't dump llama logs: %v", err))
-		}
 	}
 
 	// selected pier logs
@@ -196,6 +188,11 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 	// service logs
 	if err := dumpDockerLogs("wireguard", bugReportDir+"/wireguard.log"); err != nil {
 		zap.L().Warn(fmt.Sprintf("Couldn't dump pier logs: %v", err))
+	}
+	if existing, err := docker.FindContainer(docker.HermesContainerName); err == nil && existing != nil {
+		if err := dumpDockerLogs(docker.HermesContainerName, bugReportDir+"/hermes.log"); err != nil {
+			zap.L().Warn(fmt.Sprintf("Couldn't dump Hermes logs: %v", err))
+		}
 	}
 
 	// system.json
@@ -235,6 +232,16 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 		destPath = filepath.Join(bugReportDir, configFile)
 		if err := copyFile(srcPath, destPath); err != nil {
 			zap.L().Warn(fmt.Sprintf("Couldn't copy service configs: %v", err))
+		}
+	}
+	srcPath = filepath.Join(config.BasePath, "settings", "hermes.json")
+	destPath = filepath.Join(bugReportDir, "hermes.json")
+	if err := copyFile(srcPath, destPath); err != nil {
+		zap.L().Warn(fmt.Sprintf("Couldn't copy Hermes config: %v", err))
+	} else if err := sanitizeJSON(destPath, "access_code", "provider_api_key", "web_api_key", "api_key"); err != nil {
+		zap.L().Error("Couldn't sanitize hermes.json! Removing from report")
+		if err := os.Remove(destPath); err != nil {
+			return fmt.Errorf("Error removing unsanitized Hermes config: %v", err)
 		}
 	}
 

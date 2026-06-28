@@ -133,6 +133,9 @@ func handleStartramRestart() {
 		if err := docker.LoadObjectStores(); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to load RustFS containers: %v", err))
 		}
+		if err := docker.LoadHermes(); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to load Hermes container: %v", err))
+		}
 		startram.EventBus <- structs.Event{Type: "restart", Data: "done"}
 		showDone = true
 	}
