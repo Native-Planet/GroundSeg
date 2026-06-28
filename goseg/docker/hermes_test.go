@@ -138,6 +138,31 @@ func TestHermesContainerAPIEnvRequiresExplicitToggle(t *testing.T) {
 	}
 }
 
+func TestHermesContainerRunsGatewayInTmuxSession(t *testing.T) {
+	setupHermesContainerConfTest(t, false, "")
+
+	containerConfig, _, err := hermesContainerConf(HermesContainerName)
+	if err != nil {
+		t.Fatalf("expected Hermes container config, got error: %v", err)
+	}
+
+	if len(containerConfig.Cmd) != 3 || containerConfig.Cmd[0] != "bash" || containerConfig.Cmd[1] != "-lc" {
+		t.Fatalf("expected bash -lc container command, got %#v", containerConfig.Cmd)
+	}
+	command := containerConfig.Cmd[2]
+	for _, want := range []string{
+		"tmux new-session -d -s hermes -n gateway",
+		"tmux new-window -d -t hermes -n shell",
+		"tmux select-window -t hermes:shell",
+		"hermes gateway run --replace --accept-hooks",
+		"/opt/data/logs/gateway.log",
+	} {
+		if !strings.Contains(command, want) {
+			t.Fatalf("expected Hermes command to contain %q", want)
+		}
+	}
+}
+
 func setupHermesContainerConfTest(t *testing.T, apiEnabled bool, apiKey string) {
 	t.Helper()
 	oldBasePath := config.BasePath

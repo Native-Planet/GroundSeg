@@ -20,7 +20,7 @@ const (
 	HermesWorkspaceVolumeName       = "hermes_workspace"
 	HermesTlonSkillDir              = "/opt/data/tlon-skill"
 	hermesConfigVersionLabel        = "nativeplanet.groundseg.hermes.config-version"
-	hermesConfigVersion             = "2026-06-28-runtime-files-lcm"
+	hermesConfigVersion             = "2026-06-28-hermes-tmux"
 	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
@@ -415,7 +415,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 	containerConfig = container.Config{
 		Image:        HermesImageOrDefault(hermesConf.Image),
 		Env:          environment,
-		Cmd:          []string{"sh", "-lc", hermesGatewayCommand(hermesConf)},
+		Cmd:          []string{"bash", "-lc", hermesGatewayCommand(hermesConf)},
 		Labels:       map[string]string{hermesConfigVersionLabel: hermesConfigVersion},
 		ExposedPorts: nat.PortSet{dashboardPort: struct{}{}},
 	}
@@ -533,6 +533,36 @@ if ! "${TLON_CLI:-tlon}" --help >/dev/null 2>&1; then
   echo "ERROR: tlon CLI failed its startup smoke check" >&2
   "${TLON_CLI:-tlon}" --help >/dev/null
   exit 1
+fi
+
+if command -v tmux >/dev/null 2>&1; then
+  log_file="/opt/data/logs/gateway.log"
+  exit_file="/opt/data/gateway.exit"
+  mkdir -p "$(dirname "$log_file")"
+  : > "$log_file"
+  rm -f "$exit_file"
+  tmux kill-session -t hermes >/dev/null 2>&1 || true
+  tmux new-session -d -s hermes -n gateway "bash -lc 'set -o pipefail; hermes gateway run --replace --accept-hooks 2>&1 | tee -a /opt/data/logs/gateway.log; code=\${PIPESTATUS[0]}; echo \"\$code\" > /opt/data/gateway.exit; tmux wait-for -S hermes-gateway-exit; exit \"\$code\"'"
+  tmux new-window -d -t hermes -n shell "bash -l"
+  tmux select-window -t hermes:shell
+
+  cleanup() {
+    tmux send-keys -t hermes:gateway C-c >/dev/null 2>&1 || true
+    sleep 2
+    tmux kill-session -t hermes >/dev/null 2>&1 || true
+  }
+  trap cleanup INT TERM
+
+  tail -n +1 -F "$log_file" &
+  tail_pid="$!"
+  tmux wait-for hermes-gateway-exit || true
+  kill "$tail_pid" >/dev/null 2>&1 || true
+  wait "$tail_pid" >/dev/null 2>&1 || true
+  code="1"
+  if [ -f "$exit_file" ]; then
+    code="$(cat "$exit_file")"
+  fi
+  exit "$code"
 fi
 exec hermes gateway run --replace --accept-hooks`,
 	)

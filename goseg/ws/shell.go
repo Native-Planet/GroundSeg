@@ -249,7 +249,7 @@ func resolveShellTarget(target string, patp string) (string, []string, string) {
 		if _, err := docker.GetContainerRunningStatus(docker.HermesContainerName); err != nil {
 			return "", nil, "Hermes container is not running"
 		}
-		return docker.HermesContainerName, []string{"bash", "-lc", "if command -v tmux >/dev/null 2>&1; then exec tmux new -A -s hermes-shell; fi; exec bash -l"}, ""
+		return docker.HermesContainerName, []string{"bash", "-lc", "if command -v tmux >/dev/null 2>&1 && tmux has-session -t hermes 2>/dev/null; then exec tmux attach -t hermes:shell; fi; if command -v tmux >/dev/null 2>&1; then exec tmux new -A -s hermes-shell; fi; exec bash -l"}, ""
 	default:
 		return "", nil, "Unsupported shell target"
 	}

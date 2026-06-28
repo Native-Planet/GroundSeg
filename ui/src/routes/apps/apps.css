@@ -207,10 +207,7 @@ select:focus {
 }
 
 .sigil-preview.empty {
-  background:
-    linear-gradient(135deg, rgba(248, 248, 246, 0.10) 25%, transparent 25%) 0 0 / 12px 12px,
-    linear-gradient(315deg, rgba(248, 248, 246, 0.10) 25%, transparent 25%) 0 0 / 12px 12px,
-    var(--btn-secondary, #5C7060);
+  background: var(--btn-secondary, #5C7060);
 }
 
 .sigil-preview :global(svg) {
