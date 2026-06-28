@@ -12,6 +12,7 @@
   import Logs from './Logs.svelte'
   import Penpai from './Penpai.svelte'
   import Support from './Support.svelte'
+  import ConfigEditor from './ConfigEditor.svelte'
 
   $: state = ($structure?.system?.updates?.linux?.state) || "updated"
 </script>
@@ -28,6 +29,7 @@
   {/if}
   <Penpai />
   <Support />
+  <ConfigEditor />
 </div>
 
 <style>

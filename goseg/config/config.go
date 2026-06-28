@@ -298,6 +298,26 @@ func UpdateConf(values map[string]any) error {
 	return nil
 }
 
+func ReplaceConfJSON(raw []byte) ([]byte, error) {
+	confMutex.Lock()
+	defer confMutex.Unlock()
+	var configMap map[string]any
+	if err := json.Unmarshal(raw, &configMap); err != nil {
+		return nil, fmt.Errorf("invalid system config JSON: %v", err)
+	}
+	if len(configMap) == 0 {
+		return nil, fmt.Errorf("refusing to persist empty system configuration")
+	}
+	formatted, err := json.MarshalIndent(configMap, "", "    ")
+	if err != nil {
+		return nil, fmt.Errorf("error encoding system config: %v", err)
+	}
+	if err := persistConf(configMap); err != nil {
+		return nil, fmt.Errorf("unable to persist system config: %v", err)
+	}
+	return formatted, nil
+}
+
 func persistConf(configMap map[string]any) error {
 	BasePath := getBasePath()
 	confPath := filepath.Join(BasePath, "settings", "system.json")
@@ -326,9 +346,11 @@ func persistConf(configMap map[string]any) error {
 	if fi.Size() == 0 {
 		return fmt.Errorf("refusing to persist empty configuration file")
 	}
-	if err := json.Unmarshal(updatedJSON, &globalConfig); err != nil {
+	var nextConfig structs.SysConfig
+	if err := json.Unmarshal(updatedJSON, &nextConfig); err != nil {
 		return fmt.Errorf("error updating global config: %v", err)
 	}
+	globalConfig = nextConfig
 	if err := os.Rename(tmpPath, confPath); err != nil {
 		return fmt.Errorf("error moving temp file: %v", err)
 	}

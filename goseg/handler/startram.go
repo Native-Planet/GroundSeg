@@ -72,6 +72,16 @@ func handleStartramRegions() {
 func handleStartramRestart() {
 	zap.L().Info("Restarting StarTram")
 	startram.EventBus <- structs.Event{Type: "restart", Data: "startram"}
+	showDone := false
+	defer func() {
+		if r := recover(); r != nil {
+			zap.L().Error(fmt.Sprintf("Panic restarting StarTram: %v", r))
+		}
+		if showDone {
+			time.Sleep(3 * time.Second)
+		}
+		startram.EventBus <- structs.Event{Type: "restart", Data: ""}
+	}()
 	conf := config.Conf()
 	// only restart if startram is on
 	if conf.WgOn {
@@ -100,14 +110,8 @@ func handleStartramRestart() {
 				if err := click.BarExit(patp); err != nil {
 					zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
 				} else {
-					for {
-						exited, err := shipExited(patp)
-						if err == nil {
-							if !exited {
-								continue
-							}
-						}
-						break
+					if _, err := shipExited(patp); err != nil {
+						zap.L().Warn(fmt.Sprintf("Timed out waiting for %s to exit cleanly: %v", patp, err))
 					}
 				}
 			}
@@ -130,13 +134,18 @@ func handleStartramRestart() {
 			zap.L().Error(fmt.Sprintf("Failed to load RustFS containers: %v", err))
 		}
 		startram.EventBus <- structs.Event{Type: "restart", Data: "done"}
-		time.Sleep(3 * time.Second)
-		startram.EventBus <- structs.Event{Type: "restart", Data: ""}
+		showDone = true
 	}
 }
 
 func handleStartramToggle() {
 	startram.EventBus <- structs.Event{Type: "toggle", Data: "loading"}
+	defer func() {
+		if r := recover(); r != nil {
+			zap.L().Error(fmt.Sprintf("Panic toggling StarTram: %v", r))
+		}
+		startram.EventBus <- structs.Event{Type: "toggle", Data: nil}
+	}()
 	conf := config.Conf()
 	if conf.WgOn {
 		if containerState, exists := config.GetContainerState()["wireguard"]; exists {
@@ -199,7 +208,13 @@ func handleStartramToggle() {
 	if err := docker.LoadObjectStores(); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to load RustFS containers: %v", err))
 	}
-	startram.EventBus <- structs.Event{Type: "toggle", Data: nil}
+}
+
+func loadFreshWireguard() error {
+	if err := docker.DeleteContainer("wireguard"); err != nil {
+		zap.L().Debug(fmt.Sprintf("Wireguard container was not removed before reload: %v", err))
+	}
+	return docker.LoadWireguard()
 }
 
 func handleStartramRegister(regCode, region string) {
@@ -231,7 +246,7 @@ func handleStartramRegister(regCode, region string) {
 	}
 	// Start Wireguard
 	startram.EventBus <- structs.Event{Type: "register", Data: "starting"}
-	if err := docker.LoadWireguard(); err != nil {
+	if err := loadFreshWireguard(); err != nil {
 		handleError(fmt.Sprintf("Unable to start Wireguard: %v", err))
 		return
 	}
@@ -426,6 +441,7 @@ func handleNotImplement(action string) {
 }
 
 func shipExited(patp string) (bool, error) {
+	deadline := time.Now().Add(90 * time.Second)
 	for {
 		statuses, err := docker.GetShipStatus([]string{patp})
 		if err != nil {
@@ -436,6 +452,10 @@ func shipExited(patp string) (bool, error) {
 			return false, fmt.Errorf("%s status doesn't exist", patp)
 		}
 		if strings.Contains(status, "Up") {
+			if time.Now().After(deadline) {
+				return false, fmt.Errorf("%s is still %s", patp, status)
+			}
+			time.Sleep(500 * time.Millisecond)
 			continue
 		}
 		return true, nil

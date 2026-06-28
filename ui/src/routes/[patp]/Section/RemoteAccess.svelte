@@ -25,6 +25,7 @@
   export let ownShip
 
   const dispatch = createEventDispatcher()
+  $: disabled = (!wgRunning || !remoteReady) && !remote
 
   function handleClick() {
     if ($URBIT_MODE) {
@@ -35,7 +36,7 @@
   }
 </script>
 
-<div class="section" class:disabled={!wgRunning || !remoteReady}>
+<div class="section" class:disabled>
   <div class="section-left">
     <div class="section-title">Remote Access</div>
     <div class="section-description">Access your ship via a StarTram connection</div>

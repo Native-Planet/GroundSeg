@@ -129,6 +129,73 @@ func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
 	return nil
 }
 
+func ReplaceUrbitConfigJSON(pier string, raw []byte) ([]byte, error) {
+	var configMap map[string]any
+	if err := json.Unmarshal(raw, &configMap); err != nil {
+		return nil, fmt.Errorf("invalid %s config JSON: %v", pier, err)
+	}
+	if len(configMap) == 0 {
+		return nil, fmt.Errorf("refusing to persist empty configuration for pier %s", pier)
+	}
+	formatted, err := json.MarshalIndent(configMap, "", "    ")
+	if err != nil {
+		return nil, fmt.Errorf("error encoding %s config: %v", pier, err)
+	}
+	var targetStruct structs.UrbitDocker
+	if err := unmarshalUrbitDockerSafe(formatted, &targetStruct); err != nil {
+		return nil, err
+	}
+	if targetStruct.PierName != "" && targetStruct.PierName != pier {
+		return nil, fmt.Errorf("pier_name %q does not match %q", targetStruct.PierName, pier)
+	}
+	if targetStruct.StartramReminder == nil {
+		targetStruct.StartramReminder = defaults.UrbitConfig.StartramReminder
+	}
+	if targetStruct.SnapTime == 0 {
+		targetStruct.SnapTime = 60
+	}
+	structs.SyncCustomS3Domains(&targetStruct)
+
+	urbitMutex.Lock()
+	defer urbitMutex.Unlock()
+	path := filepath.Join(BasePath, "settings", "pier", pier+".json")
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		return nil, err
+	}
+	tmpFile, err := os.CreateTemp(filepath.Dir(path), pier+".json.*")
+	if err != nil {
+		return nil, fmt.Errorf("error creating temp file: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmpFile.Write(formatted); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("error writing temp file: %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return nil, fmt.Errorf("error closing temp file: %v", err)
+	}
+	if fi, err := os.Stat(tmpPath); err != nil {
+		return nil, fmt.Errorf("error checking temp file: %v", err)
+	} else if fi.Size() == 0 {
+		return nil, fmt.Errorf("refusing to persist empty configuration for pier %s", pier)
+	}
+	UrbitsConfig[pier] = targetStruct
+	if err := os.Rename(tmpPath, path); err != nil {
+		return nil, fmt.Errorf("error moving temp file: %v", err)
+	}
+	return formatted, nil
+}
+
+func unmarshalUrbitDockerSafe(data []byte, target *structs.UrbitDocker) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid urbit config: %v", r)
+		}
+	}()
+	return json.Unmarshal(data, target)
+}
+
 func UpdateUrbitConfigForPier(pier string, mutate func(*structs.UrbitDocker)) error {
 	if err := LoadUrbitConfig(pier); err != nil {
 		return err

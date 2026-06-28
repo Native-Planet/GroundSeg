@@ -324,8 +324,30 @@ func AliasDelete(subdomain string, alias string) error {
 	return nil
 }
 
-// call registration endpoint for 5 minutes or until all services are "ok"
-func backoffRetrieve() error {
+func pendingSubdomains(subdomains []structs.Subdomain, expectedURLs []string) []string {
+	if len(expectedURLs) == 0 {
+		return nil
+	}
+	byURL := make(map[string]structs.Subdomain, len(subdomains))
+	for _, subdomain := range subdomains {
+		byURL[subdomain.URL] = subdomain
+	}
+	pending := []string{}
+	for _, expectedURL := range expectedURLs {
+		remote, ok := byURL[expectedURL]
+		if !ok {
+			pending = append(pending, fmt.Sprintf("%s missing", expectedURL))
+			continue
+		}
+		if remote.Status != "ok" {
+			pending = append(pending, fmt.Sprintf("%s %s", remote.URL, remote.Status))
+		}
+	}
+	return pending
+}
+
+// call registration endpoint for 5 minutes or until expected services are "ok"
+func backoffRetrieve(expectedURLs []string) error {
 	startTime := time.Now()
 	duration := 5 * time.Second
 	for {
@@ -333,14 +355,12 @@ func backoffRetrieve() error {
 		if err != nil {
 			return err
 		}
-		// return if all services are registered
-		for _, remote := range res.Subdomains {
-			if remote.Status != "ok" {
-				zap.L().Warn(fmt.Sprintf("backoff: %v %v", remote.URL, remote.Status))
-				break
-			}
-			// all "ok"
+		pending := pendingSubdomains(res.Subdomains, expectedURLs)
+		if len(pending) == 0 {
 			return nil
+		}
+		for _, pendingSubdomain := range pending {
+			zap.L().Warn(fmt.Sprintf("backoff: %s", pendingSubdomain))
 		}
 		// timeout after 5min
 		if time.Since(startTime) > 5*time.Minute {
@@ -361,22 +381,30 @@ func backoffRetrieve() error {
 func RegisterExistingShips() error {
 	conf := config.Conf()
 	if conf.WgRegistered {
+		expectedURLs := []string{}
 		for _, ship := range conf.Piers {
 			if err := SvcCreate(ship, "urbit"); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't register pier: %v: %v", ship, err))
 				continue
 			}
+			expectedURLs = append(expectedURLs, ship)
 			if err := SvcCreate("s3."+ship, "minio"); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't register S3: %v: %v", ship, err))
+			} else {
+				expectedURLs = append(expectedURLs, "s3."+ship)
 			}
 			if err := SvcCreate("console.s3."+ship, "minio-console"); err != nil {
 				zap.L().Warn(fmt.Sprintf("Couldn't register RustFS console: %v: %v", ship, err))
+			} else {
+				expectedURLs = append(expectedURLs, "console.s3."+ship)
 			}
 			if err := SvcCreate("bucket.s3."+ship, "minio-bucket"); err != nil {
 				zap.L().Warn(fmt.Sprintf("Couldn't register RustFS bucket endpoint: %v: %v", ship, err))
+			} else {
+				expectedURLs = append(expectedURLs, "bucket.s3."+ship)
 			}
 		}
-		if err := backoffRetrieve(); err != nil {
+		if err := backoffRetrieve(expectedURLs); err != nil {
 			return err
 		}
 	} else {
@@ -388,19 +416,27 @@ func RegisterExistingShips() error {
 
 func RegisterNewShip(ship string) error {
 	zap.L().Info(fmt.Sprintf("Registering service for new ship: %s", ship))
+	expectedURLs := []string{}
 	if err := SvcCreate(ship, "urbit"); err != nil {
 		return fmt.Errorf("Couldn't register pier: %v: %v", ship, err)
 	}
+	expectedURLs = append(expectedURLs, ship)
 	if err := SvcCreate("s3."+ship, "minio"); err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't register S3: %v: %v", ship, err))
+	} else {
+		expectedURLs = append(expectedURLs, "s3."+ship)
 	}
 	if err := SvcCreate("console.s3."+ship, "minio-console"); err != nil {
 		zap.L().Warn(fmt.Sprintf("Couldn't register RustFS console: %v: %v", ship, err))
+	} else {
+		expectedURLs = append(expectedURLs, "console.s3."+ship)
 	}
 	if err := SvcCreate("bucket.s3."+ship, "minio-bucket"); err != nil {
 		zap.L().Warn(fmt.Sprintf("Couldn't register RustFS bucket endpoint: %v: %v", ship, err))
+	} else {
+		expectedURLs = append(expectedURLs, "bucket.s3."+ship)
 	}
-	if err := backoffRetrieve(); err != nil {
+	if err := backoffRetrieve(expectedURLs); err != nil {
 		return err
 	}
 	return nil
