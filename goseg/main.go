@@ -178,14 +178,25 @@ func startServer() { // *http.Server {
 }
 
 func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
+	fileServer := http.FileServer(fs)
 	return func(w http.ResponseWriter, r *http.Request) {
 		file, err := fs.Open(r.URL.Path)
-		if err != nil {
-			r.URL.Path = "/index.html"
-		} else {
+		if err == nil {
 			defer file.Close()
+			fileServer.ServeHTTP(w, r)
+			return
 		}
-		http.FileServer(fs).ServeHTTP(w, r)
+		if filepath.Ext(r.URL.Path) != "" {
+			http.NotFound(w, r)
+			return
+		}
+		indexReq := new(http.Request)
+		*indexReq = *r
+		indexURL := *r.URL
+		indexURL.Path = "/"
+		indexURL.RawPath = ""
+		indexReq.URL = &indexURL
+		fileServer.ServeHTTP(w, indexReq)
 	}
 }
 

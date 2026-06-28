@@ -1,4 +1,5 @@
 <script>
+  import { base } from '$app/paths'
   import ToggleButton from '$lib/ToggleButton.svelte'
   import { readConfigFile, saveConfigFile } from '$lib/stores/config-files'
   import { hermesInstall, hermesRestart, hermesSave, hermesToggle } from '$lib/stores/websocket'
@@ -229,7 +230,7 @@
   <div class="top">
     <div>
       <div class="title-row">
-        <img src="/hermes.png" alt="" aria-hidden="true" />
+        <img src={base + "/hermes.png"} alt="" aria-hidden="true" />
         <div class="prof-title">HERMES</div>
       </div>
       <div class="status-row">
