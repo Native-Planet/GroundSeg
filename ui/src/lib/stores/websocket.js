@@ -421,6 +421,15 @@ export const updateLinux = () => {
   send(payload)
 }
 
+export const checkUpdates = () => {
+  let payload = {
+    "type":"system",
+    "action":"update",
+    "update":"check"
+  }
+  send(payload)
+}
+
 export const setSwap = val => {
   let payload = {
     "type":"system",
@@ -530,6 +539,14 @@ export const hermesInstall = config => {
   send({
     "type":"hermes",
     "action":"install",
+    ...config
+  })
+}
+
+export const hermesUpdate = config => {
+  send({
+    "type":"hermes",
+    "action":"update",
     ...config
   })
 }

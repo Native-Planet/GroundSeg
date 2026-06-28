@@ -44,6 +44,7 @@ func TestResolveConfigFileTarget(t *testing.T) {
 		{name: "settings alias", file: "settings.json", kind: "system"},
 		{name: "configured pier", file: "pier/sampel-palnet.json", kind: "pier", pier: "sampel-palnet"},
 		{name: "hermes yaml", file: "hermes/config.yaml", kind: "hermes-yaml"},
+		{name: "hermes env", file: "hermes/.env", kind: "hermes-env"},
 		{name: "traversal", file: "../system.json", wantErr: true},
 		{name: "nested traversal", file: "pier/../system.json", wantErr: true},
 		{name: "nested pier path", file: "pier/sampel-palnet/extra.json", wantErr: true},
@@ -67,6 +68,39 @@ func TestResolveConfigFileTarget(t *testing.T) {
 			}
 			if got.pier != tt.pier {
 				t.Fatalf("pier = %q, want %q", got.pier, tt.pier)
+			}
+		})
+	}
+}
+
+func TestValidateHermesEnv(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{name: "basic", raw: "OPENAI_BASE_URL=http://localhost:1234/v1\nOPENAI_API_KEY=\n"},
+		{name: "export", raw: "export HERMES_MODEL=local-model\n"},
+		{name: "comments", raw: "# local endpoint\nOPENAI_API_KEY=sk-test\n"},
+		{name: "empty", raw: "  \n", wantErr: true},
+		{name: "invalid key", raw: "1BAD=value\n", wantErr: true},
+		{name: "missing separator", raw: "OPENAI_API_KEY\n", wantErr: true},
+		{name: "null byte", raw: "OPENAI_API_KEY=x\x00\n", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validateHermesEnv([]byte(tt.raw))
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("validateHermesEnv(%q) returned nil error", tt.raw)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("validateHermesEnv(%q) returned error: %v", tt.raw, err)
+			}
+			if len(got) == 0 || got[len(got)-1] != '\n' {
+				t.Fatalf("validated env should end with newline: %q", string(got))
 			}
 		})
 	}

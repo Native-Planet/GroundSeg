@@ -99,9 +99,17 @@ func SystemHandler(msg []byte) error {
 		}()
 		zap.L().Info(fmt.Sprintf("Swap successfully set to %v", systemPayload.Payload.Value))
 	case "update":
-		if systemPayload.Payload.Update == "linux" {
+		switch systemPayload.Payload.Update {
+		case "linux":
 			if err := system.RunUpgrade(); err != nil {
 				zap.L().Error(fmt.Sprintf("Error updating host system: %v", err))
+			}
+		case "check":
+			select {
+			case docker.UpdateCheckBus <- struct{}{}:
+				docker.SysTransBus <- structs.SystemTransition{Type: "checkUpdates", Event: "queued"}
+			default:
+				docker.SysTransBus <- structs.SystemTransition{Type: "checkUpdates", Event: "queued"}
 			}
 		}
 	case "wifi-toggle":

@@ -11,10 +11,14 @@ on:
         description: Hermes Agent git ref
         required: false
         default: 2ffa1c97c09317c1d066aa5708b8ad961a4ca589
+      hermes_lcm_ref:
+        description: Hermes LCM git ref
+        required: false
+        default: 34043036d12f69d0089c4630eb9acfb2d9424b4c
       tlon_apps_ref:
         description: tlon-apps git ref
         required: false
-        default: 1f098d21aff413c55e2abffcfe32b58f158e6846
+        default: 33112008b1f3e83816dee61020dc5d4c57770c15
       push:
         description: Push image to Docker Hub
         required: false
@@ -39,7 +43,8 @@ env:
   DEFAULT_IMAGE: nativeplanet/hermes-tlon
   HERMES_IMAGE_TAG: 0.14.0-0.14.0
   HERMES_AGENT_REF: 2ffa1c97c09317c1d066aa5708b8ad961a4ca589
-  TLON_APPS_REF: 1f098d21aff413c55e2abffcfe32b58f158e6846
+  HERMES_LCM_REF: 34043036d12f69d0089c4630eb9acfb2d9424b4c
+  TLON_APPS_REF: 33112008b1f3e83816dee61020dc5d4c57770c15
 
 jobs:
   build:
@@ -53,11 +58,13 @@ jobs:
           set -euo pipefail
           image="${{ github.event.inputs.image }}"
           hermes_ref="${{ github.event.inputs.hermes_agent_ref }}"
+          lcm_ref="${{ github.event.inputs.hermes_lcm_ref }}"
           tlon_ref="${{ github.event.inputs.tlon_apps_ref }}"
           push_image="true"
 
           if [ -z "$image" ]; then image="$DEFAULT_IMAGE"; fi
           if [ -z "$hermes_ref" ]; then hermes_ref="$HERMES_AGENT_REF"; fi
+          if [ -z "$lcm_ref" ]; then lcm_ref="$HERMES_LCM_REF"; fi
           if [ -z "$tlon_ref" ]; then tlon_ref="$TLON_APPS_REF"; fi
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             push_image="false"
@@ -67,6 +74,7 @@ jobs:
 
           echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "hermes-ref=$hermes_ref" >> "$GITHUB_OUTPUT"
+          echo "lcm-ref=$lcm_ref" >> "$GITHUB_OUTPUT"
           echo "tlon-ref=$tlon_ref" >> "$GITHUB_OUTPUT"
           echo "push=$push_image" >> "$GITHUB_OUTPUT"
 
@@ -92,6 +100,7 @@ jobs:
           push: ${{ steps.args.outputs.push == 'true' }}
           build-args: |
             HERMES_AGENT_REF=${{ steps.args.outputs.hermes-ref }}
+            HERMES_LCM_REF=${{ steps.args.outputs.lcm-ref }}
             TLON_APPS_REF=${{ steps.args.outputs.tlon-ref }}
           tags: |
             ${{ steps.args.outputs.image }}:${{ env.HERMES_IMAGE_TAG }}

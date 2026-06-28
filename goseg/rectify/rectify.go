@@ -349,6 +349,8 @@ func SystemTransitionHandler() {
 		switch event.Type {
 		case "wifiConnect":
 			current.System.Transition.WifiConnect = event.Event
+		case "checkUpdates":
+			current.System.Transition.CheckUpdates = event.Event
 		case "swap":
 			current.System.Transition.Swap = event.BoolEvent
 		case "bugReport":

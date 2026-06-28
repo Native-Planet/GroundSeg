@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -47,6 +48,8 @@ type configFileTarget struct {
 	path string
 }
 
+var hermesEnvLinePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
+
 func ConfigFilesHandler(w http.ResponseWriter, r *http.Request) {
 	setConfigFilesCORS(w)
 	if r.Method == http.MethodOptions {
@@ -76,9 +79,12 @@ func ConfigFilesHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var content []byte
-		if target.kind == "hermes-yaml" {
+		switch target.kind {
+		case "hermes-yaml":
 			content, err = docker.ReadFileFromVolume(docker.HermesDataVolumeName, "config.yaml")
-		} else {
+		case "hermes-env":
+			content, err = docker.ReadFileFromVolume(docker.HermesDataVolumeName, ".env")
+		default:
 			content, err = os.ReadFile(target.path)
 		}
 		if err != nil {
@@ -107,6 +113,14 @@ func ConfigFilesHandler(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				err = docker.WriteFileToVolume(docker.HermesDataVolumeName, "config.yaml", string(formatted))
 			}
+		case "hermes-env":
+			formatted, err = validateHermesEnv([]byte(req.Content))
+			if err == nil {
+				err = docker.WriteFileToVolume(docker.HermesDataVolumeName, ".env", string(formatted))
+			}
+			if err == nil {
+				err = docker.WriteFileToVolume(docker.HermesWorkspaceVolumeName, ".env", string(formatted))
+			}
 		default:
 			err = fmt.Errorf("unsupported config kind %q", target.kind)
 		}
@@ -122,11 +136,23 @@ func ConfigFilesHandler(w http.ResponseWriter, r *http.Request) {
 
 func listConfigFiles() []configFileSummary {
 	conf := config.Conf()
-	files := []configFileSummary{{
-		File:  "system.json",
-		Label: "System settings",
-		Kind:  "system",
-	}}
+	files := []configFileSummary{
+		{
+			File:  "system.json",
+			Label: "System settings",
+			Kind:  "system",
+		},
+		{
+			File:  "hermes/config.yaml",
+			Label: "Hermes config.yaml",
+			Kind:  "hermes-yaml",
+		},
+		{
+			File:  "hermes/.env",
+			Label: "Hermes .env",
+			Kind:  "hermes-env",
+		},
+	}
 	for _, pier := range conf.Piers {
 		files = append(files, configFileSummary{
 			File:  fmt.Sprintf("pier/%s.json", pier),
@@ -158,6 +184,11 @@ func resolveConfigFileTarget(file string) (configFileTarget, error) {
 		return configFileTarget{
 			file: "hermes/config.yaml",
 			kind: "hermes-yaml",
+		}, nil
+	case "hermes/.env":
+		return configFileTarget{
+			file: "hermes/.env",
+			kind: "hermes-env",
 		}, nil
 	}
 	if path.Dir(cleaned) != "pier" || path.Ext(cleaned) != ".json" {
@@ -191,6 +222,27 @@ func validateHermesConfigYAML(raw []byte) ([]byte, error) {
 		return nil, fmt.Errorf("Hermes config.yaml must be a YAML mapping")
 	}
 	return []byte(trimmed + "\n"), nil
+}
+
+func validateHermesEnv(raw []byte) ([]byte, error) {
+	if strings.ContainsRune(string(raw), '\x00') {
+		return nil, fmt.Errorf("Hermes .env cannot contain null bytes")
+	}
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return nil, fmt.Errorf("Hermes .env cannot be empty")
+	}
+	for idx, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
+		if !hermesEnvLinePattern.MatchString(line) {
+			return nil, fmt.Errorf("invalid Hermes .env line %d: expected NAME=value", idx+1)
+		}
+	}
+	return []byte(strings.TrimRight(string(raw), "\r\n") + "\n"), nil
 }
 
 func configuredPier(pier string) bool {

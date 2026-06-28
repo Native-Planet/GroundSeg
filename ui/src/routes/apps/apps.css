@@ -40,7 +40,7 @@ h2,
 .operation-tabs button,
 .segmented button,
 .notice {
-  font-family: var(--regular-font);
+  font-family: var(--title-font);
   letter-spacing: 0;
 }
 
@@ -144,8 +144,8 @@ select:focus {
   border: 0;
   border-radius: 4px;
   font-family: var(--regular-font);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
   padding: 0 18px;
   white-space: nowrap;
@@ -168,7 +168,7 @@ select:focus {
 
 .secondary,
 .icon-button {
-  background: var(--btn-secondary);
+  background: var(--btn-secondary, #5C7060);
   color: var(--text-card-color);
 }
 
@@ -208,9 +208,9 @@ select:focus {
 
 .sigil-preview.empty {
   background:
-    linear-gradient(135deg, rgba(22, 29, 23, 0.08) 25%, transparent 25%) 0 0 / 12px 12px,
-    linear-gradient(315deg, rgba(22, 29, 23, 0.08) 25%, transparent 25%) 0 0 / 12px 12px,
-    var(--bg-card);
+    linear-gradient(135deg, rgba(248, 248, 246, 0.10) 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(315deg, rgba(248, 248, 246, 0.10) 25%, transparent 25%) 0 0 / 12px 12px,
+    var(--btn-secondary, #5C7060);
 }
 
 .sigil-preview :global(svg) {
@@ -235,6 +235,7 @@ select:focus {
 .state-row strong,
 .state-row code {
   min-width: 0;
+  font-family: var(--log-font);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
@@ -302,7 +303,6 @@ select:focus {
   color: rgba(49, 57, 51, 0.7);
   cursor: pointer;
   font-size: 16px;
-  font-weight: 600;
 }
 
 .segmented button:last-child,

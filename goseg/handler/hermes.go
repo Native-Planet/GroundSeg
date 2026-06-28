@@ -23,6 +23,8 @@ func HermesHandler(msg []byte) error {
 	switch hermesPayload.Payload.Action {
 	case "install":
 		go handleHermesInstall(hermesPayload)
+	case "update":
+		go handleHermesUpdate(hermesPayload)
 	case "toggle":
 		go handleHermesToggle(hermesPayload)
 	case "save":
@@ -61,6 +63,62 @@ func handleHermesInstall(hermesPayload structs.WsHermesPayload) {
 		return
 	}
 	zap.L().Info(fmt.Sprintf("Hermes image %s installed", image))
+	docker.HermesTransBus <- structs.Event{Type: "install", Data: "success"}
+}
+
+func handleHermesUpdate(hermesPayload structs.WsHermesPayload) {
+	clearHermesError()
+	docker.HermesTransBus <- structs.Event{Type: "install", Data: "preparing"}
+	defer clearHermesTransition("install")
+	if err := config.LoadHermesConfig(); err != nil {
+		failHermesTransition("install", err)
+		return
+	}
+	hermesConf := config.HermesConf()
+	wasEnabled := hermesConf.Enabled
+	if err := applyHermesPayload(hermesPayload.Payload, &hermesConf); err != nil {
+		failHermesTransition("install", err)
+		return
+	}
+	versionServerImage, err := docker.HermesVersionServerImage()
+	if err != nil {
+		failHermesTransition("install", err)
+		return
+	}
+	hermesConf.Image = versionServerImage
+	docker.HermesTransBus <- structs.Event{Type: "install", Data: "removing-container"}
+	stopAndDeleteHermes(false)
+	zap.L().Info(fmt.Sprintf("Updating Hermes image to %s", versionServerImage))
+	if err := docker.PullImageByRefWithProgress(versionServerImage, func(status string) {
+		docker.HermesTransBus <- structs.Event{Type: "install", Data: status}
+	}); err != nil {
+		failHermesTransition("install", err)
+		return
+	}
+	if wasEnabled {
+		docker.HermesTransBus <- structs.Event{Type: "install", Data: "validating"}
+		if err := validateRunnableHermes(hermesConf); err != nil {
+			failHermesTransition("install", err)
+			return
+		}
+		docker.HermesTransBus <- structs.Event{Type: "install", Data: "fetching-code"}
+		if err := refreshHermesAccessCode(&hermesConf); err != nil {
+			failHermesTransition("install", err)
+			return
+		}
+	}
+	if err := config.UpdateHermesConfig(hermesConf); err != nil {
+		failHermesTransition("install", err)
+		return
+	}
+	if wasEnabled {
+		docker.HermesTransBus <- structs.Event{Type: "install", Data: "starting"}
+		if err := recreateHermesContainer(); err != nil {
+			failHermesTransition("install", err)
+			return
+		}
+	}
+	zap.L().Info(fmt.Sprintf("Hermes image %s updated", versionServerImage))
 	docker.HermesTransBus <- structs.Event{Type: "install", Data: "success"}
 }
 
@@ -214,7 +272,7 @@ func applyHermesPayload(payload structs.WsHermesAction, hermesConf *structs.Herm
 		hermesConf.Image = image
 	}
 	if strings.TrimSpace(hermesConf.Image) == "" {
-		hermesConf.Image = docker.DefaultHermesImage
+		hermesConf.Image = docker.HermesImageOrDefault("")
 	}
 	if !isPinnedImageRef(hermesConf.Image) {
 		return fmt.Errorf("Hermes image must be pinned by non-latest tag or sha256 digest")
@@ -244,7 +302,7 @@ func applyHermesPayload(payload structs.WsHermesAction, hermesConf *structs.Herm
 			hermesConf.WebAPIKey = ""
 		}
 		hermesConf.WebProvider = normalizedWebProvider
-	} else if payload.Action == "save" || payload.Action == "toggle" || payload.Action == "install" {
+	} else if payload.Action == "save" || payload.Action == "toggle" || payload.Action == "install" || payload.Action == "update" {
 		hermesConf.WebProvider = ""
 		hermesConf.WebAPIKey = ""
 	}

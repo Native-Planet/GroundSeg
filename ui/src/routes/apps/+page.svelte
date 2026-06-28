@@ -165,14 +165,13 @@
   function renderSigil(patp) {
     if (!patp) return ''
     const root = getComputedStyle(document.documentElement)
+    const bg = root.getPropertyValue('--btn-secondary').trim() || '#5C7060'
+    const fg = root.getPropertyValue('--text-card-color').trim() || '#F8F8F6'
     return sigil({
       patp,
       renderer: stringRenderer,
       size: 120,
-      colors: [
-        root.getPropertyValue('--btn-secondary'),
-        root.getPropertyValue('--text-card-color')
-      ]
+      colors: [bg, fg]
     })
   }
 

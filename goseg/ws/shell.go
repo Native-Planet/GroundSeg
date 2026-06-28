@@ -20,10 +20,11 @@ import (
 )
 
 type ShellInitPayload struct {
-	Patp  string                `json:"patp"`
-	Cols  uint                  `json:"cols"`
-	Rows  uint                  `json:"rows"`
-	Token structs.WsTokenStruct `json:"token"`
+	Patp   string                `json:"patp"`
+	Target string                `json:"target"`
+	Cols   uint                  `json:"cols"`
+	Rows   uint                  `json:"rows"`
+	Token  structs.WsTokenStruct `json:"token"`
 }
 
 type ShellClientMessage struct {
@@ -83,23 +84,13 @@ func ShellHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	patp := strings.TrimSpace(init.Patp)
-	if patp == "" {
-		_ = writer.writeJSON(ShellServerMessage{Type: "error", Message: "Missing ship name"})
-		return
+	target := strings.TrimSpace(init.Target)
+	if target == "" {
+		target = "ship"
 	}
-
-	shipConf := config.UrbitConf(patp)
-	if shipConf.PierName == "" {
-		_ = writer.writeJSON(ShellServerMessage{Type: "error", Message: "Ship not found"})
-		return
-	}
-	if !shipConf.DevMode {
-		_ = writer.writeJSON(ShellServerMessage{Type: "error", Message: "Developer mode must be enabled"})
-		return
-	}
-	if _, err := docker.GetContainerRunningStatus(patp); err != nil {
-		_ = writer.writeJSON(ShellServerMessage{Type: "error", Message: "Ship container is not running"})
+	containerName, execCommand, errMessage := resolveShellTarget(target, strings.TrimSpace(init.Patp))
+	if errMessage != "" {
+		_ = writer.writeJSON(ShellServerMessage{Type: "error", Message: errMessage})
 		return
 	}
 
@@ -113,9 +104,9 @@ func ShellHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	containerID, err := docker.GetContainerIDByName(ctx, cli, patp)
+	containerID, err := docker.GetContainerIDByName(ctx, cli, containerName)
 	if err != nil {
-		_ = writer.writeJSON(ShellServerMessage{Type: "error", Message: "Could not find running ship container"})
+		_ = writer.writeJSON(ShellServerMessage{Type: "error", Message: "Could not find running container"})
 		return
 	}
 
@@ -124,7 +115,7 @@ func ShellHandler(w http.ResponseWriter, r *http.Request) {
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          true,
-		Cmd:          []string{"tmux", "a"},
+		Cmd:          execCommand,
 	})
 	if err != nil {
 		_ = writer.writeJSON(ShellServerMessage{Type: "error", Message: "Failed to start shell session"})
@@ -143,7 +134,7 @@ func ShellHandler(w http.ResponseWriter, r *http.Request) {
 			Width:  init.Cols,
 			Height: init.Rows,
 		}); err != nil {
-			zap.L().Warn(fmt.Sprintf("initial shell resize failed for %s: %v", patp, err))
+			zap.L().Warn(fmt.Sprintf("initial shell resize failed for %s: %v", containerName, err))
 		}
 	}
 
@@ -207,7 +198,7 @@ func ShellHandler(w http.ResponseWriter, r *http.Request) {
 					Width:  message.Cols,
 					Height: message.Rows,
 				}); err != nil {
-					zap.L().Warn(fmt.Sprintf("shell resize failed for %s: %v", patp, err))
+					zap.L().Warn(fmt.Sprintf("shell resize failed for %s: %v", containerName, err))
 				}
 			case "close":
 				inputDone <- nil
@@ -221,12 +212,12 @@ func ShellHandler(w http.ResponseWriter, r *http.Request) {
 		cancel()
 		hijackedResp.Close()
 		if err != nil && !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
-			zap.L().Debug(fmt.Sprintf("shell input closed for %s: %v", patp, err))
+			zap.L().Debug(fmt.Sprintf("shell input closed for %s: %v", containerName, err))
 		}
 	case err := <-outputDone:
 		cancel()
 		if err != nil {
-			zap.L().Debug(fmt.Sprintf("shell output closed for %s: %v", patp, err))
+			zap.L().Debug(fmt.Sprintf("shell output closed for %s: %v", containerName, err))
 		}
 		inspect, inspectErr := cli.ContainerExecInspect(context.Background(), execResp.ID)
 		if inspectErr != nil {
@@ -234,5 +225,32 @@ func ShellHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = writer.writeJSON(ShellServerMessage{Type: "exit", Code: inspect.ExitCode})
+	}
+}
+
+func resolveShellTarget(target string, patp string) (string, []string, string) {
+	switch target {
+	case "ship":
+		if patp == "" {
+			return "", nil, "Missing ship name"
+		}
+		shipConf := config.UrbitConf(patp)
+		if shipConf.PierName == "" {
+			return "", nil, "Ship not found"
+		}
+		if !shipConf.DevMode {
+			return "", nil, "Developer mode must be enabled"
+		}
+		if _, err := docker.GetContainerRunningStatus(patp); err != nil {
+			return "", nil, "Ship container is not running"
+		}
+		return patp, []string{"tmux", "a"}, ""
+	case "hermes":
+		if _, err := docker.GetContainerRunningStatus(docker.HermesContainerName); err != nil {
+			return "", nil, "Hermes container is not running"
+		}
+		return docker.HermesContainerName, []string{"bash", "-lc", "if command -v tmux >/dev/null 2>&1; then exec tmux new -A -s hermes-shell; fi; exec bash -l"}, ""
+	default:
+		return "", nil, "Unsupported shell target"
 	}
 }

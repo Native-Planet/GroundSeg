@@ -1,18 +1,24 @@
-diff --git a/agent/file_safety.py b/agent/file_safety.py
-index 9b0c9fb..8936261 100644
 --- a/agent/file_safety.py
 +++ b/agent/file_safety.py
-@@ -83,7 +83,8 @@ def is_write_denied(path: str) -> bool:
-     # profile-mode session leaves <root>/auth.json + <root>/config.yaml
-     # writable — letting a prompt-injected write_file overwrite the global
-     # files that every profile inherits from (same shape as #15981).
--    control_file_names = ("auth.json", "config.yaml", "webhook_subscriptions.json")
-+    allow_config_write = os.getenv("HERMES_ALLOW_CONFIG_WRITE", "").strip().lower() in {"1", "true", "yes", "on"}
-+    control_file_names = ("auth.json", "config.yaml", "webhook_subscriptions.json")
-     mcp_tokens_dir_name = "mcp-tokens"
+@@ -91,8 +91,15 @@
+     home = os.path.realpath(os.path.expanduser("~"))
+     resolved = os.path.realpath(os.path.expanduser(str(path)))
  
-     hermes_dirs = []
-@@ -97,6 +98,8 @@ def is_write_denied(path: str) -> bool:
+-    if resolved in build_write_denied_paths(home):
+-        return True
++    allow_config_write = os.getenv("HERMES_ALLOW_CONFIG_WRITE", "").strip().lower() in {"1", "true", "yes", "on"}
++    denied_paths = build_write_denied_paths(home)
++    if resolved in denied_paths:
++        allowed_paths = set()
++        if allow_config_write:
++            allowed_paths.add(os.path.realpath(_hermes_home_path() / ".env"))
++            allowed_paths.add(os.path.realpath(_hermes_root_path() / ".env"))
++        if resolved not in allowed_paths:
++            return True
+     for prefix in build_write_denied_prefixes(home):
+         if resolved.startswith(prefix):
+             return True
+@@ -116,6 +123,8 @@
  
      for base_real in hermes_dirs:
          for name in control_file_names:
@@ -21,11 +27,9 @@ index 9b0c9fb..8936261 100644
              try:
                  if resolved == os.path.realpath(os.path.join(base_real, name)):
                      return True
-diff --git a/hermes_cli/web_server.py b/hermes_cli/web_server.py
-index e607f83..87d9220 100644
 --- a/hermes_cli/web_server.py
 +++ b/hermes_cli/web_server.py
-@@ -4318,12 +4318,18 @@ async def post_agent_plugin_install(request: Request, body: _AgentPluginInstallB
+@@ -4319,12 +4319,18 @@
  
  def _validate_plugin_name(name: str) -> str:
      """Reject path-traversal attempts in plugin name URL parameters."""
@@ -47,7 +51,7 @@ index e607f83..87d9220 100644
  async def post_agent_plugin_enable(request: Request, name: str):
      _require_token(request)
      name = _validate_plugin_name(name)
-@@ -4336,7 +4341,7 @@ async def post_agent_plugin_enable(request: Request, name: str):
+@@ -4336,7 +4342,7 @@
      return result
  
  
@@ -56,7 +60,7 @@ index e607f83..87d9220 100644
  async def post_agent_plugin_disable(request: Request, name: str):
      _require_token(request)
      name = _validate_plugin_name(name)
-@@ -4348,7 +4353,7 @@ async def post_agent_plugin_disable(request: Request, name: str):
+@@ -4348,7 +4354,7 @@
      return result
  
  
@@ -65,7 +69,7 @@ index e607f83..87d9220 100644
  async def post_agent_plugin_update(request: Request, name: str):
      _require_token(request)
      name = _validate_plugin_name(name)
-@@ -4361,7 +4366,7 @@ async def post_agent_plugin_update(request: Request, name: str):
+@@ -4361,7 +4367,7 @@
      return result
  
  
@@ -74,7 +78,7 @@ index e607f83..87d9220 100644
  async def delete_agent_plugin(request: Request, name: str):
      _require_token(request)
      name = _validate_plugin_name(name)
-@@ -4401,7 +4406,7 @@ class _PluginVisibilityBody(BaseModel):
+@@ -4399,7 +4405,7 @@
      hidden: bool
  
  

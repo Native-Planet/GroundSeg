@@ -3,6 +3,8 @@ FROM node:${NODE_VERSION}-bookworm-slim
 
 ARG HERMES_AGENT_REPO=https://github.com/NousResearch/hermes-agent.git
 ARG HERMES_AGENT_REF=2ffa1c97c09317c1d066aa5708b8ad961a4ca589
+ARG HERMES_LCM_REPO=https://github.com/stephenschoettler/hermes-lcm.git
+ARG HERMES_LCM_REF=34043036d12f69d0089c4630eb9acfb2d9424b4c
 ARG TLON_APPS_REPO=https://github.com/tloncorp/tlon-apps.git
 ARG TLON_APPS_REF=33112008b1f3e83816dee61020dc5d4c57770c15
 ARG PNPM_VERSION=9.15.9
@@ -11,6 +13,7 @@ LABEL org.opencontainers.image.title="NativePlanet Hermes Tlon"
 LABEL org.opencontainers.image.description="Hermes Agent with the Tlon platform adapter and tlon CLI"
 LABEL org.opencontainers.image.source="https://github.com/Native-Planet/GroundSeg"
 LABEL org.nativeplanet.hermes.agent-ref="${HERMES_AGENT_REF}"
+LABEL org.nativeplanet.hermes.lcm-ref="${HERMES_LCM_REF}"
 LABEL org.nativeplanet.hermes.tlon-apps-ref="${TLON_APPS_REF}"
 
 ENV HERMES_AGENT_DIR=/opt/hermes-agent
@@ -55,6 +58,7 @@ RUN apt-get update \
     python3-venv \
     ripgrep \
     tini \
+    tmux \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
@@ -84,6 +88,14 @@ RUN python3 -m venv "${HERMES_VENV}" \
   && "${HERMES_VENV}/bin/python" -m pip install --upgrade pip setuptools wheel \
   && "${HERMES_VENV}/bin/python" -m pip install -e "${HERMES_AGENT_DIR}[cron,cli,pty,mcp,acp,web]" \
   && "${HERMES_VENV}/bin/python" -m pip install "aiohttp>=3.9"
+
+RUN git clone --filter=blob:none "${HERMES_LCM_REPO}" /tmp/hermes-lcm \
+  && cd /tmp/hermes-lcm \
+  && git checkout "${HERMES_LCM_REF}" \
+  && mkdir -p "${HERMES_AGENT_DIR}/plugins/context_engine/lcm" \
+  && cp -a . "${HERMES_AGENT_DIR}/plugins/context_engine/lcm/" \
+  && ln -sfn "${HERMES_AGENT_DIR}/plugins/context_engine/lcm" "${HERMES_AGENT_DIR}/hermes_lcm" \
+  && rm -rf "${HERMES_AGENT_DIR}/plugins/context_engine/lcm/.git" /tmp/hermes-lcm
 
 RUN git clone --filter=blob:none "${TLON_APPS_REPO}" "${TLON_APPS_DIR}" \
   && cd "${TLON_APPS_DIR}" \

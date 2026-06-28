@@ -48,6 +48,7 @@ type SystemTransitionBroadcast struct {
 	BugReport      string   `json:"bugReport"`
 	BugReportError string   `json:"bugReportError"`
 	WifiConnect    string   `json:"wifiConnect"`
+	CheckUpdates   string   `json:"checkUpdates"`
 }
 
 // broadcast payload subobject
@@ -143,6 +144,8 @@ type Hermes struct {
 		APIEnabled         bool     `json:"apiEnabled"`
 		APIKeySet          bool     `json:"apiKeySet"`
 		ImageInstalled     bool     `json:"imageInstalled"`
+		VersionServerImage string   `json:"versionServerImage"`
+		UpdateAvailable    bool     `json:"updateAvailable"`
 		Ships              []string `json:"ships"`
 	} `json:"info"`
 	Transition HermesTransition `json:"transition"`

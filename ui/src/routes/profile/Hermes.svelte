@@ -1,8 +1,10 @@
 <script>
+  import { openModal } from 'svelte-modals'
   import ToggleButton from '$lib/ToggleButton.svelte'
   import { readConfigFile, saveConfigFile } from '$lib/stores/config-files'
-  import { hermesInstall, hermesRestart, hermesSave, hermesToggle } from '$lib/stores/websocket'
+  import { hermesInstall, hermesRestart, hermesSave, hermesToggle, hermesUpdate } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
+  import WebShellModal from '../[patp]/WebShellModal.svelte'
 
   const hermesIcon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAYCAYAAADtaU2/AAAACXBIWXMAAABtAAAAbgDSdnyfAAAAAXNSR0IB2cksfwAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAABGdBTUEAALGPC/xhBQAABG5JREFUeJyllltIXFcUhkdnvM541zrebx0DGivaor4Eb2gfRBChKAj1wXqp+uKLCo6KgtpRK4goXhJEQRSKVvoiGtNJGySGgjI1GvqgoPRB7MPUCG2Sybjyrx3PMJozdqbZsDn7HM5e315r/Wudo1C4MDw8PBRxcXF3cnJyvo6Pjzd4eXnd9/b2/s7Pz+8rX19frSu2nBowrvb396+LiIjYKioqet3f308mk4nGx8cJQMIrpNFo/goODh7EYdQfDXRzc1MEBASUBAYGvlCpVAIgzYSEBNrd3aWtrS3CwcQzd3d3wgGfKZXKTz4KDCN6T0/Pa0BphoWFUUVFBZ2entLExITtOTynkpKSx9jn/r+gOp2uOTQ0lBA6ioqKopCQEEpJSRH31dXVtLm5SX19fdTV1UUWi4VKS0spNzeXpqenRQp8fHzqXYbitNqVlRXz0tIS1dbWCkPt7e00OjpKAwMDdHBwQDU1NcLD6Ohouri4oIWFBcrMzKS0tDSKiYlhz5/DjtIlMETSmpWVRQUFBaTVagl5Fp4yiEMPFZN9zjs7O6mpqelaKq7ey3UaCmFwbo2KGzll4SQlJcnmm1MCxbOwxIQoxfOgoKAhp8GoVSU2H9gDcRix5iiEh4dfgzJEAl3BbCqHncfsiNMeI7Q/S4YSExNpbGyM6urqqLCwkBoaGkiv19Pg4CBlZ2d/4D1ERUiVWKPG/4QjGqe9xoYvcfJXXDIsruPjY+LBcPZoZGRE3E9NTQkAjFN+fr6obb5nXfAVurBCZOlOg3nA6y9QRpNcQkajUYC4WxkMBtrZ2RH37LXiKtwMlwTH6WAxcprQfL5xCcwDG6taW1sF5PLykm6OxsZGWbFxE2GR8RoOPHAZjHLQz83N0fn5uQBZrVYxpUPk5eXJgtlzeCrWENrvuHeti+Hkkx0dHTQ0NER7e3s2OA+z2SyahxxYcSUyTgH08hZ27joNRZi5g/3EJYQuRkdHRzaPeezv74sy4xqWU7fivaotqO83arX62/8EQrWfY0MUg7HBxAZWV1c/yO/a2powziVWXl4uC8bB/4VAn8HjH7C+HQwP+qHISOQmBNcLNsAda3FxkWZnZ6mnp4fOzs5oeXlZGMdPAVVWVjoC/43SegChmWJjYysRepXD8OKr9AuUuIaXH2FyHVpvGiwuLqbh4WGxrq+vp5aWFlkwxHmI0voVNvYiIyMNOMinDj1OTk6eRHheo/s8R9cyYrNVaoH2kz8KqampDsXFE59SM2BvYeMhPP8Ra51DMPKrw3/VE4R8H2XwEiF6AYW+kYxxU2CV8zg5OaGMjAxbE5Hekflb+Q32uG+73ZpnvKBCuxzFAbZx/eNmuHt7ewV4Y2OD2traqKqqSohsZmZGiG5+fp7KysqE6rmeYecUNvJvhUoDYdEg199D2SPI01N7MPfr5uZm8fFfX18XfySHh4fXVM9/KOnp6Qx+iCh+5hTUfgByDyL7h3svhCdmd3e36GYMZe+3t7dlOxvesyA1yXJ23wFhL8w2DPf/cAAAAABJRU5ErkJggg=="
 
@@ -13,8 +15,11 @@
   $: running = info?.running || false
   $: url = info?.url || "#"
   $: imageInstalled = info?.imageInstalled || false
+  $: updateAvailable = info?.updateAvailable || false
+  $: versionServerImage = info?.versionServerImage || ""
   $: savedImage = info?.image || ""
   $: selectedImageInstalled = imageInstalled && image.trim() == savedImage
+  $: selectedImageChanged = image.trim() != savedImage
   $: providerApiKeySaved = info?.providerApiKeySet || false
   $: savedModelProvider = info?.modelProvider || "openrouter"
   $: providerApiKeyPlaceholder = providerApiKeySaved && modelProvider == savedModelProvider ? "Saved" : ""
@@ -31,7 +36,7 @@
   $: tSave = transition?.save || ""
   $: tRestart = transition?.restart || ""
   $: tError = transition?.error || ""
-  $: imageReady = selectedImageInstalled || tInstall == "success" || tInstall == "installed"
+  $: imageReady = imageInstalled || selectedImageInstalled || tInstall == "success" || tInstall == "installed"
   $: installing = tInstall.length > 0 && tInstall != "success" && tInstall != "error"
   $: selectedShipKey = selectedShip.replace(/^~/, "")
   $: attachedRunning = ($structure?.urbits?.[selectedShipKey]?.info?.running) || false
@@ -41,8 +46,9 @@
   $: dashboardReady = running && url != "#"
   $: activity = tInstall || tToggle || tSave || tRestart
   $: activityText = transitionText(activity)
-  $: installLabel = imageReady && tInstall.length < 1 ? "Installed" : transitionText(tInstall) || "Install"
-  $: canInstall = image.trim().length > 0 && !imageReady && !busy
+  $: imageActionMode = selectedImageChanged || !imageInstalled ? "install" : updateAvailable ? "update" : "installed"
+  $: installLabel = transitionText(tInstall) || imageActionLabel(imageActionMode)
+  $: canInstall = image.trim().length > 0 && !busy && imageActionMode != "installed"
 
   let selectedShip = ""
   let owner = ""
@@ -58,6 +64,8 @@
   let dirty = false
   let showAdvanced = false
   let showConfig = false
+  let configFile = "hermes/config.yaml"
+  let configLoadedFile = ""
   let configLoaded = false
   let configLoading = false
   let configSaving = false
@@ -66,8 +74,14 @@
   let configError = ""
   let configStatus = ""
 
+  const configFiles = [
+    { file: "hermes/config.yaml", label: "config.yaml" },
+    { file: "hermes/.env", label: ".env" }
+  ]
+
+  $: configLabel = configFiles.find(file => file.file == configFile)?.label || "config"
   $: configDirty = configContent !== configOriginalContent
-  $: configValidationError = showConfig && !configContent.trim() ? "config.yaml cannot be empty" : ""
+  $: configValidationError = showConfig && !configContent.trim() ? `${configLabel} cannot be empty` : ""
   $: canSaveConfig = configDirty && !configValidationError && !configLoading && !configSaving
 
   const providers = [
@@ -79,14 +93,11 @@
     { value: "anthropic", label: "Anthropic" },
     { value: "arcee", label: "Arcee" },
     { value: "deepseek", label: "DeepSeek" },
-    { value: "gemini", label: "Google Gemini" },
     { value: "gmi", label: "GMI Cloud" },
     { value: "huggingface", label: "Hugging Face" },
     { value: "kilocode", label: "Kilo Code" },
     { value: "kimi-coding", label: "Kimi" },
     { value: "kimi-coding-cn", label: "Kimi CN" },
-    { value: "minimax", label: "MiniMax" },
-    { value: "minimax-cn", label: "MiniMax CN" },
     { value: "nous", label: "Nous" },
     { value: "novita", label: "Novita" },
     { value: "nvidia", label: "NVIDIA NIM" },
@@ -111,6 +122,7 @@
 
   const transitionLabels = {
     "preparing": "Preparing",
+    "removing-container": "Removing container",
     "pulling": "Pulling image",
     "installed": "Installed",
     "loading": "Working",
@@ -131,6 +143,12 @@
       return `Pulling image ${value.replace("pulling ", "")}`
     }
     return transitionLabels[value] || value
+  }
+
+  const imageActionLabel = mode => {
+    if (mode == "update") return "Update"
+    if (mode == "installed") return "Installed"
+    return "Install"
   }
 
   $: if (tInstall == "success" || tSave == "success" || tToggle == "success") {
@@ -191,7 +209,11 @@
 
   const install = () => {
     if (!canInstall) return
-    hermesInstall(payload())
+    if (imageActionMode == "update") {
+      hermesUpdate(payload())
+    } else {
+      hermesInstall(payload())
+    }
   }
 
   const toggle = () => {
@@ -202,7 +224,19 @@
 
   const toggleConfig = async () => {
     showConfig = !showConfig
-    if (showConfig && !configLoaded) {
+    if (showConfig && (!configLoaded || configLoadedFile != configFile)) {
+      await loadHermesConfig()
+    }
+  }
+
+  const changeConfigFile = async () => {
+    configLoaded = false
+    configLoadedFile = ""
+    configContent = ""
+    configOriginalContent = ""
+    configStatus = ""
+    configError = ""
+    if (showConfig) {
       await loadHermesConfig()
     }
   }
@@ -212,10 +246,11 @@
     configError = ""
     configStatus = ""
     try {
-      const response = await readConfigFile("hermes/config.yaml")
+      const response = await readConfigFile(configFile)
       configContent = response.content || ""
       configOriginalContent = configContent
       configLoaded = true
+      configLoadedFile = configFile
     } catch (err) {
       configError = err.message
     } finally {
@@ -229,15 +264,25 @@
     configError = ""
     configStatus = ""
     try {
-      const response = await saveConfigFile("hermes/config.yaml", configContent)
+      const response = await saveConfigFile(configFile, configContent)
       configContent = response.content || configContent
       configOriginalContent = configContent
-      configStatus = "config.yaml saved"
+      configStatus = `${configLabel} saved`
     } catch (err) {
       configError = err.message
     } finally {
       configSaving = false
     }
+  }
+
+  const openHermesTerminal = () => {
+    openModal(WebShellModal, {
+      target: "hermes",
+      title: "Hermes Terminal",
+      width: 1180,
+      height: "72vh",
+      minHeight: 560,
+    })
   }
 </script>
 
@@ -251,7 +296,13 @@
       <div class="status-row">
         <div class="status" class:on={enabled}>{enabled ? "Enabled" : "Disabled"}</div>
         <div class="status" class:on={running}>{running ? "Running" : "Stopped"}</div>
-        <div class="status" class:on={imageReady}>{imageReady ? "Installed" : "Not installed"}</div>
+        <div class="status" class:on={imageReady} class:warn={updateAvailable && !selectedImageChanged}>
+          {#if updateAvailable && !selectedImageChanged}
+            Update available
+          {:else}
+            {imageReady ? "Installed" : "Not installed"}
+          {/if}
+        </div>
       </div>
     </div>
     <div class="spacer"></div>
@@ -259,7 +310,7 @@
       <button
         class="install"
         disabled={!canInstall}
-        class:success={imageReady}
+        class:success={imageActionMode == "installed"}
         on:click={install}>
         {installLabel}
       </button>
@@ -388,18 +439,31 @@
       <div class="versions">
         <div>Hermes {info?.hermesVersion || ""}</div>
         <div>Tlon Adapter {info?.tlonAdapterVersion || ""}</div>
+        {#if versionServerImage}
+          <div>Latest {versionServerImage}</div>
+        {/if}
       </div>
     </div>
   {/if}
 
   <button class="config-toggle" class:active={showConfig} on:click={toggleConfig}>
-    <span>config.yaml</span>
+    <span>Runtime files</span>
     <span>{showConfig ? "Hide" : "Edit"}</span>
   </button>
 
   {#if showConfig}
     <div class="config-editor">
       <div class="config-toolbar">
+        <select
+          class="config-select"
+          bind:value={configFile}
+          on:change={changeConfigFile}
+          disabled={configLoading || configSaving}>
+          {#each configFiles as file}
+            <option value={file.file}>{file.label}</option>
+          {/each}
+        </select>
+        <button on:click={openHermesTerminal} disabled={!running}>Terminal</button>
         <button on:click={loadHermesConfig} disabled={configLoading || configSaving}>Reload</button>
         <button class="save-config" on:click={saveHermesConfig} disabled={!canSaveConfig}>
           {configSaving ? "Saving" : "Save"}
@@ -407,7 +471,7 @@
       </div>
 
       {#if configLoading}
-        <div class="message">Loading config.yaml...</div>
+        <div class="message">Loading {configLabel}...</div>
       {/if}
       {#if configError}
         <div class="message error">{configError}</div>
@@ -416,7 +480,7 @@
       {:else if configStatus}
         <div class="message success">{configStatus}</div>
       {:else if configDirty}
-        <div class="message">Unsaved config.yaml edits</div>
+        <div class="message">Unsaved {configLabel} edits</div>
       {/if}
 
       <textarea
@@ -424,7 +488,7 @@
         spellcheck="false"
         bind:value={configContent}
         disabled={configLoading || configSaving}
-        aria-label="Hermes config.yaml editor"
+        aria-label={`Hermes ${configLabel} editor`}
       />
     </div>
   {/if}
@@ -483,6 +547,10 @@
   }
   .status.on {
     background: #077D13;
+    color: #fff;
+  }
+  .status.warn {
+    background: #D9A100;
     color: #fff;
   }
   .controls {
@@ -576,9 +644,16 @@
     margin-top: 16px;
   }
   .config-toolbar {
-    display: flex;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: minmax(160px, 220px) 120px 96px 96px;
+    justify-content: end;
     gap: 12px;
+  }
+  .config-select {
+    height: 48px;
+    border-radius: 8px;
+    font-size: 16px;
+    padding: 0 12px;
   }
   .config-toolbar button {
     height: 48px;
@@ -589,6 +664,7 @@
     font-size: 16px;
     font-weight: 300;
     padding: 0 20px;
+    white-space: nowrap;
   }
   .config-toolbar button.save-config {
     background: #077D13;
@@ -623,10 +699,12 @@
   .versions {
     grid-column: 1 / -1;
     display: flex;
+    flex-wrap: wrap;
     gap: 24px;
     color: var(--Gray-400, #5C7060);
     font-family: Inter;
     font-size: 16px;
+    overflow-wrap: anywhere;
   }
   .actions {
     display: flex;
@@ -718,6 +796,10 @@
       grid-auto-rows: 65px;
       height: 142px;
       overflow: visible;
+    }
+    .config-toolbar {
+      grid-template-columns: 1fr 1fr;
+      justify-content: stretch;
     }
     .save, .restart, .install, .dashboard {
       font-size: 20px;

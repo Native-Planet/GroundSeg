@@ -20,7 +20,7 @@ const (
 	HermesWorkspaceVolumeName       = "hermes_workspace"
 	HermesTlonSkillDir              = "/opt/data/tlon-skill"
 	hermesConfigVersionLabel        = "nativeplanet.groundseg.hermes.config-version"
-	hermesConfigVersion             = "2026-06-27-node-tlon-cli"
+	hermesConfigVersion             = "2026-06-28-runtime-files-lcm"
 	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
@@ -57,14 +57,11 @@ var hermesModelProviders = []hermesModelProvider{
 	{Name: "anthropic", APIKeyEnv: "ANTHROPIC_API_KEY"},
 	{Name: "arcee", APIKeyEnv: "ARCEEAI_API_KEY"},
 	{Name: "deepseek", APIKeyEnv: "DEEPSEEK_API_KEY"},
-	{Name: "gemini", APIKeyEnv: "GOOGLE_API_KEY"},
 	{Name: "gmi", APIKeyEnv: "GMI_API_KEY"},
 	{Name: "huggingface", APIKeyEnv: "HF_TOKEN"},
 	{Name: "kilocode", APIKeyEnv: "KILOCODE_API_KEY"},
 	{Name: "kimi-coding", APIKeyEnv: "KIMI_API_KEY"},
 	{Name: "kimi-coding-cn", APIKeyEnv: "KIMI_CN_API_KEY"},
-	{Name: "minimax", APIKeyEnv: "MINIMAX_API_KEY"},
-	{Name: "minimax-cn", APIKeyEnv: "MINIMAX_CN_API_KEY"},
 	{Name: "nous", APIKeyEnv: "NOUS_API_KEY"},
 	{Name: "novita", APIKeyEnv: "NOVITA_API_KEY"},
 	{Name: "nvidia", APIKeyEnv: "NVIDIA_API_KEY"},
@@ -92,7 +89,37 @@ func HermesImageOrDefault(image string) string {
 	if image = strings.TrimSpace(image); image != "" {
 		return image
 	}
+	if image, err := HermesVersionServerImage(); err == nil && image != "" {
+		return image
+	}
 	return DefaultHermesImage
+}
+
+func HermesVersionServerImage() (string, error) {
+	info, err := GetLatestContainerInfo("hermes")
+	if err != nil {
+		return "", err
+	}
+	repo := strings.TrimSpace(info["repo"])
+	tag := strings.TrimSpace(info["tag"])
+	hash := strings.TrimSpace(info["hash"])
+	if repo == "" || tag == "" {
+		return "", fmt.Errorf("Hermes version-server image is missing repo or tag")
+	}
+	image := fmt.Sprintf("%s:%s", repo, tag)
+	if hash != "" {
+		image = fmt.Sprintf("%s@sha256:%s", image, hash)
+	}
+	return image, nil
+}
+
+func HermesUpdateAvailable(configuredImage string) bool {
+	latestImage, err := HermesVersionServerImage()
+	if err != nil || latestImage == "" {
+		return false
+	}
+	currentImage := HermesImageOrDefault(configuredImage)
+	return strings.TrimSpace(currentImage) != strings.TrimSpace(latestImage)
 }
 
 func HermesModelProviderOrDefault(provider string) string {
@@ -305,7 +332,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		fmt.Sprintf("HERMES_TLON_ADAPTER_REF=%s", HermesTlonAdapterRefOrDefault(hermesConf.TlonAdapterRef)),
 		"TLON_TELEMETRY=false",
 		"HERMES_TLON_TOOLSET=tlon",
-		"HERMES_TLON_TOOLSETS=tlon,file,terminal,web,browser,skills,todo,cronjob",
+		"HERMES_TLON_TOOLSETS=tlon,file,terminal,web,browser,skills,todo,cronjob,context_engine",
 		"TERMINAL_ENV=local",
 		"TERMINAL_CWD=/workspace",
 		"TERMINAL_LOCAL_PERSISTENT=true",
@@ -439,13 +466,14 @@ cat > "$config_file" <<EOF
 EOF
 chmod 600 "$config_file"
 
+managed_env_tmp="$(mktemp)"
 {
   for name in \
     API_SERVER_ENABLED API_SERVER_KEY \
     AI_GATEWAY_API_KEY ALIBABA_CODING_PLAN_API_KEY ANTHROPIC_API_KEY ARCEEAI_API_KEY \
-    BRAVE_API_KEY BRAVE_SEARCH_API_KEY DASHSCOPE_API_KEY DEEPSEEK_API_KEY GEMINI_API_KEY \
-    EXA_API_KEY FIRECRAWL_API_KEY GLM_API_KEY GMI_API_KEY GOOGLE_API_KEY GROQ_API_KEY \
-    HF_TOKEN KILOCODE_API_KEY KIMI_API_KEY KIMI_CN_API_KEY KIMI_CODING_API_KEY MINIMAX_API_KEY MINIMAX_CN_API_KEY \
+    BRAVE_API_KEY BRAVE_SEARCH_API_KEY DASHSCOPE_API_KEY DEEPSEEK_API_KEY \
+    EXA_API_KEY FIRECRAWL_API_KEY GLM_API_KEY GMI_API_KEY GROQ_API_KEY \
+    HF_TOKEN KILOCODE_API_KEY KIMI_API_KEY KIMI_CN_API_KEY KIMI_CODING_API_KEY \
     MISTRAL_API_KEY NOUS_API_KEY NOVITA_API_KEY NVIDIA_API_KEY OLLAMA_API_KEY \
     OPENCODE_GO_API_KEY OPENCODE_ZEN_API_KEY OPENAI_API_KEY OPENROUTER_API_KEY \
     PARALLEL_API_KEY STEPFUN_API_KEY TAVILY_API_KEY XAI_API_KEY XIAOMI_API_KEY ZAI_API_KEY Z_AI_API_KEY \
@@ -471,7 +499,31 @@ chmod 600 "$config_file"
   done
   printf 'TLON_CONFIG_FILE=%%s\n' "$config_file"
   printf 'TLON_SKILL_DIR=%%s\n' "$skill_dir"
-} > /opt/data/.env
+} > "$managed_env_tmp"
+if [ -f /opt/data/.env ]; then
+  awk -F= '
+    NR == FNR {
+      if ($0 ~ /^[A-Za-z_][A-Za-z0-9_]*=/) managed[$1] = 1
+      next
+    }
+    /^[[:space:]]*(#|$)/ { print; next }
+    {
+      line = $0
+      sub(/^[[:space:]]*export[[:space:]]+/, "", line)
+      if (line ~ /^[A-Za-z_][A-Za-z0-9_]*=/) {
+        key = line
+        sub(/=.*/, "", key)
+        if (managed[key]) next
+      }
+      print
+    }
+  ' "$managed_env_tmp" /opt/data/.env > /opt/data/.env.next
+else
+  : > /opt/data/.env.next
+fi
+cat "$managed_env_tmp" >> /opt/data/.env.next
+mv /opt/data/.env.next /opt/data/.env
+rm -f "$managed_env_tmp"
 chmod 600 /opt/data/.env
 cp /opt/data/.env /workspace/.env
 chmod 600 /workspace/.env

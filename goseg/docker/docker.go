@@ -29,6 +29,7 @@ var (
 	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
 	HermesTransBus     = make(chan structs.Event, 100)             // hermes profile transition bus
 	SysTransBus        = make(chan structs.SystemTransition, 100)  // system transition bus
+	UpdateCheckBus     = make(chan struct{}, 1)                    // manual version-server update checks
 	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus
 	ImportShipTransBus = make(chan structs.UploadTransition, 100)  // transition event bus
 	ContainerStats     = make(map[string]structs.ContainerStats)   // used for broadcast
@@ -670,6 +671,8 @@ func containerVersionDetails(channel structs.Channel, containerType string) (str
 		return channel.Netdata, true
 	case "vere":
 		return channel.Vere, true
+	case "hermes":
+		return channel.Hermes, true
 	case "webui":
 		return channel.Webui, true
 	case "wireguard":

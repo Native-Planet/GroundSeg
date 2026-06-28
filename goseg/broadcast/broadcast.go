@@ -499,6 +499,12 @@ func constructProfileInfo() structs.Profile {
 	hermesInfo.Info.Owner = docker.NormalizeHermesShip(hermesConf.Owner)
 	hermesInfo.Info.Port = hermesConf.Port
 	hermesInfo.Info.Image = docker.HermesImageOrDefault(hermesConf.Image)
+	if versionServerImage, err := docker.HermesVersionServerImage(); err == nil {
+		hermesInfo.Info.VersionServerImage = versionServerImage
+		hermesInfo.Info.UpdateAvailable = docker.HermesUpdateAvailable(hermesConf.Image)
+	} else {
+		zap.L().Debug(fmt.Sprintf("Unable to read version-server Hermes info: %v", err))
+	}
 	hermesInfo.Info.HermesVersion = docker.HermesVersionOrDefault(hermesConf.HermesVersion)
 	hermesInfo.Info.HermesAgentRef = docker.HermesAgentRefOrDefault(hermesConf.HermesAgentRef)
 	hermesInfo.Info.TlonAdapterVersion = docker.HermesTlonAdapterVersionOrDefault(hermesConf.TlonAdapterVersion)
