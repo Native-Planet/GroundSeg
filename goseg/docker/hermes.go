@@ -294,7 +294,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		"HERMES_DASHBOARD=1",
 		"HERMES_DASHBOARD_HOST=0.0.0.0",
 		fmt.Sprintf("HERMES_DASHBOARD_PORT=%d", HermesDashboardContainerPort),
-		"API_SERVER_ENABLED=true",
+		fmt.Sprintf("API_SERVER_ENABLED=%t", hermesConf.APIEnabled),
 		"HERMES_ALLOW_CONFIG_WRITE=true",
 		fmt.Sprintf("HERMES_INFERENCE_PROVIDER=%s", HermesModelProviderOrDefault(hermesConf.ModelProvider)),
 		fmt.Sprintf("HERMES_MODEL_PROVIDER=%s", HermesModelProviderOrDefault(hermesConf.ModelProvider)),
@@ -335,7 +335,6 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		"TLON_AUTO_ACCEPT_GROUP_INVITES=true",
 		"TLON_ALLOW_ALL_USERS=false",
 		"TLON_DM_POLL_ENABLED=true",
-		"TLON_HOSTING=true",
 		"TLON_OWNER_LISTEN=true",
 		"TLON_OWNER_LISTEN_ENABLED=true",
 		"TLON_REQUIRE_MENTION=true",
@@ -359,6 +358,9 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		return containerConfig, hostConfig, fmt.Errorf("Hermes provider API key is not configured")
 	}
 	environment = append(environment, fmt.Sprintf("%s=%s", apiKeyEnv, apiKey))
+	if apiServerKey := strings.TrimSpace(hermesConf.APIKey); hermesConf.APIEnabled && apiServerKey != "" {
+		environment = append(environment, fmt.Sprintf("API_SERVER_KEY=%s", apiServerKey))
+	}
 	if webProviderName := NormalizeHermesWebProvider(hermesConf.WebProvider); webProviderName != "" {
 		webProvider, ok := hermesWebProviderConfig(webProviderName)
 		if !ok {
@@ -439,7 +441,7 @@ chmod 600 "$config_file"
 
 {
   for name in \
-    API_SERVER_ENABLED \
+    API_SERVER_ENABLED API_SERVER_KEY \
     AI_GATEWAY_API_KEY ALIBABA_CODING_PLAN_API_KEY ANTHROPIC_API_KEY ARCEEAI_API_KEY \
     BRAVE_API_KEY BRAVE_SEARCH_API_KEY DASHSCOPE_API_KEY DEEPSEEK_API_KEY GEMINI_API_KEY \
     EXA_API_KEY FIRECRAWL_API_KEY GLM_API_KEY GMI_API_KEY GOOGLE_API_KEY GROQ_API_KEY \
@@ -457,7 +459,7 @@ chmod 600 "$config_file"
     TLON_ALLOW_ALL_USERS TLON_AUTO_ACCEPT_DM_INVITES TLON_AUTO_ACCEPT_GROUP_INVITES \
     TLON_AUTO_DISCOVER TLON_BOT_ALIASES TLON_BOT_MENTIONS TLON_CHANNELS TLON_CHANNEL_RULES \
 	TLON_CLI TLON_CODE TLON_DEFAULT_AUTHORIZED_SHIPS TLON_DM_ALLOWLIST \
-	TLON_DM_POLL_ENABLED TLON_GROUP_INVITE_ALLOWLIST TLON_HOME_CHANNEL TLON_HOSTING \
+	TLON_DM_POLL_ENABLED TLON_GROUP_INVITE_ALLOWLIST TLON_HOME_CHANNEL \
 	TLON_MAX_CONSECUTIVE_BOT_RESPONSES TLON_NODE_ID TLON_NODE_URL TLON_OWNER \
     TLON_OWNER_LISTEN TLON_OWNER_LISTEN_ENABLED TLON_OWNER_SHIP TLON_OWNER_URL \
     TLON_REQUIRE_MENTION TLON_SHIP TLON_SHIP_CODE TLON_SHIP_NAME TLON_SHIP_URL \

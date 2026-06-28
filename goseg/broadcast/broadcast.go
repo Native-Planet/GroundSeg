@@ -508,6 +508,8 @@ func constructProfileInfo() structs.Profile {
 	hermesInfo.Info.ProviderAPIKeySet = strings.TrimSpace(hermesConf.ProviderAPIKey) != ""
 	hermesInfo.Info.WebProvider = docker.HermesWebProviderOrEmpty(hermesConf.WebProvider)
 	hermesInfo.Info.WebAPIKeySet = strings.TrimSpace(hermesConf.WebAPIKey) != ""
+	hermesInfo.Info.APIEnabled = hermesConf.APIEnabled
+	hermesInfo.Info.APIKeySet = strings.TrimSpace(hermesConf.APIKey) != ""
 	if installed, err := docker.ImageRefExists(hermesInfo.Info.Image); err == nil {
 		hermesInfo.Info.ImageInstalled = installed
 	} else {

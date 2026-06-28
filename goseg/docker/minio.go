@@ -228,6 +228,10 @@ func objectStoreCustomDomainForMode(shipConf structs.UrbitDocker, mode string) s
 			return domain
 		}
 	}
+	if normalizedObjectStoreCustomDomain(shipConf.CustomS3WebLocal) != "" ||
+		normalizedObjectStoreCustomDomain(shipConf.CustomS3WebRemote) != "" {
+		return ""
+	}
 	return normalizedObjectStoreCustomDomain(shipConf.CustomS3Web)
 }
 
@@ -257,6 +261,17 @@ func SetObjectStoreCustomDomain(conf structs.SysConfig, shipConf *structs.UrbitD
 	default:
 		shipConf.CustomS3WebLocal = domain
 	}
+	structs.SyncCustomS3Domains(shipConf)
+}
+
+func ClearObjectStoreCustomDomain(conf structs.SysConfig, shipConf *structs.UrbitDocker) {
+	switch ObjectStoreCustomDomainMode(conf, *shipConf) {
+	case "remote":
+		shipConf.CustomS3WebRemote = ""
+	default:
+		shipConf.CustomS3WebLocal = ""
+	}
+	shipConf.CustomS3Web = ""
 	structs.SyncCustomS3Domains(shipConf)
 }
 

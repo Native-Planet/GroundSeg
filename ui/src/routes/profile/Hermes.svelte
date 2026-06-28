@@ -23,6 +23,9 @@
   $: savedWebProvider = info?.webProvider || ""
   $: webApiKeyPlaceholder = webApiKeySaved && webProvider == savedWebProvider ? "Saved" : ""
   $: webApiKeyReady = webProvider.trim().length < 1 || webApiKey.trim().length > 0 || webApiKeyPlaceholder.length > 0
+  $: apiKeySaved = info?.apiKeySet || false
+  $: apiKeyPlaceholder = apiKeySaved ? "Saved" : ""
+  $: apiKeyReady = !apiEnabled || apiKey.trim().length > 0 || apiKeySaved
   $: tInstall = transition?.install || ""
   $: tToggle = transition?.toggle || ""
   $: tSave = transition?.save || ""
@@ -32,7 +35,7 @@
   $: installing = tInstall.length > 0 && tInstall != "success" && tInstall != "error"
   $: selectedShipKey = selectedShip.replace(/^~/, "")
   $: attachedRunning = ($structure?.urbits?.[selectedShipKey]?.info?.running) || false
-  $: canConfigure = selectedShip.length > 0 && owner.trim().length > 0 && providerApiKeyReady && webApiKeyReady
+  $: canConfigure = selectedShip.length > 0 && owner.trim().length > 0 && providerApiKeyReady && webApiKeyReady && apiKeyReady
   $: canToggle = enabled || (canConfigure && attachedRunning && imageReady)
   $: busy = tInstall.length > 0 || tToggle.length > 0 || tSave.length > 0 || tRestart.length > 0
   $: dashboardReady = running && url != "#"
@@ -50,6 +53,8 @@
   let providerApiKey = ""
   let webProvider = ""
   let webApiKey = ""
+  let apiEnabled = false
+  let apiKey = ""
   let dirty = false
   let showAdvanced = false
   let showConfig = false
@@ -142,6 +147,8 @@
     providerApiKey = ""
     webProvider = info?.webProvider || ""
     webApiKey = ""
+    apiEnabled = info?.apiEnabled || false
+    apiKey = ""
   }
 
   const markDirty = () => {
@@ -158,6 +165,11 @@
     markDirty()
   }
 
+  const toggleAPI = () => {
+    apiEnabled = !apiEnabled
+    markDirty()
+  }
+
   const payload = () => ({
     ship: selectedShip,
     owner: owner.trim(),
@@ -167,7 +179,9 @@
     model: model.trim(),
     providerApiKey: providerApiKey.trim(),
     webProvider: webProvider.trim(),
-    webApiKey: webApiKey.trim()
+    webApiKey: webApiKey.trim(),
+    apiEnabled,
+    apiKey: apiKey.trim()
   })
 
   const save = () => {
@@ -357,6 +371,20 @@
         <span>Port</span>
         <input type="number" min="1" max="65535" bind:value={port} on:input={markDirty} />
       </label>
+      <label>
+        <span>API Server Key</span>
+        <input
+          type="password"
+          autocomplete="off"
+          bind:value={apiKey}
+          on:input={markDirty}
+          disabled={!apiEnabled}
+          placeholder={apiEnabled ? apiKeyPlaceholder : ""} />
+      </label>
+      <div class="api-toggle-row">
+        <span>API Server</span>
+        <ToggleButton on:click={toggleAPI} on={apiEnabled} />
+      </div>
       <div class="versions">
         <div>Hermes {info?.hermesVersion || ""}</div>
         <div>Tlon Adapter {info?.tlonAdapterVersion || ""}</div>
@@ -586,6 +614,11 @@
     grid-template-columns: 1fr 180px;
     gap: 24px;
     margin-top: 24px;
+  }
+  .api-toggle-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
   .versions {
     grid-column: 1 / -1;

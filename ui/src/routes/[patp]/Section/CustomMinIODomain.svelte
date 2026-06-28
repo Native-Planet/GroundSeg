@@ -1,7 +1,7 @@
 <script>
   // Style
   import "../theme.css"
-  import { setRustFSDomain } from '$lib/stores/websocket'
+  import { removeRustFSDomain, setRustFSDomain } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
   import { createEventDispatcher, afterUpdate } from 'svelte'
   import DocsModal from '$lib/DocsModal.svelte'
@@ -67,6 +67,12 @@
         Success!
       {/if}
     </button>
+    <button
+      disabled={(savedDomain.length < 1) || (t.length > 0)}
+      class="remove-button"
+      on:click={()=>removeRustFSDomain(patp)}>
+      Remove
+    </button>
   </div>
 </div>
 
@@ -114,7 +120,23 @@
     letter-spacing: -1.92px;
     cursor: pointer;
   }
-  .save-button:disabled {
+  .remove-button {
+    padding: 20px 28px;
+    justify-content: center;
+    align-items: center;
+    border-radius: 16px;
+    background: var(--locked-color);
+    color: var(--text-card-color);
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 24px;
+    letter-spacing: 0;
+    cursor: pointer;
+  }
+  .save-button:disabled,
+  .remove-button:disabled {
     opacity: .6;
     pointer-events: none;
   }

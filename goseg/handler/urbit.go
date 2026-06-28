@@ -46,6 +46,8 @@ func UrbitHandler(msg []byte) error {
 		return setUrbitDomain(patp, urbitPayload, shipConf)
 	case "set-minio-domain":
 		return setMinIODomain(patp, urbitPayload, shipConf)
+	case "remove-minio-domain":
+		return removeMinIODomain(patp, shipConf)
 		// set whether or not ship wants startram reminders
 	case "startram-reminder":
 		return startramReminder(patp, urbitPayload.Payload.Remind, shipConf)
@@ -633,6 +635,50 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 		rollback := map[string]structs.UrbitDocker{patp: oldShipConf}
 		if rollbackErr := config.UpdateUrbitConfig(rollback); rollbackErr != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't roll back RustFS domain change for %s after recreate failure: %v", patp, rollbackErr))
+		} else if rollbackStartErr := recreateObjectStoreContainer(patp); rollbackStartErr != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't restore RustFS container for %s after recreate failure: %v", patp, rollbackStartErr))
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return err
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"}
+	time.Sleep(3 * time.Second)
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "done"}
+	return nil
+}
+
+func removeMinIODomain(patp string, shipConf structs.UrbitDocker) error {
+	defer func() {
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: ""}
+	}()
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "loading"}
+
+	conf := config.Conf()
+	oldShipConf := shipConf
+	alias := strings.TrimSpace(docker.ObjectStoreCustomDomain(conf, shipConf))
+	if alias == "" {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return fmt.Errorf("RustFS custom domain is not configured for %s", patp)
+	}
+
+	if docker.ObjectStoreUsesRemoteDomain(conf, shipConf) {
+		if err := startram.AliasDelete(fmt.Sprintf("s3.%s", patp), alias); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return err
+		}
+	}
+
+	docker.ClearObjectStoreCustomDomain(conf, &shipConf)
+	update := map[string]structs.UrbitDocker{patp: shipConf}
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	if err := recreateObjectStoreContainer(patp); err != nil {
+		rollback := map[string]structs.UrbitDocker{patp: oldShipConf}
+		if rollbackErr := config.UpdateUrbitConfig(rollback); rollbackErr != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't roll back RustFS domain removal for %s after recreate failure: %v", patp, rollbackErr))
 		} else if rollbackStartErr := recreateObjectStoreContainer(patp); rollbackStartErr != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't restore RustFS container for %s after recreate failure: %v", patp, rollbackStartErr))
 		}

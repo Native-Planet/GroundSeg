@@ -323,6 +323,8 @@ type HermesConfig struct {
 	ProviderAPIKey     string `json:"provider_api_key"`
 	WebProvider        string `json:"web_provider"`
 	WebAPIKey          string `json:"web_api_key"`
+	APIEnabled         bool   `json:"api_enabled"`
+	APIKey             string `json:"api_key"`
 	AccessCode         string `json:"access_code"`
 }
 

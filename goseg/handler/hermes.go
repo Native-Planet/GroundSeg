@@ -251,6 +251,12 @@ func applyHermesPayload(payload structs.WsHermesAction, hermesConf *structs.Herm
 	if webAPIKey := strings.TrimSpace(payload.WebAPIKey); webAPIKey != "" {
 		hermesConf.WebAPIKey = webAPIKey
 	}
+	if payload.Action == "save" || payload.Action == "toggle" || payload.Action == "install" {
+		hermesConf.APIEnabled = payload.APIEnabled
+	}
+	if apiKey := strings.TrimSpace(payload.APIKey); apiKey != "" {
+		hermesConf.APIKey = apiKey
+	}
 	if strings.TrimSpace(hermesConf.ModelProvider) == "" {
 		hermesConf.ModelProvider = docker.DefaultHermesModelProvider
 	}
@@ -300,6 +306,9 @@ func validateRunnableHermes(hermesConf structs.HermesConfig) error {
 		if strings.TrimSpace(hermesConf.WebAPIKey) == "" {
 			return fmt.Errorf("Hermes web API key is required for %s", webProvider)
 		}
+	}
+	if hermesConf.APIEnabled && strings.TrimSpace(hermesConf.APIKey) == "" {
+		return fmt.Errorf("Hermes API key is required when the API server is enabled")
 	}
 	installed, err := docker.ImageRefExists(docker.HermesImageOrDefault(hermesConf.Image))
 	if err != nil {

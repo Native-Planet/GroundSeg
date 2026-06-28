@@ -3,7 +3,7 @@
   import "../theme.css"
 
   import Clipboard from 'clipboard'
-  import { onMount, createEventDispatcher } from 'svelte'
+  import { onMount } from 'svelte'
   import { toggleRustFSLink } from '$lib/stores/websocket'
   import CustomMinIODomain from './CustomMinIODomain.svelte'
   import { URBIT_MODE } from '$lib/stores/data'
@@ -23,7 +23,6 @@
   let copied = false
   let showCustom = false
   $: s3Ready = (minioPwd?.length > 0) && (minioUrl != "#")
-  $: modeLabel = minioAliasMode === "remote" ? "Remote" : "Local"
 
   onMount(()=>{
     copy = new Clipboard('#copy');
@@ -66,7 +65,7 @@
       {:else if tToggleMinIOLink == "unlink-success"}
         S3 disconnected!
       {:else}
-        {minioLinked ? "Disconnect from Urbit" : "Connect to Urbit"}
+        {minioLinked ? "Disconnect" : "Connect to Urbit"}
       {/if}
     </button>
     <div class="spacer"></div>
@@ -74,7 +73,7 @@
       class="btn domain-btn"
       class:active={showCustom}
       on:click={()=>showCustom = !showCustom}>
-      {minioAlias.length > 0 ? "Modify" : "Set"} Custom {modeLabel} S3 Domain
+      {minioAlias.length > 0 ? "Modify custom domain" : "Set custom domain"}
     </button>
   </div>
   {#if showCustom}
@@ -86,40 +85,46 @@
 <style>
   .wrapper {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 16px;
     margin: 16px 0;
   }
   .btn {
     color: #161D17;
-    text-align: right;
+    text-align: center;
     font-family: Inter;
-    font-size: 24px;
+    font-size: 20px;
     font-style: normal;
     font-weight: 300;
-    line-height: 24px; /* 100% */
-    letter-spacing: -1.44px;
+    line-height: 24px;
+    letter-spacing: 0;
     padding: 16px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     border-radius: 12px;
     background: var(--NP_White, #F8F8F6);
     cursor: pointer;
+    flex: 0 0 auto;
+    width: auto;
   }
   .btn:disabled {
     opacity: .6;
     pointer-events: none;
   }
   .copy-btn {
-    width: 285px;
+    min-width: 230px;
   }
   .domain-btn {
     background: #2C3A2E;
     color: white;
-    padding: 0 48px;
+    padding: 16px 24px;
   }
   .spacer {
-    flex: 1;
+    flex: 1 1 24px;
+    min-width: 0;
   }
   .active {
     background: var(--btn-secondary);

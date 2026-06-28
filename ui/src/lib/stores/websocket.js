@@ -764,6 +764,15 @@ export const setRustFSDomain = (patp, domain) => {
   setMinIODomain(patp, domain)
 }
 
+export const removeRustFSDomain = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"remove-minio-domain",
+    "patp":patp,
+  }
+  send(payload)
+}
+
 export const setUrbitDomain = (patp, domain) => {
   let payload = {
     "type":"urbit",

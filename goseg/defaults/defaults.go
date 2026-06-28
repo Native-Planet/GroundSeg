@@ -99,6 +99,8 @@ var (
 		ProviderAPIKey:     "",
 		WebProvider:        "",
 		WebAPIKey:          "",
+		APIEnabled:         false,
+		APIKey:             "",
 		AccessCode:         "",
 	}
 

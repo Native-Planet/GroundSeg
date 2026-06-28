@@ -140,6 +140,8 @@ type Hermes struct {
 		ProviderAPIKeySet  bool     `json:"providerApiKeySet"`
 		WebProvider        string   `json:"webProvider"`
 		WebAPIKeySet       bool     `json:"webApiKeySet"`
+		APIEnabled         bool     `json:"apiEnabled"`
+		APIKeySet          bool     `json:"apiKeySet"`
 		ImageInstalled     bool     `json:"imageInstalled"`
 		Ships              []string `json:"ships"`
 	} `json:"info"`

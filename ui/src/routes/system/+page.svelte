@@ -26,8 +26,8 @@
   {#if !$URBIT_MODE}
     <Logs />
   {/if}
-  <Support />
   <ConfigEditor />
+  <Support />
 </div>
 
 <style>

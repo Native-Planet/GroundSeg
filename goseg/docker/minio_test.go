@@ -190,6 +190,31 @@ func TestSetObjectStoreCustomDomainPreservesLegacyLocalCompatibility(t *testing.
 	}
 }
 
+func TestClearObjectStoreCustomDomainDoesNotRestoreFromLegacyFallback(t *testing.T) {
+	conf := structs.SysConfig{WgRegistered: true, WgOn: false}
+	shipConf := structs.UrbitDocker{
+		HTTPPort:          8080,
+		CustomS3Web:       "local.storage.example.com",
+		CustomS3WebLocal:  "local.storage.example.com",
+		CustomS3WebRemote: "remote.storage.example.com",
+	}
+
+	ClearObjectStoreCustomDomain(conf, &shipConf)
+
+	if shipConf.CustomS3WebLocal != "" {
+		t.Fatalf("expected local custom domain to be cleared, got %q", shipConf.CustomS3WebLocal)
+	}
+	if shipConf.CustomS3WebRemote != "remote.storage.example.com" {
+		t.Fatalf("expected remote custom domain to remain, got %q", shipConf.CustomS3WebRemote)
+	}
+	if shipConf.CustomS3Web != "remote.storage.example.com" {
+		t.Fatalf("expected legacy compatibility field to move to remaining remote domain, got %q", shipConf.CustomS3Web)
+	}
+	if domain := ObjectStoreCustomDomain(conf, shipConf); domain != "" {
+		t.Fatalf("expected local mode to have no custom domain after removal, got %q", domain)
+	}
+}
+
 func TestObjectStoreCustomDomainIgnoresNullString(t *testing.T) {
 	conf := structs.SysConfig{WgRegistered: true, WgOn: false}
 	shipConf := structs.UrbitDocker{
