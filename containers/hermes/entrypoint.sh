@@ -234,6 +234,8 @@ if not web_search_backend:
         web_search_backend = "firecrawl"
     elif (os.environ.get("PARALLEL_API_KEY") or "").strip():
         web_search_backend = "parallel"
+    elif (os.environ.get("SEARXNG_URL") or "").strip():
+        web_search_backend = "searxng"
     elif (os.environ.get("TAVILY_API_KEY") or "").strip():
         web_search_backend = "tavily"
     elif (os.environ.get("XAI_API_KEY") or "").strip():

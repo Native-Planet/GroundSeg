@@ -332,6 +332,7 @@ type WsHermesAction struct {
 	ProviderAPIKey string `json:"providerApiKey"`
 	WebProvider    string `json:"webProvider"`
 	WebAPIKey      string `json:"webApiKey"`
+	WebURL         string `json:"webUrl"`
 	APIEnabled     bool   `json:"apiEnabled"`
 	APIKey         string `json:"apiKey"`
 }

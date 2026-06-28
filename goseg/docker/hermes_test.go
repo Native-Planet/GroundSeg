@@ -163,6 +163,34 @@ func TestHermesContainerRunsGatewayInTmuxSession(t *testing.T) {
 	}
 }
 
+func TestHermesContainerSupportsSearXNGWebProvider(t *testing.T) {
+	setupHermesContainerConfTest(t, false, "")
+	hermesConf := config.HermesConf()
+	hermesConf.WebProvider = "searxng"
+	hermesConf.WebURL = "http://localhost:8888"
+	if err := config.UpdateHermesConfig(hermesConf); err != nil {
+		t.Fatalf("failed to update Hermes config: %v", err)
+	}
+
+	containerConfig, hostConfig, err := hermesContainerConf(HermesContainerName)
+	if err != nil {
+		t.Fatalf("expected Hermes container config, got error: %v", err)
+	}
+
+	if got, ok := envValue(containerConfig.Env, "HERMES_WEB_SEARCH_BACKEND"); !ok || got != "searxng" {
+		t.Fatalf("HERMES_WEB_SEARCH_BACKEND = %q, %t; want searxng, true", got, ok)
+	}
+	if got, ok := envValue(containerConfig.Env, "SEARXNG_URL"); !ok || got != "http://host.docker.internal:8888" {
+		t.Fatalf("SEARXNG_URL = %q, %t; want host gateway URL, true", got, ok)
+	}
+	if _, ok := envValue(containerConfig.Env, "BRAVE_SEARCH_API_KEY"); ok {
+		t.Fatalf("SearXNG should not set a web API key env")
+	}
+	if len(hostConfig.ExtraHosts) != 1 || hostConfig.ExtraHosts[0] != "host.docker.internal:host-gateway" {
+		t.Fatalf("expected host-gateway extra host for local SearXNG, got %#v", hostConfig.ExtraHosts)
+	}
+}
+
 func setupHermesContainerConfTest(t *testing.T, apiEnabled bool, apiKey string) {
 	t.Helper()
 	oldBasePath := config.BasePath

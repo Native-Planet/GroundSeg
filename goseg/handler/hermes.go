@@ -301,13 +301,28 @@ func applyHermesPayload(payload structs.WsHermesAction, hermesConf *structs.Herm
 		if normalizedWebProvider != hermesConf.WebProvider && strings.TrimSpace(payload.WebAPIKey) == "" {
 			hermesConf.WebAPIKey = ""
 		}
+		if normalizedWebProvider != hermesConf.WebProvider && strings.TrimSpace(payload.WebURL) == "" {
+			hermesConf.WebURL = ""
+		}
 		hermesConf.WebProvider = normalizedWebProvider
 	} else if payload.Action == "save" || payload.Action == "toggle" || payload.Action == "install" || payload.Action == "update" {
 		hermesConf.WebProvider = ""
 		hermesConf.WebAPIKey = ""
+		hermesConf.WebURL = ""
 	}
 	if webAPIKey := strings.TrimSpace(payload.WebAPIKey); webAPIKey != "" {
 		hermesConf.WebAPIKey = webAPIKey
+	}
+	if webURL := strings.TrimSpace(payload.WebURL); webURL != "" {
+		hermesConf.WebURL = webURL
+	}
+	if webProvider, ok := docker.HermesWebProviderConfig(hermesConf.WebProvider); ok {
+		if webProvider.APIKeyEnv == "" {
+			hermesConf.WebAPIKey = ""
+		}
+		if webProvider.URLEnv == "" {
+			hermesConf.WebURL = ""
+		}
 	}
 	if payload.Action == "save" || payload.Action == "toggle" || payload.Action == "install" {
 		hermesConf.APIEnabled = payload.APIEnabled
@@ -358,11 +373,15 @@ func validateRunnableHermes(hermesConf structs.HermesConfig) error {
 		return fmt.Errorf("Hermes provider API key is required for %s", docker.HermesModelProviderOrDefault(hermesConf.ModelProvider))
 	}
 	if webProvider := docker.NormalizeHermesWebProvider(hermesConf.WebProvider); webProvider != "" {
-		if docker.HermesWebProviderAPIKeyEnv(webProvider) == "" {
+		webProviderConfig, ok := docker.HermesWebProviderConfig(webProvider)
+		if !ok {
 			return fmt.Errorf("unsupported Hermes web provider %q", hermesConf.WebProvider)
 		}
-		if strings.TrimSpace(hermesConf.WebAPIKey) == "" {
+		if webProviderConfig.APIKeyEnv != "" && strings.TrimSpace(hermesConf.WebAPIKey) == "" {
 			return fmt.Errorf("Hermes web API key is required for %s", webProvider)
+		}
+		if webProviderConfig.URLEnv != "" && strings.TrimSpace(hermesConf.WebURL) == "" {
+			return fmt.Errorf("Hermes web URL is required for %s", webProvider)
 		}
 	}
 	if hermesConf.APIEnabled && strings.TrimSpace(hermesConf.APIKey) == "" {

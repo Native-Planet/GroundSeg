@@ -120,5 +120,6 @@ func applyHermesDefaults(target *structs.HermesConfig) {
 	if target.WebProvider != "" {
 		target.WebProvider = strings.TrimSpace(target.WebProvider)
 	}
+	target.WebURL = strings.TrimSpace(target.WebURL)
 	target.APIKey = strings.TrimSpace(target.APIKey)
 }

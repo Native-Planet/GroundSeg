@@ -5,7 +5,9 @@ import (
 	"groundseg/config"
 	"groundseg/structs"
 	"net"
+	neturl "net/url"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -20,7 +22,7 @@ const (
 	HermesWorkspaceVolumeName       = "hermes_workspace"
 	HermesTlonSkillDir              = "/opt/data/tlon-skill"
 	hermesConfigVersionLabel        = "nativeplanet.groundseg.hermes.config-version"
-	hermesConfigVersion             = "2026-06-28-hermes-tmux"
+	hermesConfigVersion             = "2026-06-28-hermes-tmux-searxng"
 	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
@@ -45,6 +47,7 @@ type hermesModelProvider struct {
 type hermesWebProvider struct {
 	Name           string
 	APIKeyEnv      string
+	URLEnv         string
 	AliasEnv       []string
 	SearchBackend  string
 	ExtractBackend string
@@ -81,6 +84,7 @@ var hermesWebProviders = []hermesWebProvider{
 	{Name: "exa", APIKeyEnv: "EXA_API_KEY", SearchBackend: "exa", ExtractBackend: "exa"},
 	{Name: "firecrawl", APIKeyEnv: "FIRECRAWL_API_KEY", SearchBackend: "firecrawl", ExtractBackend: "firecrawl"},
 	{Name: "parallel", APIKeyEnv: "PARALLEL_API_KEY", SearchBackend: "parallel", ExtractBackend: "parallel"},
+	{Name: "searxng", URLEnv: "SEARXNG_URL", SearchBackend: "searxng"},
 	{Name: "tavily", APIKeyEnv: "TAVILY_API_KEY", SearchBackend: "tavily", ExtractBackend: "tavily"},
 	{Name: "xai", APIKeyEnv: "XAI_API_KEY", SearchBackend: "xai"},
 }
@@ -176,7 +180,17 @@ func HermesWebProviderAPIKeyEnv(provider string) string {
 	return ""
 }
 
-func hermesWebProviderConfig(provider string) (hermesWebProvider, bool) {
+func HermesWebProviderURLEnv(provider string) string {
+	provider = NormalizeHermesWebProvider(provider)
+	for _, supported := range hermesWebProviders {
+		if provider == supported.Name {
+			return supported.URLEnv
+		}
+	}
+	return ""
+}
+
+func HermesWebProviderConfig(provider string) (hermesWebProvider, bool) {
 	provider = NormalizeHermesWebProvider(provider)
 	for _, supported := range hermesWebProviders {
 		if provider == supported.Name {
@@ -389,19 +403,32 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		environment = append(environment, fmt.Sprintf("API_SERVER_KEY=%s", apiServerKey))
 	}
 	if webProviderName := NormalizeHermesWebProvider(hermesConf.WebProvider); webProviderName != "" {
-		webProvider, ok := hermesWebProviderConfig(webProviderName)
+		webProvider, ok := HermesWebProviderConfig(webProviderName)
 		if !ok {
 			return containerConfig, hostConfig, fmt.Errorf("unsupported Hermes web provider %q", hermesConf.WebProvider)
-		}
-		webAPIKey := strings.TrimSpace(hermesConf.WebAPIKey)
-		if webAPIKey == "" {
-			return containerConfig, hostConfig, fmt.Errorf("Hermes web API key is not configured")
 		}
 		environment = append(environment,
 			fmt.Sprintf("HERMES_WEB_BACKEND=%s", webProvider.SearchBackend),
 			fmt.Sprintf("HERMES_WEB_SEARCH_BACKEND=%s", webProvider.SearchBackend),
-			fmt.Sprintf("%s=%s", webProvider.APIKeyEnv, webAPIKey),
 		)
+		webAPIKey := strings.TrimSpace(hermesConf.WebAPIKey)
+		if webProvider.APIKeyEnv != "" {
+			if webAPIKey == "" {
+				return containerConfig, hostConfig, fmt.Errorf("Hermes web API key is not configured")
+			}
+			environment = append(environment, fmt.Sprintf("%s=%s", webProvider.APIKeyEnv, webAPIKey))
+		}
+		if webProvider.URLEnv != "" {
+			webURL, urlExtraHosts, err := hermesURLForContainer(hermesConf.WebURL)
+			if err != nil {
+				return containerConfig, hostConfig, err
+			}
+			if webURL == "" {
+				return containerConfig, hostConfig, fmt.Errorf("Hermes web URL is not configured")
+			}
+			environment = append(environment, fmt.Sprintf("%s=%s", webProvider.URLEnv, webURL))
+			shipTarget.ExtraHosts = appendUniqueStrings(shipTarget.ExtraHosts, urlExtraHosts...)
+		}
 		if webProvider.ExtractBackend != "" {
 			environment = append(environment, fmt.Sprintf("HERMES_WEB_EXTRACT_BACKEND=%s", webProvider.ExtractBackend))
 		}
@@ -476,7 +503,7 @@ managed_env_tmp="$(mktemp)"
     HF_TOKEN KILOCODE_API_KEY KIMI_API_KEY KIMI_CN_API_KEY KIMI_CODING_API_KEY \
     MISTRAL_API_KEY NOUS_API_KEY NOVITA_API_KEY NVIDIA_API_KEY OLLAMA_API_KEY \
     OPENCODE_GO_API_KEY OPENCODE_ZEN_API_KEY OPENAI_API_KEY OPENROUTER_API_KEY \
-    PARALLEL_API_KEY STEPFUN_API_KEY TAVILY_API_KEY XAI_API_KEY XIAOMI_API_KEY ZAI_API_KEY Z_AI_API_KEY \
+    PARALLEL_API_KEY SEARXNG_URL STEPFUN_API_KEY TAVILY_API_KEY XAI_API_KEY XIAOMI_API_KEY ZAI_API_KEY Z_AI_API_KEY \
     HERMES_CONTAINER_HOME HERMES_DASHBOARD HERMES_DASHBOARD_HOST HERMES_DASHBOARD_PORT \
     HERMES_ALLOW_CONFIG_WRITE HERMES_EXEC_ASK HERMES_GATEWAY_SESSION HERMES_HOME HERMES_INFERENCE_PROVIDER \
     HERMES_INTERACTIVE HERMES_MODEL HERMES_MODEL_PROVIDER HERMES_OPENROUTER_CACHE \
@@ -627,6 +654,44 @@ func normalizeHermesURL(rawURL string) string {
 		return rawURL
 	}
 	return "https://" + rawURL
+}
+
+func hermesURLForContainer(rawURL string) (string, []string, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return "", nil, nil
+	}
+	if !strings.Contains(rawURL, "://") {
+		rawURL = "http://" + rawURL
+	}
+	parsed, err := neturl.Parse(rawURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", nil, fmt.Errorf("invalid Hermes web URL %q", rawURL)
+	}
+	host := parsed.Hostname()
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		port := parsed.Port()
+		if port != "" {
+			parsed.Host = net.JoinHostPort("host.docker.internal", port)
+		} else {
+			parsed.Host = "host.docker.internal"
+		}
+		return strings.TrimRight(parsed.String(), "/"), []string{"host.docker.internal:host-gateway"}, nil
+	}
+	return strings.TrimRight(parsed.String(), "/"), nil, nil
+}
+
+func appendUniqueStrings(values []string, additions ...string) []string {
+	for _, addition := range additions {
+		if addition == "" {
+			continue
+		}
+		exists := slices.Contains(values, addition)
+		if !exists {
+			values = append(values, addition)
+		}
+	}
+	return values
 }
 
 func hermesDashboardHostIP() string {

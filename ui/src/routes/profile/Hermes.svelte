@@ -26,8 +26,10 @@
   $: providerApiKeyReady = providerApiKey.trim().length > 0 || providerApiKeyPlaceholder.length > 0
   $: webApiKeySaved = info?.webApiKeySet || false
   $: savedWebProvider = info?.webProvider || ""
+  $: webProviderUsesUrl = webProvider == "searxng"
   $: webApiKeyPlaceholder = webApiKeySaved && webProvider == savedWebProvider ? "Saved" : ""
-  $: webApiKeyReady = webProvider.trim().length < 1 || webApiKey.trim().length > 0 || webApiKeyPlaceholder.length > 0
+  $: webCredentialReady = webProvider.trim().length < 1
+    || (webProviderUsesUrl ? webUrl.trim().length > 0 : webApiKey.trim().length > 0 || webApiKeyPlaceholder.length > 0)
   $: apiKeySaved = info?.apiKeySet || false
   $: apiKeyPlaceholder = apiKeySaved ? "Saved" : ""
   $: apiKeyReady = !apiEnabled || apiKey.trim().length > 0 || apiKeySaved
@@ -40,7 +42,7 @@
   $: installing = tInstall.length > 0 && tInstall != "success" && tInstall != "error"
   $: selectedShipKey = selectedShip.replace(/^~/, "")
   $: attachedRunning = ($structure?.urbits?.[selectedShipKey]?.info?.running) || false
-  $: canConfigure = selectedShip.length > 0 && owner.trim().length > 0 && providerApiKeyReady && webApiKeyReady && apiKeyReady
+  $: canConfigure = selectedShip.length > 0 && owner.trim().length > 0 && providerApiKeyReady && webCredentialReady && apiKeyReady
   $: canToggle = enabled || (canConfigure && attachedRunning && imageReady)
   $: busy = tInstall.length > 0 || tToggle.length > 0 || tSave.length > 0 || tRestart.length > 0
   $: dashboardReady = running && url != "#"
@@ -59,6 +61,7 @@
   let providerApiKey = ""
   let webProvider = ""
   let webApiKey = ""
+  let webUrl = ""
   let apiEnabled = false
   let apiKey = ""
   let dirty = false
@@ -116,6 +119,7 @@
     { value: "exa", label: "Exa" },
     { value: "firecrawl", label: "Firecrawl" },
     { value: "parallel", label: "Parallel" },
+    { value: "searxng", label: "SearXNG" },
     { value: "tavily", label: "Tavily" },
     { value: "xai", label: "xAI" }
   ]
@@ -165,6 +169,7 @@
     providerApiKey = ""
     webProvider = info?.webProvider || ""
     webApiKey = ""
+    webUrl = info?.webUrl || ""
     apiEnabled = info?.apiEnabled || false
     apiKey = ""
   }
@@ -180,6 +185,7 @@
 
   const changeWebProvider = () => {
     webApiKey = ""
+    if (webProvider != "searxng") webUrl = ""
     markDirty()
   }
 
@@ -198,6 +204,7 @@
     providerApiKey: providerApiKey.trim(),
     webProvider: webProvider.trim(),
     webApiKey: webApiKey.trim(),
+    webUrl: webUrl.trim(),
     apiEnabled,
     apiKey: apiKey.trim()
   })
@@ -396,16 +403,26 @@
         {/each}
       </select>
     </label>
-    <label>
-      <span>Web API Key</span>
-      <input
-        type="password"
-        autocomplete="off"
-        bind:value={webApiKey}
-        on:input={markDirty}
-        disabled={webProvider.trim().length < 1}
-        placeholder={webProvider.trim().length < 1 ? "" : webApiKeyPlaceholder} />
-    </label>
+    {#if webProviderUsesUrl}
+      <label>
+        <span>SearXNG URL</span>
+        <input
+          bind:value={webUrl}
+          on:input={markDirty}
+          placeholder="http://localhost:8888" />
+      </label>
+    {:else}
+      <label>
+        <span>Web API Key</span>
+        <input
+          type="password"
+          autocomplete="off"
+          bind:value={webApiKey}
+          on:input={markDirty}
+          disabled={webProvider.trim().length < 1}
+          placeholder={webProvider.trim().length < 1 ? "" : webApiKeyPlaceholder} />
+      </label>
+    {/if}
   </div>
 
   <button class="advanced-toggle" class:active={showAdvanced} on:click={()=>showAdvanced = !showAdvanced}>
