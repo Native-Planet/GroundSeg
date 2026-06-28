@@ -6,7 +6,6 @@ import (
 	"groundseg/structs"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -38,6 +37,57 @@ type hermesShipTarget struct {
 	ExtraHosts []string
 }
 
+type hermesModelProvider struct {
+	Name      string
+	APIKeyEnv string
+}
+
+type hermesWebProvider struct {
+	Name           string
+	APIKeyEnv      string
+	AliasEnv       []string
+	SearchBackend  string
+	ExtractBackend string
+}
+
+var hermesModelProviders = []hermesModelProvider{
+	{Name: "ai-gateway", APIKeyEnv: "AI_GATEWAY_API_KEY"},
+	{Name: "alibaba", APIKeyEnv: "DASHSCOPE_API_KEY"},
+	{Name: "alibaba-coding-plan", APIKeyEnv: "ALIBABA_CODING_PLAN_API_KEY"},
+	{Name: "anthropic", APIKeyEnv: "ANTHROPIC_API_KEY"},
+	{Name: "arcee", APIKeyEnv: "ARCEEAI_API_KEY"},
+	{Name: "deepseek", APIKeyEnv: "DEEPSEEK_API_KEY"},
+	{Name: "gemini", APIKeyEnv: "GOOGLE_API_KEY"},
+	{Name: "gmi", APIKeyEnv: "GMI_API_KEY"},
+	{Name: "huggingface", APIKeyEnv: "HF_TOKEN"},
+	{Name: "kilocode", APIKeyEnv: "KILOCODE_API_KEY"},
+	{Name: "kimi-coding", APIKeyEnv: "KIMI_API_KEY"},
+	{Name: "kimi-coding-cn", APIKeyEnv: "KIMI_CN_API_KEY"},
+	{Name: "minimax", APIKeyEnv: "MINIMAX_API_KEY"},
+	{Name: "minimax-cn", APIKeyEnv: "MINIMAX_CN_API_KEY"},
+	{Name: "nous", APIKeyEnv: "NOUS_API_KEY"},
+	{Name: "novita", APIKeyEnv: "NOVITA_API_KEY"},
+	{Name: "nvidia", APIKeyEnv: "NVIDIA_API_KEY"},
+	{Name: "ollama-cloud", APIKeyEnv: "OLLAMA_API_KEY"},
+	{Name: "openai", APIKeyEnv: "OPENAI_API_KEY"},
+	{Name: "opencode-go", APIKeyEnv: "OPENCODE_GO_API_KEY"},
+	{Name: "opencode-zen", APIKeyEnv: "OPENCODE_ZEN_API_KEY"},
+	{Name: "openrouter", APIKeyEnv: "OPENROUTER_API_KEY"},
+	{Name: "stepfun", APIKeyEnv: "STEPFUN_API_KEY"},
+	{Name: "xai", APIKeyEnv: "XAI_API_KEY"},
+	{Name: "xiaomi", APIKeyEnv: "XIAOMI_API_KEY"},
+	{Name: "zai", APIKeyEnv: "GLM_API_KEY"},
+}
+
+var hermesWebProviders = []hermesWebProvider{
+	{Name: "brave-free", APIKeyEnv: "BRAVE_SEARCH_API_KEY", AliasEnv: []string{"BRAVE_API_KEY"}, SearchBackend: "brave-free"},
+	{Name: "exa", APIKeyEnv: "EXA_API_KEY", SearchBackend: "exa", ExtractBackend: "exa"},
+	{Name: "firecrawl", APIKeyEnv: "FIRECRAWL_API_KEY", SearchBackend: "firecrawl", ExtractBackend: "firecrawl"},
+	{Name: "parallel", APIKeyEnv: "PARALLEL_API_KEY", SearchBackend: "parallel", ExtractBackend: "parallel"},
+	{Name: "tavily", APIKeyEnv: "TAVILY_API_KEY", SearchBackend: "tavily", ExtractBackend: "tavily"},
+	{Name: "xai", APIKeyEnv: "XAI_API_KEY", SearchBackend: "xai"},
+}
+
 func HermesImageOrDefault(image string) string {
 	if image = strings.TrimSpace(image); image != "" {
 		return image
@@ -53,29 +103,60 @@ func HermesModelProviderOrDefault(provider string) string {
 }
 
 func NormalizeHermesModelProvider(provider string) string {
-	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "openrouter":
-		return "openrouter"
-	case "openai":
-		return "openai"
-	case "anthropic":
-		return "anthropic"
-	default:
-		return ""
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	for _, supported := range hermesModelProviders {
+		if provider == supported.Name {
+			return supported.Name
+		}
 	}
+	return ""
 }
 
 func HermesProviderAPIKeyEnv(provider string) string {
-	switch NormalizeHermesModelProvider(provider) {
-	case "openrouter":
-		return "OPENROUTER_API_KEY"
-	case "openai":
-		return "OPENAI_API_KEY"
-	case "anthropic":
-		return "ANTHROPIC_API_KEY"
-	default:
+	provider = NormalizeHermesModelProvider(provider)
+	for _, supported := range hermesModelProviders {
+		if provider == supported.Name {
+			return supported.APIKeyEnv
+		}
+	}
+	return ""
+}
+
+func HermesWebProviderOrEmpty(provider string) string {
+	return NormalizeHermesWebProvider(provider)
+}
+
+func NormalizeHermesWebProvider(provider string) string {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" || provider == "off" || provider == "none" {
 		return ""
 	}
+	for _, supported := range hermesWebProviders {
+		if provider == supported.Name {
+			return supported.Name
+		}
+	}
+	return ""
+}
+
+func HermesWebProviderAPIKeyEnv(provider string) string {
+	provider = NormalizeHermesWebProvider(provider)
+	for _, supported := range hermesWebProviders {
+		if provider == supported.Name {
+			return supported.APIKeyEnv
+		}
+	}
+	return ""
+}
+
+func hermesWebProviderConfig(provider string) (hermesWebProvider, bool) {
+	provider = NormalizeHermesWebProvider(provider)
+	for _, supported := range hermesWebProviders {
+		if provider == supported.Name {
+			return supported, true
+		}
+	}
+	return hermesWebProvider{}, false
 }
 
 func HermesModelOrDefault(model string) string {
@@ -213,6 +294,8 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		"HERMES_DASHBOARD=1",
 		"HERMES_DASHBOARD_HOST=0.0.0.0",
 		fmt.Sprintf("HERMES_DASHBOARD_PORT=%d", HermesDashboardContainerPort),
+		"API_SERVER_ENABLED=true",
+		"HERMES_ALLOW_CONFIG_WRITE=true",
 		fmt.Sprintf("HERMES_INFERENCE_PROVIDER=%s", HermesModelProviderOrDefault(hermesConf.ModelProvider)),
 		fmt.Sprintf("HERMES_MODEL_PROVIDER=%s", HermesModelProviderOrDefault(hermesConf.ModelProvider)),
 		fmt.Sprintf("HERMES_MODEL=%s", HermesModelOrDefault(hermesConf.Model)),
@@ -222,7 +305,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		fmt.Sprintf("HERMES_TLON_ADAPTER_REF=%s", HermesTlonAdapterRefOrDefault(hermesConf.TlonAdapterRef)),
 		"TLON_TELEMETRY=false",
 		"HERMES_TLON_TOOLSET=tlon",
-		"HERMES_TLON_TOOLSETS=tlon,file,cronjob",
+		"HERMES_TLON_TOOLSETS=tlon,file,terminal,web,browser,skills,todo,cronjob",
 		"TERMINAL_ENV=local",
 		"TERMINAL_CWD=/workspace",
 		"TERMINAL_LOCAL_PERSISTENT=true",
@@ -276,6 +359,27 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 		return containerConfig, hostConfig, fmt.Errorf("Hermes provider API key is not configured")
 	}
 	environment = append(environment, fmt.Sprintf("%s=%s", apiKeyEnv, apiKey))
+	if webProviderName := NormalizeHermesWebProvider(hermesConf.WebProvider); webProviderName != "" {
+		webProvider, ok := hermesWebProviderConfig(webProviderName)
+		if !ok {
+			return containerConfig, hostConfig, fmt.Errorf("unsupported Hermes web provider %q", hermesConf.WebProvider)
+		}
+		webAPIKey := strings.TrimSpace(hermesConf.WebAPIKey)
+		if webAPIKey == "" {
+			return containerConfig, hostConfig, fmt.Errorf("Hermes web API key is not configured")
+		}
+		environment = append(environment,
+			fmt.Sprintf("HERMES_WEB_BACKEND=%s", webProvider.SearchBackend),
+			fmt.Sprintf("HERMES_WEB_SEARCH_BACKEND=%s", webProvider.SearchBackend),
+			fmt.Sprintf("%s=%s", webProvider.APIKeyEnv, webAPIKey),
+		)
+		if webProvider.ExtractBackend != "" {
+			environment = append(environment, fmt.Sprintf("HERMES_WEB_EXTRACT_BACKEND=%s", webProvider.ExtractBackend))
+		}
+		for _, alias := range webProvider.AliasEnv {
+			environment = append(environment, fmt.Sprintf("%s=%s", alias, webAPIKey))
+		}
+	}
 	zap.L().Info(fmt.Sprintf("Configuring Hermes for %s via %s with owner %s", attachedShip, shipURL, owner))
 
 	dashboardPort := nat.Port(fmt.Sprintf("%d/tcp", HermesDashboardContainerPort))
@@ -312,10 +416,7 @@ func hermesContainerConf(containerName string) (container.Config, container.Host
 
 func hermesGatewayCommand(hermesConf structs.HermesConfig) string {
 	return fmt.Sprintf(
-		`cat > /opt/data/config.yaml <<'EOF'
-%s
-EOF
-skill_dir="${TLON_SKILL_DIR:-/opt/data/tlon-skill}"
+		`skill_dir="${TLON_SKILL_DIR:-/opt/data/tlon-skill}"
 ship="${TLON_NODE_ID:-${TLON_SHIP_NAME:-${URBIT_SHIP:-${TLON_SHIP:-}}}}"
 case "$ship" in
   "~"*) ;;
@@ -338,13 +439,20 @@ chmod 600 "$config_file"
 
 {
   for name in \
-    ANTHROPIC_API_KEY BRAVE_API_KEY BRAVE_SEARCH_API_KEY DEEPSEEK_API_KEY GROQ_API_KEY \
+    API_SERVER_ENABLED \
+    AI_GATEWAY_API_KEY ALIBABA_CODING_PLAN_API_KEY ANTHROPIC_API_KEY ARCEEAI_API_KEY \
+    BRAVE_API_KEY BRAVE_SEARCH_API_KEY DASHSCOPE_API_KEY DEEPSEEK_API_KEY GEMINI_API_KEY \
+    EXA_API_KEY FIRECRAWL_API_KEY GLM_API_KEY GMI_API_KEY GOOGLE_API_KEY GROQ_API_KEY \
+    HF_TOKEN KILOCODE_API_KEY KIMI_API_KEY KIMI_CN_API_KEY KIMI_CODING_API_KEY MINIMAX_API_KEY MINIMAX_CN_API_KEY \
+    MISTRAL_API_KEY NOUS_API_KEY NOVITA_API_KEY NVIDIA_API_KEY OLLAMA_API_KEY \
+    OPENCODE_GO_API_KEY OPENCODE_ZEN_API_KEY OPENAI_API_KEY OPENROUTER_API_KEY \
+    PARALLEL_API_KEY STEPFUN_API_KEY TAVILY_API_KEY XAI_API_KEY XIAOMI_API_KEY ZAI_API_KEY Z_AI_API_KEY \
     HERMES_CONTAINER_HOME HERMES_DASHBOARD HERMES_DASHBOARD_HOST HERMES_DASHBOARD_PORT \
-    HERMES_EXEC_ASK HERMES_GATEWAY_SESSION HERMES_HOME HERMES_INFERENCE_PROVIDER \
+    HERMES_ALLOW_CONFIG_WRITE HERMES_EXEC_ASK HERMES_GATEWAY_SESSION HERMES_HOME HERMES_INFERENCE_PROVIDER \
     HERMES_INTERACTIVE HERMES_MODEL HERMES_MODEL_PROVIDER HERMES_OPENROUTER_CACHE \
-    HERMES_TLON_ADAPTER_DIR HERMES_TLON_TOOLSET HERMES_TLON_TOOLSETS HERMES_WORKSPACE \
-    HERMES_WORKSPACE_DIR HOME LCM_DATABASE_PATH MISTRAL_API_KEY NOUS_API_KEY OPENAI_API_KEY \
-    OPENROUTER_API_KEY TERMINAL_CWD TERMINAL_ENV TERMINAL_LOCAL_PERSISTENT \
+    HERMES_TLON_ADAPTER_DIR HERMES_TLON_TOOLSET HERMES_TLON_TOOLSETS HERMES_WEB_BACKEND \
+    HERMES_WEB_EXTRACT_BACKEND HERMES_WEB_SEARCH_BACKEND HERMES_WORKSPACE \
+    HERMES_WORKSPACE_DIR HOME LCM_DATABASE_PATH TERMINAL_CWD TERMINAL_ENV TERMINAL_LOCAL_PERSISTENT \
     TERMINAL_MAX_FOREGROUND_TIMEOUT TERMINAL_TIMEOUT TLON_ACCESS_CODE TLON_ALLOWED_USERS \
     TLON_ALLOW_ALL_USERS TLON_AUTO_ACCEPT_DM_INVITES TLON_AUTO_ACCEPT_GROUP_INVITES \
     TLON_AUTO_DISCOVER TLON_BOT_ALIASES TLON_BOT_MENTIONS TLON_CHANNELS TLON_CHANNEL_RULES \
@@ -354,7 +462,7 @@ chmod 600 "$config_file"
     TLON_OWNER_LISTEN TLON_OWNER_LISTEN_ENABLED TLON_OWNER_SHIP TLON_OWNER_URL \
     TLON_REQUIRE_MENTION TLON_SHIP TLON_SHIP_CODE TLON_SHIP_NAME TLON_SHIP_URL \
     TLON_SKILL_PATH TLON_TELEMETRY TLON_URL URBIT_CODE URBIT_SHIP \
-    URBIT_URL XAI_API_KEY
+    URBIT_URL
   do
     eval "value=\${$name-}"
     printf '%%s=%%s\n' "$name" "$value"
@@ -373,66 +481,11 @@ if ! "${TLON_CLI:-tlon}" --help >/dev/null 2>&1; then
   exit 1
 fi
 exec hermes gateway run --replace --accept-hooks`,
-		hermesConfigYAML(hermesConf),
 	)
 }
 
 func hermesTlonShipConfigPath(attachedShipBare string) string {
 	return fmt.Sprintf("%s/ships/%s.json", HermesTlonSkillDir, strings.TrimPrefix(attachedShipBare, "~"))
-}
-
-func hermesConfigYAML(hermesConf structs.HermesConfig) string {
-	provider := HermesModelProviderOrDefault(hermesConf.ModelProvider)
-	model := HermesModelOrDefault(hermesConf.Model)
-	apiMode := ""
-	if provider == "openrouter" || provider == "openai" {
-		apiMode = "\n  api_mode: \"chat_completions\""
-	}
-	return fmt.Sprintf(`model:
-  default: %s
-  provider: %s%s
-
-openrouter:
-  response_cache: false
-
-plugins:
-  enabled:
-    - "platforms/tlon"
-
-toolsets:
-  - "tlon"
-  - "file"
-  - "cronjob"
-
-platform_toolsets:
-  tlon:
-    - "tlon"
-    - "file"
-    - "cronjob"
-
-platforms:
-  tlon:
-    enabled: true
-    gateway_restart_notification: false
-
-display:
-  tool_progress: off
-  interim_assistant_messages: false
-
-terminal:
-  backend: "local"
-  cwd: "/workspace"
-  timeout: 180
-
-agent:
-  max_turns: 90
-  gateway_timeout: 1800
-  disabled_toolsets: []
-`, yamlString(model), yamlString(provider), apiMode)
-}
-
-func yamlString(value string) string {
-	return strconv.Quote(value)
 }
 
 func hermesShipTargetForContainer(shipConf structs.UrbitDocker) (hermesShipTarget, error) {

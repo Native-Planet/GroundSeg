@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"groundseg/auth"
 	"groundseg/config"
+	"groundseg/docker"
 	"groundseg/structs"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 )
 
 type configFileRequest struct {
@@ -73,7 +75,12 @@ func ConfigFilesHandler(w http.ResponseWriter, r *http.Request) {
 			writeConfigFilesError(w, http.StatusBadRequest, err)
 			return
 		}
-		content, err := os.ReadFile(target.path)
+		var content []byte
+		if target.kind == "hermes-yaml" {
+			content, err = docker.ReadFileFromVolume(docker.HermesDataVolumeName, "config.yaml")
+		} else {
+			content, err = os.ReadFile(target.path)
+		}
 		if err != nil {
 			writeConfigFilesError(w, http.StatusInternalServerError, fmt.Errorf("unable to read %s: %v", target.file, err))
 			return
@@ -95,6 +102,11 @@ func ConfigFilesHandler(w http.ResponseWriter, r *http.Request) {
 			formatted, err = config.ReplaceConfJSON([]byte(req.Content))
 		case "pier":
 			formatted, err = config.ReplaceUrbitConfigJSON(target.pier, []byte(req.Content))
+		case "hermes-yaml":
+			formatted, err = validateHermesConfigYAML([]byte(req.Content))
+			if err == nil {
+				err = docker.WriteFileToVolume(docker.HermesDataVolumeName, "config.yaml", string(formatted))
+			}
 		default:
 			err = fmt.Errorf("unsupported config kind %q", target.kind)
 		}
@@ -142,6 +154,11 @@ func resolveConfigFileTarget(file string) (configFileTarget, error) {
 			kind: "system",
 			path: filepath.Join(config.BasePath, "settings", "system.json"),
 		}, nil
+	case "hermes/config.yaml":
+		return configFileTarget{
+			file: "hermes/config.yaml",
+			kind: "hermes-yaml",
+		}, nil
 	}
 	if path.Dir(cleaned) != "pier" || path.Ext(cleaned) != ".json" {
 		return configFileTarget{}, fmt.Errorf("unsupported config file: %s", file)
@@ -159,6 +176,21 @@ func resolveConfigFileTarget(file string) (configFileTarget, error) {
 		pier: pier,
 		path: filepath.Join(config.BasePath, "settings", "pier", pier+".json"),
 	}, nil
+}
+
+func validateHermesConfigYAML(raw []byte) ([]byte, error) {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return nil, fmt.Errorf("Hermes config.yaml cannot be empty")
+	}
+	var decoded any
+	if err := yaml.Unmarshal([]byte(trimmed), &decoded); err != nil {
+		return nil, fmt.Errorf("invalid Hermes config.yaml: %v", err)
+	}
+	if _, ok := decoded.(map[string]any); !ok {
+		return nil, fmt.Errorf("Hermes config.yaml must be a YAML mapping")
+	}
+	return []byte(trimmed + "\n"), nil
 }
 
 func configuredPier(pier string) bool {

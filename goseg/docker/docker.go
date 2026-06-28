@@ -239,15 +239,17 @@ func WriteFileToVolume(name string, file string, content string) error {
 		return errmsg
 	}
 	defer cli.Close()
-	// Inspect volume
 	vol, err := cli.VolumeInspect(context.Background(), name)
 	if err != nil {
-		errmsg := fmt.Errorf("Failed to inspect volume: %v : %v", name, err)
-		return errmsg
+		if _, createErr := cli.VolumeCreate(context.Background(), volumetypes.CreateOptions{Name: name}); createErr != nil {
+			return fmt.Errorf("Failed to create docker volume: %v : %v", name, createErr)
+		}
+		vol, err = cli.VolumeInspect(context.Background(), name)
+		if err != nil {
+			return fmt.Errorf("Failed to inspect volume: %v : %v", name, err)
+		}
 	}
-	// Get volume directory path
 	fullPath := filepath.Join(vol.Mountpoint, file)
-	// Write to file
 	err = os.WriteFile(fullPath, []byte(content), 0644)
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to write to volume: %v : %v", name, err)
@@ -255,6 +257,25 @@ func WriteFileToVolume(name string, file string, content string) error {
 	}
 	zap.L().Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
 	return nil
+}
+
+// ReadFileFromVolume reads a file from a Docker volume.
+func ReadFileFromVolume(name string, file string) ([]byte, error) {
+	cli, err := dockerclient.New()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create docker client: %v : %v", name, err)
+	}
+	defer cli.Close()
+	vol, err := cli.VolumeInspect(context.Background(), name)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to inspect volume: %v : %v", name, err)
+	}
+	fullPath := filepath.Join(vol.Mountpoint, file)
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read from volume: %v : %v", name, err)
+	}
+	return content, nil
 }
 
 // start a container by name + type

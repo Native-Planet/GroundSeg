@@ -64,6 +64,11 @@ RUN git clone --filter=blob:none "${HERMES_AGENT_REPO}" "${HERMES_AGENT_DIR}" \
   && cd "${HERMES_AGENT_DIR}" \
   && git checkout "${HERMES_AGENT_REF}"
 
+COPY patches /tmp/hermes-patches
+RUN cd "${HERMES_AGENT_DIR}" \
+  && for patch in /tmp/hermes-patches/*.patch; do git apply "$patch"; done \
+  && rm -rf /tmp/hermes-patches
+
 RUN cd "${HERMES_AGENT_DIR}" \
   && npm install --prefer-offline --no-audit \
   && npx playwright install --with-deps chromium --only-shell \

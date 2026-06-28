@@ -97,6 +97,8 @@ var (
 		ModelProvider:      "openrouter",
 		Model:              "deepseek/deepseek-v4-flash",
 		ProviderAPIKey:     "",
+		WebProvider:        "",
+		WebAPIKey:          "",
 		AccessCode:         "",
 	}
 

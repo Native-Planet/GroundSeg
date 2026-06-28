@@ -1,5 +1,6 @@
 <script>
   import ToggleButton from '$lib/ToggleButton.svelte'
+  import { readConfigFile, saveConfigFile } from '$lib/stores/config-files'
   import { hermesInstall, hermesRestart, hermesSave, hermesToggle } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
 
@@ -16,6 +17,10 @@
   $: savedModelProvider = info?.modelProvider || "openrouter"
   $: providerApiKeyPlaceholder = providerApiKeySaved && modelProvider == savedModelProvider ? "Saved" : ""
   $: providerApiKeyReady = providerApiKey.trim().length > 0 || providerApiKeyPlaceholder.length > 0
+  $: webApiKeySaved = info?.webApiKeySet || false
+  $: savedWebProvider = info?.webProvider || ""
+  $: webApiKeyPlaceholder = webApiKeySaved && webProvider == savedWebProvider ? "Saved" : ""
+  $: webApiKeyReady = webProvider.trim().length < 1 || webApiKey.trim().length > 0 || webApiKeyPlaceholder.length > 0
   $: tInstall = transition?.install || ""
   $: tToggle = transition?.toggle || ""
   $: tSave = transition?.save || ""
@@ -25,7 +30,7 @@
   $: installing = tInstall.length > 0 && tInstall != "success" && tInstall != "error"
   $: selectedShipKey = selectedShip.replace(/^~/, "")
   $: attachedRunning = ($structure?.urbits?.[selectedShipKey]?.info?.running) || false
-  $: canConfigure = selectedShip.length > 0 && owner.trim().length > 0 && providerApiKeyReady
+  $: canConfigure = selectedShip.length > 0 && owner.trim().length > 0 && providerApiKeyReady && webApiKeyReady
   $: canToggle = enabled || (canConfigure && attachedRunning && imageReady)
   $: busy = tInstall.length > 0 || tToggle.length > 0 || tSave.length > 0 || tRestart.length > 0
   $: dashboardReady = running && url != "#"
@@ -41,13 +46,60 @@
   let modelProvider = "openrouter"
   let model = "deepseek/deepseek-v4-flash"
   let providerApiKey = ""
+  let webProvider = ""
+  let webApiKey = ""
   let dirty = false
   let showAdvanced = false
+  let showConfig = false
+  let configLoaded = false
+  let configLoading = false
+  let configSaving = false
+  let configContent = ""
+  let configOriginalContent = ""
+  let configError = ""
+  let configStatus = ""
+
+  $: configDirty = configContent !== configOriginalContent
+  $: configValidationError = showConfig && !configContent.trim() ? "config.yaml cannot be empty" : ""
+  $: canSaveConfig = configDirty && !configValidationError && !configLoading && !configSaving
 
   const providers = [
     { value: "openrouter", label: "OpenRouter" },
+    { value: "ai-gateway", label: "AI Gateway" },
+    { value: "alibaba", label: "Alibaba DashScope" },
+    { value: "alibaba-coding-plan", label: "Alibaba Coding Plan" },
     { value: "openai", label: "OpenAI" },
-    { value: "anthropic", label: "Anthropic" }
+    { value: "anthropic", label: "Anthropic" },
+    { value: "arcee", label: "Arcee" },
+    { value: "deepseek", label: "DeepSeek" },
+    { value: "gemini", label: "Google Gemini" },
+    { value: "gmi", label: "GMI Cloud" },
+    { value: "huggingface", label: "Hugging Face" },
+    { value: "kilocode", label: "Kilo Code" },
+    { value: "kimi-coding", label: "Kimi" },
+    { value: "kimi-coding-cn", label: "Kimi CN" },
+    { value: "minimax", label: "MiniMax" },
+    { value: "minimax-cn", label: "MiniMax CN" },
+    { value: "nous", label: "Nous" },
+    { value: "novita", label: "Novita" },
+    { value: "nvidia", label: "NVIDIA NIM" },
+    { value: "ollama-cloud", label: "Ollama Cloud" },
+    { value: "opencode-go", label: "OpenCode Go" },
+    { value: "opencode-zen", label: "OpenCode Zen" },
+    { value: "stepfun", label: "StepFun" },
+    { value: "xai", label: "xAI" },
+    { value: "xiaomi", label: "Xiaomi MiMo" },
+    { value: "zai", label: "Z.AI / GLM" }
+  ]
+
+  const webProviders = [
+    { value: "", label: "Off" },
+    { value: "brave-free", label: "Brave Search" },
+    { value: "exa", label: "Exa" },
+    { value: "firecrawl", label: "Firecrawl" },
+    { value: "parallel", label: "Parallel" },
+    { value: "tavily", label: "Tavily" },
+    { value: "xai", label: "xAI" }
   ]
 
   const transitionLabels = {
@@ -86,6 +138,8 @@
     modelProvider = info?.modelProvider || "openrouter"
     model = info?.model || "deepseek/deepseek-v4-flash"
     providerApiKey = ""
+    webProvider = info?.webProvider || ""
+    webApiKey = ""
   }
 
   const markDirty = () => {
@@ -97,6 +151,11 @@
     markDirty()
   }
 
+  const changeWebProvider = () => {
+    webApiKey = ""
+    markDirty()
+  }
+
   const payload = () => ({
     ship: selectedShip,
     owner: owner.trim(),
@@ -104,7 +163,9 @@
     image: image.trim(),
     modelProvider: modelProvider.trim(),
     model: model.trim(),
-    providerApiKey: providerApiKey.trim()
+    providerApiKey: providerApiKey.trim(),
+    webProvider: webProvider.trim(),
+    webApiKey: webApiKey.trim()
   })
 
   const save = () => {
@@ -122,12 +183,55 @@
     if (!enabled && busy) return
     hermesToggle(payload())
   }
+
+  const toggleConfig = async () => {
+    showConfig = !showConfig
+    if (showConfig && !configLoaded) {
+      await loadHermesConfig()
+    }
+  }
+
+  const loadHermesConfig = async () => {
+    configLoading = true
+    configError = ""
+    configStatus = ""
+    try {
+      const response = await readConfigFile("hermes/config.yaml")
+      configContent = response.content || ""
+      configOriginalContent = configContent
+      configLoaded = true
+    } catch (err) {
+      configError = err.message
+    } finally {
+      configLoading = false
+    }
+  }
+
+  const saveHermesConfig = async () => {
+    if (!canSaveConfig) return
+    configSaving = true
+    configError = ""
+    configStatus = ""
+    try {
+      const response = await saveConfigFile("hermes/config.yaml", configContent)
+      configContent = response.content || configContent
+      configOriginalContent = configContent
+      configStatus = "config.yaml saved"
+    } catch (err) {
+      configError = err.message
+    } finally {
+      configSaving = false
+    }
+  }
 </script>
 
 <div class="container">
   <div class="top">
     <div>
-      <div class="prof-title">HERMES</div>
+      <div class="title-row">
+        <img src="/hermes.png" alt="" aria-hidden="true" />
+        <div class="prof-title">HERMES</div>
+      </div>
       <div class="status-row">
         <div class="status" class:on={enabled}>{enabled ? "Enabled" : "Disabled"}</div>
         <div class="status" class:on={running}>{running ? "Running" : "Stopped"}</div>
@@ -216,6 +320,27 @@
     </label>
   </div>
 
+  <div class="grid">
+    <label>
+      <span>Web Search</span>
+      <select bind:value={webProvider} on:change={changeWebProvider}>
+        {#each webProviders as provider}
+          <option value={provider.value}>{provider.label}</option>
+        {/each}
+      </select>
+    </label>
+    <label>
+      <span>Web API Key</span>
+      <input
+        type="password"
+        autocomplete="off"
+        bind:value={webApiKey}
+        on:input={markDirty}
+        disabled={webProvider.trim().length < 1}
+        placeholder={webProvider.trim().length < 1 ? "" : webApiKeyPlaceholder} />
+    </label>
+  </div>
+
   <button class="advanced-toggle" class:active={showAdvanced} on:click={()=>showAdvanced = !showAdvanced}>
     Advanced
   </button>
@@ -234,6 +359,43 @@
         <div>Hermes {info?.hermesVersion || ""}</div>
         <div>Tlon Adapter {info?.tlonAdapterVersion || ""}</div>
       </div>
+    </div>
+  {/if}
+
+  <button class="config-toggle" class:active={showConfig} on:click={toggleConfig}>
+    <span>config.yaml</span>
+    <span>{showConfig ? "Hide" : "Edit"}</span>
+  </button>
+
+  {#if showConfig}
+    <div class="config-editor">
+      <div class="config-toolbar">
+        <button on:click={loadHermesConfig} disabled={configLoading || configSaving}>Reload</button>
+        <button class="save-config" on:click={saveHermesConfig} disabled={!canSaveConfig}>
+          {configSaving ? "Saving" : "Save"}
+        </button>
+      </div>
+
+      {#if configLoading}
+        <div class="message">Loading config.yaml...</div>
+      {/if}
+      {#if configError}
+        <div class="message error">{configError}</div>
+      {:else if configValidationError}
+        <div class="message error">{configValidationError}</div>
+      {:else if configStatus}
+        <div class="message success">{configStatus}</div>
+      {:else if configDirty}
+        <div class="message">Unsaved config.yaml edits</div>
+      {/if}
+
+      <textarea
+        class="config-textarea"
+        spellcheck="false"
+        bind:value={configContent}
+        disabled={configLoading || configSaving}
+        aria-label="Hermes config.yaml editor"
+      />
     </div>
   {/if}
 
@@ -265,9 +427,21 @@
     align-items: flex-start;
     gap: 20px;
   }
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .title-row img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+    flex: 0 0 30px;
+  }
   .status-row {
     display: flex;
     gap: 12px;
+    margin-top: 8px;
   }
   .status {
     background: var(--Gray-100, #DDE3DF);
@@ -340,6 +514,71 @@
   .advanced-toggle.active {
     background: black;
   }
+  .config-toggle {
+    width: 100%;
+    margin-top: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--NP_Black, #313933);
+    font-family: Inter;
+    font-size: 18px;
+    font-weight: 300;
+    letter-spacing: 0;
+    padding: 0;
+  }
+  .config-toggle span:first-child {
+    color: var(--Gray-400, #5C7060);
+    font-size: 18px;
+  }
+  .config-toggle span:last-child {
+    background: var(--btn-secondary);
+    border-radius: 12px;
+    color: #fff;
+    padding: 12px 24px;
+  }
+  .config-toggle.active span:last-child {
+    background: black;
+  }
+  .config-editor {
+    margin-top: 16px;
+  }
+  .config-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+  .config-toolbar button {
+    height: 48px;
+    border-radius: 8px;
+    background: var(--Gray-400, #5C7060);
+    color: #fff;
+    font-family: Inter;
+    font-size: 16px;
+    font-weight: 300;
+    padding: 0 20px;
+  }
+  .config-toolbar button.save-config {
+    background: #077D13;
+  }
+  .config-textarea {
+    width: 100%;
+    min-height: 360px;
+    box-sizing: border-box;
+    margin-top: 16px;
+    border: 1px solid var(--Gray-200, #ABBAAE);
+    border-radius: 8px;
+    background: #101511;
+    color: #F8F8F6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 14px;
+    line-height: 20px;
+    letter-spacing: 0;
+    padding: 16px;
+    resize: vertical;
+  }
   .advanced {
     display: grid;
     grid-template-columns: 1fr 180px;
@@ -393,7 +632,9 @@
     visibility: hidden;
     pointer-events: none;
   }
-  .save:disabled, .restart:disabled, .install:disabled {
+  .save:disabled, .restart:disabled, .install:disabled,
+  .config-toolbar button:disabled,
+  .config-textarea:disabled {
     opacity: .5;
     pointer-events: none;
   }
@@ -409,6 +650,11 @@
   .message.error {
     background: #F9D2D2;
     color: #8A1111;
+  }
+  .message.success {
+    color: #077D13;
+    opacity: 1;
+    pointer-events: auto;
   }
   .success {
     opacity: .7;

@@ -238,7 +238,7 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 	destPath = filepath.Join(bugReportDir, "hermes.json")
 	if err := copyFile(srcPath, destPath); err != nil {
 		zap.L().Warn(fmt.Sprintf("Couldn't copy Hermes config: %v", err))
-	} else if err := sanitizeJSON(destPath, "access_code", "provider_api_key"); err != nil {
+	} else if err := sanitizeJSON(destPath, "access_code", "provider_api_key", "web_api_key"); err != nil {
 		zap.L().Error("Couldn't sanitize hermes.json! Removing from report")
 		if err := os.Remove(destPath); err != nil {
 			return fmt.Errorf("Error removing unsanitized Hermes config: %v", err)

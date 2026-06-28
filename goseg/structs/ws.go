@@ -330,6 +330,8 @@ type WsHermesAction struct {
 	Model          string `json:"model"`
 	ModelProvider  string `json:"modelProvider"`
 	ProviderAPIKey string `json:"providerApiKey"`
+	WebProvider    string `json:"webProvider"`
+	WebAPIKey      string `json:"webApiKey"`
 }
 
 type WsDevAction struct {

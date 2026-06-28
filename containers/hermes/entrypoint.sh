@@ -164,23 +164,35 @@ terminal["timeout"] = env_int("TERMINAL_TIMEOUT", 180)
 terminal["persistent_shell"] = str(os.environ.get("TERMINAL_LOCAL_PERSISTENT") or "true").lower() in {"true", "1", "yes"}
 config["terminal"] = terminal
 
-toolset = (os.environ.get("HERMES_TLON_TOOLSET") or "hermes-tlon").strip()
-if toolset:
+toolsets_raw = (
+    os.environ.get("HERMES_TLON_TOOLSETS")
+    or os.environ.get("HERMES_TLON_TOOLSET")
+    or "hermes-tlon"
+)
+toolsets_selected = []
+for item in re.split(r"[,:\s]+", toolsets_raw):
+    item = item.strip()
+    if item and item not in toolsets_selected:
+        toolsets_selected.append(item)
+if toolsets_selected:
     toolsets = config.get("toolsets")
     if not isinstance(toolsets, list):
         toolsets = []
-    if toolset not in toolsets:
-        toolsets.append(toolset)
+    for toolset in toolsets_selected:
+        if toolset not in toolsets:
+            toolsets.append(toolset)
     config["toolsets"] = toolsets
 
     platform_toolsets = config.get("platform_toolsets")
     if not isinstance(platform_toolsets, dict):
         platform_toolsets = {}
     tlon_toolsets = platform_toolsets.get("tlon")
-    if not isinstance(tlon_toolsets, list):
-        tlon_toolsets = []
-    if toolset not in tlon_toolsets:
-        tlon_toolsets.append(toolset)
+    if not isinstance(tlon_toolsets, list) or not tlon_toolsets:
+        tlon_toolsets = list(toolsets_selected)
+    else:
+        current = {str(item).strip() for item in tlon_toolsets if str(item).strip()}
+        if current <= {"tlon", "hermes-tlon"}:
+            tlon_toolsets = list(toolsets_selected)
     platform_toolsets["tlon"] = tlon_toolsets
     config["platform_toolsets"] = platform_toolsets
 
@@ -213,10 +225,30 @@ if provider or model:
 
 web_backend = (os.environ.get("HERMES_WEB_BACKEND") or "").strip()
 web_search_backend = (os.environ.get("HERMES_WEB_SEARCH_BACKEND") or web_backend).strip()
-if not web_search_backend and (os.environ.get("BRAVE_SEARCH_API_KEY") or "").strip():
-    web_search_backend = "brave-free"
+if not web_search_backend:
+    if (os.environ.get("BRAVE_SEARCH_API_KEY") or "").strip():
+        web_search_backend = "brave-free"
+    elif (os.environ.get("EXA_API_KEY") or "").strip():
+        web_search_backend = "exa"
+    elif (os.environ.get("FIRECRAWL_API_KEY") or "").strip():
+        web_search_backend = "firecrawl"
+    elif (os.environ.get("PARALLEL_API_KEY") or "").strip():
+        web_search_backend = "parallel"
+    elif (os.environ.get("TAVILY_API_KEY") or "").strip():
+        web_search_backend = "tavily"
+    elif (os.environ.get("XAI_API_KEY") or "").strip():
+        web_search_backend = "xai"
 
 web_extract_backend = (os.environ.get("HERMES_WEB_EXTRACT_BACKEND") or "").strip()
+if not web_extract_backend:
+    if (os.environ.get("EXA_API_KEY") or "").strip():
+        web_extract_backend = "exa"
+    elif (os.environ.get("FIRECRAWL_API_KEY") or "").strip():
+        web_extract_backend = "firecrawl"
+    elif (os.environ.get("PARALLEL_API_KEY") or "").strip():
+        web_extract_backend = "parallel"
+    elif (os.environ.get("TAVILY_API_KEY") or "").strip():
+        web_extract_backend = "tavily"
 if web_search_backend or web_extract_backend:
     web_config = config.get("web")
     if not isinstance(web_config, dict):

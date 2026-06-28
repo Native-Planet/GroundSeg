@@ -7,6 +7,7 @@ import (
 	"groundseg/structs"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -115,5 +116,8 @@ func applyHermesDefaults(target *structs.HermesConfig) {
 	}
 	if target.Model == "" {
 		target.Model = defaults.HermesConfig.Model
+	}
+	if target.WebProvider != "" {
+		target.WebProvider = strings.TrimSpace(target.WebProvider)
 	}
 }

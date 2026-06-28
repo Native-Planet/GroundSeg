@@ -235,6 +235,22 @@ func applyHermesPayload(payload structs.WsHermesAction, hermesConf *structs.Herm
 	if providerAPIKey := strings.TrimSpace(payload.ProviderAPIKey); providerAPIKey != "" {
 		hermesConf.ProviderAPIKey = providerAPIKey
 	}
+	if webProvider := strings.TrimSpace(payload.WebProvider); webProvider != "" {
+		normalizedWebProvider := docker.NormalizeHermesWebProvider(webProvider)
+		if normalizedWebProvider == "" {
+			return fmt.Errorf("unsupported Hermes web provider %q", webProvider)
+		}
+		if normalizedWebProvider != hermesConf.WebProvider && strings.TrimSpace(payload.WebAPIKey) == "" {
+			hermesConf.WebAPIKey = ""
+		}
+		hermesConf.WebProvider = normalizedWebProvider
+	} else if payload.Action == "save" || payload.Action == "toggle" || payload.Action == "install" {
+		hermesConf.WebProvider = ""
+		hermesConf.WebAPIKey = ""
+	}
+	if webAPIKey := strings.TrimSpace(payload.WebAPIKey); webAPIKey != "" {
+		hermesConf.WebAPIKey = webAPIKey
+	}
 	if strings.TrimSpace(hermesConf.ModelProvider) == "" {
 		hermesConf.ModelProvider = docker.DefaultHermesModelProvider
 	}
@@ -252,6 +268,9 @@ func applyHermesPayload(payload structs.WsHermesAction, hermesConf *structs.Herm
 	}
 	if strings.TrimSpace(hermesConf.TlonAdapterRef) == "" {
 		hermesConf.TlonAdapterRef = docker.DefaultHermesTlonAdapterRef
+	}
+	if strings.TrimSpace(hermesConf.WebProvider) != "" && docker.NormalizeHermesWebProvider(hermesConf.WebProvider) == "" {
+		return fmt.Errorf("unsupported Hermes web provider %q", hermesConf.WebProvider)
 	}
 	return nil
 }
@@ -273,6 +292,14 @@ func validateRunnableHermes(hermesConf structs.HermesConfig) error {
 	}
 	if strings.TrimSpace(hermesConf.ProviderAPIKey) == "" {
 		return fmt.Errorf("Hermes provider API key is required for %s", docker.HermesModelProviderOrDefault(hermesConf.ModelProvider))
+	}
+	if webProvider := docker.NormalizeHermesWebProvider(hermesConf.WebProvider); webProvider != "" {
+		if docker.HermesWebProviderAPIKeyEnv(webProvider) == "" {
+			return fmt.Errorf("unsupported Hermes web provider %q", hermesConf.WebProvider)
+		}
+		if strings.TrimSpace(hermesConf.WebAPIKey) == "" {
+			return fmt.Errorf("Hermes web API key is required for %s", webProvider)
+		}
 	}
 	installed, err := docker.ImageRefExists(docker.HermesImageOrDefault(hermesConf.Image))
 	if err != nil {

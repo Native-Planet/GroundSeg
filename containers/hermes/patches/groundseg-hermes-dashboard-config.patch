@@ -1,0 +1,85 @@
+diff --git a/agent/file_safety.py b/agent/file_safety.py
+index 9b0c9fb..8936261 100644
+--- a/agent/file_safety.py
++++ b/agent/file_safety.py
+@@ -83,7 +83,8 @@ def is_write_denied(path: str) -> bool:
+     # profile-mode session leaves <root>/auth.json + <root>/config.yaml
+     # writable — letting a prompt-injected write_file overwrite the global
+     # files that every profile inherits from (same shape as #15981).
+-    control_file_names = ("auth.json", "config.yaml", "webhook_subscriptions.json")
++    allow_config_write = os.getenv("HERMES_ALLOW_CONFIG_WRITE", "").strip().lower() in {"1", "true", "yes", "on"}
++    control_file_names = ("auth.json", "config.yaml", "webhook_subscriptions.json")
+     mcp_tokens_dir_name = "mcp-tokens"
+ 
+     hermes_dirs = []
+@@ -97,6 +98,8 @@ def is_write_denied(path: str) -> bool:
+ 
+     for base_real in hermes_dirs:
+         for name in control_file_names:
++            if allow_config_write and name == "config.yaml":
++                continue
+             try:
+                 if resolved == os.path.realpath(os.path.join(base_real, name)):
+                     return True
+diff --git a/hermes_cli/web_server.py b/hermes_cli/web_server.py
+index e607f83..87d9220 100644
+--- a/hermes_cli/web_server.py
++++ b/hermes_cli/web_server.py
+@@ -4318,12 +4318,18 @@ async def post_agent_plugin_install(request: Request, body: _AgentPluginInstallB
+ 
+ def _validate_plugin_name(name: str) -> str:
+     """Reject path-traversal attempts in plugin name URL parameters."""
+-    if not name or "/" in name or "\\" in name or ".." in name:
++    name = (name or "").strip().strip("/")
++    parts = [part for part in name.split("/") if part]
++    if (
++        not parts
++        or "\\" in name
++        or any(part in {".", ".."} for part in parts)
++    ):
+         raise HTTPException(status_code=400, detail="Invalid plugin name.")
+-    return name
++    return "/".join(parts)
+ 
+ 
+-@app.post("/api/dashboard/agent-plugins/{name}/enable")
++@app.post("/api/dashboard/agent-plugins/{name:path}/enable")
+ async def post_agent_plugin_enable(request: Request, name: str):
+     _require_token(request)
+     name = _validate_plugin_name(name)
+@@ -4336,7 +4341,7 @@ async def post_agent_plugin_enable(request: Request, name: str):
+     return result
+ 
+ 
+-@app.post("/api/dashboard/agent-plugins/{name}/disable")
++@app.post("/api/dashboard/agent-plugins/{name:path}/disable")
+ async def post_agent_plugin_disable(request: Request, name: str):
+     _require_token(request)
+     name = _validate_plugin_name(name)
+@@ -4348,7 +4353,7 @@ async def post_agent_plugin_disable(request: Request, name: str):
+     return result
+ 
+ 
+-@app.post("/api/dashboard/agent-plugins/{name}/update")
++@app.post("/api/dashboard/agent-plugins/{name:path}/update")
+ async def post_agent_plugin_update(request: Request, name: str):
+     _require_token(request)
+     name = _validate_plugin_name(name)
+@@ -4361,7 +4366,7 @@ async def post_agent_plugin_update(request: Request, name: str):
+     return result
+ 
+ 
+-@app.delete("/api/dashboard/agent-plugins/{name}")
++@app.delete("/api/dashboard/agent-plugins/{name:path}")
+ async def delete_agent_plugin(request: Request, name: str):
+     _require_token(request)
+     name = _validate_plugin_name(name)
+@@ -4401,7 +4406,7 @@ class _PluginVisibilityBody(BaseModel):
+     hidden: bool
+ 
+ 
+-@app.post("/api/dashboard/plugins/{name}/visibility")
++@app.post("/api/dashboard/plugins/{name:path}/visibility")
+ async def post_plugin_visibility(request: Request, name: str, body: _PluginVisibilityBody):
+     """Toggle a plugin's sidebar visibility (persists to config.yaml dashboard.hidden_plugins)."""
+     _require_token(request)

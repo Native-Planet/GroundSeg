@@ -43,6 +43,7 @@ func TestResolveConfigFileTarget(t *testing.T) {
 		{name: "system file", file: "system.json", kind: "system"},
 		{name: "settings alias", file: "settings.json", kind: "system"},
 		{name: "configured pier", file: "pier/sampel-palnet.json", kind: "pier", pier: "sampel-palnet"},
+		{name: "hermes yaml", file: "hermes/config.yaml", kind: "hermes-yaml"},
 		{name: "traversal", file: "../system.json", wantErr: true},
 		{name: "nested traversal", file: "pier/../system.json", wantErr: true},
 		{name: "nested pier path", file: "pier/sampel-palnet/extra.json", wantErr: true},
@@ -66,6 +67,36 @@ func TestResolveConfigFileTarget(t *testing.T) {
 			}
 			if got.pier != tt.pier {
 				t.Fatalf("pier = %q, want %q", got.pier, tt.pier)
+			}
+		})
+	}
+}
+
+func TestValidateHermesConfigYAML(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{name: "mapping", raw: "model:\n  provider: openrouter\n"},
+		{name: "empty", raw: "  \n", wantErr: true},
+		{name: "invalid", raw: "model: [", wantErr: true},
+		{name: "scalar", raw: "hello", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validateHermesConfigYAML([]byte(tt.raw))
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("validateHermesConfigYAML(%q) returned nil error", tt.raw)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("validateHermesConfigYAML(%q) returned error: %v", tt.raw, err)
+			}
+			if len(got) == 0 || got[len(got)-1] != '\n' {
+				t.Fatalf("validated YAML should end with newline: %q", string(got))
 			}
 		})
 	}
