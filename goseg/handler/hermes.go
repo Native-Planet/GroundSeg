@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"groundseg/broadcast"
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
@@ -430,6 +431,7 @@ func recreateHermesContainer() error {
 		return fmt.Errorf("couldn't start Hermes: %v", err)
 	}
 	config.UpdateContainerState(docker.HermesContainerName, info)
+	updateHermesRunningBroadcast(true)
 	zap.L().Info("Hermes container started")
 	return nil
 }
@@ -466,6 +468,7 @@ func disableHermesIfAssignedTo(patp string) {
 func stopAndDeleteHermes(deleteVolume bool) {
 	if existing, err := docker.FindContainer(docker.HermesContainerName); err == nil && existing != nil {
 		zap.L().Info("Stopping existing Hermes container")
+		markHermesDesiredStopped()
 		if existing.State == "running" {
 			if err := docker.StopContainerByName(docker.HermesContainerName); err != nil {
 				zap.L().Warn(fmt.Sprintf("Couldn't stop Hermes container: %v", err))
@@ -484,6 +487,21 @@ func stopAndDeleteHermes(deleteVolume bool) {
 		}
 	}
 	config.DeleteContainerState(docker.HermesContainerName)
+	updateHermesRunningBroadcast(false)
+}
+
+func markHermesDesiredStopped() {
+	if containerState, exists := config.GetContainerState()[docker.HermesContainerName]; exists {
+		containerState.DesiredStatus = "stopped"
+		config.UpdateContainerState(docker.HermesContainerName, containerState)
+	}
+}
+
+func updateHermesRunningBroadcast(running bool) {
+	current := broadcast.GetState()
+	current.Profile.Hermes.Info.Running = running
+	broadcast.UpdateBroadcast(current)
+	broadcast.BroadcastToClients()
 }
 
 func nextHermesPort() (int, error) {

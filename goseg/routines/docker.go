@@ -65,6 +65,10 @@ func DockerSubscriptionHandler() {
 			zap.L().Info(fmt.Sprintf("Docker: %s stopped", contName))
 
 			if containerState, exists := config.GetContainerState()[contName]; exists {
+				if !isCurrentContainerEvent(containerState, dockerEvent) {
+					zap.L().Debug(fmt.Sprintf("Ignoring stale stop event for %s", contName))
+					continue
+				}
 				containerState.ActualStatus = "stopped"
 				config.UpdateContainerState(contName, containerState)
 				// start it again if this isn't what the user wants.
@@ -89,6 +93,10 @@ func DockerSubscriptionHandler() {
 
 			containerState, exists := config.GetContainerState()[contName]
 			if exists {
+				if !isCurrentContainerEvent(containerState, dockerEvent) {
+					zap.L().Debug(fmt.Sprintf("Ignoring stale start event for %s", contName))
+					continue
+				}
 				containerState.ActualStatus = "running"
 				config.UpdateContainerState(contName, containerState)
 				switch contName {
@@ -109,6 +117,10 @@ func DockerSubscriptionHandler() {
 
 		case "die":
 			if containerState, exists := config.GetContainerState()[contName]; exists {
+				if !isCurrentContainerEvent(containerState, dockerEvent) {
+					zap.L().Debug(fmt.Sprintf("Ignoring stale die event for %s", contName))
+					continue
+				}
 				zap.L().Warn(fmt.Sprintf("Docker: %s died!", contName))
 				containerState.ActualStatus = "died"
 				config.UpdateContainerState(contName, containerState)
@@ -165,6 +177,17 @@ func DockerSubscriptionHandler() {
 			zap.L().Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
 		}
 	}
+}
+
+func isCurrentContainerEvent(containerState structs.ContainerState, dockerEvent eventtypes.Message) bool {
+	eventID := dockerEvent.Actor.ID
+	if eventID == "" {
+		eventID = dockerEvent.ID
+	}
+	if containerState.ID == "" || eventID == "" {
+		return true
+	}
+	return strings.HasPrefix(containerState.ID, eventID) || strings.HasPrefix(eventID, containerState.ID)
 }
 
 func makeBroadcast(contName string, status string) {
