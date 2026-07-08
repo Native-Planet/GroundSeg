@@ -14,7 +14,7 @@
 <div class="section">
   <div class="section-left">
     <div class="section-title">Web Shell</div>
-    <div class="section-description">Attach to this ship's tmux session with <code>tmux a</code>.</div>
+    <div class="section-description">Open an interactive shell inside this ship's container.</div>
   </div>
   <div class="section-right">
     <button class="open-button" on:click={handleOpen}>Open Shell</button>

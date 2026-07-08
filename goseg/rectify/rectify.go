@@ -255,8 +255,6 @@ func RectifyUrbit() {
 					zap.L().Info(fmt.Sprintf("Registering missing StarTram service for %v", patp))
 					startram.SvcCreate(patp, "urbit")
 					startram.SvcCreate("s3."+patp, "minio")
-					startram.SvcCreate("console.s3."+patp, "minio-console")
-					startram.SvcCreate("bucket.s3."+patp, "minio-bucket")
 				}
 				for _, remote := range startramConfig.Subdomains {
 					if remote.Status == "creating" {

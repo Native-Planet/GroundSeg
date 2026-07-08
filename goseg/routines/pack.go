@@ -3,16 +3,21 @@ package routines
 import (
 	"fmt"
 	"groundseg/broadcast"
-	"groundseg/click"
 	"groundseg/config"
-	"groundseg/docker"
-	"groundseg/structs"
+	"groundseg/handler"
 	"strconv"
-	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
 )
+
+var scheduledPackState = struct {
+	sync.Mutex
+	active map[string]time.Time
+}{
+	active: make(map[string]time.Time),
+}
 
 func PackScheduleLoop() {
 	// check once at start
@@ -94,10 +99,28 @@ func queuePack() error {
 		zap.L().Debug(fmt.Sprintf("Next pack for %s on %v", patp, meldNext))
 		oneMinuteLater := now.Add(1 * time.Minute)
 		if oneMinuteLater.After(meldNext) || oneMinuteLater.Equal(meldNext) {
-			go setScheduledPackTimer(patp, meldNext.Sub(now))
+			if reserveScheduledPack(patp, meldNext) {
+				go setScheduledPackTimer(patp, meldNext.Sub(now))
+			}
 		}
 	}
 	return nil
+}
+
+func reserveScheduledPack(patp string, scheduledAt time.Time) bool {
+	scheduledPackState.Lock()
+	defer scheduledPackState.Unlock()
+	if _, exists := scheduledPackState.active[patp]; exists {
+		return false
+	}
+	scheduledPackState.active[patp] = scheduledAt
+	return true
+}
+
+func releaseScheduledPack(patp string) {
+	scheduledPackState.Lock()
+	delete(scheduledPackState.active, patp)
+	scheduledPackState.Unlock()
 }
 
 func setMonthSchedule(meldLast time.Time, freq, date int, meldTime string) (time.Time, error) {
@@ -156,34 +179,6 @@ func setWeekSchedule(meldLast time.Time, freq int, dayStr, meldTime string) (tim
 	return meldNext, nil
 }
 
-func waitComplete(patp string) {
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-	timeout := time.After(10 * time.Minute)
-	for {
-		select {
-		case <-ticker.C:
-			statuses, err := docker.GetShipStatus([]string{patp})
-			if err != nil {
-				continue
-			}
-			status, exists := statuses[patp]
-			if !exists {
-				continue
-			}
-			if strings.Contains(status, "Up") {
-				zap.L().Debug(fmt.Sprintf("%s continue waiting...", patp))
-				continue
-			}
-			zap.L().Debug(fmt.Sprintf("%s finished", patp))
-			return
-		case <-timeout:
-			zap.L().Warn(fmt.Sprintf("%s timed out waiting for scheduled pack completion", patp))
-			return
-		}
-	}
-}
-
 func convertMeldTime(meldTime string) (int, int, error) {
 	hour, err := strconv.Atoi(meldTime[0:2])
 	if err != nil {
@@ -198,6 +193,7 @@ func convertMeldTime(meldTime string) (int, int, error) {
 }
 
 func setScheduledPackTimer(patp string, delay time.Duration) {
+	defer releaseScheduledPack(patp)
 	shipConf := config.UrbitConf(patp)
 	if delay > 0 {
 		zap.L().Info(fmt.Sprintf("Starting scheduled pack for %s in %v", patp, delay))
@@ -205,66 +201,16 @@ func setScheduledPackTimer(patp string, delay time.Duration) {
 	} else {
 		zap.L().Info(fmt.Sprintf("Starting scheduled pack for %s", patp))
 	}
-	// error handling
-	packError := func(err error) {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "error"}
+	if err := config.LoadUrbitConfig(patp); err != nil {
+		zap.L().Error(fmt.Sprintf("Scheduled pack failed to load %s config: %v", patp, err))
 		return
 	}
-	// clear transition after end
-	defer func() {
-		time.Sleep(3 * time.Second)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: ""}
-	}()
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "packing"}
-	statuses, err := docker.GetShipStatus([]string{patp})
-	if err != nil {
-		packError(fmt.Errorf("Failed to get ship status for %s: %v", patp, err))
+	shipConf = config.UrbitConf(patp)
+	if !shipConf.MeldSchedule {
+		zap.L().Info(fmt.Sprintf("Scheduled pack for %s was cancelled before it started", patp))
 		return
 	}
-	status, exists := statuses[patp]
-	if !exists {
-		packError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
-		return
+	if err := handler.ScheduledPackPier(patp, shipConf); err != nil {
+		zap.L().Error(fmt.Sprintf("Scheduled pack failed for %s: %v", patp, err))
 	}
-	// running
-	if strings.Contains(status, "Up") {
-		// send |pack
-		if err := click.SendPack(patp); err != nil {
-			packError(fmt.Errorf("Failed to |pack to %s: %v", patp, err))
-			return
-		}
-		// not running
-	} else {
-		// set DesiredStatus to prevent auto-restart when pack container exits
-		if containerState, exists := config.GetContainerState()[patp]; exists {
-			containerState.DesiredStatus = "stopped"
-			config.UpdateContainerState(patp, containerState)
-		}
-		// switch boot status to pack
-		shipConf.BootStatus = "pack"
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		err := config.UpdateUrbitConfig(update)
-		if err != nil {
-			packError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
-			return
-		}
-		_, err = docker.StartContainer(patp, "vere")
-		if err != nil {
-			packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
-			return
-		}
-		// wait for pack to complete before marking success
-		waitComplete(patp)
-	}
-	// set last meld
-	now := time.Now().Unix()
-	if err := config.UpdateUrbitConfigForPier(patp, func(shipConf *structs.UrbitDocker) {
-		shipConf.MeldLast = strconv.FormatInt(now, 10)
-	}); err != nil {
-		packError(fmt.Errorf("Failed to update %s urbit config with last meld time: %v", patp, err))
-		return
-	}
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
-	return
 }
