@@ -392,15 +392,7 @@ func RegisterExistingShips() error {
 				zap.L().Error(fmt.Sprintf("Couldn't register S3: %v: %v", ship, err))
 			} else {
 				expectedURLs = append(expectedURLs, "s3."+ship)
-			}
-			if err := SvcCreate("console.s3."+ship, "minio-console"); err != nil {
-				zap.L().Warn(fmt.Sprintf("Couldn't register RustFS console: %v: %v", ship, err))
-			} else {
 				expectedURLs = append(expectedURLs, "console.s3."+ship)
-			}
-			if err := SvcCreate("bucket.s3."+ship, "minio-bucket"); err != nil {
-				zap.L().Warn(fmt.Sprintf("Couldn't register RustFS bucket endpoint: %v: %v", ship, err))
-			} else {
 				expectedURLs = append(expectedURLs, "bucket.s3."+ship)
 			}
 		}
@@ -425,15 +417,7 @@ func RegisterNewShip(ship string) error {
 		zap.L().Error(fmt.Sprintf("Couldn't register S3: %v: %v", ship, err))
 	} else {
 		expectedURLs = append(expectedURLs, "s3."+ship)
-	}
-	if err := SvcCreate("console.s3."+ship, "minio-console"); err != nil {
-		zap.L().Warn(fmt.Sprintf("Couldn't register RustFS console: %v: %v", ship, err))
-	} else {
 		expectedURLs = append(expectedURLs, "console.s3."+ship)
-	}
-	if err := SvcCreate("bucket.s3."+ship, "minio-bucket"); err != nil {
-		zap.L().Warn(fmt.Sprintf("Couldn't register RustFS bucket endpoint: %v: %v", ship, err))
-	} else {
 		expectedURLs = append(expectedURLs, "bucket.s3."+ship)
 	}
 	if err := backoffRetrieve(expectedURLs); err != nil {
