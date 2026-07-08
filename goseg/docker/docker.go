@@ -1014,6 +1014,10 @@ func DockerPoller() {
 
 // execute command
 func ExecDockerCommand(containerName string, cmd []string) (string, error) {
+	return ExecDockerCommandWithTimeout(containerName, cmd, 10*time.Minute)
+}
+
+func ExecDockerCommandWithTimeout(containerName string, cmd []string, timeout time.Duration) (string, error) {
 	cli, err := dockerclient.New()
 	if err != nil {
 		return "", err
@@ -1025,8 +1029,12 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 		AttachStderr: true,
 		Cmd:          cmd,
 	}
-	// Context
 	ctx := context.Background()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	// Get container ID by name
 	containerID, err := GetContainerIDByName(ctx, cli, containerName)
@@ -1046,13 +1054,27 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 	}
 	defer hijackedResp.Close()
 
-	// Read the output
-	//stdout, err := ioutil.ReadAll(hijackedResp.Reader)
+	closeOnDone := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			hijackedResp.Close()
+		case <-closeOnDone:
+		}
+	}()
+
 	output, err := io.ReadAll(hijackedResp.Reader)
+	close(closeOnDone)
+	if ctx.Err() == context.DeadlineExceeded {
+		return string(output), fmt.Errorf("docker exec timed out after %s", timeout)
+	}
 	if err != nil {
 		return "", err
 	}
-	inspect, err := cli.ContainerExecInspect(ctx, resp.ID)
+
+	inspectCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	inspect, err := cli.ContainerExecInspect(inspectCtx, resp.ID)
 	if err != nil {
 		return "", err
 	}

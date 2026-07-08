@@ -8,7 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+const clickExecTimeout = 2 * time.Minute
 
 func createHoon(patp, file, hoon string) error {
 	shipConf := config.UrbitConf(patp)
@@ -51,7 +54,7 @@ func clickExec(patp, file, dependency string) (string, error) {
 		patp,
 		dependency,
 	}
-	res, err := docker.ExecDockerCommand(patp, execCommand)
+	res, err := docker.ExecDockerCommandWithTimeout(patp, execCommand, clickExecTimeout)
 	if err != nil {
 		return "", err
 	}

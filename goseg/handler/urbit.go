@@ -177,9 +177,13 @@ func looksLikeObjectStoreAlias(patp string, alias string) bool {
 }
 
 func WaitComplete(patp string) {
+	_ = WaitCompleteWithTimeout(patp, 10*time.Minute)
+}
+
+func WaitCompleteWithTimeout(patp string, timeout time.Duration) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	timeout := time.After(10 * time.Minute)
+	timer := time.After(timeout)
 	for {
 		select {
 		case <-ticker.C:
@@ -196,10 +200,10 @@ func WaitComplete(patp string) {
 				continue
 			}
 			zap.L().Debug(fmt.Sprintf("%s finished", patp))
-			return
-		case <-timeout:
+			return nil
+		case <-timer:
 			zap.L().Warn(fmt.Sprintf("%s timed out waiting for completion", patp))
-			return
+			return fmt.Errorf("%s timed out waiting for completion", patp)
 		}
 	}
 }
@@ -208,6 +212,62 @@ func updateDesiredContainerStatus(patp, desiredStatus string) {
 	if containerState, exists := config.GetContainerState()[patp]; exists {
 		containerState.DesiredStatus = desiredStatus
 		config.UpdateContainerState(patp, containerState)
+	}
+}
+
+func setShipBootStatus(patp, bootStatus string) error {
+	return config.UpdateUrbitConfigForPier(patp, func(shipConf *structs.UrbitDocker) {
+		shipConf.BootStatus = bootStatus
+	})
+}
+
+func startShipWithDesiredStatus(patp, desiredStatus string) error {
+	info, err := docker.StartContainer(patp, "vere")
+	if err != nil {
+		return err
+	}
+	if desiredStatus != "" {
+		info.DesiredStatus = desiredStatus
+	}
+	config.UpdateContainerState(patp, info)
+	return nil
+}
+
+func currentDesiredStatus(patp, status, bootStatus string) string {
+	if containerState, exists := config.GetContainerState()[patp]; exists && containerState.DesiredStatus != "" {
+		return containerState.DesiredStatus
+	}
+	if strings.Contains(status, "Up") || bootStatus == "boot" {
+		return "running"
+	}
+	return "stopped"
+}
+
+func recordPackAttempt(patp string) error {
+	now := time.Now().Unix()
+	return config.UpdateUrbitConfigForPier(patp, func(shipConf *structs.UrbitDocker) {
+		shipConf.MeldLast = strconv.FormatInt(now, 10)
+	})
+}
+
+func restoreAfterMaintenanceError(patp, previousBootStatus, previousDesiredStatus string, shouldRestart bool) {
+	if err := setShipBootStatus(patp, previousBootStatus); err != nil {
+		zap.L().Warn(fmt.Sprintf("Failed to restore %s boot status to %s after maintenance error: %v", patp, previousBootStatus, err))
+	}
+	updateDesiredContainerStatus(patp, previousDesiredStatus)
+	if !shouldRestart {
+		return
+	}
+	statuses, err := docker.GetShipStatus([]string{patp})
+	if err == nil && strings.Contains(statuses[patp], "Up") {
+		return
+	}
+	if err := setShipBootStatus(patp, "boot"); err != nil {
+		zap.L().Warn(fmt.Sprintf("Failed to set %s boot status during maintenance recovery: %v", patp, err))
+		return
+	}
+	if err := startShipWithDesiredStatus(patp, "running"); err != nil {
+		zap.L().Warn(fmt.Sprintf("Failed to restart %s after maintenance error: %v", patp, err))
 	}
 }
 
@@ -381,7 +441,27 @@ func urbitDeleteStartramService(patp string, service string, shipConf structs.Ur
 	}
 }
 
+func ScheduledPackPier(patp string, shipConf structs.UrbitDocker) error {
+	err := packPierWithMode(patp, shipConf)
+	if err != nil {
+		if recordErr := recordPackAttempt(patp); recordErr != nil {
+			zap.L().Warn(fmt.Sprintf("Failed to record scheduled pack attempt for %s after error %v: %v", patp, err, recordErr))
+		}
+	}
+	return err
+}
+
 func packPier(patp string, shipConf structs.UrbitDocker) error {
+	return packPierWithMode(patp, shipConf)
+}
+
+func packPierWithMode(patp string, shipConf structs.UrbitDocker) error {
+	done, err := beginShipMaintenance(patp, "pack")
+	if err != nil {
+		return err
+	}
+	defer done()
+
 	// error handling
 	packError := func(err error) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "error"}
@@ -401,6 +481,10 @@ func packPier(patp string, shipConf structs.UrbitDocker) error {
 	if !exists {
 		return packError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 	}
+	previousBootStatus := shipConf.BootStatus
+	previousDesiredStatus := currentDesiredStatus(patp, status, previousBootStatus)
+	shouldRestart := previousDesiredStatus == "running" || previousBootStatus == "boot"
+
 	// running
 	if strings.Contains(status, "Up") {
 		// send |pack
@@ -415,25 +499,35 @@ func packPier(patp string, shipConf structs.UrbitDocker) error {
 			config.UpdateContainerState(patp, containerState)
 		}
 		// switch boot status to pack
-		shipConf.BootStatus = "pack"
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		err := config.UpdateUrbitConfig(update)
-		if err != nil {
+		if err := setShipBootStatus(patp, "pack"); err != nil {
 			return packError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
 		}
-		_, err = docker.StartContainer(patp, "vere")
-		if err != nil {
+		if err := startShipWithDesiredStatus(patp, "stopped"); err != nil {
+			_ = setShipBootStatus(patp, previousBootStatus)
+			updateDesiredContainerStatus(patp, previousDesiredStatus)
 			return packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
 		}
 		// wait for pack to complete before marking success
-		WaitComplete(patp)
+		if err := WaitCompleteWithTimeout(patp, 2*time.Hour); err != nil {
+			return packError(err)
+		}
+		if shouldRestart {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "starting"}
+			if err := setShipBootStatus(patp, "boot"); err != nil {
+				return packError(fmt.Errorf("Failed to update %s urbit config to boot: %v", patp, err))
+			}
+			if err := startShipWithDesiredStatus(patp, "running"); err != nil {
+				return packError(fmt.Errorf("Failed to restart %s after pack: %v", patp, err))
+			}
+		} else {
+			if err := setShipBootStatus(patp, docker.PersistentBootStatusAfterContainerBuild(previousBootStatus)); err != nil {
+				return packError(fmt.Errorf("Failed to restore %s boot status after pack: %v", patp, err))
+			}
+			updateDesiredContainerStatus(patp, "stopped")
+		}
 	}
 	// set last meld
-	now := time.Now().Unix()
-	if err := config.UpdateUrbitConfigForPier(patp, func(shipConf *structs.UrbitDocker) {
-		shipConf.MeldLast = strconv.FormatInt(now, 10)
-	}); err != nil {
+	if err := recordPackAttempt(patp); err != nil {
 		return packError(fmt.Errorf("Failed to update %s urbit config with last meld time: %v", patp, err))
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
@@ -441,7 +535,22 @@ func packPier(patp string, shipConf structs.UrbitDocker) error {
 }
 
 func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
+	done, err := beginShipMaintenance(patp, "pack-meld")
+	if err != nil {
+		return err
+	}
+	defer done()
+
+	var (
+		previousBootStatus    = shipConf.BootStatus
+		previousDesiredStatus string
+		shouldRestart         bool
+		maintenanceChanged    bool
+	)
 	packMeldError := func(err error) error {
+		if maintenanceChanged {
+			restoreAfterMaintenanceError(patp, previousBootStatus, previousDesiredStatus, shouldRestart)
+		}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "error"}
 		return err
 	}
@@ -459,11 +568,14 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 		return packMeldError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 	}
 	isRunning := strings.Contains(status, "Up")
+	previousDesiredStatus = currentDesiredStatus(patp, status, previousBootStatus)
+	shouldRestart = isRunning || previousDesiredStatus == "running" || previousBootStatus == "boot"
 	// set DesiredStatus to prevent auto-restart from die/stop event handlers during maintenance
 	if containerState, exists := config.GetContainerState()[patp]; exists {
 		containerState.DesiredStatus = "stopped"
 		config.UpdateContainerState(patp, containerState)
 	}
+	maintenanceChanged = true
 	if isRunning {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "stopping"}
 		if err := click.BarExit(patp); err != nil {
@@ -472,64 +584,60 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 				zap.L().Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
 			}
 		}
-		WaitComplete(patp)
+		if err := WaitCompleteWithTimeout(patp, 10*time.Minute); err != nil {
+			return packMeldError(err)
+		}
 	}
 	// stop ship
 	// start ship as pack
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "packing"}
 	zap.L().Info(fmt.Sprintf("Attempting to urth pack %s", patp))
-	shipConf.BootStatus = "pack"
-	update := make(map[string]structs.UrbitDocker)
-	update[patp] = shipConf
-	err = config.UpdateUrbitConfig(update)
-	if err != nil {
+	if err := setShipBootStatus(patp, "pack"); err != nil {
 		return packMeldError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
 	}
-	_, err = docker.StartContainer(patp, "vere")
-	if err != nil {
+	if err := startShipWithDesiredStatus(patp, "stopped"); err != nil {
 		return packMeldError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
 	}
 
 	zap.L().Info(fmt.Sprintf("Waiting for urth pack to complete for %s", patp))
-	WaitComplete(patp)
+	if err := WaitCompleteWithTimeout(patp, 2*time.Hour); err != nil {
+		return packMeldError(err)
+	}
 
 	// start ship as meld
 	zap.L().Info(fmt.Sprintf("Attempting to urth meld %s", patp))
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "melding"}
-	shipConf.BootStatus = "meld"
-	update = make(map[string]structs.UrbitDocker)
-	update[patp] = shipConf
-	err = config.UpdateUrbitConfig(update)
-	if err != nil {
+	if err := setShipBootStatus(patp, "meld"); err != nil {
 		return packMeldError(fmt.Errorf("Failed to update %s urbit config to meld: %v", patp, err))
 	}
-	_, err = docker.StartContainer(patp, "vere")
-	if err != nil {
+	if err := startShipWithDesiredStatus(patp, "stopped"); err != nil {
 		return packMeldError(fmt.Errorf("Failed to urth meld %s: %v", patp, err))
 	}
 
 	zap.L().Info(fmt.Sprintf("Waiting for urth meld to complete for %s", patp))
-	WaitComplete(patp)
+	if err := WaitCompleteWithTimeout(patp, 2*time.Hour); err != nil {
+		return packMeldError(err)
+	}
 
 	// start ship if "boot"
-	if isRunning {
+	if shouldRestart {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "starting"}
 		// restore DesiredStatus so normal auto-restart behavior resumes
 		if containerState, exists := config.GetContainerState()[patp]; exists {
 			containerState.DesiredStatus = "running"
 			config.UpdateContainerState(patp, containerState)
 		}
-		shipConf.BootStatus = "boot"
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		err := config.UpdateUrbitConfig(update)
-		if err != nil {
-			return packMeldError(fmt.Errorf("Failed to update %s urbit config to meld: %v", patp, err))
+		if err := setShipBootStatus(patp, "boot"); err != nil {
+			return packMeldError(fmt.Errorf("Failed to update %s urbit config to boot: %v", patp, err))
 		}
-		_, err = docker.StartContainer(patp, "vere")
-		if err != nil {
-			return packMeldError(fmt.Errorf("Failed to urth meld %s: %v", patp, err))
+		if err := startShipWithDesiredStatus(patp, "running"); err != nil {
+			return packMeldError(fmt.Errorf("Failed to restart %s after pack & meld: %v", patp, err))
 		}
+	} else {
+		if err := setShipBootStatus(patp, docker.PersistentBootStatusAfterContainerBuild(previousBootStatus)); err != nil {
+			return packMeldError(fmt.Errorf("Failed to restore %s boot status after pack & meld: %v", patp, err))
+		}
+		updateDesiredContainerStatus(patp, "stopped")
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "success"}
 	return nil
@@ -1285,8 +1393,23 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 }
 
 func performChop(patp string, shipConf structs.UrbitDocker, transitionType string, rollBeforeChop bool, autoTriggered bool) error {
+	done, err := beginShipMaintenance(patp, transitionType)
+	if err != nil {
+		return err
+	}
+	defer done()
+
 	zap.L().Info(fmt.Sprintf("Chop called for %s", patp))
+	var (
+		previousBootStatus    = shipConf.BootStatus
+		previousDesiredStatus string
+		shouldRestart         bool
+		maintenanceChanged    bool
+	)
 	chopError := func(err error) error {
+		if maintenanceChanged {
+			restoreAfterMaintenanceError(patp, previousBootStatus, previousDesiredStatus, shouldRestart)
+		}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "error"}
 		return err
 	}
@@ -1305,11 +1428,14 @@ func performChop(patp string, shipConf structs.UrbitDocker, transitionType strin
 		return chopError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 	}
 	isRunning := strings.Contains(status, "Up")
+	previousDesiredStatus = currentDesiredStatus(patp, status, previousBootStatus)
+	shouldRestart = isRunning || previousDesiredStatus == "running" || previousBootStatus == "boot"
 	// prevent die/stop watchers from restarting the ship while maintenance exits are expected
 	if containerState, exists := config.GetContainerState()[patp]; exists {
 		containerState.DesiredStatus = "stopped"
 		config.UpdateContainerState(patp, containerState)
 	}
+	maintenanceChanged = true
 	if isRunning {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "stopping"}
 		if err := click.BarExit(patp); err != nil {
@@ -1318,7 +1444,9 @@ func performChop(patp string, shipConf structs.UrbitDocker, transitionType strin
 				return chopError(fmt.Errorf("Failed to stop ship for chop %s: %v", patp, err))
 			}
 		}
-		WaitComplete(patp)
+		if err := WaitCompleteWithTimeout(patp, 10*time.Minute); err != nil {
+			return chopError(err)
+		}
 	}
 
 	bootStatus := "chop"
@@ -1331,13 +1459,10 @@ func performChop(patp string, shipConf structs.UrbitDocker, transitionType strin
 		zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
 	}
 
-	shipConf.BootStatus = bootStatus
-	update := make(map[string]structs.UrbitDocker)
-	update[patp] = shipConf
-	if err := config.UpdateUrbitConfig(update); err != nil {
+	if err := setShipBootStatus(patp, bootStatus); err != nil {
 		return chopError(fmt.Errorf("Failed to update %s urbit config to %s: %v", patp, bootStatus, err))
 	}
-	if _, err := docker.StartContainer(patp, "vere"); err != nil {
+	if err := startShipWithDesiredStatus(patp, "stopped"); err != nil {
 		return chopError(fmt.Errorf("Failed to start %s maintenance for %s: %v", bootStatus, patp, err))
 	}
 	if rollBeforeChop {
@@ -1345,23 +1470,27 @@ func performChop(patp string, shipConf structs.UrbitDocker, transitionType strin
 	}
 
 	zap.L().Info(fmt.Sprintf("Waiting for %s to complete for %s", bootStatus, patp))
-	WaitComplete(patp)
+	if err := WaitCompleteWithTimeout(patp, 2*time.Hour); err != nil {
+		return chopError(err)
+	}
 
-	if isRunning {
+	if shouldRestart {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "starting"}
 		if containerState, exists := config.GetContainerState()[patp]; exists {
 			containerState.DesiredStatus = "running"
 			config.UpdateContainerState(patp, containerState)
 		}
-		shipConf.BootStatus = "boot"
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		if err := config.UpdateUrbitConfig(update); err != nil {
-			return chopError(fmt.Errorf("Failed to update %s urbit config to chop: %v", patp, err))
+		if err := setShipBootStatus(patp, "boot"); err != nil {
+			return chopError(fmt.Errorf("Failed to update %s urbit config to boot: %v", patp, err))
 		}
-		if _, err := docker.StartContainer(patp, "vere"); err != nil {
-			return chopError(fmt.Errorf("Failed to chop %s: %v", patp, err))
+		if err := startShipWithDesiredStatus(patp, "running"); err != nil {
+			return chopError(fmt.Errorf("Failed to restart %s after %s: %v", patp, bootStatus, err))
 		}
+	} else {
+		if err := setShipBootStatus(patp, docker.PersistentBootStatusAfterContainerBuild(previousBootStatus)); err != nil {
+			return chopError(fmt.Errorf("Failed to restore %s boot status after %s: %v", patp, bootStatus, err))
+		}
+		updateDesiredContainerStatus(patp, "stopped")
 	}
 
 	postChopSize := int64(docker.ForceUpdateContainerStats(patp).DiskUsage / (1 << 30))

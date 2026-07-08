@@ -5,6 +5,7 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/handler"
+	"groundseg/structs"
 	"time"
 
 	"go.uber.org/zap"
@@ -23,7 +24,11 @@ func ChopAtLimit() {
 			zap.L().Info(fmt.Sprintf("Auto chop: Checking if %s requires a chop. Limit: %v GB, Current Size (rounded) %v GB", patp, urbConf.SizeLimit, currentSize))
 			if int64(urbConf.SizeLimit) <= currentSize {
 				zap.L().Info(fmt.Sprintf("Auto chop: Attempting roll & chop for %s", patp))
-				go handler.ScheduledChopPier(patp, urbConf)
+				go func(patp string, urbConf structs.UrbitDocker) {
+					if err := handler.ScheduledChopPier(patp, urbConf); err != nil {
+						zap.L().Warn(fmt.Sprintf("Auto chop failed for %s: %v", patp, err))
+					}
+				}(patp, urbConf)
 			}
 		}
 

@@ -6,16 +6,16 @@
   let contact = ''
   let description = ''
 
-  let bugChecker = []
-  let selectAll
   let pierLogs = []
 
   $: urbits = ($structure?.urbits) || {}
-  $: urbitKeys = Object.keys(urbits)
-
-  const forceSet = b => {
-    for (let i = 0; i < bugChecker.length; i++) {
-      bugChecker[i].forceSet(b)
+  $: urbitKeys = Object.keys(urbits).sort()
+  $: allPiersSelected = urbitKeys.length > 0 && urbitKeys.every(p => pierLogs.includes(p))
+  $: {
+    const available = new Set(urbitKeys)
+    const filtered = pierLogs.filter(p => available.has(p))
+    if (filtered.length !== pierLogs.length) {
+      pierLogs = filtered
     }
   }
 
@@ -23,18 +23,15 @@
     const { name, check } = e.detail
     if (check) {
       if (!pierLogs.includes(name)) {
-        pierLogs.push(name)
+        pierLogs = [...pierLogs, name]
       }
     } else {
-      const index = pierLogs.indexOf(name);
-      if (index > -1) {
-        pierLogs.splice(index, 1);
-      }
+      pierLogs = pierLogs.filter(p => p !== name)
     }
   }
 
   const handleCheckAll = e => {
-    forceSet(e.detail.check)
+    pierLogs = e.detail.check ? [...urbitKeys] : []
   }
 
 
@@ -68,11 +65,15 @@
       <div class="logs">
         <div class="header">Send Pier Logs (optional)</div>
         <div class="check-flex">
-          {#each urbitKeys as p, i}
-            <PierCheck bind:this={bugChecker[i]} name={p} on:update={addPier} submitting={false}/>
-          {/each}
+          {#if urbitKeys.length === 0}
+            <div class="empty">No ships are currently registered in GroundSeg.</div>
+          {:else}
+            {#each urbitKeys as p (p)}
+              <PierCheck name={p} checked={pierLogs.includes(p)} on:update={addPier} submitting={false}/>
+            {/each}
+          {/if}
           {#if urbitKeys.length > 1}
-            <PierCheck bind:this={selectAll} on:update={handleCheckAll} checkAll={true} submitting={false} />
+            <PierCheck on:update={handleCheckAll} checkAll={true} checked={allPiersSelected} submitting={false} />
           {/if}
         </div>
       </div>
@@ -163,6 +164,12 @@
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 10px;
+  }
+  .empty {
+    width: 100%;
+    font-family: var(--regular-font);
+    font-size: 12px;
+    opacity: .7;
   }
   ul {
     font-size: 12px;
