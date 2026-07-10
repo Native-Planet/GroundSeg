@@ -1,5 +1,5 @@
 import { get, writable } from 'svelte/store'
-import { loadSession, saveSession, generateRandom } from './gs-crypto'
+import { loadSession, saveSession, isSessionRemembered, setSessionRemembered, generateRandom } from './gs-crypto'
 import { URBIT_MODE, connected, structure, firstLoad } from './data.js'
 import { sendPoke } from './urbit.js'
 
@@ -306,28 +306,32 @@ export const verify = async () => {
 }
 
 // Login
-export const login = async password => {
+export const login = async (password, remember = isSessionRemembered()) => {
   loginError.set('');
+  setSessionRemembered(remember)
   let payload = {
     "type":"login",
-    "password":password
+    "password":password,
+    "remember":remember
   }
   send(payload)
 }
 
 // Logout
-export const logout = () => {
+export const logout = async () => {
+  setSessionRemembered(false)
   let payload = {"type":"logout"}
-  send(payload)
+  await send(payload)
 }
 
 // Logout everywhere
-export const logoutAll = () => {
+export const logoutAll = async () => {
+  setSessionRemembered(false)
   let payload = {
     "type":"logout",
     "action":"everywhere"
   }
-  send(payload)
+  await send(payload)
 }
 
 export const modifyPassword = (old,pwd) => {

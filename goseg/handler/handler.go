@@ -160,7 +160,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
 		failedLogins = 0
-		newToken, err := auth.AuthToken(loginPayload.Token.Token)
+		newToken, err := auth.AuthToken(loginPayload.Token.Token, loginPayload.Payload.Remember)
 		if err != nil {
 			return make(map[string]string), err
 		}
@@ -222,6 +222,10 @@ func LogoutHandler(msg []byte) error {
 		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
 	}
 	auth.RemoveFromAuthMap(logoutPayload.Token.ID, true)
+	auth.RemoveFromAuthMap(logoutPayload.Token.ID, false)
+	if err := auth.RemoveSession(logoutPayload.Token.ID); err != nil {
+		return err
+	}
 	return nil
 }
 

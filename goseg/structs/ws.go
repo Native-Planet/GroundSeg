@@ -423,6 +423,7 @@ type WsLoginPayload struct {
 type WsLoginAction struct {
 	Type     string `json:"type"`
 	Password string `json:"password"`
+	Remember bool   `json:"remember"`
 }
 
 type WsPwPayload struct {
