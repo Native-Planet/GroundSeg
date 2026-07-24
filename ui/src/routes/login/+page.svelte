@@ -1,10 +1,9 @@
 <script>
   import { login, loginError } from '$lib/stores/websocket'
+  import { isSessionRemembered } from '$lib/stores/gs-crypto'
   import { structure } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
-  import { scale } from 'svelte/transition'
   import { onMount, onDestroy } from 'svelte'
-  import { page } from '$app/stores'
 
   import Fa from 'svelte-fa'
   import { faLock } from '@fortawesome/free-solid-svg-icons'
@@ -12,7 +11,7 @@
   let passwordInput;
   let inView = false
   let loginPassword = ''
-  let buttonStatus = 'standard'
+  let rememberMe = false
 
   $: if ($loginError) {
     showModal($loginError);
@@ -27,6 +26,7 @@
   $: seconds = Math.floor(remainder % 60)
 
   onMount(() => {
+    rememberMe = isSessionRemembered()
     inView = true;
     setTimeout(() => {
       if (passwordInput && unlocked) {
@@ -37,7 +37,7 @@
   onDestroy(() => inView = false);
 
   const handleLogin = async () => {
-    login(loginPassword)
+    login(loginPassword, rememberMe)
   }
 
   function showModal(message) {
@@ -60,6 +60,7 @@
       <!-- Password Input -->
       <div class="pw-wrapper">
         <input
+          class="password-input"
           bind:this={passwordInput}
           type="password"
           disabled={!unlocked}
@@ -69,6 +70,15 @@
           }}
         />
       </div>
+      <label class="remember-row">
+        <input class="remember-input" type="checkbox" bind:checked={rememberMe} />
+        <span class="remember-box" aria-hidden="true">
+          {#if rememberMe}
+            <img class="checkmark" src="/checkmark.svg" alt="" />
+          {/if}
+        </span>
+        <span class="remember-text">Remember me</span>
+      </label>
       <button on:click={handleLogin} login>Submit</button>
     {:else}
       <div class="locked-icon"><Fa icon={faLock} size="8x" /></div>
@@ -107,7 +117,7 @@
     font-size: 60px;
     font-family: var(--title-font);
   }
-  input {
+  .password-input {
     flex: 1;
     color: var(--NP_Black, #313933);
     leading-trim: both;
@@ -126,11 +136,53 @@
     text-align: center;
     padding: 32px 24px 36px 24px;
   }
-  input:focus {
+  .password-input:focus {
     outline: none;
   }
+  .remember-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 480px;
+    max-width: 80vw;
+    cursor: pointer;
+    user-select: none;
+  }
+  .remember-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .remember-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: solid 2px var(--text-color);
+    border-radius: 8px;
+    background: var(--Gray-100, #DDE3DF);
+    flex-shrink: 0;
+  }
+  .remember-input:focus-visible + .remember-box {
+    outline: solid 2px var(--btn-special);
+    outline-offset: 3px;
+  }
+  .remember-text {
+    color: var(--Gray-400, #5C7060);
+    font-family: Inter;
+    font-size: 18px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: 0;
+  }
+  .checkmark {
+    width: 16px;
+    height: 16px;
+  }
   button {
-    margin-top: 55px;
+    margin-top: 32px;
     font-family: var(--regular-font);
     background: var(--btn-special);
     color: var(--text-card-color);
@@ -153,10 +205,6 @@
     font-weight: 300;
     line-height: 32px; /* 133.333% */
     letter-spacing: -1.44px;
-  }
-  .info {
-    margin: 20px;
-    padding: 12px 0;
   }
   .locked-icon {
     color: var(--locked-color);

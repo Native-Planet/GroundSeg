@@ -43,6 +43,7 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/structs"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -56,6 +57,11 @@ import (
 
 var (
 	ClientManager = NewClientManager()
+)
+
+const (
+	authTokenTimeFormat  = time.RFC3339
+	rememberedSessionTTL = 30 * 24 * time.Hour
 )
 
 func init() {
@@ -172,17 +178,21 @@ func TokenIdUnauthed(clientManager *structs.ClientManager, token string) bool {
 	return exists
 }
 
+func hashToken(tokenStr string) string {
+	hashed := sha512.Sum512([]byte(tokenStr))
+	return hex.EncodeToString(hashed[:])
+}
+
 // this takes a bool for auth/unauth
 // purge token/conn from opposite map
 // persists to config
 func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) error {
 	tokenStr := token["token"]
 	tokenId := token["id"]
-	hashed := sha512.Sum512([]byte(tokenStr))
-	hash := hex.EncodeToString(hashed[:])
+	hash := hashToken(tokenStr)
 	muConn := &structs.MuConn{}
 	if conn != nil {
-		muConn = &structs.MuConn{Conn: conn, Active: true}
+		muConn = &structs.MuConn{Conn: conn, Active: true, LastActive: time.Now()}
 		if authed {
 			ClientManager.AddAuthClient(tokenId, muConn)
 			zap.L().Info(fmt.Sprintf("%s added to auth", tokenId))
@@ -210,6 +220,59 @@ func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
 	}
 }
 
+func copySessionMap(input map[string]structs.SessionInfo) map[string]structs.SessionInfo {
+	output := make(map[string]structs.SessionInfo)
+	maps.Copy(output, input)
+	return output
+}
+
+func RemoveSession(tokenId string) error {
+	conf := config.Conf()
+	authorizedSessions := copySessionMap(conf.Sessions.Authorized)
+	unauthorizedSessions := copySessionMap(conf.Sessions.Unauthorized)
+	delete(authorizedSessions, tokenId)
+	delete(unauthorizedSessions, tokenId)
+	update := map[string]any{
+		"sessions": map[string]any{
+			"authorized":   authorizedSessions,
+			"unauthorized": unauthorizedSessions,
+		},
+	}
+	if err := config.UpdateConf(update); err != nil {
+		return fmt.Errorf("Error removing session: %v", err)
+	}
+	return nil
+}
+
+func authorizedSessionKnown(tokenID string, tokenStr string) bool {
+	if TokenIdAuthed(ClientManager, tokenID) {
+		return true
+	}
+	conf := config.Conf()
+	session, exists := conf.Sessions.Authorized[tokenID]
+	return exists && session.Hash == hashToken(tokenStr)
+}
+
+func expireSession(tokenID string) {
+	RemoveFromAuthMap(tokenID, true)
+	RemoveFromAuthMap(tokenID, false)
+	if err := RemoveSession(tokenID); err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to remove expired session %s: %v", tokenID, err))
+	}
+}
+
+func tokenExpired(contents map[string]string) bool {
+	expires := contents["expires"]
+	if expires == "" {
+		return false
+	}
+	expiresAt, err := time.Parse(authTokenTimeFormat, expires)
+	if err != nil {
+		return true
+	}
+	return time.Now().After(expiresAt)
+}
+
 // check the validity of the token
 func CheckToken(token map[string]string, r *http.Request) (string, bool) {
 	// great you have token. we see if valid.
@@ -223,6 +286,10 @@ func CheckToken(token map[string]string, r *http.Request) (string, bool) {
 		zap.L().Warn(fmt.Sprintf("Invalid token provided: %v", err))
 		return token["token"], false
 	} else {
+		if tokenExpired(res) {
+			expireSession(token["id"])
+			return token["token"], false
+		}
 		// so you decrypt. now we see the useragent and ip.
 		var ip string
 		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
@@ -232,7 +299,7 @@ func CheckToken(token map[string]string, r *http.Request) (string, bool) {
 		}
 		userAgent := r.Header.Get("User-Agent")
 		// you in auth map?
-		if TokenIdAuthed(ClientManager, token["id"]) {
+		if authorizedSessionKnown(token["id"], token["token"]) {
 			// check the decrypted token contents
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
 				// already marked authorized? yes
@@ -270,6 +337,10 @@ func CheckStreamToken(token structs.WsTokenStruct, r *http.Request) (string, boo
 		zap.L().Warn(fmt.Sprintf("Invalid stream token provided: %v", err))
 		return token.Token, false, false
 	}
+	if tokenExpired(res) {
+		expireSession(token.ID)
+		return token.Token, false, false
+	}
 	var ip string
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 		ip = strings.Split(forwarded, ",")[0]
@@ -281,7 +352,7 @@ func CheckStreamToken(token structs.WsTokenStruct, r *http.Request) (string, boo
 		zap.L().Warn("Stream token metadata doesn't match session")
 		return token.Token, false, false
 	}
-	if TokenIdAuthed(ClientManager, token.ID) {
+	if authorizedSessionKnown(token.ID, token.Token) {
 		if res["authorized"] == "true" {
 			return token.Token, true, true
 		}
@@ -300,7 +371,7 @@ func CheckStreamToken(token structs.WsTokenStruct, r *http.Request) (string, boo
 }
 
 // make a token authed
-func AuthToken(token string) (string, error) {
+func AuthToken(token string, remember bool) (string, error) {
 	conf := config.Conf()
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token, key)
@@ -308,6 +379,12 @@ func AuthToken(token string) (string, error) {
 		return "", err
 	}
 	res["authorized"] = "true"
+	res["remembered"] = fmt.Sprintf("%v", remember)
+	if remember {
+		res["expires"] = time.Now().Add(rememberedSessionTTL).UTC().Format(authTokenTimeFormat)
+	} else {
+		delete(res, "expires")
+	}
 	encryptedText, err := KeyfileEncrypt(res, key)
 	if err != nil {
 		zap.L().Error("Error encrypting token")
@@ -339,6 +416,7 @@ func CreateToken(conn *websocket.Conn, r *http.Request, authed bool) (map[string
 		"secret":     secret,
 		"padding":    padding,
 		"authorized": fmt.Sprintf("%v", authed),
+		"remembered": "false",
 		"created":    now,
 	}
 	// encrypt the contents
@@ -363,29 +441,28 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 		Hash:    hash,
 		Created: created,
 	}
+	conf := config.Conf()
+	authorizedSessions := copySessionMap(conf.Sessions.Authorized)
+	unauthorizedSessions := copySessionMap(conf.Sessions.Unauthorized)
 	if authorized {
-		update := map[string]any{
-			"sessions": map[string]any{
-				"authorized": map[string]structs.SessionInfo{
-					tokenID: session,
-				},
-			},
-		}
-		if err := config.UpdateConf(update); err != nil {
-			return fmt.Errorf("Error adding session: %v", err)
-		}
+		authorizedSessions[tokenID] = session
+		delete(unauthorizedSessions, tokenID)
+	} else {
+		unauthorizedSessions[tokenID] = session
+		delete(authorizedSessions, tokenID)
+	}
+	update := map[string]any{
+		"sessions": map[string]any{
+			"authorized":   authorizedSessions,
+			"unauthorized": unauthorizedSessions,
+		},
+	}
+	if err := config.UpdateConf(update); err != nil {
+		return fmt.Errorf("Error adding session: %v", err)
+	}
+	if authorized {
 		RemoveFromAuthMap(tokenID, false)
 	} else {
-		update := map[string]any{
-			"sessions": map[string]any{
-				"unauthorized": map[string]structs.SessionInfo{
-					tokenID: session,
-				},
-			},
-		}
-		if err := config.UpdateConf(update); err != nil {
-			return fmt.Errorf("Error adding session: %v", err)
-		}
 		RemoveFromAuthMap(tokenID, true)
 	}
 	return nil
@@ -461,6 +538,10 @@ func LogTokenCheck(token structs.WsTokenStruct, r *http.Request) bool {
 		zap.L().Warn(fmt.Sprintf("Invalid token provided: %v", err))
 		return false
 	} else {
+		if tokenExpired(res) {
+			expireSession(token.ID)
+			return false
+		}
 		// so you decrypt. now we see the useragent and ip.
 		var ip string
 		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
@@ -470,7 +551,7 @@ func LogTokenCheck(token structs.WsTokenStruct, r *http.Request) bool {
 		}
 		userAgent := r.Header.Get("User-Agent")
 		// you in auth map?
-		if TokenIdAuthed(ClientManager, token.ID) {
+		if authorizedSessionKnown(token.ID, token.Token) {
 			// check the decrypted token contents
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token.ID {
 				// already marked authorized? yes
