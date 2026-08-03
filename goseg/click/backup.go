@@ -10,11 +10,11 @@ import (
 	    ;<  a=egg-any:gall
 			  bind:m
 			(scry egg-any:gall /gv/<agent>/$)
-	  (pure:m !>((jam ?>(?=(%live +<.a) a(p.old-state -:!>(*))))))
+	  (pure:m !>((jam ?>(?=(%live +<.a) a))))
 */
 func backupAgent(patp, agent string) error {
 	file := fmt.Sprintf("backup-%s", agent)
-	stateJam := "(jam ?>(?=(%live +<.a) a(p.old-state -:!>(*))))"
+	stateJam := "(jam ?>(?=(%live +<.a) a))"
 	scry := fmt.Sprintf("(scry egg-any:gall /gv/%s/$)", agent)
 	hoon := joinGap([]string{
 		"=/", "m", "(strand ,vase)",
