@@ -82,19 +82,11 @@ func CheckVersion() (structs.Channel, bool) {
 		VersionInfo = targetChannel
 		// debug: re-marshal and write the entire fetched version to disk
 		confPath := filepath.Join(BasePath, "settings", "version_info.json")
-		file, err := os.Create(confPath)
-		if err != nil {
-			errmsg := fmt.Sprintf("Failed to create file: %v", err)
+		if err := writeJSONDurably(confPath, &fetchedVersion, 0o644); err != nil {
+			errmsg := fmt.Sprintf("Failed to write JSON: %v", err)
 			zap.L().Error(errmsg)
 			VersionServerReady = false
 			return VersionInfo, false
-		}
-		defer file.Close()
-		encoder := json.NewEncoder(file)
-		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(&fetchedVersion); err != nil {
-			errmsg := fmt.Sprintf("Failed to write JSON: %v", err)
-			zap.L().Error(errmsg)
 		}
 		VersionServerReady = true
 		return VersionInfo, true
@@ -135,7 +127,7 @@ func CreateDefaultVersion() error {
 		return err
 	}
 	filePath := filepath.Join(BasePath, "settings", "version_info.json")
-	err = os.WriteFile(filePath, prettyJSON, 0644)
+	err = writeFileDurably(filePath, append(prettyJSON, '\n'), 0o644)
 	if err != nil {
 		return err
 	}

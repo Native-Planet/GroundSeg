@@ -1,10 +1,8 @@
 package config
 
 import (
-	"encoding/json"
 	"groundseg/defaults"
 	"groundseg/structs"
-	"os"
 	"path/filepath"
 )
 
@@ -12,20 +10,7 @@ import (
 func CreateDefaultNetdataConf() error {
 	defaultConfig := defaults.NetdataConfig
 	path := filepath.Join(BasePath, "settings", "netdata.json")
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return err
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(&defaultConfig); err != nil {
-		return err
-	}
-	return nil
+	return writeJSONDurably(path, &defaultConfig, 0o644)
 }
 
 // write a conf to disk from version server info
@@ -57,18 +42,5 @@ func UpdateNetdataConf() error {
 		},
 	}
 	path := filepath.Join(BasePath, "settings", "netdata.json")
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return err
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(&newConfig); err != nil {
-		return err
-	}
-	return nil
+	return writeJSONDurably(path, &newConfig, 0o644)
 }

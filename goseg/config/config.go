@@ -106,7 +106,7 @@ func init() {
 		keyfile, err := os.Stat(keyPath)
 		if err != nil || keyfile.Size() == 0 {
 			keyContent := RandString(32)
-			if err := os.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+			if err := writeFileDurably(keyPath, []byte(keyContent), 0644); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
 			}
 		}
@@ -168,7 +168,7 @@ func init() {
 		keyfile, err := os.Stat(keyPath)
 		if err != nil || keyfile.Size() == 0 {
 			keyContent := RandString(32)
-			if err := os.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+			if err := writeFileDurably(keyPath, []byte(keyContent), 0644); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
 			}
 		}
@@ -334,39 +334,22 @@ func persistConf(configMap map[string]any) error {
 	pruneRemovedSysConfigKeys(configMap)
 	BasePath := getBasePath()
 	confPath := filepath.Join(BasePath, "settings", "system.json")
-	tmpFile, err := os.CreateTemp(filepath.Dir(confPath), "system.json.*")
-	if err != nil {
-		return fmt.Errorf("error creating temp file: %v", err)
-	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
 	updatedJSON, err := json.MarshalIndent(configMap, "", "    ")
 	if err != nil {
 		return fmt.Errorf("error encoding JSON: %v", err)
 	}
-	// write to temp file and validate before overwriting
-	if _, err := tmpFile.Write(updatedJSON); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("error writing temp file: %v", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("error closing temp file: %v", err)
-	}
-	fi, err := os.Stat(tmpPath)
-	if err != nil {
-		return fmt.Errorf("error checking temp file: %v", err)
-	}
-	if fi.Size() == 0 {
+	if len(updatedJSON) == 0 {
 		return fmt.Errorf("refusing to persist empty configuration file")
 	}
 	var nextConfig structs.SysConfig
 	if err := json.Unmarshal(updatedJSON, &nextConfig); err != nil {
 		return fmt.Errorf("error updating global config: %v", err)
 	}
-	globalConfig = nextConfig
-	if err := os.Rename(tmpPath, confPath); err != nil {
-		return fmt.Errorf("error moving temp file: %v", err)
+	updatedJSON = append(updatedJSON, '\n')
+	if err := writeFileDurably(confPath, updatedJSON, 0o644); err != nil {
+		return fmt.Errorf("error persisting system config: %v", err)
 	}
+	globalConfig = nextConfig
 	return nil
 }
 
@@ -395,27 +378,7 @@ func pruneRemovedSysConfigKeysOnDisk() error {
 	if !changed {
 		return nil
 	}
-	tmpFile, err := os.CreateTemp(filepath.Dir(confPath), "system.json.*")
-	if err != nil {
-		return fmt.Errorf("error creating temp file: %v", err)
-	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
-	encoder := json.NewEncoder(tmpFile)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(configMap); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("error encoding config: %v", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("error closing temp file: %v", err)
-	}
-	if fi, err := os.Stat(tmpPath); err != nil {
-		return fmt.Errorf("error checking temp file: %v", err)
-	} else if fi.Size() == 0 {
-		return fmt.Errorf("refusing to persist empty configuration file")
-	}
-	return os.Rename(tmpPath, confPath)
+	return writeJSONDurably(confPath, configMap, 0o644)
 }
 
 // we keep map[string]structs.ContainerState in memory to keep track of the containers
@@ -451,20 +414,7 @@ func GetContainerState() map[string]structs.ContainerState {
 func createDefaultConf() error {
 	defaultConfig := defaults.SysConfig(BasePath)
 	path := filepath.Join(BasePath, "settings", "system.json")
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return err
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(&defaultConfig); err != nil {
-		return err
-	}
-	return nil
+	return writeJSONDurably(path, &defaultConfig, 0o644)
 }
 
 // check outbound tcp connectivity
