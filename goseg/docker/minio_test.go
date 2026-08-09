@@ -257,3 +257,12 @@ func TestObjectStoreConsoleURLUsesPublishedOfflineConsolePort(t *testing.T) {
 		t.Fatalf("unexpected console url: %s", url)
 	}
 }
+
+func TestLegacyEmptyMigrationMarkerCompletesMigration(t *testing.T) {
+	if !migrationMarkerRepresentsCompletedEmptySource("legacy-empty") {
+		t.Fatal("legacy-empty marker must prevent future migration attempts")
+	}
+	if migrationMarkerRepresentsCompletedEmptySource("ok") {
+		t.Fatal("ok marker still requires verifying that the target contains objects")
+	}
+}
