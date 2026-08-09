@@ -115,10 +115,17 @@ func SelectVersionChannel(versionStruct structs.Version, releaseChannel string) 
 	return structs.Channel{}, releaseChannel, false
 }
 
+func BundledVersion() (structs.Version, error) {
+	var versionInfo structs.Version
+	if err := json.Unmarshal([]byte(defaults.DefaultVersionText), &versionInfo); err != nil {
+		return structs.Version{}, err
+	}
+	return versionInfo, nil
+}
+
 // write the defaults.VersionInfo value to disk
 func CreateDefaultVersion() error {
-	var versionInfo structs.Version
-	err := json.Unmarshal([]byte(defaults.DefaultVersionText), &versionInfo)
+	versionInfo, err := BundledVersion()
 	if err != nil {
 		return err
 	}

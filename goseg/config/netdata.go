@@ -2,8 +2,8 @@ package config
 
 import (
 	"groundseg/defaults"
-	"groundseg/structs"
 	"path/filepath"
+	"strings"
 )
 
 // write a hardcoded default conf to disk
@@ -15,31 +15,13 @@ func CreateDefaultNetdataConf() error {
 
 // write a conf to disk from version server info
 func UpdateNetdataConf() error {
-	conf := Conf()
-	releaseChannel := conf.UpdateBranch
-	netdataRepo := VersionInfo.Netdata.Repo
-	amdHash := VersionInfo.Netdata.Amd64Sha256
-	armHash := VersionInfo.Netdata.Arm64Sha256
-	newConfig := structs.NetdataConfig{
-		NetdataName:    "netdata",
-		Repo:           netdataRepo,
-		NetdataVersion: releaseChannel,
-		Amd64Sha256:    amdHash,
-		Arm64Sha256:    armHash,
-		CapAdd:         []string{"SYS_PTRACE"},
-		Port:           19999,
-		Restart:        "unless-stopped",
-		SecurityOpt:    "apparmor=unconfined",
-		Volumes: []string{
-			"netdataconfig:/etc/netdata",
-			"netdatalib:/var/lib/netdata",
-			"netdatacache:/var/cache/netdata",
-			"/etc/passwd:/host/etc/passwd:ro",
-			"/etc/group:/host/etc/group:ro",
-			"/proc:/host/proc:ro",
-			"/sys:/host/sys:ro",
-			"/etc/os-release:/host/etc/os-release:ro",
-		},
+	newConfig := defaults.NetdataConfig
+	versionInfo := VersionInfo.Netdata
+	if strings.Contains(versionInfo.Repo, "henrygd/beszel") {
+		newConfig.Repo = versionInfo.Repo
+		newConfig.NetdataVersion = versionInfo.Tag
+		newConfig.Amd64Sha256 = versionInfo.Amd64Sha256
+		newConfig.Arm64Sha256 = versionInfo.Arm64Sha256
 	}
 	path := filepath.Join(BasePath, "settings", "netdata.json")
 	return writeJSONDurably(path, &newConfig, 0o644)

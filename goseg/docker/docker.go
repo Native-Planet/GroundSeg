@@ -301,7 +301,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 	case "netdata":
-		containerConfig, hostConfig, err = netdataContainerConf()
+		runtime := currentBeszelRuntime()
+		containerConfig, hostConfig, err = beszelHubContainerConf(runtime.password)
+		if err != nil {
+			return containerState, err
+		}
+	case "beszel-agent":
+		runtime := currentBeszelRuntime()
+		containerConfig, hostConfig, err = beszelAgentContainerConf(runtime.key, runtime.token)
 		if err != nil {
 			return containerState, err
 		}
@@ -519,7 +526,14 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 			return containerState, err
 		}
 	case "netdata":
-		containerConfig, hostConfig, err = netdataContainerConf()
+		runtime := currentBeszelRuntime()
+		containerConfig, hostConfig, err = beszelHubContainerConf(runtime.password)
+		if err != nil {
+			return containerState, err
+		}
+	case "beszel-agent":
+		runtime := currentBeszelRuntime()
+		containerConfig, hostConfig, err = beszelAgentContainerConf(runtime.key, runtime.token)
 		if err != nil {
 			return containerState, err
 		}
@@ -620,12 +634,19 @@ func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	arch := config.Architecture
 	hashLabel := arch + "_sha256"
 	detail, ok := containerVersionDetails(config.VersionInfo, containerType)
-	if !ok || strings.TrimSpace(detail.Tag) == "" || strings.TrimSpace(detail.Repo) == "" {
-		localVersion := config.LocalVersion()
+	useBundledVersion := !ok || strings.TrimSpace(detail.Tag) == "" || strings.TrimSpace(detail.Repo) == ""
+	if containerType == "netdata" && !strings.Contains(detail.Repo, "henrygd/beszel") {
+		useBundledVersion = true
+	}
+	if useBundledVersion {
+		bundledVersion, err := config.BundledVersion()
+		if err != nil {
+			return nil, fmt.Errorf("decode bundled version data: %w", err)
+		}
 		releaseChannel := config.Conf().UpdateBranch
-		channel, selectedChannel, exactChannel := config.SelectVersionChannel(localVersion, releaseChannel)
+		channel, selectedChannel, exactChannel := config.SelectVersionChannel(bundledVersion, releaseChannel)
 		if !exactChannel {
-			zap.L().Warn(fmt.Sprintf("Version channel %q not found locally; using %q", releaseChannel, selectedChannel))
+			zap.L().Warn(fmt.Sprintf("Version channel %q not found in bundled data; using %q", releaseChannel, selectedChannel))
 		}
 		detail, ok = containerVersionDetails(channel, containerType)
 	}
@@ -669,6 +690,8 @@ func containerVersionDetails(channel structs.Channel, containerType string) (str
 		return channel.Miniomc, true
 	case "netdata":
 		return channel.Netdata, true
+	case "beszel-agent", "beszel_agent":
+		return bundledBeszelAgentVersion, true
 	case "vere":
 		return channel.Vere, true
 	case "hermes":

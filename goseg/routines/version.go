@@ -328,7 +328,12 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 			latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
 			if config.Architecture == "amd64" {
 				if latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256 {
-					if contains([]string{"netdata", "wireguard"}, sw) {
+					if sw == "netdata" {
+						reportUpdateStatus(reportStatus, "updating Beszel")
+						if err := docker.LoadBeszel(); err != nil {
+							zap.L().Error(fmt.Sprintf("Failed to update Beszel: %v", err))
+						}
+					} else if sw == "wireguard" {
 						reportUpdateStatus(reportStatus, "updating "+sw)
 						docker.StartContainer(sw, sw)
 					} else if sw == "vere" {
@@ -411,7 +416,12 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 				}
 			} else {
 				if latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256 {
-					if contains([]string{"netdata", "wireguard"}, sw) {
+					if sw == "netdata" {
+						reportUpdateStatus(reportStatus, "updating Beszel")
+						if err := docker.LoadBeszel(); err != nil {
+							zap.L().Error(fmt.Sprintf("Failed to update Beszel: %v", err))
+						}
+					} else if sw == "wireguard" {
 						reportUpdateStatus(reportStatus, "updating "+sw)
 						docker.StartContainer(sw, sw)
 					} else if sw == "vere" {

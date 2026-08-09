@@ -329,7 +329,7 @@ type HermesConfig struct {
 	AccessCode         string `json:"access_code"`
 }
 
-// nedata config json
+// NetdataConfig preserves the legacy monitoring settings slot for Beszel.
 type NetdataConfig struct {
 	NetdataName    string   `json:"netdata_name"`
 	Repo           string   `json:"repo"`

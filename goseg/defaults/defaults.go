@@ -56,23 +56,16 @@ var (
 	}
 	NetdataConfig = structs.NetdataConfig{
 		NetdataName:    "netdata",
-		Repo:           "registry.hub.docker.com/netdata/netdata",
-		NetdataVersion: "latest",
-		Amd64Sha256:    "95e74c36f15091bcd7983ee162248f1f91c21207c235fce6b0d6f8ed9a11732a",
-		Arm64Sha256:    "cd3dc9d182a4561b162f03c6986f4647bbb704f8e7e4872ee0611b1b9e86e1b0",
-		CapAdd:         []string{"SYS_PTRACE"},
+		Repo:           "registry.hub.docker.com/henrygd/beszel",
+		NetdataVersion: "0.18.7",
+		Amd64Sha256:    "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
+		Arm64Sha256:    "598bdb0940ecb734bc95a0c0e388a40a2bc8bf5cf285379657a077e43a2b9e04",
+		CapAdd:         []string{},
 		Port:           19999,
 		Restart:        "unless-stopped",
-		SecurityOpt:    "apparmor=unconfined",
+		SecurityOpt:    "",
 		Volumes: []string{
-			"netdataconfig:/etc/netdata",
-			"netdatalib:/var/lib/netdata",
-			"netdatacache:/var/cache/netdata",
-			"/etc/passwd:/host/etc/passwd:ro",
-			"/etc/group:/host/etc/group:ro",
-			"/proc:/host/proc:ro",
-			"/sys:/host/sys:ro",
-			"/etc/os-release:/host/etc/os-release:ro",
+			"beszel_data:/beszel_data",
 		},
 	}
 

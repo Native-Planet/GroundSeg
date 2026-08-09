@@ -27,7 +27,7 @@
       class="link">
       Report Bug
     </button>
-    <a href="http://{$page.url.hostname}:19999" target="_blank" class="link">Netdata</a>
+    <a href="http://{$page.url.hostname}:19999" target="_blank" class="link">Beszel</a>
     <span>|</span>
     <a href="https://twitter.com/NativePlanetIO" target="_blank" class="link">Twitter</a>
     <a href="mailto:support@nativeplanet.io" target="_blank" class="link">Email</a>
