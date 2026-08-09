@@ -54,16 +54,16 @@ var (
 		DisableShipRestarts: false,
 		SnapTime:            60,
 	}
-	NetdataConfig = structs.NetdataConfig{
-		NetdataName:    "netdata",
-		Repo:           "registry.hub.docker.com/henrygd/beszel",
-		NetdataVersion: "0.18.7",
-		Amd64Sha256:    "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
-		Arm64Sha256:    "598bdb0940ecb734bc95a0c0e388a40a2bc8bf5cf285379657a077e43a2b9e04",
-		CapAdd:         []string{},
-		Port:           19999,
-		Restart:        "unless-stopped",
-		SecurityOpt:    "",
+	BeszelConfig = structs.BeszelConfig{
+		BeszelName:    "beszel",
+		Repo:          "registry.hub.docker.com/henrygd/beszel",
+		BeszelVersion: "0.18.7",
+		Amd64Sha256:   "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
+		Arm64Sha256:   "598bdb0940ecb734bc95a0c0e388a40a2bc8bf5cf285379657a077e43a2b9e04",
+		CapAdd:        []string{},
+		Port:          19999,
+		Restart:       "unless-stopped",
+		SecurityOpt:   "",
 		Volumes: []string{
 			"beszel_data:/beszel_data",
 		},

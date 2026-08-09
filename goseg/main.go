@@ -357,7 +357,7 @@ func main() {
 		// Load object stores
 		loadService(docker.LoadObjectStores, "Unable to load RustFS containers!")
 	}
-	// Load Beszel in the legacy netdata service slot.
+	// Load Beszel monitoring.
 	loadService(docker.LoadBeszel, "Unable to load Beszel!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")

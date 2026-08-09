@@ -44,10 +44,16 @@ var (
         "repo": "registry.hub.docker.com/minio/mc",
         "tag": "latest"
       },
-      "netdata": {
+      "beszel": {
         "amd64_sha256": "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
         "arm64_sha256": "598bdb0940ecb734bc95a0c0e388a40a2bc8bf5cf285379657a077e43a2b9e04",
         "repo": "registry.hub.docker.com/henrygd/beszel",
+        "tag": "0.18.7"
+      },
+      "beszel_agent": {
+        "amd64_sha256": "a45ca92579eca9b5e7304e2f5982de3c3e6325151e48dbc59e4fa0c5a28d55a1",
+        "arm64_sha256": "d4b6f8811850a3d59cebc23d4f506bf05bdfcf42192e084609b8535d3ee0940d",
+        "repo": "registry.hub.docker.com/henrygd/beszel-agent",
         "tag": "0.18.7"
       },
       "vere": {
@@ -104,10 +110,16 @@ var (
         "repo": "registry.hub.docker.com/minio/mc",
         "tag": "latest"
       },
-      "netdata": {
+      "beszel": {
         "amd64_sha256": "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
         "arm64_sha256": "598bdb0940ecb734bc95a0c0e388a40a2bc8bf5cf285379657a077e43a2b9e04",
         "repo": "registry.hub.docker.com/henrygd/beszel",
+        "tag": "0.18.7"
+      },
+      "beszel_agent": {
+        "amd64_sha256": "a45ca92579eca9b5e7304e2f5982de3c3e6325151e48dbc59e4fa0c5a28d55a1",
+        "arm64_sha256": "d4b6f8811850a3d59cebc23d4f506bf05bdfcf42192e084609b8535d3ee0940d",
+        "repo": "registry.hub.docker.com/henrygd/beszel-agent",
         "tag": "0.18.7"
       },
       "vere": {
@@ -164,10 +176,16 @@ var (
         "repo": "registry.hub.docker.com/minio/mc",
         "tag": "latest"
       },
-      "netdata": {
+      "beszel": {
         "amd64_sha256": "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
         "arm64_sha256": "598bdb0940ecb734bc95a0c0e388a40a2bc8bf5cf285379657a077e43a2b9e04",
         "repo": "registry.hub.docker.com/henrygd/beszel",
+        "tag": "0.18.7"
+      },
+      "beszel_agent": {
+        "amd64_sha256": "a45ca92579eca9b5e7304e2f5982de3c3e6325151e48dbc59e4fa0c5a28d55a1",
+        "arm64_sha256": "d4b6f8811850a3d59cebc23d4f506bf05bdfcf42192e084609b8535d3ee0940d",
+        "repo": "registry.hub.docker.com/henrygd/beszel-agent",
         "tag": "0.18.7"
       },
       "vere": {

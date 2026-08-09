@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"groundseg/config"
-	"groundseg/structs"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	beszelHubContainerName   = "netdata"
+	beszelHubContainerName   = "beszel"
 	beszelAgentContainerName = "beszel-agent"
 	beszelHubURL             = "http://127.0.0.1:19999"
 	beszelUserEmail          = "admin@groundseg.local"
@@ -29,12 +29,6 @@ const (
 )
 
 var (
-	bundledBeszelAgentVersion = structs.VersionDetails{
-		Amd64Sha256: "a45ca92579eca9b5e7304e2f5982de3c3e6325151e48dbc59e4fa0c5a28d55a1",
-		Arm64Sha256: "d4b6f8811850a3d59cebc23d4f506bf05bdfcf42192e084609b8535d3ee0940d",
-		Repo:        "registry.hub.docker.com/henrygd/beszel-agent",
-		Tag:         "0.18.7",
-	}
 	beszelLoadMu       sync.Mutex
 	beszelRuntimeState = struct {
 		sync.RWMutex
@@ -61,12 +55,15 @@ func LoadBeszel() error {
 		return fmt.Errorf("generate Beszel registration token: %w", err)
 	}
 	setBeszelRuntime(beszelRuntime{password: password})
-	if err := config.UpdateNetdataConf(); err != nil {
-		return fmt.Errorf("update netdata settings slot for Beszel: %w", err)
+	if err := config.UpdateBeszelConf(); err != nil {
+		return fmt.Errorf("update Beszel settings: %w", err)
+	}
+	if err := removeLegacyNetdataContainer(FindContainer, DeleteContainer); err != nil {
+		return err
 	}
 
-	zap.L().Info("Loading Beszel Hub container in netdata slot")
-	hubState, err := StartContainer(beszelHubContainerName, "netdata")
+	zap.L().Info("Loading Beszel Hub container")
+	hubState, err := StartContainer(beszelHubContainerName, "beszel")
 	if err != nil {
 		return fmt.Errorf("start Beszel Hub: %w", err)
 	}
@@ -80,14 +77,8 @@ func LoadBeszel() error {
 	}
 	setBeszelRuntime(beszelRuntime{password: password, key: key, token: token})
 
-	existingAgent, err := FindContainer(beszelAgentContainerName)
-	if err != nil {
-		return fmt.Errorf("find Beszel Agent container: %w", err)
-	}
-	if existingAgent != nil {
-		if err := DeleteContainer(beszelAgentContainerName); err != nil {
-			return fmt.Errorf("replace Beszel Agent container: %w", err)
-		}
+	if err := removeExistingBeszelAgent(FindContainer, DeleteContainer); err != nil {
+		return err
 	}
 
 	zap.L().Info("Loading Beszel Agent container")
@@ -99,11 +90,52 @@ func LoadBeszel() error {
 	return nil
 }
 
+func removeExistingBeszelAgent(
+	find func(string) (*container.Summary, error),
+	remove func(string) error,
+) error {
+	existingAgent, err := find(beszelAgentContainerName)
+	if err != nil {
+		if errors.Is(err, ErrContainerNotFound) {
+			return nil
+		}
+		return fmt.Errorf("find Beszel Agent container: %w", err)
+	}
+	if existingAgent == nil {
+		return nil
+	}
+	if err := remove(beszelAgentContainerName); err != nil {
+		return fmt.Errorf("replace Beszel Agent container: %w", err)
+	}
+	return nil
+}
+
+func removeLegacyNetdataContainer(
+	find func(string) (*container.Summary, error),
+	remove func(string) error,
+) error {
+	const legacyContainerName = "netdata"
+	existing, err := find(legacyContainerName)
+	if err != nil {
+		if errors.Is(err, ErrContainerNotFound) {
+			return nil
+		}
+		return fmt.Errorf("find legacy Netdata container: %w", err)
+	}
+	if existing == nil {
+		return nil
+	}
+	if err := remove(legacyContainerName); err != nil {
+		return fmt.Errorf("remove legacy Netdata container: %w", err)
+	}
+	return nil
+}
+
 func beszelHubContainerConf(password string) (container.Config, container.HostConfig, error) {
 	if password == "" {
 		return container.Config{}, container.HostConfig{}, fmt.Errorf("Beszel bootstrap password is empty")
 	}
-	image, err := beszelImageRef("netdata")
+	image, err := beszelImageRef("beszel")
 	if err != nil {
 		return container.Config{}, container.HostConfig{}, err
 	}

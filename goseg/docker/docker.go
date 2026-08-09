@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"groundseg/config"
 	"groundseg/dockerclient"
@@ -25,15 +26,16 @@ import (
 )
 
 var (
-	VolumeDir          = config.DockerDir
-	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
-	HermesTransBus     = make(chan structs.Event, 100)             // hermes profile transition bus
-	SysTransBus        = make(chan structs.SystemTransition, 100)  // system transition bus
-	UpdateCheckBus     = make(chan struct{}, 1)                    // manual version-server update checks
-	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus
-	ImportShipTransBus = make(chan structs.UploadTransition, 100)  // transition event bus
-	ContainerStats     = make(map[string]structs.ContainerStats)   // used for broadcast
-	ContainerStatList  []string                                    // slice of containers to poll for resource use
+	ErrContainerNotFound = errors.New("container not found")
+	VolumeDir            = config.DockerDir
+	UTransBus            = make(chan structs.UrbitTransition, 100)   // urbit transition bus
+	HermesTransBus       = make(chan structs.Event, 100)             // hermes profile transition bus
+	SysTransBus          = make(chan structs.SystemTransition, 100)  // system transition bus
+	UpdateCheckBus       = make(chan struct{}, 1)                    // manual version-server update checks
+	NewShipTransBus      = make(chan structs.NewShipTransition, 100) // transition event bus
+	ImportShipTransBus   = make(chan structs.UploadTransition, 100)  // transition event bus
+	ContainerStats       = make(map[string]structs.ContainerStats)   // used for broadcast
+	ContainerStatList    []string                                    // slice of containers to poll for resource use
 )
 
 func init() {
@@ -300,7 +302,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-	case "netdata":
+	case "beszel":
 		runtime := currentBeszelRuntime()
 		containerConfig, hostConfig, err = beszelHubContainerConf(runtime.password)
 		if err != nil {
@@ -525,7 +527,7 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		if err != nil {
 			return containerState, err
 		}
-	case "netdata":
+	case "beszel":
 		runtime := currentBeszelRuntime()
 		containerConfig, hostConfig, err = beszelHubContainerConf(runtime.password)
 		if err != nil {
@@ -635,9 +637,6 @@ func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	hashLabel := arch + "_sha256"
 	detail, ok := containerVersionDetails(config.VersionInfo, containerType)
 	useBundledVersion := !ok || strings.TrimSpace(detail.Tag) == "" || strings.TrimSpace(detail.Repo) == ""
-	if containerType == "netdata" && !strings.Contains(detail.Repo, "henrygd/beszel") {
-		useBundledVersion = true
-	}
 	if useBundledVersion {
 		bundledVersion, err := config.BundledVersion()
 		if err != nil {
@@ -688,10 +687,10 @@ func containerVersionDetails(channel structs.Channel, containerType string) (str
 		return channel.Minio, true
 	case "miniomc", "mc":
 		return channel.Miniomc, true
-	case "netdata":
-		return channel.Netdata, true
+	case "beszel":
+		return channel.Beszel, true
 	case "beszel-agent", "beszel_agent":
-		return bundledBeszelAgentVersion, true
+		return channel.BeszelAgent, true
 	case "vere":
 		return channel.Vere, true
 	case "hermes":
@@ -1017,7 +1016,7 @@ func FindContainer(containerName string) (*container.Summary, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("Container %v not found", containerName)
+	return nil, fmt.Errorf("%w: %s", ErrContainerNotFound, containerName)
 }
 
 // periodically poll docker in case we miss something

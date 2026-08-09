@@ -301,6 +301,14 @@ func contains(slice []string, item string) bool {
 	return slices.Contains(slice, item)
 }
 
+func versionComponentName(field reflect.StructField) string {
+	name := strings.Split(field.Tag.Get("json"), ",")[0]
+	if name == "" || name == "-" {
+		name = field.Name
+	}
+	return strings.ReplaceAll(strings.ToLower(name), "_", "-")
+}
+
 func updateDocker(release string, currentVersion structs.Channel, latestVersion structs.Channel, reportStatus bool) {
 	zap.L().Info(fmt.Sprintf("update docker called: Current: %v , Latest %v", currentVersion, latestVersion))
 	zap.L().Info(fmt.Sprintf(
@@ -321,17 +329,21 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 
 	typeOfVersion := valCurrent.Type()
 
+	beszelUpdated := false
 	for i := 0; i < valCurrent.NumField(); i++ {
-		sw := strings.ToLower(typeOfVersion.Field(i).Name)
+		sw := versionComponentName(typeOfVersion.Field(i))
 		if sw != "groundseg" && sw != "hermes" {
 			currentDetail := valCurrent.Field(i).Interface().(structs.VersionDetails)
 			latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
 			if config.Architecture == "amd64" {
 				if latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256 {
-					if sw == "netdata" {
-						reportUpdateStatus(reportStatus, "updating Beszel")
-						if err := docker.LoadBeszel(); err != nil {
-							zap.L().Error(fmt.Sprintf("Failed to update Beszel: %v", err))
+					if sw == "beszel" || sw == "beszel-agent" {
+						if !beszelUpdated {
+							reportUpdateStatus(reportStatus, "updating Beszel")
+							if err := docker.LoadBeszel(); err != nil {
+								zap.L().Error(fmt.Sprintf("Failed to update Beszel: %v", err))
+							}
+							beszelUpdated = true
 						}
 					} else if sw == "wireguard" {
 						reportUpdateStatus(reportStatus, "updating "+sw)
@@ -416,10 +428,13 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 				}
 			} else {
 				if latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256 {
-					if sw == "netdata" {
-						reportUpdateStatus(reportStatus, "updating Beszel")
-						if err := docker.LoadBeszel(); err != nil {
-							zap.L().Error(fmt.Sprintf("Failed to update Beszel: %v", err))
+					if sw == "beszel" || sw == "beszel-agent" {
+						if !beszelUpdated {
+							reportUpdateStatus(reportStatus, "updating Beszel")
+							if err := docker.LoadBeszel(); err != nil {
+								zap.L().Error(fmt.Sprintf("Failed to update Beszel: %v", err))
+							}
+							beszelUpdated = true
 						}
 					} else if sw == "wireguard" {
 						reportUpdateStatus(reportStatus, "updating "+sw)

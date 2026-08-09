@@ -11,9 +11,11 @@ import (
 
 	"groundseg/config"
 	"groundseg/structs"
+
+	"github.com/docker/docker/api/types/container"
 )
 
-func TestGetLatestContainerInfoUsesBundledBeszelForLegacyNetdataSlot(t *testing.T) {
+func TestGetLatestContainerInfoUsesBundledBeszelSlots(t *testing.T) {
 	originalVersionInfo := config.VersionInfo
 	originalArchitecture := config.Architecture
 	t.Cleanup(func() {
@@ -21,14 +23,7 @@ func TestGetLatestContainerInfoUsesBundledBeszelForLegacyNetdataSlot(t *testing.
 		config.Architecture = originalArchitecture
 	})
 
-	config.VersionInfo = structs.Channel{
-		Netdata: structs.VersionDetails{
-			Amd64Sha256: "legacy-netdata-amd64",
-			Arm64Sha256: "legacy-netdata-arm64",
-			Repo:        "registry.hub.docker.com/netdata/netdata",
-			Tag:         "latest",
-		},
-	}
+	config.VersionInfo = structs.Channel{}
 	config.Architecture = "amd64"
 
 	tests := []struct {
@@ -37,7 +32,7 @@ func TestGetLatestContainerInfoUsesBundledBeszelForLegacyNetdataSlot(t *testing.
 		hash          string
 	}{
 		{
-			containerType: "netdata",
+			containerType: "beszel",
 			repo:          "registry.hub.docker.com/henrygd/beszel",
 			hash:          "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
 		},
@@ -67,7 +62,7 @@ func TestGetLatestContainerInfoUsesBundledBeszelForLegacyNetdataSlot(t *testing.
 	}
 }
 
-func TestBeszelContainerConfigsPreserveNetdataEndpoint(t *testing.T) {
+func TestBeszelContainerConfigsPreserveMonitoringEndpoint(t *testing.T) {
 	originalVersionInfo := config.VersionInfo
 	originalArchitecture := config.Architecture
 	t.Cleanup(func() {
@@ -106,6 +101,66 @@ func TestBeszelContainerConfigsPreserveNetdataEndpoint(t *testing.T) {
 	assertContains(t, agentHostConfig.Binds, "/var/run/docker.sock:/var/run/docker.sock:ro")
 }
 
+func TestGetLatestContainerInfoUsesBeszelHubVersionSlot(t *testing.T) {
+	originalVersionInfo := config.VersionInfo
+	originalArchitecture := config.Architecture
+	t.Cleanup(func() {
+		config.VersionInfo = originalVersionInfo
+		config.Architecture = originalArchitecture
+	})
+
+	config.VersionInfo = structs.Channel{
+		Beszel: structs.VersionDetails{
+			Amd64Sha256: "server-hub-amd64",
+			Arm64Sha256: "server-hub-arm64",
+			Repo:        "registry.example.com/beszel",
+			Tag:         "server-version",
+		},
+	}
+	config.Architecture = "amd64"
+
+	info, err := GetLatestContainerInfo("beszel")
+	if err != nil {
+		t.Fatalf("GetLatestContainerInfo returned an error: %v", err)
+	}
+	if info["repo"] != "registry.example.com/beszel" {
+		t.Fatalf("repo = %q, want version-server repo", info["repo"])
+	}
+	if info["tag"] != "server-version" || info["hash"] != "server-hub-amd64" {
+		t.Fatalf("version-server Hub details were not used: %#v", info)
+	}
+}
+
+func TestGetLatestContainerInfoUsesBeszelAgentVersionSlot(t *testing.T) {
+	originalVersionInfo := config.VersionInfo
+	originalArchitecture := config.Architecture
+	t.Cleanup(func() {
+		config.VersionInfo = originalVersionInfo
+		config.Architecture = originalArchitecture
+	})
+
+	config.VersionInfo = structs.Channel{
+		BeszelAgent: structs.VersionDetails{
+			Amd64Sha256: "server-agent-amd64",
+			Arm64Sha256: "server-agent-arm64",
+			Repo:        "registry.example.com/beszel-agent",
+			Tag:         "server-version",
+		},
+	}
+	config.Architecture = "amd64"
+
+	info, err := GetLatestContainerInfo("beszel-agent")
+	if err != nil {
+		t.Fatalf("GetLatestContainerInfo returned an error: %v", err)
+	}
+	if info["repo"] != "registry.example.com/beszel-agent" {
+		t.Fatalf("repo = %q, want version-server repo", info["repo"])
+	}
+	if info["tag"] != "server-version" || info["hash"] != "server-agent-amd64" {
+		t.Fatalf("version-server Agent details were not used: %#v", info)
+	}
+}
+
 func TestBootstrapBeszelEnablesPermanentUniversalToken(t *testing.T) {
 	const token = "registration token"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +192,47 @@ func TestBootstrapBeszelEnablesPermanentUniversalToken(t *testing.T) {
 	}
 	if key != "ssh-ed25519 hub-key" {
 		t.Fatalf("key = %q, want %q", key, "ssh-ed25519 hub-key")
+	}
+}
+
+func TestRemoveExistingBeszelAgentAllowsFirstRun(t *testing.T) {
+	removeCalled := false
+	err := removeExistingBeszelAgent(
+		func(string) (*container.Summary, error) {
+			return nil, fmt.Errorf("%w: %s", ErrContainerNotFound, beszelAgentContainerName)
+		},
+		func(string) error {
+			removeCalled = true
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("removeExistingBeszelAgent returned an error: %v", err)
+	}
+	if removeCalled {
+		t.Fatal("removeExistingBeszelAgent tried to remove an absent first-run Agent")
+	}
+}
+
+func TestRemoveLegacyNetdataContainerDeletesContainer(t *testing.T) {
+	var removed string
+	err := removeLegacyNetdataContainer(
+		func(name string) (*container.Summary, error) {
+			if name != "netdata" {
+				t.Fatalf("looked up %q, want netdata", name)
+			}
+			return &container.Summary{}, nil
+		},
+		func(name string) error {
+			removed = name
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("removeLegacyNetdataContainer returned an error: %v", err)
+	}
+	if removed != "netdata" {
+		t.Fatalf("removed %q, want netdata", removed)
 	}
 }
 

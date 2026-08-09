@@ -7,16 +7,17 @@ type Version struct {
 
 // version server payload substruct
 type Channel struct {
-	Groundseg VersionDetails `json:"groundseg"`
-	Manual    VersionDetails `json:"manual"`
-	Rustfs    VersionDetails `json:"rustfs"`
-	Minio     VersionDetails `json:"minio"`
-	Miniomc   VersionDetails `json:"miniomc"`
-	Netdata   VersionDetails `json:"netdata"`
-	Vere      VersionDetails `json:"vere"`
-	Hermes    VersionDetails `json:"hermes"`
-	Webui     VersionDetails `json:"webui"`
-	Wireguard VersionDetails `json:"wireguard"`
+	Groundseg   VersionDetails `json:"groundseg"`
+	Manual      VersionDetails `json:"manual"`
+	Rustfs      VersionDetails `json:"rustfs"`
+	Minio       VersionDetails `json:"minio"`
+	Miniomc     VersionDetails `json:"miniomc"`
+	Beszel      VersionDetails `json:"beszel"`
+	BeszelAgent VersionDetails `json:"beszel_agent"`
+	Vere        VersionDetails `json:"vere"`
+	Hermes      VersionDetails `json:"hermes"`
+	Webui       VersionDetails `json:"webui"`
+	Wireguard   VersionDetails `json:"wireguard"`
 }
 
 // version server payload substruct
