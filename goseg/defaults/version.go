@@ -44,11 +44,17 @@ var (
         "repo": "registry.hub.docker.com/minio/mc",
         "tag": "latest"
       },
-      "netdata": {
-        "amd64_sha256": "95e74c36f15091bcd7983ee162248f1f91c21207c235fce6b0d6f8ed9a11732a",
-        "arm64_sha256": "cd3dc9d182a4561b162f03c6986f4647bbb704f8e7e4872ee0611b1b9e86e1b0",
-        "repo": "registry.hub.docker.com/netdata/netdata",
-        "tag": "latest"
+      "beszel": {
+        "amd64_sha256": "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
+        "arm64_sha256": "598bdb0940ecb734bc95a0c0e388a40a2bc8bf5cf285379657a077e43a2b9e04",
+        "repo": "registry.hub.docker.com/henrygd/beszel",
+        "tag": "0.18.7"
+      },
+      "beszel_agent": {
+        "amd64_sha256": "a45ca92579eca9b5e7304e2f5982de3c3e6325151e48dbc59e4fa0c5a28d55a1",
+        "arm64_sha256": "d4b6f8811850a3d59cebc23d4f506bf05bdfcf42192e084609b8535d3ee0940d",
+        "repo": "registry.hub.docker.com/henrygd/beszel-agent",
+        "tag": "0.18.7"
       },
       "vere": {
         "amd64_sha256": "1e75a40f2ba19939c1cc538a381111f79fe541ee1732712fd64027596dabf68d",
@@ -104,11 +110,17 @@ var (
         "repo": "registry.hub.docker.com/minio/mc",
         "tag": "latest"
       },
-      "netdata": {
-        "amd64_sha256": "4a3a8e1e79e31e3380a79493f53fdaba94d414c90954ed9a96690e9e6406bcf0",
-        "arm64_sha256": "623840bab070e05cddadb197678598a58f2759d6685d4bcefb5881cfc5304f63",
-        "repo": "registry.hub.docker.com/netdata/netdata",
-        "tag": "latest"
+      "beszel": {
+        "amd64_sha256": "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
+        "arm64_sha256": "598bdb0940ecb734bc95a0c0e388a40a2bc8bf5cf285379657a077e43a2b9e04",
+        "repo": "registry.hub.docker.com/henrygd/beszel",
+        "tag": "0.18.7"
+      },
+      "beszel_agent": {
+        "amd64_sha256": "a45ca92579eca9b5e7304e2f5982de3c3e6325151e48dbc59e4fa0c5a28d55a1",
+        "arm64_sha256": "d4b6f8811850a3d59cebc23d4f506bf05bdfcf42192e084609b8535d3ee0940d",
+        "repo": "registry.hub.docker.com/henrygd/beszel-agent",
+        "tag": "0.18.7"
       },
       "vere": {
         "amd64_sha256": "a4af757cd710226be794c32fcd83589db6da19bedba8b90d60455ab5c8ff20a1",
@@ -164,11 +176,17 @@ var (
         "repo": "registry.hub.docker.com/minio/mc",
         "tag": "latest"
       },
-      "netdata": {
-        "amd64_sha256": "95e74c36f15091bcd7983ee162248f1f91c21207c235fce6b0d6f8ed9a11732a",
-        "arm64_sha256": "cd3dc9d182a4561b162f03c6986f4647bbb704f8e7e4872ee0611b1b9e86e1b0",
-        "repo": "registry.hub.docker.com/netdata/netdata",
-        "tag": "latest"
+      "beszel": {
+        "amd64_sha256": "1c5a4b2a277b6878b2d612419f02fc88957f870435ab2bf000c8bc14835c1aa5",
+        "arm64_sha256": "598bdb0940ecb734bc95a0c0e388a40a2bc8bf5cf285379657a077e43a2b9e04",
+        "repo": "registry.hub.docker.com/henrygd/beszel",
+        "tag": "0.18.7"
+      },
+      "beszel_agent": {
+        "amd64_sha256": "a45ca92579eca9b5e7304e2f5982de3c3e6325151e48dbc59e4fa0c5a28d55a1",
+        "arm64_sha256": "d4b6f8811850a3d59cebc23d4f506bf05bdfcf42192e084609b8535d3ee0940d",
+        "repo": "registry.hub.docker.com/henrygd/beszel-agent",
+        "tag": "0.18.7"
       },
       "vere": {
         "amd64_sha256": "7194cdf9df489ec68155a7d801c4444cd76857702d0cefc59de8dc04a4c9cc13",

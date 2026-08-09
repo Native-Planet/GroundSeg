@@ -69,13 +69,17 @@ func LoadUrbitConfig(pier string) error {
 
 // Delete urbit config entry
 func RemoveUrbitConfig(pier string) error {
-	// remove from memory
 	urbitMutex.Lock()
 	defer urbitMutex.Unlock()
+	path := filepath.Join(BasePath, "settings", "pier", pier+".json")
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	if err := syncDirectory(filepath.Dir(path)); err != nil {
+		return fmt.Errorf("sync pier config directory: %w", err)
+	}
 	delete(UrbitsConfig, pier)
-	// remove from disk
-	err := os.Remove(filepath.Join(BasePath, "settings", "pier", pier+".json"))
-	return err
+	return nil
 }
 
 // update the in-memory struct and save it to json
@@ -90,36 +94,20 @@ func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
 		if err == nil {
 			config.UrbitVersion = ver
 		}
-		UrbitsConfig[pier] = config
 		// also update the corresponding json files
 		path := filepath.Join(BasePath, "settings", "pier", pier+".json")
-		if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-			return err
-		}
-		tmpFile, err := os.CreateTemp(filepath.Dir(path), pier+".json.*")
+		encoded, err := json.MarshalIndent(&config, "", "    ")
 		if err != nil {
-			return fmt.Errorf("error creating temp file: %v", err)
-		}
-		// write and validate temp file before overwriting
-		tmpPath := tmpFile.Name()
-		defer os.Remove(tmpPath)
-		encoder := json.NewEncoder(tmpFile)
-		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(&config); err != nil {
-			tmpFile.Close()
 			return fmt.Errorf("error encoding config: %v", err)
 		}
-		if err := tmpFile.Close(); err != nil {
-			return fmt.Errorf("error closing temp file: %v", err)
-		}
-		if fi, err := os.Stat(tmpPath); err != nil {
-			return fmt.Errorf("error checking temp file: %v", err)
-		} else if fi.Size() == 0 {
+		if len(encoded) == 0 {
 			return fmt.Errorf("refusing to persist empty configuration for pier %s", pier)
 		}
-		if err := os.Rename(tmpPath, path); err != nil {
-			return fmt.Errorf("error moving temp file: %v", err)
+		encoded = append(encoded, '\n')
+		if err := writeFileDurably(path, encoded, 0o644); err != nil {
+			return fmt.Errorf("error persisting configuration for pier %s: %v", pier, err)
 		}
+		UrbitsConfig[pier] = config
 	}
 	return nil
 }
@@ -149,31 +137,13 @@ func ReplaceUrbitConfigJSON(pier string, raw []byte) ([]byte, error) {
 	urbitMutex.Lock()
 	defer urbitMutex.Unlock()
 	path := filepath.Join(BasePath, "settings", "pier", pier+".json")
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return nil, err
-	}
-	tmpFile, err := os.CreateTemp(filepath.Dir(path), pier+".json.*")
-	if err != nil {
-		return nil, fmt.Errorf("error creating temp file: %v", err)
-	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
-	if _, err := tmpFile.Write(formatted); err != nil {
-		tmpFile.Close()
-		return nil, fmt.Errorf("error writing temp file: %v", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return nil, fmt.Errorf("error closing temp file: %v", err)
-	}
-	if fi, err := os.Stat(tmpPath); err != nil {
-		return nil, fmt.Errorf("error checking temp file: %v", err)
-	} else if fi.Size() == 0 {
+	if len(formatted) == 0 {
 		return nil, fmt.Errorf("refusing to persist empty configuration for pier %s", pier)
 	}
-	UrbitsConfig[pier] = targetStruct
-	if err := os.Rename(tmpPath, path); err != nil {
-		return nil, fmt.Errorf("error moving temp file: %v", err)
+	if err := writeFileDurably(path, append(formatted, '\n'), 0o644); err != nil {
+		return nil, fmt.Errorf("error persisting configuration for pier %s: %v", pier, err)
 	}
+	UrbitsConfig[pier] = targetStruct
 	return formatted, nil
 }
 

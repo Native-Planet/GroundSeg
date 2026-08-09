@@ -329,16 +329,16 @@ type HermesConfig struct {
 	AccessCode         string `json:"access_code"`
 }
 
-// nedata config json
-type NetdataConfig struct {
-	NetdataName    string   `json:"netdata_name"`
-	Repo           string   `json:"repo"`
-	NetdataVersion string   `json:"netdata_version"`
-	Amd64Sha256    string   `json:"amd64_sha256"`
-	Arm64Sha256    string   `json:"arm64_sha256"`
-	CapAdd         []string `json:"cap_add"`
-	Port           int      `json:"port"`
-	Restart        string   `json:"restart"`
-	SecurityOpt    string   `json:"security_opt"`
-	Volumes        []string `json:"volumes"`
+// BeszelConfig stores the monitoring Hub settings.
+type BeszelConfig struct {
+	BeszelName    string   `json:"beszel_name"`
+	Repo          string   `json:"repo"`
+	BeszelVersion string   `json:"beszel_version"`
+	Amd64Sha256   string   `json:"amd64_sha256"`
+	Arm64Sha256   string   `json:"arm64_sha256"`
+	CapAdd        []string `json:"cap_add"`
+	Port          int      `json:"port"`
+	Restart       string   `json:"restart"`
+	SecurityOpt   string   `json:"security_opt"`
+	Volumes       []string `json:"volumes"`
 }

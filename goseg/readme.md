@@ -73,7 +73,8 @@ stateDiagram-v2
         Urbit
         Minio
         MinioMC
-        Netdata
+        Beszel_Hub
+        Beszel_Agent
         WireGuard
     }
     Operations-->Docker_daemon: manage containers

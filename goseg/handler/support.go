@@ -226,7 +226,7 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 	}
 
 	// service config jsons
-	configFiles := []string{"netdata.json", "wireguard.json"}
+	configFiles := []string{"beszel.json", "wireguard.json"}
 	for _, configFile := range configFiles {
 		srcPath = filepath.Join(config.BasePath, "settings", configFile)
 		destPath = filepath.Join(bugReportDir, configFile)

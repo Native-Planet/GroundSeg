@@ -47,49 +47,19 @@ func LoadHermesConfig() error {
 func CreateDefaultHermesConf() error {
 	defaultConfig := defaults.HermesConfig
 	path := filepath.Join(BasePath, "settings", "hermes.json")
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return err
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "    ")
-	return encoder.Encode(&defaultConfig)
+	return writeJSONDurably(path, &defaultConfig, 0o644)
 }
 
 func UpdateHermesConfig(input structs.HermesConfig) error {
 	applyHermesDefaults(&input)
 	hermesMutex.Lock()
 	defer hermesMutex.Unlock()
-	hermesConfig = input
 	path := filepath.Join(BasePath, "settings", "hermes.json")
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return err
+	if err := writeJSONDurably(path, &input, 0o644); err != nil {
+		return fmt.Errorf("error persisting Hermes config: %v", err)
 	}
-	tmpFile, err := os.CreateTemp(filepath.Dir(path), "hermes.json.*")
-	if err != nil {
-		return fmt.Errorf("error creating temp Hermes config: %v", err)
-	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
-	encoder := json.NewEncoder(tmpFile)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(&input); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("error encoding Hermes config: %v", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("error closing Hermes config: %v", err)
-	}
-	if fi, err := os.Stat(tmpPath); err != nil {
-		return fmt.Errorf("error checking Hermes config: %v", err)
-	} else if fi.Size() == 0 {
-		return fmt.Errorf("refusing to persist empty Hermes config")
-	}
-	return os.Rename(tmpPath, path)
+	hermesConfig = input
+	return nil
 }
 
 func applyHermesDefaults(target *structs.HermesConfig) {
