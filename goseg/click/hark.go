@@ -4,39 +4,27 @@ import (
 	"fmt"
 )
 
-/*
-		=/  m  (strand ,vase)
-		;<    =bowl:rand
-		    bind:m
-		  get-our
-		;<    ~
-		    bind:m
-			=+  id=(end 7 (shas %startram-notification eny.bowl))
-	    =/  con=(list content:h)  ~[text text]
-	    =+  rope=[[~ our.bowl %nativeplanet] [~ %diary our.bowl %changelog] %groups /]
-	    =/  wer=path  /groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/changelog/note/'170141184506582040503264511680103579648'
-			=+  but=~
-		  (poke [our.bowl %hark] %hark-action !>([%add-yarn & & id rope now.bowl con wer but])
-		(pure:m !>('success'))
-*/
-func sendStartramReminder(patp string, daysLeft int) error {
-	file := "startram-hark"
-	// construct poke
-	text := fmt.Sprintf("'Your startram code is expiring in %v days. Click for more information.'", daysLeft)
-	con := fmt.Sprintf("~[%s %s]", text, text)
-	//id := "0v14e.5p95b.d5mk5.vrqe0.oeu0m.3ghcb"
-	id := "(end 7 (shas %startram-notification eny.bowl))"
-	rope := "[[~ our.bowl %nativeplanet] [~ %diary our.bowl %documentation] %groups /]"                                           // temp location
-	wer := "/groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/documentation/note/'170141184506683847949839018055058849792'" //temp location
+func harkNotificationHoon(category, text string) string {
+	place := fmt.Sprintf("[q.byk.bowl /nativeplanet/%s]", category)
+	bin := fmt.Sprintf("[/%s place]", category)
+	content := fmt.Sprintf("~[[%%text %s]]", text)
 
-	but := "~"
-	hoon := joinGap([]string{
+	return joinGap([]string{
 		"=/", "m", "(strand ,vase)",
 		";<", "=bowl:rand", "bind:m", "get-bowl",
+		"=/", "place", place,
+		"=/", "bin", bin,
+		"=/", "body", fmt.Sprintf("[%s %s now.bowl / /]", content, content),
 		";<", "~", "bind:m",
-		fmt.Sprintf("(poke [our.bowl %%hark] %%hark-action !>([%%add-yarn & & [%s %s now.bowl %s %s %s]]))", id, rope, con, wer, but),
+		"(poke [our.bowl %hark-store] %hark-action !>([%add-note bin body]))",
 		"(pure:m !>('success'))",
 	})
+}
+
+func sendStartramReminder(patp string, daysLeft int) error {
+	file := "startram-hark"
+	text := fmt.Sprintf("'Your startram code is expiring in %v days. Click for more information.'", daysLeft)
+	hoon := harkNotificationHoon("startram", text)
 
 	// create hoon file
 	if err := createHoon(patp, file, hoon); err != nil {
@@ -61,21 +49,8 @@ func sendStartramReminder(patp string, daysLeft int) error {
 
 func sendDiskSpaceWarning(patp, diskName string, diskUsage float64) error {
 	file := "diskspace-hark"
-	// construct poke
 	text := fmt.Sprintf("'Your drive %s is %v%% full. Manage your disk to prevent issues!'", diskName, diskUsage)
-	con := fmt.Sprintf("~[%s]", text)
-	id := "(end 7 (shas %diskusage eny.bowl))"
-	rope := "[[~ our.bowl %nativeplanet] [~ %diary our.bowl %documentation] %groups /]"
-	wer := "/groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/documentation/note/'170141184506683847949839018055058849792'"
-
-	but := "~"
-	hoon := joinGap([]string{
-		"=/", "m", "(strand ,vase)",
-		";<", "=bowl:rand", "bind:m", "get-bowl",
-		";<", "~", "bind:m",
-		fmt.Sprintf("(poke [our.bowl %%hark] %%hark-action !>([%%add-yarn & & [%s %s now.bowl %s %s %s]]))", id, rope, con, wer, but),
-		"(pure:m !>('success'))",
-	})
+	hoon := harkNotificationHoon("disk-space", text)
 
 	// create hoon file
 	if err := createHoon(patp, file, hoon); err != nil {
@@ -100,21 +75,8 @@ func sendDiskSpaceWarning(patp, diskName string, diskUsage float64) error {
 
 func sendSmartWarning(patp, diskName string) error {
 	file := "smart-fail-hark"
-	// construct poke
 	text := fmt.Sprintf("'Your drive %s failed a health check. Replace your hard drive to prevent data loss!'", diskName)
-	con := fmt.Sprintf("~[%s]", text)
-	id := "(end 7 (shas %smartfail eny.bowl))"
-	rope := "[[~ our.bowl %nativeplanet] [~ %diary our.bowl %documentation] %groups /]"
-	wer := "/groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/documentation/note/'170141184506683847949839018055058849792'"
-
-	but := "~"
-	hoon := joinGap([]string{
-		"=/", "m", "(strand ,vase)",
-		";<", "=bowl:rand", "bind:m", "get-bowl",
-		";<", "~", "bind:m",
-		fmt.Sprintf("(poke [our.bowl %%hark] %%hark-action !>([%%add-yarn & & [%s %s now.bowl %s %s %s]]))", id, rope, con, wer, but),
-		"(pure:m !>('success'))",
-	})
+	hoon := harkNotificationHoon("disk-health", text)
 
 	// create hoon file
 	if err := createHoon(patp, file, hoon); err != nil {
