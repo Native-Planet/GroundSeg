@@ -5,18 +5,18 @@ import (
 )
 
 func harkNotificationHoon(category, text string) string {
-	place := fmt.Sprintf("[q.byk.bowl /nativeplanet/%s]", category)
-	bin := fmt.Sprintf("[/%s place]", category)
-	content := fmt.Sprintf("~[[%%text %s]]", text)
+	id := "(end 7 (shas %nativeplanet-notification eny.bowl))"
+	rope := fmt.Sprintf("[~ ~ %%nativeplanet /nativeplanet/%s]", category)
+	content := fmt.Sprintf("~[%s]", text)
 
 	return joinGap([]string{
 		"=/", "m", "(strand ,vase)",
 		";<", "=bowl:rand", "bind:m", "get-bowl",
-		"=/", "place", place,
-		"=/", "bin", bin,
-		"=/", "body", fmt.Sprintf("[%s %s now.bowl / /]", content, content),
+		"=/", "id", id,
+		"=/", "rope", rope,
+		"=/", "content", content,
 		";<", "~", "bind:m",
-		"(poke [our.bowl %hark-store] %hark-action !>([%add-note bin body]))",
+		"(poke [our.bowl %hark] %hark-action !>([%add-yarn & & id rope now.bowl content / ~]))",
 		"(pure:m !>('success'))",
 	})
 }

@@ -2,7 +2,7 @@ ARG NODE_VERSION=22.22.2
 FROM node:${NODE_VERSION}-bookworm-slim
 
 ARG HERMES_AGENT_REPO=https://github.com/NousResearch/hermes-agent.git
-ARG HERMES_AGENT_REF=2ffa1c97c09317c1d066aa5708b8ad961a4ca589
+ARG HERMES_AGENT_REF=9de9c25f620ff7f1ce0fd5457d596052d5159596
 ARG HERMES_LCM_REPO=https://github.com/stephenschoettler/hermes-lcm.git
 ARG HERMES_LCM_REF=34043036d12f69d0089c4630eb9acfb2d9424b4c
 ARG TLON_APPS_REPO=https://github.com/tloncorp/tlon-apps.git

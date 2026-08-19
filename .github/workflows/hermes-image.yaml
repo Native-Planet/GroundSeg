@@ -10,7 +10,7 @@ on:
       hermes_agent_ref:
         description: Hermes Agent git ref
         required: false
-        default: 2ffa1c97c09317c1d066aa5708b8ad961a4ca589
+        default: 9de9c25f620ff7f1ce0fd5457d596052d5159596
       hermes_lcm_ref:
         description: Hermes LCM git ref
         required: false
@@ -68,8 +68,8 @@ permissions:
 
 env:
   DEFAULT_IMAGE: nativeplanet/hermes-tlon
-  HERMES_IMAGE_TAG: 0.14.0-0.14.0
-  HERMES_AGENT_REF: 2ffa1c97c09317c1d066aa5708b8ad961a4ca589
+  HERMES_IMAGE_TAG: 0.18.2-0.14.0
+  HERMES_AGENT_REF: 9de9c25f620ff7f1ce0fd5457d596052d5159596
   HERMES_LCM_REF: 34043036d12f69d0089c4630eb9acfb2d9424b4c
   TLON_APPS_REF: 33112008b1f3e83816dee61020dc5d4c57770c15
   VERSION_AUTH: ${{ secrets.VERSION_AUTH }}
