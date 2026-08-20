@@ -6,8 +6,8 @@ ARG HERMES_AGENT_REF=9de9c25f620ff7f1ce0fd5457d596052d5159596
 ARG HERMES_LCM_REPO=https://github.com/stephenschoettler/hermes-lcm.git
 ARG HERMES_LCM_REF=34043036d12f69d0089c4630eb9acfb2d9424b4c
 ARG TLON_APPS_REPO=https://github.com/tloncorp/tlon-apps.git
-ARG TLON_APPS_REF=33112008b1f3e83816dee61020dc5d4c57770c15
-ARG PNPM_VERSION=9.15.9
+ARG TLON_APPS_REF=15fc26bd9d8a13345d54f4c7b3e00601a2e0996f
+ARG PNPM_VERSION=11.9.0
 
 LABEL org.opencontainers.image.title="NativePlanet Hermes Tlon"
 LABEL org.opencontainers.image.description="Hermes Agent with the Tlon platform adapter and tlon CLI"
@@ -64,9 +64,10 @@ RUN apt-get update \
 
 RUN npm install -g "pnpm@${PNPM_VERSION}"
 
-RUN git clone --filter=blob:none "${HERMES_AGENT_REPO}" "${HERMES_AGENT_DIR}" \
+RUN git init "${HERMES_AGENT_DIR}" \
   && cd "${HERMES_AGENT_DIR}" \
-  && git checkout "${HERMES_AGENT_REF}"
+  && git fetch --depth=1 "${HERMES_AGENT_REPO}" "${HERMES_AGENT_REF}" \
+  && git checkout --detach FETCH_HEAD
 
 COPY patches /tmp/hermes-patches
 RUN cd "${HERMES_AGENT_DIR}" \
@@ -89,17 +90,19 @@ RUN python3 -m venv "${HERMES_VENV}" \
   && "${HERMES_VENV}/bin/python" -m pip install -e "${HERMES_AGENT_DIR}[cron,cli,pty,mcp,acp,web]" \
   && "${HERMES_VENV}/bin/python" -m pip install "aiohttp>=3.9"
 
-RUN git clone --filter=blob:none "${HERMES_LCM_REPO}" /tmp/hermes-lcm \
+RUN git init /tmp/hermes-lcm \
   && cd /tmp/hermes-lcm \
-  && git checkout "${HERMES_LCM_REF}" \
+  && git fetch --depth=1 "${HERMES_LCM_REPO}" "${HERMES_LCM_REF}" \
+  && git checkout --detach FETCH_HEAD \
   && mkdir -p "${HERMES_AGENT_DIR}/plugins/context_engine/lcm" \
   && cp -a . "${HERMES_AGENT_DIR}/plugins/context_engine/lcm/" \
   && ln -sfn "${HERMES_AGENT_DIR}/plugins/context_engine/lcm" "${HERMES_AGENT_DIR}/hermes_lcm" \
   && rm -rf "${HERMES_AGENT_DIR}/plugins/context_engine/lcm/.git" /tmp/hermes-lcm
 
-RUN git clone --filter=blob:none "${TLON_APPS_REPO}" "${TLON_APPS_DIR}" \
+RUN git init "${TLON_APPS_DIR}" \
   && cd "${TLON_APPS_DIR}" \
-  && git checkout "${TLON_APPS_REF}"
+  && git fetch --depth=1 "${TLON_APPS_REPO}" "${TLON_APPS_REF}" \
+  && git checkout --detach FETCH_HEAD
 
 RUN cd "${TLON_APPS_DIR}" \
   && pnpm install --filter @tloncorp/tlon-skill... --frozen-lockfile --ignore-scripts \
