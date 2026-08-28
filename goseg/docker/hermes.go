@@ -23,13 +23,13 @@ const (
 	HermesTlonSkillDir              = "/opt/data/tlon-skill"
 	hermesConfigVersionLabel        = "nativeplanet.groundseg.hermes.config-version"
 	hermesConfigVersion             = "2026-06-28-hermes-tmux-searxng"
-	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.14.0-0.14.0"
+	DefaultHermesImage              = "registry.hub.docker.com/nativeplanet/hermes-tlon:0.18.2-0.5.0"
 	DefaultHermesModelProvider      = "openrouter"
 	DefaultHermesModel              = "deepseek/deepseek-v4-flash"
-	DefaultHermesVersion            = "0.14.0"
-	DefaultHermesAgentRef           = "2ffa1c97c09317c1d066aa5708b8ad961a4ca589"
-	DefaultHermesTlonAdapterVersion = "0.14.0"
-	DefaultHermesTlonAdapterRef     = "33112008b1f3e83816dee61020dc5d4c57770c15"
+	DefaultHermesVersion            = "0.18.2"
+	DefaultHermesAgentRef           = "9de9c25f620ff7f1ce0fd5457d596052d5159596"
+	DefaultHermesTlonAdapterVersion = "0.5.0"
+	DefaultHermesTlonAdapterRef     = "15fc26bd9d8a13345d54f4c7b3e00601a2e0996f"
 	DefaultHermesDashboardHostPort  = 19119
 	HermesDashboardContainerPort    = 9119
 )
