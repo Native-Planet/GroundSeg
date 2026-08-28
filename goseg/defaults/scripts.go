@@ -765,6 +765,9 @@ var (
 		fi
 	fi
 
+	urbit -Lx $ttyflag --loom $loom $dirname || true
+	urbit roll --loom $loom $dirname || true
+	urbit -Lx $ttyflag --loom $loom $dirname || true
 	urbit roll --loom $loom $dirname || true
 	urbit chop --loom $loom $dirname`
 

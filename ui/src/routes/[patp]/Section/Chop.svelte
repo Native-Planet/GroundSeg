@@ -1,7 +1,7 @@
 <script>
   // Style
   import "../theme.css"
-  import { urbitChop, toggleChopAfterVereUpdate } from '$lib/stores/websocket'
+  import { urbitRollChop, toggleChopAfterVereUpdate } from '$lib/stores/websocket'
   import {  afterUpdate } from 'svelte'
   import { structure, URBIT_MODE } from '$lib/stores/data'
   import { openModal } from 'svelte-modals'
@@ -15,7 +15,7 @@
   $: chopOnUpgrade = ship?.info?.chopOnUpgrade == undefined || ship?.info?.chopOnUpgrade // true by default
 
   $: tChopOnUpgrade = ship?.transition?.chopOnUpgrade || ""
-  $: tChop = (ship?.transition?.chop) || ""
+  $: tRollChop = (ship?.transition?.rollChop) || ""
 
   const handleModal = () => {
     openModal(ChopModal,{"patp":patp})
@@ -58,16 +58,16 @@
     <div class="btn-wrapper">
       <div class="spacer"></div>
       <button
-        class:disabled={tChop.length > 0}
-        class="super" on:click={()=>urbitChop(patp)}>
-        {#if tChop.length < 1 || tChop == "done"}
+        class:disabled={tRollChop.length > 0}
+        class="super" on:click={()=>urbitRollChop(patp)}>
+        {#if tRollChop.length < 1 || tRollChop == "done"}
           Chop
-        {:else if tChop == "success"}
+        {:else if tRollChop == "success"}
           Success!
-        {:else if tChop == "error"}
+        {:else if tRollChop == "error"}
           Error!
         {:else}
-          {tChop.charAt(0).toUpperCase() + tChop.slice(1)}
+          {tRollChop.charAt(0).toUpperCase() + tRollChop.slice(1)}
         {/if}
       </button>
       <button class="super chop" on:click={handleModal}>Set Auto</button> 
