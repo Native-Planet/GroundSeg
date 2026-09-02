@@ -100,7 +100,7 @@ func handleStartramRestart() {
 		}
 		zap.L().Debug(fmt.Sprintf("Containers: %+v", wgShips))
 		// restart wireguard container
-		if err := docker.RestartContainer("wireguard"); err != nil {
+		if err := docker.RestartWireguard(); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
 		}
 		// operate on urbit ships

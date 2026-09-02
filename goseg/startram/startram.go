@@ -77,6 +77,10 @@ func Retrieve() (structs.StartramRetrieve, error) {
 		zap.L().Warn(errmsg)
 		return retrieve, err
 	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		resp.Body.Close()
+		return retrieve, fmt.Errorf("StarTram retrieve returned HTTP status %s", resp.Status)
+	}
 	// read response body
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -93,31 +97,34 @@ func Retrieve() (structs.StartramRetrieve, error) {
 		zap.L().Warn(errmsg)
 		return retrieve, err
 	}
-	regStatus := true
-	if retrieve.Status != "No record" {
-		// pin that ho to the global vars
-		config.StartramConfig = retrieve
-		zap.L().Info(fmt.Sprintf("StarTram info retrieved"))
-		zap.L().Debug(fmt.Sprintf("StarTram info: %s", string(body)))
-	} else {
-		regStatus = false
+	if retrieve.Status == "No record" {
+		if conf.WgRegistered {
+			if err := config.UpdateConf(map[string]any{"wgRegistered": false}); err != nil {
+				zap.L().Error(fmt.Sprintf("Unable to update StarTram registration status: %v", err))
+			}
+		}
 		return retrieve, fmt.Errorf("No registration record")
 	}
-	if conf.WgRegistered != regStatus {
+	if retrieve.Error != 0 {
+		return retrieve, fmt.Errorf("StarTram retrieve returned API error %d: %v", retrieve.Error, retrieve.Debug)
+	}
+	if _, err := config.DecodeStartramWireguardConfig(retrieve.Conf); err != nil {
+		return retrieve, err
+	}
+
+	// Pin only a complete, validated response to the global state. This keeps a
+	// transient boot-time retrieve failure from becoming an empty wg0.conf.
+	config.StartramConfig = retrieve
+	zap.L().Info("StarTram info retrieved")
+	zap.L().Debug(fmt.Sprintf("StarTram info: %s", string(body)))
+	if !conf.WgRegistered {
 		zap.L().Info("Updating registration status")
-		err = config.UpdateConf(map[string]any{
-			"wgRegistered": regStatus,
-		})
-		if err != nil {
+		if err := config.UpdateConf(map[string]any{"wgRegistered": true}); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	}
-	err = fmt.Errorf("No registration")
-	if regStatus {
-		err = nil
-		EventBus <- structs.Event{Type: "retrieve", Data: nil}
-	}
-	return retrieve, err
+	EventBus <- structs.Event{Type: "retrieve", Data: nil}
+	return retrieve, nil
 }
 
 // register your pubkey

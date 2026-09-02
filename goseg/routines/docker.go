@@ -274,7 +274,7 @@ func Check502Loop() {
 						}
 
 						// restart wireguard container
-						if err := docker.RestartContainer("wireguard"); err != nil {
+						if err := docker.RestartWireguard(); err != nil {
 							zap.L().Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
 						}
 						// operate on urbit ships

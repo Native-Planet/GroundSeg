@@ -10,9 +10,89 @@ import (
 
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
+
+// DecodeStartramWireguardConfig decodes and validates the WireGuard template
+// returned by StarTram. In particular, an empty string is valid base64, so it
+// must be rejected explicitly before it reaches the on-disk configuration.
+func DecodeStartramWireguardConfig(encoded string) (string, error) {
+	if strings.TrimSpace(encoded) == "" {
+		return "", fmt.Errorf("StarTram returned an empty WireGuard configuration")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode remote WireGuard configuration: %w", err)
+	}
+	configText := string(decoded)
+	if err := ValidateWireguardConfig(configText, true); err != nil {
+		return "", fmt.Errorf("invalid remote WireGuard configuration: %w", err)
+	}
+	return configText, nil
+}
+
+// ValidateWireguardConfig performs the minimum structural checks needed to
+// avoid replacing a working tunnel configuration with empty or partial data.
+func ValidateWireguardConfig(configText string, allowPrivateKeyPlaceholder bool) error {
+	if strings.TrimSpace(configText) == "" {
+		return fmt.Errorf("configuration is empty")
+	}
+
+	section := ""
+	hasInterface := false
+	hasPeer := false
+	hasPrivateKey := false
+	hasPeerPublicKey := false
+	hasPeerEndpoint := false
+	for rawLine := range strings.SplitSeq(configText, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			section = strings.ToLower(strings.TrimSpace(line[1 : len(line)-1]))
+			switch section {
+			case "interface":
+				hasInterface = true
+			case "peer":
+				hasPeer = true
+			}
+			continue
+		}
+
+		key, value, found := strings.Cut(line, "=")
+		if !found {
+			continue
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		value = strings.TrimSpace(value)
+		switch {
+		case section == "interface" && key == "privatekey":
+			hasPrivateKey = value != "" && (allowPrivateKeyPlaceholder || value != "privkey")
+		case section == "peer" && key == "publickey":
+			hasPeerPublicKey = value != ""
+		case section == "peer" && key == "endpoint":
+			hasPeerEndpoint = value != ""
+		}
+	}
+
+	switch {
+	case !hasInterface:
+		return fmt.Errorf("missing [Interface] section")
+	case !hasPrivateKey:
+		return fmt.Errorf("missing private key")
+	case !hasPeer:
+		return fmt.Errorf("missing [Peer] section")
+	case !hasPeerPublicKey:
+		return fmt.Errorf("missing peer public key")
+	case !hasPeerEndpoint:
+		return fmt.Errorf("missing peer endpoint")
+	default:
+		return nil
+	}
+}
 
 // retrieve struct corresponding with urbit json file
 func GetWgConf() (structs.WgConfig, error) {
