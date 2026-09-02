@@ -71,19 +71,19 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	var retrieve structs.StartramRetrieve
 	conf := config.Conf()
 	regionUrl := "https://" + conf.EndpointUrl + "/v1/retrieve?pubkey=" + conf.Pubkey
-	resp, err := http.Get(regionUrl)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(regionUrl)
 	if err != nil {
 		errmsg := maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err))
 		zap.L().Warn(errmsg)
 		return retrieve, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		resp.Body.Close()
 		return retrieve, fmt.Errorf("StarTram retrieve returned HTTP status %s", resp.Status)
 	}
 	// read response body
 	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error reading retrieve info: %v", err)
 		zap.L().Warn(errmsg)
@@ -98,11 +98,6 @@ func Retrieve() (structs.StartramRetrieve, error) {
 		return retrieve, err
 	}
 	if retrieve.Status == "No record" {
-		if conf.WgRegistered {
-			if err := config.UpdateConf(map[string]any{"wgRegistered": false}); err != nil {
-				zap.L().Error(fmt.Sprintf("Unable to update StarTram registration status: %v", err))
-			}
-		}
 		return retrieve, fmt.Errorf("No registration record")
 	}
 	if retrieve.Error != 0 {

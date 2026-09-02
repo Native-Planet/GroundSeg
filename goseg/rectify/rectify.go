@@ -235,10 +235,8 @@ func RectifyUrbit() {
 			broadcast.BroadcastToClients()
 		case "retrieve":
 			conf := config.Conf()
-			if conf.WgOn {
-				if err := docker.ApplyRetrievedWireguardConfig(); err != nil {
-					zap.L().Warn(fmt.Sprintf("Unable to apply retrieved WireGuard config: %v", err))
-				}
+			if err := docker.ApplyRetrievedWireguardConfig(); err != nil {
+				zap.L().Warn(fmt.Sprintf("Unable to apply retrieved WireGuard config: %v", err))
 			}
 			for patp, _ := range config.UrbitConfAll() {
 				modified := false

@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,7 +28,7 @@ func TestWireguardConfigPathFromMountpoint(t *testing.T) {
 }
 
 func TestWireguardConfigPathRejectsUnsafeMountpoints(t *testing.T) {
-	for _, mountpoint := range []string{"", ".", "/"} {
+	for _, mountpoint := range []string{"", ".", "/", "relative/path"} {
 		if _, err := wireguardConfigPathFromMountpoint(mountpoint); err == nil {
 			t.Fatalf("expected mountpoint %q to be rejected", mountpoint)
 		}
@@ -44,6 +45,29 @@ func TestWriteWgConfRejectsEmptyContentWithoutTruncatingExistingFile(t *testing.
 		t.Fatal("expected empty WireGuard config to be rejected")
 	}
 
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read existing config: %v", err)
+	}
+	if string(contents) != validWgConf {
+		t.Fatalf("existing config was modified: %q", string(contents))
+	}
+}
+
+func TestSyncWireguardConfigPreservesLastKnownGoodOnRetrieveFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "wg0.conf")
+	existing := []byte(validWgConf)
+	if err := os.WriteFile(path, existing, 0600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	changed, err := syncWireguardConfigAtPath(path, existing, nil, "", errors.New("retrieve failed"))
+	if err != nil {
+		t.Fatalf("preserve valid existing config: %v", err)
+	}
+	if changed {
+		t.Fatal("preserving the existing config must not report a change")
+	}
 	contents, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read existing config: %v", err)

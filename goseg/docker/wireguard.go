@@ -15,6 +15,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	volumetypes "github.com/docker/docker/api/types/volume"
+	"github.com/docker/docker/errdefs"
 	"go.uber.org/zap"
 	// "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -24,7 +25,7 @@ var wireguardConfigMu sync.Mutex
 func LoadWireguard() error {
 	zap.L().Info("Loading Startram Wireguard container")
 	confPath := filepath.Join(config.BasePath, "settings", "wireguard.json")
-	_, err := os.Open(confPath)
+	_, err := os.Stat(confPath)
 	if err != nil {
 		// create a default container conf if it doesn't exist
 		err = config.CreateDefaultWGConf()
@@ -105,7 +106,7 @@ func buildWgConf() (string, error) {
 
 func wireguardConfigPathFromMountpoint(mountpoint string) (string, error) {
 	mountpoint = filepath.Clean(strings.TrimSpace(mountpoint))
-	if mountpoint == "." || mountpoint == "/" {
+	if !filepath.IsAbs(mountpoint) || mountpoint == "/" {
 		return "", fmt.Errorf("Docker returned an invalid WireGuard volume mountpoint %q", mountpoint)
 	}
 	return filepath.Join(mountpoint, "wg0.conf"), nil
@@ -122,6 +123,9 @@ func wireguardHostConfigPath() (string, error) {
 	defer cancel()
 	volume, err := cli.VolumeInspect(ctx, "wireguard")
 	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return "", fmt.Errorf("inspect WireGuard volume: %w", err)
+		}
 		volume, err = cli.VolumeCreate(ctx, volumetypes.CreateOptions{Name: "wireguard"})
 		if err != nil {
 			return "", fmt.Errorf("inspect or create WireGuard volume: %w", err)
@@ -143,17 +147,22 @@ func SyncWireguardConfig() (bool, error) {
 	}
 	existingConf, readErr := os.ReadFile(filePath)
 	newConf, buildErr := buildWgConf()
+	return syncWireguardConfigAtPath(filePath, existingConf, readErr, newConf, buildErr)
+}
+
+func syncWireguardConfigAtPath(filePath string, existingConf []byte, readErr error, newConf string, buildErr error) (bool, error) {
 	if buildErr != nil {
 		if readErr == nil {
-			if validationErr := config.ValidateWireguardConfig(string(existingConf), false); validationErr == nil {
+			validationErr := config.ValidateWireguardConfig(string(existingConf), false)
+			if validationErr == nil {
 				zap.L().Warn(fmt.Sprintf("Fresh WireGuard config unavailable; preserving last known-good config: %v", buildErr))
 				return false, nil
 			}
+			return false, fmt.Errorf("fresh WireGuard config unavailable (%v) and existing config is invalid: %w", buildErr, validationErr)
 		}
 		if readErr != nil {
 			return false, fmt.Errorf("fresh WireGuard config unavailable (%v) and existing config could not be read: %w", buildErr, readErr)
 		}
-		return false, fmt.Errorf("fresh WireGuard config unavailable and existing config is invalid: %w", buildErr)
 	}
 	if readErr == nil && string(existingConf) == newConf {
 		return false, nil
@@ -180,18 +189,17 @@ func WriteWgConf() error {
 }
 
 // ApplyRetrievedWireguardConfig repairs the on-disk file after a successful
-// retrieve and reloads a running tunnel only when its contents changed.
+// retrieve. Existing restart paths will reload it while coordinating the ships
+// that share WireGuard's network namespace.
 func ApplyRetrievedWireguardConfig() error {
 	changed, err := SyncWireguardConfig()
-	if err != nil || !changed {
+	if err != nil {
 		return err
 	}
-	status, err := GetContainerRunningStatus("wireguard")
-	if err != nil || !strings.Contains(status, "Up") {
-		return nil
+	if changed {
+		zap.L().Info("Applied retrieved WireGuard configuration; it will be used on the next coordinated restart")
 	}
-	zap.L().Info("Reloading Wireguard after applying an updated configuration")
-	return RestartContainer("wireguard")
+	return nil
 }
 
 // RestartWireguard ensures the persisted configuration is valid before a
