@@ -69,6 +69,12 @@ func writeFileDurably(path string, data []byte, mode os.FileMode) error {
 	return nil
 }
 
+// WriteFileDurably atomically replaces path after flushing both the new file
+// and its directory entry to stable storage.
+func WriteFileDurably(path string, data []byte, mode os.FileMode) error {
+	return writeFileDurably(path, data, mode)
+}
+
 func writeJSONDurably(path string, value any, mode os.FileMode) error {
 	data, err := json.MarshalIndent(value, "", "    ")
 	if err != nil {
