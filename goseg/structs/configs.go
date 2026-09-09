@@ -75,6 +75,7 @@ type UrbitDocker struct {
 	HTTPPort              int    `json:"http_port"`
 	AmesPort              int    `json:"ames_port"`
 	LoomSize              int    `json:"loom_size"`
+	VereBits              int    `json:"vere_bits"`
 	ExtraArgs             string `json:"extra_args"`
 	UrbitVersion          string `json:"urbit_version"`
 	UrbitImageTagOverride string `json:"urbit_image_tag_override"`
@@ -118,6 +119,25 @@ type UrbitDocker struct {
 	BackupTime            string `json:"backup_time"`
 	DisableShipRestarts   any    `json:"disable_ship_restarts"`
 	SnapTime              int    `json:"snap_time"`
+}
+
+const (
+	DefaultVereBits = 32
+	Vere64Bits      = 64
+)
+
+// IsValidVereBits reports whether bits names a supported vere binary width.
+func IsValidVereBits(bits int) bool {
+	return bits == DefaultVereBits || bits == Vere64Bits
+}
+
+// EffectiveVereBits returns the vere binary width the ship should run on,
+// treating an unset value (older configs) as 32-bit.
+func (u UrbitDocker) EffectiveVereBits() int {
+	if IsValidVereBits(u.VereBits) {
+		return u.VereBits
+	}
+	return DefaultVereBits
 }
 
 // Define the interface
@@ -172,6 +192,8 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			u.AmesPort = toInt(v)
 		case "loom_size":
 			u.LoomSize = toInt(v)
+		case "vere_bits":
+			u.VereBits = toInt(v)
 		case "extra_args":
 			u.ExtraArgs, _ = v.(string)
 		case "urbit_version":

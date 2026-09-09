@@ -41,6 +41,8 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.ExtraArgs = event.Event
 			case "vereTag":
 				urbitStruct.Transition.VereTag = event.Event
+			case "vereBits":
+				urbitStruct.Transition.VereBits = event.Event
 			case "urbitDomain":
 				urbitStruct.Transition.UrbitDomain = event.Event
 			case "minioDomain":

@@ -704,6 +704,27 @@ func containerVersionDetails(channel structs.Channel, containerType string) (str
 	}
 }
 
+// GetContainerExitCode returns the exit code of a container that has stopped.
+func GetContainerExitCode(containerName string) (int, error) {
+	ctx := context.Background()
+	cli, err := dockerclient.New()
+	if err != nil {
+		return 0, err
+	}
+	defer cli.Close()
+	details, err := cli.ContainerInspect(ctx, containerName)
+	if err != nil {
+		return 0, err
+	}
+	if details.State == nil {
+		return 0, fmt.Errorf("no state reported for %s", containerName)
+	}
+	if details.State.Running {
+		return 0, fmt.Errorf("%s is still running", containerName)
+	}
+	return details.State.ExitCode, nil
+}
+
 // stop a container with the name
 func StopContainerByName(containerName string) error {
 	ctx := context.Background()
