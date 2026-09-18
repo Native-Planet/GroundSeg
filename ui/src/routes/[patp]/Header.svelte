@@ -16,6 +16,7 @@
   $: urbitImageTagOverride = (ship?.urbitImageTagOverride) || ""
   $: versionServerVereTag = (ship?.versionServerVereTag) || ""
   $: vereTags = (ship?.vereTags) || []
+  $: vereBits = (ship?.vereBits) || 32
   $: tVereTag = ($structure?.urbits?.[patp]?.transition?.vereTag) || ""
   $: isSavingVere = tVereTag == "loading"
   $: vereError = tVereTag.length > 0 && tVereTag != "loading" && tVereTag != "success" ? tVereTag : ""
@@ -113,6 +114,9 @@
         <sup class="version-status">SAVED</sup>
       {:else if vereError.length > 0}
         <sup class="version-status error">ERROR</sup>
+      {/if}
+      {#if vereBits == 64}
+        <sup class="version-status bits" title="This ship runs the 64-bit vere binary">64-BIT</sup>
       {/if}
     </div>
     <div class="patp" id="patp" data-clipboard-text={patp}>
@@ -269,6 +273,12 @@
   }
   .version-status.error {
     color: #d45151;
+  }
+  .version-status.bits {
+    color: var(--text-card-color);
+    border: 1px solid var(--Gray-400, #5C7060);
+    border-radius: 3px;
+    padding: 0 3px;
   }
   .patp {
     cursor: pointer;

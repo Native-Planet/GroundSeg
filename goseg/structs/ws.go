@@ -295,7 +295,7 @@ type WsUrbitAction struct {
 	Type         string `json:"type"`
 	Action       string `json:"action"`
 	Patp         string `json:"patp"`
-	Value        int    `json:value"`
+	Value        int    `json:"value"`
 	ExtraArgs    string `json:"extraArgs"`
 	VereTag      string `json:"vereTag"`
 	Domain       string `json:"domain"`
