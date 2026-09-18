@@ -22,6 +22,7 @@ import (
 	networktypes "github.com/docker/docker/api/types/network"
 	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"go.uber.org/zap"
 )
 
@@ -384,7 +385,10 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		}
 	}
 	// check if container exists
-	existingContainer, _ := FindContainer(containerName)
+	existingContainer, err := FindContainer(containerName)
+	if err != nil && !errors.Is(err, ErrContainerNotFound) {
+		return containerState, err
+	}
 
 	ctx := context.Background()
 	cli, err := dockerclient.New()
@@ -392,6 +396,15 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		return containerState, err
 	}
 	defer cli.Close()
+	if existingContainer != nil {
+		removed, err := removeStaleNetworkContainer(ctx, cli, containerName, hostConfig.NetworkMode)
+		if err != nil {
+			return containerState, err
+		}
+		if removed {
+			existingContainer = nil
+		}
+	}
 	switch {
 	case existingContainer == nil:
 		// if the container does not exist, create and start it
@@ -608,11 +621,17 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		return containerState, err
 	}
 	defer cli.Close()
-	_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
-	if err != nil {
+	if _, err := removeStaleNetworkContainer(ctx, cli, containerName, hostConfig.NetworkMode); err != nil {
 		return containerState, err
 	}
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
+	if errdefs.IsNotFound(err) {
+		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		if err != nil {
+			return containerState, err
+		}
+		containerDetails, err = cli.ContainerInspect(ctx, containerName)
+	}
 	if err != nil {
 		return containerState, fmt.Errorf("failed to inspect container %s: %v", containerName, err)
 	}

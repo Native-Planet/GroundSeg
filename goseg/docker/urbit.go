@@ -32,7 +32,7 @@ func LoadUrbits() error {
 			continue
 		}
 		shipConf := config.UrbitConf(pier)
-		// don't bootstrap if it's busted
+		// Reconcile every ship, including ships configured to remain stopped.
 		if shipConf.BootStatus != "noboot" {
 			info, err := StartContainer(pier, "vere")
 			if err != nil {
@@ -43,7 +43,7 @@ func LoadUrbits() error {
 		} else {
 			info, err := CreateContainer(pier, "vere")
 			if err != nil {
-				zap.L().Error(fmt.Sprintf("Error starting %s: %v", pier, err))
+				zap.L().Error(fmt.Sprintf("Error creating stopped ship %s: %v", pier, err))
 				continue
 			}
 			config.UpdateContainerState(pier, info)
