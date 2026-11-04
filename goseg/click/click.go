@@ -76,6 +76,7 @@ func RestoreTlon(patp string) error {
 		{"groups", restoreAgent(patp, "groups")},
 		{"profile", restoreAgent(patp, "profile")},
 		{"chat", restoreAgent(patp, "chat")},
+		{"notes", restoreAgent(patp, "notes")},
 	}
 
 	for _, component := range components {
