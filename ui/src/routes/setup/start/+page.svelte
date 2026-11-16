@@ -1,5 +1,5 @@
 <script>
-  import { beginSetup } from '$lib/stores/websocket'
+  import { beginSetup } from '#lib/stores/websocket.js'
 </script>
 
 <div class="wrapper">

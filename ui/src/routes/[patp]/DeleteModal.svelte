@@ -1,12 +1,12 @@
 <script>
   import { goto } from '$app/navigation'
   import { afterUpdate } from 'svelte'
-  import { deleteUrbitShip } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { deleteUrbitShip } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   import Sigil from './Sigil.svelte'
 
-  import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
 
   export let patp
   export let isOpen
@@ -16,7 +16,7 @@
 
   afterUpdate(()=>{
     if (tDeleteShip == "done") {
-      closeModal()
+      modals.close()
       goto("/")
     }
   })

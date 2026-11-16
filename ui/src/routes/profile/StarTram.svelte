@@ -1,15 +1,15 @@
 <script>
   // Modals
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import RegisterModal from './RegisterModal.svelte'
   // Icons
   import Fa from 'svelte-fa'
   import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
   // Websocket
-  import { startramRestart, startramToggle } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { startramRestart, startramToggle } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   // Components
-  import ToggleButton from '$lib/ToggleButton.svelte'
+  import ToggleButton from '#lib/ToggleButton.svelte'
   import StarTramInfo from './StarTramInfo.svelte'
   import StarTramModify from './StarTramModify.svelte'
 
@@ -35,7 +35,7 @@
     <div class="controls">
       <div class="top">
         <button
-          on:click={()=>openModal(RegisterModal)}
+          on:click={()=>modals.open(RegisterModal)}
           class="new-key">
           New Key
         </button>

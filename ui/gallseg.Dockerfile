@@ -10,9 +10,8 @@ COPY ./static /webui/static
 COPY .npmrc /webui/
 COPY package-lock.json /webui/
 COPY package.json /webui
-COPY svelte.config.js /webui
 COPY vite.config.js /webui
 WORKDIR /webui
 RUN npm install -g npm
-RUN npm install
+RUN npm ci
 RUN npm run build

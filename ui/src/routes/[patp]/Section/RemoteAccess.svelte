@@ -1,7 +1,7 @@
 <script>
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import FinalModal from './FinalModal.svelte';
-  import ToggleButton from '$lib/ToggleButton.svelte'
+  import ToggleButton from '#lib/ToggleButton.svelte'
   import UnplugWarning from './UnplugWarning.svelte';
   // Style
   import "../theme.css"
@@ -10,8 +10,8 @@
   import Fa from 'svelte-fa'
   import { faPlugCircleExclamation } from '@fortawesome/free-solid-svg-icons';
 
-  import { structure } from '$lib/stores/data'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { structure } from '#lib/stores/data.js'
+  import { URBIT_MODE } from '#lib/stores/data.js'
 
   export let patp
 
@@ -29,7 +29,7 @@
 
   function handleClick() {
     if ($URBIT_MODE) {
-      openModal(FinalModal, {"component":"remote","patp":patp})
+      modals.open(FinalModal, {"component":"remote","patp":patp})
     } else {
       dispatch("click")
     }

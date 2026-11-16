@@ -1,7 +1,7 @@
 <script>
-  import { bootShip } from '$lib/stores/websocket';
-  import { structure } from '$lib/stores/data'
-  import { sigRemove, checkPatp } from '$lib/stores/patp';
+  import { bootShip } from '#lib/stores/websocket.js';
+  import { structure } from '#lib/stores/data.js'
+  import { sigRemove, checkPatp } from '#lib/stores/patp.js';
   import { goto } from '$app/navigation';
   import Sigil from './Sigil.svelte'
 
@@ -14,7 +14,7 @@
 
   import LogsDrawer from './LogsDrawer.svelte'
   import CancelModal from './CancelModal.svelte'
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
 
   export let tBootStage
   let coverage = 0
@@ -44,12 +44,12 @@
       <div class="small-button-wrapper">
         <div
           class="small-button cancel"
-          on:click={()=>openModal(CancelModal,{"patp":name})}>
+          on:click={()=>modals.open(CancelModal,{"patp":name})}>
           Cancel
         </div>
         <div 
           class="small-button"
-          on:click={()=>openModal(LogsDrawer,{"patp":name})}>
+          on:click={()=>modals.open(LogsDrawer,{"patp":name})}>
           View Logs
         </div>
       </div>
@@ -58,12 +58,12 @@
       <div class="small-button-wrapper">
         <div
           class="small-button cancel"
-          on:click={()=>openModal(CancelModal,{"patp":name})}>
+          on:click={()=>modals.open(CancelModal,{"patp":name})}>
           Cancel
         </div>
         <div 
           class="small-button"
-          on:click={()=>openModal(LogsDrawer,{"patp":name})}>
+          on:click={()=>modals.open(LogsDrawer,{"patp":name})}>
           View Logs
         </div>
       </div>

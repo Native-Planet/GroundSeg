@@ -1,8 +1,8 @@
 <script>
-  import { structure, daysUntilDate } from '$lib/stores/data'
+  import { structure, daysUntilDate } from '#lib/stores/data.js'
 
-  import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
 
   export let isOpen
 

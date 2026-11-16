@@ -1,9 +1,9 @@
 <script>
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import FinalModal from './FinalModal.svelte';
-  import ToggleButton from '$lib/ToggleButton.svelte'
+  import ToggleButton from '#lib/ToggleButton.svelte'
   import UnplugWarning from './UnplugWarning.svelte';
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { URBIT_MODE } from '#lib/stores/data.js'
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
@@ -17,7 +17,7 @@
 
   function handleClick() {
     if ($URBIT_MODE) {
-      openModal(FinalModal, {"component":"dev","patp":patp})
+      modals.open(FinalModal, {"component":"dev","patp":patp})
     } else {
       dispatch("click")
     }

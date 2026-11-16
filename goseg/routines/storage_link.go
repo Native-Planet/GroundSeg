@@ -209,7 +209,7 @@ func normalizeStorageEndpointHost(endpoint string) string {
 		}
 	}
 	withoutScheme := strings.TrimPrefix(strings.TrimPrefix(trimmed, "https://"), "http://")
-	host := strings.SplitN(withoutScheme, "/", 2)[0]
+	host, _, _ := strings.Cut(withoutScheme, "/")
 	host = strings.SplitN(host, ":", 2)[0]
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
 }

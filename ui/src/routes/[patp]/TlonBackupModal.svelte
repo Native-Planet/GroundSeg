@@ -2,10 +2,10 @@
   import { onMount } from 'svelte'
 
   // Modal
-  import Modal from '$lib/Modal.svelte'
+  import Modal from '#lib/Modal.svelte'
 
-  import { localBackup, scheduleLocalBackup } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { localBackup, scheduleLocalBackup } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   import BackupClock from './BackupClock.svelte'
 
   export let isOpen

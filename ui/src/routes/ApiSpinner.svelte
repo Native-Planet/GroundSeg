@@ -1,5 +1,5 @@
 <script>
-  import { connected } from '$lib/stores/data';
+  import { connected } from '#lib/stores/data.js';
 </script>
 {#if !$connected}
   <div class="text">CONNECTING</div>

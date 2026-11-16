@@ -1,10 +1,10 @@
 <script>
   // Modal
-  import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
 
-  import { setPackSchedule, pausePackSchedule } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { setPackSchedule, pausePackSchedule } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   import Selector from './Selector.svelte'
   import Clock from './Clock.svelte'
 
@@ -29,7 +29,6 @@
   // Next pack display
   $: nextPack = (Number(info?.nextPack) * 1000) || "0"
   $: nextPackConverted = new Date(nextPack);
-  $: currentTime = Math.floor(Date.now())
   $: nextPackRelative =  nextPack - currentTime
   $: nextPackInHours = Math.floor(nextPackRelative / (3600 * 1000))
   $: nextPackInDays = Math.floor(nextPackRelative / (3600 * 24 * 1000))

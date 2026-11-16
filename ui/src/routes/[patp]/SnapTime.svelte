@@ -1,10 +1,10 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { setUrbitSnapTime } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { setUrbitSnapTime } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
+  import { URBIT_MODE } from '#lib/stores/data.js'
   export let patp
   export let curSnapTime
   export let snapTime
@@ -13,7 +13,7 @@
 
   afterUpdate(()=>{
     if (tSnapTime == "done") {
-      closeModal()
+      modals.close()
     }
   })
 </script>

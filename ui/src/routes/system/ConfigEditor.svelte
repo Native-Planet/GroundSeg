@@ -1,6 +1,6 @@
 <script>
-  import { URBIT_MODE } from '$lib/stores/data'
-  import { listConfigFiles, readConfigFile, saveConfigFile } from '$lib/stores/config-files'
+  import { URBIT_MODE } from '#lib/stores/data.js'
+  import { listConfigFiles, readConfigFile, saveConfigFile } from '#lib/stores/config-files.js'
 
   let open = false
   let loaded = false

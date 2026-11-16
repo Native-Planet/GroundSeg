@@ -1,6 +1,6 @@
 <script>
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
 
   import { warningDone } from './store'
 
@@ -8,7 +8,7 @@
 
   const kickstartUpload = () => {
     warningDone.set(true)
-    closeModal()
+    modals.close()
   }
 </script>
 {#if isOpen}
@@ -18,7 +18,7 @@
       <p>Confirm that your pier is offline before importing your pier. It will be corrupted if it is online somewhere else.</p>
       <div class="buttons-wrapper">
         <button
-          on:click={closeModal}
+          on:click={() => modals.close()}
           >No, it is not
         </button>
         <button

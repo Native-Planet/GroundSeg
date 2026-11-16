@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { structure } from '$lib/stores/data'
+  import { structure } from '#lib/stores/data.js'
 
   export let backup;
   export let isSure;

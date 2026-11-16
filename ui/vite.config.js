@@ -1,3 +1,4 @@
+import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 
 const gsUrbitMode = process.env.GS_URBIT_MODE === 'true';
@@ -7,7 +8,16 @@ const gsVersion = process.env.GS_VERSION || 'dev';
 const perigeeWasmUrl = process.env.GS_PERIGEE_WASM_URL || 'https://files.native.computer/wasm/perigee.wasm';
 const perigeeWasmExecUrl = process.env.GS_PERIGEE_WASM_EXEC_URL || 'https://files.native.computer/wasm/wasm_exec.js';
 const config = {
-	plugins: [sveltekit()],
+	plugins: [sveltekit({
+    adapter: adapter({
+      pages: 'build',
+      assets: 'build',
+      fallback: 'index.html',
+      precompress: false,
+      strict: true,
+    }),
+    paths: { base: gsUrbitMode ? '/apps/groundseg' : '' },
+  })],
   define: {
     'process.env.GS_URBIT_MODE': JSON.stringify(gsUrbitMode),
     'process.env.GS_DEV_PANEL': JSON.stringify(devPanel),

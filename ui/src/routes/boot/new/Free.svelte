@@ -1,16 +1,16 @@
 <script>
   import KeyDropper from './KeyDropper.svelte';
-  import { bootShip } from '$lib/stores/websocket';
-  import { structure } from '$lib/stores/data'
-  import { sigRemove, checkPatp } from '$lib/stores/patp';
-  import { lintFirstBootArgs } from '$lib/urbitArgs'
+  import { bootShip } from '#lib/stores/websocket.js';
+  import { structure } from '#lib/stores/data.js'
+  import { sigRemove, checkPatp } from '#lib/stores/patp.js';
+  import { lintFirstBootArgs } from '#lib/urbitArgs.js'
   import { goto } from '$app/navigation';
   import Sigil from './Sigil.svelte'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { URBIT_MODE } from '#lib/stores/data.js'
   import Fa from 'svelte-fa'
   import { faCircleExclamation, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
 
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import NewDriveWarning from './NewDriveWarning.svelte'
 
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
@@ -41,7 +41,7 @@
     if (selectedDrive == "system-drive") {
       bootShip(noSig,key,remote,selectedDrive)
     } else {
-      openModal(NewDriveWarning)
+      modals.open(NewDriveWarning)
     }
     */
   }
@@ -94,7 +94,7 @@
           >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
         </div>
         {#if drives[name].driveID == 0}
-        <div class="mount-icon" on:click={()=>openModal(NewDriveWarning,{driveName:name})}>
+        <div class="mount-icon" on:click={()=>modals.open(NewDriveWarning,{driveName:name})}>
           <Fa icon={faCircleExclamation} size="1.5x" />
         </div>
         {/if}

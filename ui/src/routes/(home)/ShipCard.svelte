@@ -1,42 +1,41 @@
 <script>
-  import { toggleNetwork } from '$lib/stores/websocket';
-  import { structure } from '$lib/stores/data'
+  import { toggleNetwork } from '#lib/stores/websocket.js';
+  import { structure } from '#lib/stores/data.js'
 
-  import { devShipClass } from '$lib/stores/devclass'
+  import { devShipClass } from '#lib/stores/devclass.js'
 
   import Sigil from './Sigil.svelte'
   import StartramToggle from './StartramToggle.svelte'
   import NameBar from './NameBar.svelte'
   import ContainerInfo from './ContainerInfo.svelte'
   import ShipButtons from './ShipButtons.svelte'
-  import { page } from '$app/stores'
+  import { page } from '$app/state'
 
-  export let patp
+  let { patp } = $props();
 
-  $: ship = ($structure?.urbits?.[patp]?.info) || {}
-  $: running = (ship?.running) || false
-  $: remote = (ship?.remote) || false
-  $: remoteReady = (ship?.remoteReady) || false
-  $: showUrbAlias = (ship?.showUrbAlias) || false
-  $: urbitAlias = (ship?.urbitAlias) || ""
+  let ship = $derived(($structure?.urbits?.[patp]?.info) || {})
+  let running = $derived((ship?.running) || false)
+  let remote = $derived((ship?.remote) || false)
+  let remoteReady = $derived((ship?.remoteReady) || false)
+  let showUrbAlias = $derived((ship?.showUrbAlias) || false)
+  let urbitAlias = $derived((ship?.urbitAlias) || "")
 
-  $: url = (ship?.url) || "#"
-  let urlType;
-  $: {
+  let url = $derived((ship?.url) || "#")
+  let urlType = $derived.by(() => {
     try {
-      urlType = new URL(url);
+      return new URL(url);
     } catch (error) {
-      urlType = null;
+      return null;
     }
-  }
-  $: urlStripped = urlType == null ? url : `${urlType?.hostname}`
-  $: urlFixed = urlStripped == null ? url : remote ? url : (urlStripped == url) ? url : "http://" + $page.url.hostname + ":" + urlType.port 
-  $: displayedUrl = (showUrbAlias && remote ? "https://"+urbitAlias : urlFixed)
+  });
+  let urlStripped = $derived(urlType == null ? url : `${urlType?.hostname}`)
+  let urlFixed = $derived(urlStripped == null ? url : remote ? url : (urlStripped == url) ? url : "http://" + page.url.hostname + ":" + urlType.port)
+  let displayedUrl = ($derived(showUrbAlias && remote ? "https://"+urbitAlias : urlFixed))
 
-  $: memUsage = (ship?.memUsage) || 0
-  $: diskUsage = (ship?.diskUsage) || 0
-  $: loom = (ship?.loomSize) || 0
-  $: loomActual = 2 ** loom / (1024 * 1024)
+  let memUsage = $derived((ship?.memUsage) || 0)
+  let diskUsage = $derived((ship?.diskUsage) || 0)
+  let loom = $derived((ship?.loomSize) || 0)
+  let loomActual = $derived(2 ** loom / (1024 * 1024))
 
   /* debug
   let on = false
@@ -111,7 +110,7 @@
   }
   .buttons {
     position: absolute;
-    right: 3px; 
+    right: 3px;
     bottom: 2px;
   }
 </style>

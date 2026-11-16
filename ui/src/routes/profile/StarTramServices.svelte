@@ -3,8 +3,8 @@
   import { faCircleNotch, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 
   import { onMount } from 'svelte'
-  import { structure } from '$lib/stores/data'
-  import { startramGetServices, deleteStartramService } from '$lib/stores/websocket'
+  import { structure } from '#lib/stores/data.js'
+  import { startramGetServices, deleteStartramService } from '#lib/stores/websocket.js'
 
   $: services = $structure?.profile?.startram?.info?.startramServices || []
   $: urbitJSONKeys = Object.keys($structure?.urbits)

@@ -3,12 +3,12 @@
   import FinalModal from './FinalModal.svelte';
   // Style
   import "../theme.css"
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import PackScheduleModal from '../PackScheduleModal.svelte'
-  import { urthPackMeld, marsPack } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { urthPackMeld, marsPack } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   import { createEventDispatcher } from 'svelte'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { URBIT_MODE } from '#lib/stores/data.js'
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   export let patp
@@ -18,7 +18,7 @@
 
 
   const handleModal = () => {
-    openModal(PackScheduleModal,{"patp":patp})
+    modals.open(PackScheduleModal,{"patp":patp})
   }
 
   $: tPack = ($structure?.urbits?.[patp]?.transition?.pack) || ""
@@ -26,7 +26,7 @@
 
   function handleClick() {
     if ($URBIT_MODE) {
-      openModal(FinalModal, {"component":"meld","patp":patp})
+      modals.open(FinalModal, {"component":"meld","patp":patp})
     } else {
       urthPackMeld(patp)
     }

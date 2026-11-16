@@ -2,14 +2,14 @@
   import Fa from 'svelte-fa'
   import { faCaretUp, faCaretDown } from '@fortawesome/free-solid-svg-icons';
   // Modals
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import EndpointModal from './EndpointModal.svelte'
   import RegisterModal from './RegisterModal.svelte'
 
   import StarTramReminder from './StarTramReminder.svelte'
   import StarTramServices from './StarTramServices.svelte'
 
-  import { structure } from '$lib/stores/data'
+  import { structure } from '#lib/stores/data.js'
 
   $: info = ($structure?.profile?.startram?.info) || {}
   $: endpoint = (info?.endpoint) || ""
@@ -29,7 +29,7 @@
     <div class="data">
       <div class="data-text">{endpoint}</div>
       <button
-      on:click={()=>openModal(EndpointModal)}
+      on:click={()=>modals.open(EndpointModal)}
       >Edit</button>
     </div>
   </div>
@@ -40,7 +40,7 @@
       <div class="data">
         <div class="data-text">{regionFormatted}</div>
       <button
-        on:click={()=>openModal(RegisterModal,{"regionMode":true})}
+        on:click={()=>modals.open(RegisterModal,{"regionMode":true})}
       >Edit</button>
       </div>
     </div>

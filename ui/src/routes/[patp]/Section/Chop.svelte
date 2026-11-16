@@ -1,10 +1,10 @@
 <script>
   // Style
   import "../theme.css"
-  import { urbitRollChop, toggleChopAfterVereUpdate } from '$lib/stores/websocket'
+  import { urbitRollChop, toggleChopAfterVereUpdate } from '#lib/stores/websocket.js'
   import {  afterUpdate } from 'svelte'
-  import { structure, URBIT_MODE } from '$lib/stores/data'
-  import { openModal } from 'svelte-modals'
+  import { structure, URBIT_MODE } from '#lib/stores/data.js'
+  import { modals } from 'svelte-modals'
   import ChopModal from '../ChopModal.svelte'
 
   export let patp
@@ -18,7 +18,7 @@
   $: tRollChop = (ship?.transition?.rollChop) || ""
 
   const handleModal = () => {
-    openModal(ChopModal,{"patp":patp})
+    modals.open(ChopModal,{"patp":patp})
   }
 
   let loading = false

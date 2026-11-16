@@ -1,7 +1,7 @@
 <script>
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import TlonBackupModal from '../TlonBackupModal.svelte'
-  import ToggleButton from '$lib/ToggleButton.svelte'
+  import ToggleButton from '#lib/ToggleButton.svelte'
   import UnplugWarning from './UnplugWarning.svelte';
   // Style
   import "../theme.css"
@@ -10,8 +10,8 @@
   import Fa from 'svelte-fa'
   import { faGear } from '@fortawesome/free-solid-svg-icons';
 
-  import { structure } from '$lib/stores/data'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { structure } from '#lib/stores/data.js'
+  import { URBIT_MODE } from '#lib/stores/data.js'
 
   $: wgRunning = ($structure?.profile?.startram?.info?.running) || false
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
@@ -27,7 +27,7 @@
   const dispatch = createEventDispatcher()
 
   const handleModal = () => {
-    openModal(TlonBackupModal,{"patp":patp})
+    modals.open(TlonBackupModal,{"patp":patp})
   }
 </script>
 

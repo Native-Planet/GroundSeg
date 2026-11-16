@@ -1,6 +1,6 @@
 <script>
   import { afterUpdate } from 'svelte';
-  import { sigRemove, checkPatp } from '$lib/stores/patp';
+  import { sigRemove, checkPatp } from '#lib/stores/patp.js';
   import { sigil, stringRenderer } from '@tlon/sigil-js'
   export let name
   export let modal = false

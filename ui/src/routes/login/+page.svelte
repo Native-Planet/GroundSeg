@@ -1,8 +1,8 @@
 <script>
-  import { login, loginError } from '$lib/stores/websocket'
-  import { isSessionRemembered } from '$lib/stores/gs-crypto'
-  import { structure } from '$lib/stores/data'
-  import { wide } from '$lib/stores/display'
+  import { login, loginError } from '#lib/stores/websocket.js'
+  import { isSessionRemembered } from '#lib/stores/gs-crypto.js'
+  import { structure } from '#lib/stores/data.js'
+  import { wide } from '#lib/stores/display.js'
   import { onMount, onDestroy } from 'svelte'
 
   import Fa from 'svelte-fa'

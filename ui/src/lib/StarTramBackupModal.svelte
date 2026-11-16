@@ -1,7 +1,7 @@
 <script>
-  import { startramBackupPassword } from '$lib/stores/websocket'
-  import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
+  import { startramBackupPassword } from '#lib/stores/websocket.js'
+  import Modal from '#lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
   export let isOpen
   let newPassword = ''
 </script>
@@ -19,7 +19,7 @@
 
     <button
       disabled={(newPassword.length < 1)} 
-      on:click={()=>{startramBackupPassword(newPassword); closeModal()}}
+      on:click={()=>{startramBackupPassword(newPassword); modals.close()}}
       >Set New Password
     </button>
   </div>

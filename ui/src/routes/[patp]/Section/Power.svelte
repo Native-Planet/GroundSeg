@@ -1,14 +1,14 @@
 <script>
-  import ToggleButton from '$lib/ToggleButton.svelte'
-  import { openModal } from 'svelte-modals'
+  import ToggleButton from '#lib/ToggleButton.svelte'
+  import { modals } from 'svelte-modals'
   import FinalModal from './FinalModal.svelte';
   import UnplugWarning from './UnplugWarning.svelte'
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
-  import { toggleBootStatus, toggleAutoReboot } from '$lib/stores/websocket'
+  import { toggleBootStatus, toggleAutoReboot } from '#lib/stores/websocket.js'
 
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { URBIT_MODE } from '#lib/stores/data.js'
 
   export let patp
   export let ownShip
@@ -23,7 +23,7 @@
 
   function handleClick() {
     if ($URBIT_MODE) {
-      openModal(FinalModal, {"component":"power","patp":patp})
+      modals.open(FinalModal, {"component":"power","patp":patp})
     } else {
       dispatch("click")
     }

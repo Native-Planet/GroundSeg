@@ -1,10 +1,10 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { login } from '$lib/stores/websocket'
-  import { URBIT_MODE } from '$lib/stores/data'
-  import { gallsegLoginInfo } from '$lib/stores/urbit'
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
+  import { login } from '#lib/stores/websocket.js'
+  import { URBIT_MODE } from '#lib/stores/data.js'
+  import { gallsegLoginInfo } from '#lib/stores/urbit.js'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
   import { goto } from '$app/navigation';
 
   export let isOpen
@@ -14,7 +14,7 @@
   /*
   afterUpdate(()=>{
     if (tRegister == "done") {
-      closeModal()
+      modals.close()
     }
   })
   */
@@ -33,7 +33,7 @@
       } else {
         errMsg = "success"
         setTimeout(()=>{
-          closeModal()
+          modals.close()
           goto(pfx+"/")
         }, 3000)
       }

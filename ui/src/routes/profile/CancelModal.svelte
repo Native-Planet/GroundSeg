@@ -1,7 +1,7 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-  import { startramCancel } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { startramCancel } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   import { showCancelModal } from './store'
 
   let key = ''

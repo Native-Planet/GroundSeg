@@ -1,7 +1,7 @@
 <script>
   import './apps.css'
   import { afterUpdate, onDestroy, onMount } from 'svelte'
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import Fa from 'svelte-fa'
   import { sigil, stringRenderer } from '@tlon/sigil-js'
   import {
@@ -16,9 +16,9 @@
     faRotate,
     faXmark
   } from '@fortawesome/free-solid-svg-icons'
-  import { structure } from '$lib/stores/data'
-  import { checkPatp, patpFromNumber, sigRemove } from '$lib/stores/patp'
-  import { bootShip } from '$lib/stores/websocket'
+  import { structure } from '#lib/stores/data.js'
+  import { checkPatp, patpFromNumber, sigRemove } from '#lib/stores/patp.js'
+  import { bootShip } from '#lib/stores/websocket.js'
   import {
     addKeyPending,
     downloadText,
@@ -32,7 +32,7 @@
     removeKeyPending,
     submitKeyOperation,
     submitWalletOperation
-  } from '$lib/stores/keys'
+  } from '#lib/stores/keys.js'
   import ExportModal from '../[patp]/ExportModal.svelte'
 
   const credentials = [
@@ -389,7 +389,7 @@
 
   function exportShip() {
     if (!localShipExists) return
-    openModal(ExportModal, { patp: normalizedShip })
+    modals.open(ExportModal, { patp: normalizedShip })
   }
 
   function pendingTitle(tx) {

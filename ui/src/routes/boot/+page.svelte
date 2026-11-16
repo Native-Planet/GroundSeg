@@ -1,5 +1,5 @@
 <script>
-  import { wide } from '$lib/stores/display';
+  import { wide } from '#lib/stores/display.js';
   import { goto } from '$app/navigation';
 
   import Option from './Option.svelte';

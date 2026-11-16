@@ -1,11 +1,11 @@
 <script>
-  import { startramRestart } from '$lib/stores/websocket'
-  import { startramMaxReminderDays, structure, daysUntilDate } from '$lib/stores/data'
+  import { startramRestart } from '#lib/stores/websocket.js'
+  import { startramMaxReminderDays, structure, daysUntilDate } from '#lib/stores/data.js'
   import Fa from 'svelte-fa'
   import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
-  import { openModal } from 'svelte-modals'
-  import StarTramReminderModal from '$lib/StarTramReminderModal.svelte'
-  import StarTramBackupModal from '$lib/StarTramBackupModal.svelte'
+  import { modals } from 'svelte-modals'
+  import StarTramReminderModal from '#lib/StarTramReminderModal.svelte'
+  import StarTramBackupModal from '#lib/StarTramBackupModal.svelte'
 
   export let renew
   export let expiry
@@ -33,7 +33,7 @@
         {#if remoteBackupReady}
           <div class="item">{backupTime}</div>
         {:else}
-          <button class="backup-button" on:click={()=>openModal(StarTramBackupModal,{})}>Set Up</button>
+          <button class="backup-button" on:click={()=>modals.open(StarTramBackupModal,{})}>Set Up</button>
         {/if}
       </div>
     </div>
@@ -41,7 +41,7 @@
       <div class="warning">
         <Fa color="orange" icon={faTriangleExclamation} size="2x"/>
         <div class="warning-text">Your StarTram registration will expire in less than {daysLeft} day{daysLeft > 1 ? "s" : ""}.</div>
-        <div class="renew-link" on:click={()=>openModal(StarTramReminderModal,{})}>convert plan</div>
+        <div class="renew-link" on:click={()=>modals.open(StarTramReminderModal,{})}>convert plan</div>
       </div>
     {/if}
   </div>
@@ -104,7 +104,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    color: var(--text-color);;
+    color: var(--text-color);
   }
   .warning-text {
     leading-trim: both;
@@ -125,7 +125,7 @@
     font-weight: 300;
     margin: 8px;
     letter-spacing: -1.44px;
-    color: var(--text-color);;
+    color: var(--text-color);
     cursor: pointer;
   }
 </style>

@@ -1,6 +1,6 @@
 <script>
   import { goto } from '$app/navigation'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { URBIT_MODE } from '#lib/stores/data.js'
 
   export let patp
   export let url

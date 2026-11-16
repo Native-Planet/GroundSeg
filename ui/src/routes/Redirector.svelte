@@ -1,15 +1,15 @@
 <script>
-  import { structure, connected, URBIT_MODE } from '$lib/stores/data'
-  import { isC2CMode } from '$lib/stores/websocket'
+  import { structure, connected, URBIT_MODE } from '#lib/stores/data.js'
+  import { isC2CMode } from '#lib/stores/websocket.js'
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte'
-  import { page } from '$app/stores'
+  import { page } from '$app/state'
 
-  $: authLevel = ($structure?.auth_level) || "unauthorized"
-  $: stage = ($structure?.stage) || null
-  $: pageRouteID = $page.route.id
+  let authLevel = $derived(($structure?.auth_level) || "unauthorized")
+  let stage = $derived(($structure?.stage) || null)
+  let pageRouteID = $derived(page.route.id)
 
-  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
+  let pfx = $derived($URBIT_MODE ? "/apps/groundseg" : "")
 
   let count = 0
 
@@ -60,7 +60,7 @@
   }
 
   const wsAuthRedirect = () => {
-    if ((pageRouteID === (pfx+"/login")) || ($page.route.id.includes("setup"))) {
+    if ((pageRouteID === (pfx+"/login")) || (page.route.id.includes("setup"))) {
       goto(pfx+"/")
     }
   }
@@ -80,7 +80,7 @@
     if (count > 2) {
       count = 0
       const currentStage = "/setup/" + stage
-      if (currentStage != $page.route.id) {
+      if (currentStage != page.route.id) {
         goto("/setup/" + stage)
       }
     } else {

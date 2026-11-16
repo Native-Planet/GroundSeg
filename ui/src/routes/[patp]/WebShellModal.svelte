@@ -1,12 +1,12 @@
 <script>
   import { onMount, tick } from 'svelte'
   import { get } from 'svelte/store'
-  import { page } from '$app/stores'
+  import { page } from '$app/state'
 
-  import Modal from '$lib/Modal.svelte'
-  import { loadSession } from '$lib/stores/gs-crypto'
-  import { URBIT_MODE } from '$lib/stores/data'
-  import { wsPort } from '$lib/stores/websocket'
+  import Modal from '#lib/Modal.svelte'
+  import { loadSession } from '#lib/stores/gs-crypto.js'
+  import { URBIT_MODE } from '#lib/stores/data.js'
+  import { wsPort } from '#lib/stores/websocket.js'
 
   import '@xterm/xterm/css/xterm.css'
 
@@ -40,7 +40,7 @@
     if (get(URBIT_MODE)) {
       return ""
     }
-    return get(page).url.hostname
+    return page.url.hostname
   }
 
   const writeStatusLine = message => {
@@ -146,7 +146,7 @@
       })
       resizeObserver.observe(terminalEl)
 
-      const protocol = get(page).url.protocol === "https:" ? "wss" : "ws"
+      const protocol = page.url.protocol === "https:" ? "wss" : "ws"
       socket = new WebSocket(`${protocol}://${shellHost}:${get(wsPort)}/shell`)
       socket.binaryType = "arraybuffer"
 

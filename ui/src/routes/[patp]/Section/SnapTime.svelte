@@ -1,5 +1,5 @@
 <script>
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import FinalModal from './FinalModal.svelte';
   import UnplugWarning from './UnplugWarning.svelte';
   import SnapSlider from './SnapSlider.svelte'

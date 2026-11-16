@@ -1,15 +1,15 @@
 <script>
   // Style
   import "../theme.css"
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import LoginModal from '../LoginModal.svelte'
-  import { structure } from '$lib/stores/data'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { structure } from '#lib/stores/data.js'
+  import { URBIT_MODE } from '#lib/stores/data.js'
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
 
   const handleModal = () => {
-    openModal(LoginModal,{})
+    modals.open(LoginModal,{})
   }
 
 </script>

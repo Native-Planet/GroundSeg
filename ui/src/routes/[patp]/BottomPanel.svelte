@@ -2,12 +2,12 @@
   import FinalModal from './Section/FinalModal.svelte';
   import UnplugWarning from './Section/UnplugWarning.svelte';
   import { afterUpdate } from 'svelte'
-  import { rebuildContainer } from '$lib/stores/websocket'
-  import { URBIT_MODE, structure } from '$lib/stores/data'
+  import { rebuildContainer } from '#lib/stores/websocket.js'
+  import { URBIT_MODE, structure } from '#lib/stores/data.js'
   import LogsDrawer from './LogsDrawer.svelte'
   import DeleteModal from './DeleteModal.svelte'
   import ExportModal from './ExportModal.svelte'
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   export let patp
 
   $: tRebuildContainer = ($structure?.urbits?.[patp]?.transition?.rebuildContainer) || ""
@@ -23,7 +23,7 @@
 
   function handleClick() {
     if ($URBIT_MODE) {
-      openModal(FinalModal, {"component":"rebuild","patp":patp})
+      modals.open(FinalModal, {"component":"rebuild","patp":patp})
     } else {
       rebuildContainer(patp)
     }
@@ -34,7 +34,7 @@
   {#if !$URBIT_MODE}
     <button 
       class="btn" 
-      on:click={()=>openModal(LogsDrawer,{"patp":patp})}>
+      on:click={()=>modals.open(LogsDrawer,{"patp":patp})}>
       Logs
     </button>
   {/if}
@@ -55,12 +55,12 @@
   {#if !ownShip}
     <button 
       class="btn" 
-      on:click={()=>openModal(ExportModal,{"patp":patp})}>
+      on:click={()=>modals.open(ExportModal,{"patp":patp})}>
       Export
     </button>
     <button 
       class="btn" 
-      on:click={()=>openModal(DeleteModal,{"patp":patp})}>
+      on:click={()=>modals.open(DeleteModal,{"patp":patp})}>
       Delete
     </button>
   {/if}

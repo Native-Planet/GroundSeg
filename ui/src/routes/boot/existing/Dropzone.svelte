@@ -1,24 +1,24 @@
 <script>
   import Dropzone from "dropzone"
   import { onMount, createEventDispatcher } from 'svelte'
-  import { checkPatp } from '$lib/stores/patp'
-  import { generateRandom } from '$lib/stores/gs-crypto'
+  import { checkPatp } from '#lib/stores/patp.js'
+  import { generateRandom } from '#lib/stores/gs-crypto.js'
   import { warningDone } from './store'
-  import { wsPort, modifyUploadEndpoint, openUploadEndpoint } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { wsPort, modifyUploadEndpoint, openUploadEndpoint } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   import Sigil from './Sigil.svelte'
-  import { page } from '$app/stores'
+  import { page } from '$app/state'
   import { goto } from '$app/navigation'
 
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import WarningPrompt from './WarningPrompt.svelte'
   import NewDriveWarning from './NewDriveWarning.svelte'
 
   import Fa from 'svelte-fa'
   import { faCircleExclamation, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
 
-  import { URBIT_MODE } from '$lib/stores/data'
-  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
+  import { URBIT_MODE } from '#lib/stores/data.js'
+  let pfx = $derived($URBIT_MODE ? "/apps/groundseg" : "")
 
   const endpoint = generateRandom(32)
   const dispatch = createEventDispatcher()
@@ -27,23 +27,23 @@
   |   DEFAULT VALUES    |
   **********************/
 
-  let advanceOpen = false
-  let selectedDrive = "system-drive"
+  let advanceOpen = $state(false)
+  let selectedDrive = $state("system-drive")
 
-  $: drives = $structure?.system?.info?.drives || {}
-  $: driveNames = Object.keys(drives)
+  let drives = $derived($structure?.system?.info?.drives || {})
+  let driveNames = $derived(Object.keys(drives))
 
 
-  let patp = ""
-  let filename = ""
-  let remote = true;
-  let fix = true;
+  let patp = $state("")
+  let filename = $state("")
+  let remote = $state(true);
+  let fix = $state(true);
   let percent = 0
 
   /*  Uploader API address */
-  $: addr = "http://" + $page.url.hostname + ":" + $wsPort + "/import/" + endpoint
-  $: registered = ($structure?.profile?.startram?.info?.registered) || false
-  $: running = ($structure?.profile?.startram?.info?.running) || false
+  let addr = $derived("http://" + page.url.hostname + ":" + $wsPort + "/import/" + endpoint)
+  let registered = $derived(($structure?.profile?.startram?.info?.registered) || false)
+  let running = $derived(($structure?.profile?.startram?.info?.running) || false)
 
   /*  Now, we intialize the dropzone during mount */
   onMount(()=> {
@@ -141,13 +141,13 @@
   <div class="label">Pier</div>
   <div class="upload">
     <div id="dropper"></div>
-    <div on:click={selectDropper} class="select">{patp.length < 1 ? "Not chosen" : filename}</div>
-    <button on:click={selectDropper} class="btn action-btn">Choose</button>
+    <div onclick={selectDropper} class="select">{patp.length < 1 ? "Not chosen" : filename}</div>
+    <button onclick={selectDropper} class="btn action-btn">Choose</button>
   </div>
 </div>
 <!-- Customize -->
 <div class="input-wrapper">
-  <div class="advance" on:click={()=>advanceOpen = !advanceOpen}>
+  <div class="advance" onclick={()=>advanceOpen = !advanceOpen}>
     Customize <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
   </div>
 </div>
@@ -155,17 +155,17 @@
 <div class="input-wrapper">
   <div class="label">Select Drive</div>
   <div class="mount-wrapper">
-    <div class="mount-info" on:click={()=>handleDrive("system-drive")} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
+    <div class="mount-info" onclick={()=>handleDrive("system-drive")} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
     {#each driveNames as name}
       <div class="mount">
         <div
           class="mount-info"
           class:active={selectedDrive==name}
-          on:click={()=>handleDrive(name)}
+          onclick={()=>handleDrive(name)}
           >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
         </div>
         {#if drives[name].driveID == 0}
-        <div class="mount-icon" on:click={()=>openModal(NewDriveWarning,{driveName:name})}>
+        <div class="mount-icon" onclick={()=>modals.open(NewDriveWarning,{driveName:name})}>
           <Fa icon={faCircleExclamation} size="1.5x" />
         </div>
         {/if}
@@ -176,7 +176,7 @@
 <div class="input-wrapper">
   <div class="label">Configuration</div>
   {#if registered && running}
-  <div class="check-wrapper" on:click={handleRemote}>
+  <div class="check-wrapper" onclick={handleRemote}>
     <div class="checkbox">
       {#if remote}
         <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
@@ -185,7 +185,7 @@
       <div class="check-label">Set to remote</div>
   </div>
   {/if}
-  <div class="check-wrapper" on:click={handleFix}>
+  <div class="check-wrapper" onclick={handleFix}>
     <div class="checkbox">
       {#if fix}
         <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
@@ -197,8 +197,8 @@
 {/if}
 <div class="input-wrapper">
   <div class="buttons">
-    <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
-    <button class="btn action-btn" disabled={patp.length < 1} on:click={()=>openModal(WarningPrompt)}>Import</button>
+    <button class="btn back" onclick={()=>goto(pfx+'/boot')}>Back</button>
+    <button class="btn action-btn" disabled={patp.length < 1} onclick={()=>modals.open(WarningPrompt)}>Import</button>
   </div>
 </div>
 

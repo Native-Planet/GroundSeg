@@ -1,17 +1,15 @@
 <script>
-  import Nav from '$lib/Nav.svelte'
-  import { Modals, closeModal } from 'svelte-modals'
+  import Nav from '#lib/Nav.svelte'
+  import { Modals, modals } from 'svelte-modals'
 </script>
 
 <Nav />
 <slot />
 
 <Modals>
-  <div
-    slot="backdrop"
-    class="backdrop"
-    on:click={closeModal}
-  />
+  {#snippet backdrop()}
+    <div class="backdrop" on:click={() => modals.close()} />
+  {/snippet}
 </Modals>
 
 <style>

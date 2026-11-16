@@ -302,7 +302,7 @@ func contains(slice []string, item string) bool {
 }
 
 func versionComponentName(field reflect.StructField) string {
-	name := strings.Split(field.Tag.Get("json"), ",")[0]
+	name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
 	if name == "" || name == "-" {
 		name = field.Name
 	}

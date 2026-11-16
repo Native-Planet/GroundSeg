@@ -1,37 +1,28 @@
 <script>
-  import { 
+  import {
     wsPort,
     exportUrbitShip,
     exportUrbitBucket
-  } from '$lib/stores/websocket'
-  import { loadSession } from '$lib/stores/gs-crypto'
+  } from '#lib/stores/websocket.js'
+  import { loadSession } from '#lib/stores/gs-crypto.js'
 
-  import { structure } from '$lib/stores/data'
+  import { structure } from '#lib/stores/data.js'
 
   // Modal
-  import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
 
-  import { afterUpdate } from 'svelte'
-  import { page } from '$app/stores'
 
-  export let patp
-  export let isOpen
+  import { page } from '$app/state'
 
-  $: transition = ($structure?.urbits?.[patp]?.transition) || {}
+  let { patp, isOpen } = $props();
 
-  $: tExportShip = (transition?.exportShip) || ""
-  $: tShipCompressed = (transition?.shipCompressed) || 0
-  $: shipChanged = execIfShipChanged(tExportShip)
 
-  $: tExportBucket = (transition?.exportBucket) || ""
-  $: tBucketCompressed = (transition?.bucketCompressed) || 0
-  $: bucketChanged = execIfBucketChanged(tExportBucket)
 
-  $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
 
-  let shipExported = false
-  let bucketExported = false
+
+  let shipExported = $state(false)
+  let bucketExported = $state(false)
 
   const execIfShipChanged = async state => {
     if (state == "ready")
@@ -52,7 +43,7 @@
       return;
     }
     // send request
-    const hostname = $page.url.hostname
+    const hostname = page.url.hostname
     const response = await fetch("http://"+hostname+":"+ $wsPort +"/export/"+container, {
       method: 'POST',
       headers: {
@@ -85,6 +76,14 @@
       console.log("Error:", response.status);
     }
   }
+  let transition = $derived(($structure?.urbits?.[patp]?.transition) || {})
+  let tExportShip = $derived((transition?.exportShip) || "")
+  let tShipCompressed = $derived((transition?.shipCompressed) || 0)
+  let shipChanged = $derived(execIfShipChanged(tExportShip))
+  let tExportBucket = $derived((transition?.exportBucket) || "")
+  let tBucketCompressed = $derived((transition?.bucketCompressed) || 0)
+  let bucketChanged = $derived(execIfBucketChanged(tExportBucket))
+  let startramRegistered = $derived(($structure?.profile?.startram?.info?.registered) || false)
 </script>
 
 <Modal>
@@ -99,7 +98,7 @@
     <div class="name">Export Urbit Ship</div>
     <button
       disabled={(tExportShip != "") || shipExported}
-      on:click={()=>exportUrbitShip(patp)}
+      onclick={()=>exportUrbitShip(patp)}
       >
       {#if shipExported}
         Ship Exported
@@ -116,7 +115,7 @@
     <div class="name">Export Storage</div>
     <button
       disabled={(tExportBucket != "") || bucketExported}
-      on:click={()=>exportUrbitBucket(patp)}
+      onclick={()=>exportUrbitBucket(patp)}
       >
       {#if bucketExported}
         Storage Exported

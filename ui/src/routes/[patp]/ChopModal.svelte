@@ -1,9 +1,9 @@
 <script>
   // Modal
-  import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
-  import { setNewMaxPierSize, urbitRollChop } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import Modal from '#lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
+  import { setNewMaxPierSize, urbitRollChop } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
 
   export let isOpen
   export let patp

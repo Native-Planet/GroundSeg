@@ -8,9 +8,9 @@
     uninstallGallseg,
     toggleBackups,
     toggleStartramBackups
-  } from '$lib/stores/websocket'
+  } from '#lib/stores/websocket.js'
 
-  import { structure, URBIT_MODE } from '$lib/stores/data'
+  import { structure, URBIT_MODE } from '#lib/stores/data.js'
 
   import Power from './Section/Power.svelte'
   import Urbit from './Section/Urbit.svelte'

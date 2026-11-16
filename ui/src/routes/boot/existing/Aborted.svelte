@@ -1,7 +1,7 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte'
   import { goto } from '$app/navigation';
-  import { resetImportShip } from '$lib/stores/websocket'
+  import { resetImportShip } from '#lib/stores/websocket.js'
   export let name = ""
   export let error = ""
   const dispatch = createEventDispatcher()

@@ -1,5 +1,5 @@
 <script>
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import WebShellModal from '../WebShellModal.svelte'
 
   import "../theme.css"
@@ -7,7 +7,7 @@
   export let patp
 
   const handleOpen = () => {
-    openModal(WebShellModal, { patp })
+    modals.open(WebShellModal, { patp })
   }
 </script>
 

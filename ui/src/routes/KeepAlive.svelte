@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { alive, lastActivity } from './alive';
-  import { sendHeartbeat } from '$lib/stores/urbit'
+  import { sendHeartbeat } from '#lib/stores/urbit.js'
 
   $: handleActivity($alive)
   let sendOnActivity = false

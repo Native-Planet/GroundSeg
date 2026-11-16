@@ -1,19 +1,19 @@
 <script>
-  // import ToggleButton from '$lib/ToggleButton.svelte'
+  // import ToggleButton from '#lib/ToggleButton.svelte'
   // import FinalModal from './FinalModal.svelte';
   // import UnplugWarning from './UnplugWarning.svelte'
   // Style
   import "../theme.css"
-  import { openModal } from 'svelte-modals'
-  import { restoreTlonBackup } from '$lib/stores/websocket'
+  import { modals } from 'svelte-modals'
+  import { restoreTlonBackup } from '#lib/stores/websocket.js'
 
   import BackupsModal from './BackupsModal.svelte'
 
   export let patp
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { URBIT_MODE } from '#lib/stores/data.js'
 
   const openBackupsModal = () => {
-    openModal(BackupsModal, { isOpen: true, patp })
+    modals.open(BackupsModal, { isOpen: true, patp })
   }
 </script>
 

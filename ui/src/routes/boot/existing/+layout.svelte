@@ -1,15 +1,13 @@
 <script>
-  import { Modals, closeModal } from 'svelte-modals'
+  import { Modals, modals } from 'svelte-modals'
 </script>
 
 <slot />
 
 <Modals>
-  <div
-    slot="backdrop"
-    class="backdrop"
-    on:click={closeModal}
-  />
+  {#snippet backdrop()}
+    <div class="backdrop" on:click={() => modals.close()} />
+  {/snippet}
 </Modals>
 
 <style>

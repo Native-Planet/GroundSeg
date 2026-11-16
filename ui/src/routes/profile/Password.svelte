@@ -1,12 +1,12 @@
 <script>
   // Modals
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import PasswordModal from './PasswordModal.svelte'
   // Styling
   export let wide
   // Websocket
-  import { logout } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { logout } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
 
   let clicked = false
   const handleLogout = () => {
@@ -20,7 +20,7 @@
   <div class="label">Password</div>
   <div class="wrapper">
     <div class="pwd">****************</div>
-    <button class="edit" on:click={()=>openModal(PasswordModal)}>Edit</button>
+    <button class="edit" on:click={()=>modals.open(PasswordModal)}>Edit</button>
   </div>
   <div class="label">Session</div>
   <button class="logout" on:click={handleLogout}>{clicked ? "Logging out..." : "Logout"}</button>

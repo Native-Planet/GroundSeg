@@ -6,12 +6,11 @@ ENV GS_VERSION=$GS_VERSION
 
 WORKDIR /webui
 RUN npm install -g npm
-RUN npm install
+RUN npm ci
 
 RUN npm run build
 RUN rm -r src
 RUN rm -r static
-RUN rm svelte.config.js
 RUN rm vite.config.js
 RUN rm -r node_modules
 
