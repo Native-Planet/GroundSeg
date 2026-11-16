@@ -1,13 +1,12 @@
 <script>
-  import { cancelNewShip } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { cancelNewShip } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   import { afterUpdate } from 'svelte'
 
   // Modal
-  import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
 
-  import { page } from '$app/stores'
 
   export let patp
   export let isOpen
@@ -17,7 +16,7 @@
 
   afterUpdate(()=>{
     if (tDeleteShip == "done") {
-      closeModal()
+      modals.close()
     }
   })
 </script>

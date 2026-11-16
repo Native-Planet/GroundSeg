@@ -1,5 +1,5 @@
 <script>
-  import { wide } from '$lib/stores/display'
+  import { wide } from '#lib/stores/display.js'
   import './system.css'
   import SystemLogs from './SystemLogs.svelte'
   import Wireguard from './Wireguard.svelte'

@@ -1,6 +1,6 @@
 <script>
   // Modals
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import { loomChangeActive } from '../store'
   import LoomModal from '../LoomModal.svelte'
 
@@ -36,7 +36,7 @@
 
   const handleMouseUp = () => {
     if (curLoomSize != loomSize) {
-      openModal(LoomModal,{"patp":patp,"loomSize":loomSize,"curLoomSize":curLoomSize})
+      modals.open(LoomModal,{"patp":patp,"loomSize":loomSize,"curLoomSize":curLoomSize})
       loomChangeActive.set(true)
     }
   }

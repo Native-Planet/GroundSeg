@@ -1,6 +1,6 @@
 <script>
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
 
   export let isOpen
   export let driveName
@@ -14,7 +14,7 @@
       <!--
       <div class="buttons-wrapper">
         <button
-          on:click={closeModal}
+          on:click={() => modals.close()}
           >No, it is not
         </button>
         <button

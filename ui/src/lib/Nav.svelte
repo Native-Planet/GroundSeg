@@ -1,30 +1,30 @@
 <script>
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores'
-  import { wide, version } from '$lib/stores/display'
-  import { structure, URBIT_MODE } from '$lib/stores/data'
-  import SatelliteDish from '$lib/SatelliteDish.svelte'
-  import DiskWarningIcon from '$lib/DiskWarningIcon.svelte'
+  import { page } from '$app/state'
+  import { wide, version } from '#lib/stores/display.js'
+  import { structure, URBIT_MODE } from '#lib/stores/data.js'
+  import SatelliteDish from '#lib/SatelliteDish.svelte'
+  import DiskWarningIcon from '#lib/DiskWarningIcon.svelte'
 
   // Temp dev mode
-  import DevToggle from '$lib/DevToggle.svelte'
+  import DevToggle from '#lib/DevToggle.svelte'
 
-  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
-  $: authLevel = ($structure?.auth_level) || "unauthorized"
-  $: hostShip = $URBIT_MODE && typeof window !== 'undefined' ? window.ship : ''
-  $: shipTabPath = $URBIT_MODE && hostShip ? `${pfx}/${hostShip}` : `${pfx}/`
-  $: shipTabLabel = $URBIT_MODE ? "SHIP" : "SHIPS"
-  $: routeId = $page.route.id || ""
-  $: shipTabCurrent = $URBIT_MODE
+  let pfx = $derived($URBIT_MODE ? "/apps/groundseg" : "")
+  let authLevel = $derived(($structure?.auth_level) || "unauthorized")
+  let hostShip = $derived($URBIT_MODE && typeof window !== 'undefined' ? window.ship : '')
+  let shipTabPath = $derived($URBIT_MODE && hostShip ? `${pfx}/${hostShip}` : `${pfx}/`)
+  let shipTabLabel = $derived($URBIT_MODE ? "SHIP" : "SHIPS")
+  let routeId = $derived(page.route.id || "")
+  let shipTabCurrent = $derived($URBIT_MODE
     ? routeId == "/[patp]"
-    : routeId == (pfx+"/(home)")
-  $: keysTabCurrent = (routeId == "/apps") || (routeId == (pfx+"/apps"))
-  $: profileTabCurrent = (routeId == "/profile") || (routeId == (pfx+"/profile"))
-  $: systemTabCurrent = (routeId == "/system") || (routeId == (pfx+"/system"))
+    : routeId == (pfx+"/(home)"))
+  let keysTabCurrent = $derived((routeId == "/apps") || (routeId == (pfx+"/apps")))
+  let profileTabCurrent = $derived((routeId == "/profile") || (routeId == (pfx+"/profile")))
+  let systemTabCurrent = $derived((routeId == "/system") || (routeId == (pfx+"/system")))
 
   const handleBack = () => {
-    const bootExist = $page.route.id.includes("new")
-    const bootNew = $page.route.id.includes("existing")
+    const bootExist = page.route.id.includes("new")
+    const bootNew = page.route.id.includes("existing")
     if (bootExist || bootNew) {
       goto(pfx+"/boot")
     } else {
@@ -35,9 +35,9 @@
 </script>
 
 <div class="wrapper {wide ? "wide" : "slim"}">
-  {#if (!$URBIT_MODE && ($page.route.id == '/[patp]')) || ($page.route.id.includes('/boot'))}
+  {#if (!$URBIT_MODE && (page.route.id == '/[patp]')) || (page.route.id.includes('/boot'))}
     {#if authLevel == "authorized"}
-      <div class="back" on:click={handleBack}></div>
+      <div class="back" onclick={handleBack}></div>
     {/if}
   {:else}
     <div class="nav">
@@ -57,26 +57,26 @@
       <div class="spacer"></div>
       <div
         class:highlight={!shipTabCurrent}
-        on:click={()=>goto(shipTabPath)}
+        onclick={()=>goto(shipTabPath)}
         class="btn option"
         >{shipTabLabel}
       </div>
       <div
         class:highlight={!keysTabCurrent}
-        on:click={()=>goto(pfx+"/apps")}
+        onclick={()=>goto(pfx+"/apps")}
         class="btn option"
         >KEYS
       </div>
       {#if !$URBIT_MODE}
         <div
           class:highlight={!profileTabCurrent}
-          on:click={()=>goto(pfx+"/profile")}
+          onclick={()=>goto(pfx+"/profile")}
           class="btn option"
           >PROFILE
         </div>
         <div
           class:highlight={!systemTabCurrent}
-          on:click={()=>goto(pfx+"/system")}
+          onclick={()=>goto(pfx+"/system")}
           class="btn option"
           >SYSTEM
         </div>

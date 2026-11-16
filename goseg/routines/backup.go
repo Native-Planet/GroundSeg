@@ -23,67 +23,67 @@ var (
 	BackupDir = setBackupDir()
 )
 
-type BackupTime struct {
-	IsSet bool
-	Time  time.Time
-}
-
 func TlonBackupRemote() {
-	backupTime := BackupTime{IsSet: false}
+	var lastAttempt time.Time
 	for {
-		if !backupTime.IsSet {
-			backupTime = BackupTime{IsSet: true, Time: generateTimeOfDay(config.StartramConfig.UrlID)}
-			config.BackupTime = backupTime.Time
-		}
 		now := time.Now()
-		if now.Equal(backupTime.Time) || (now.After(backupTime.Time) && now.Sub(backupTime.Time) <= time.Hour) {
-			conf := config.Conf()
-			if conf.RemoteBackupPassword != "" && conf.WgRegistered {
-				zap.L().Info("Time to backup ships remotely")
-				for _, patp := range conf.Piers {
-					zap.L().Info(fmt.Sprintf("Backing up %s", patp))
-					shipBackupDir := filepath.Join(BackupDir, patp)
-					// List all files in shipBackupDir
-					files, err := filepath.Glob(filepath.Join(shipBackupDir, "*"))
-					if err != nil {
-						zap.L().Error(fmt.Sprintf("Failed to list backup files for %s: %v", patp, err))
-						continue
-					}
-
-					var latestTimestamp int64
-					var latestFile string
-
-					// Find the file with the most recent timestamp
-					for _, file := range files {
-						baseName := filepath.Base(file)
-						timestamp, err := strconv.ParseInt(baseName, 10, 64)
-						if err != nil {
-							// Skip files that are not valid timestamps
-							continue
-						}
-						if timestamp > latestTimestamp {
-							latestTimestamp = timestamp
-							latestFile = file
-						}
-					}
-
-					var backupFile string
-					if latestFile != "" {
-						backupFile = latestFile
-					} else {
-						zap.L().Warn(fmt.Sprintf("No valid backup files found for %s", patp))
-						continue
-					}
-					err = startram.UploadBackup(patp, conf.RemoteBackupPassword, backupFile)
-					if err != nil {
-						zap.L().Error(fmt.Sprintf("Failed to upload backup for %v: %v", patp, err))
-					}
+		backupTime := generateTimeOfDay(config.StartramConfig.UrlID, now)
+		config.BackupTime = backupTime
+		conf := config.Conf()
+		if conf.RemoteBackupPassword != "" && conf.WgRegistered && remoteBackupDue(backupTime, lastAttempt, now) {
+			lastAttempt = now
+			zap.L().Info("Time to backup ships remotely")
+			for _, patp := range conf.Piers {
+				backupFile, err := latestDailyBackup(BackupDir, patp)
+				if err != nil {
+					zap.L().Error(fmt.Sprintf("Failed to list backup files for %s: %v", patp, err))
+					continue
+				}
+				if backupFile == "" {
+					zap.L().Warn(fmt.Sprintf("No valid backup files found for %s", patp))
+					continue
+				}
+				if err := startram.UploadBackup(patp, conf.RemoteBackupPassword, backupFile); err != nil {
+					zap.L().Error(fmt.Sprintf("Failed to upload backup for %v: %v", patp, err))
 				}
 			}
 		}
-		time.Sleep(1 * time.Minute)
+		time.Sleep(time.Minute)
 	}
 }
+
+// Each daily window permits one upload attempt per process, including across UTC midnight.
+func remoteBackupDue(scheduled, lastAttempt, now time.Time) bool {
+	if now.Before(scheduled) {
+		scheduled = scheduled.AddDate(0, 0, -1)
+	}
+	return now.Sub(scheduled) <= time.Hour && lastAttempt.Before(scheduled)
+}
+
+func latestDailyBackup(root, ship string) (string, error) {
+	dir := filepath.Join(root, ship, "daily")
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	var latestTimestamp int64
+	var latestFile string
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() {
+			continue
+		}
+		timestamp, err := strconv.ParseInt(entry.Name(), 10, 64)
+		if err == nil && timestamp > latestTimestamp {
+			latestTimestamp = timestamp
+			latestFile = filepath.Join(dir, entry.Name())
+		}
+	}
+	return latestFile, nil
+}
+
 func TlonBackupLocal() {
 	for {
 		zap.L().Info("Checking local backups")
@@ -172,7 +172,7 @@ func TlonBackupLocal() {
 	}
 }
 
-func generateTimeOfDay(input string) time.Time {
+func generateTimeOfDay(input string, now time.Time) time.Time {
 	// modulos
 	mod24 := big.NewInt(24)
 	mod60 := big.NewInt(60)
@@ -191,7 +191,8 @@ func generateTimeOfDay(input string) time.Time {
 	minute := makeTime(input+"minute", mod60)
 	second := makeTime(input+"second", mod60)
 	// Construct a time.Time object with the generated hour, minute, and second
-	generatedTime := time.Date(0, time.January, 1, int(hour), int(minute), int(second), 0, time.UTC)
+	now = now.UTC()
+	generatedTime := time.Date(now.Year(), now.Month(), now.Day(), int(hour), int(minute), int(second), 0, time.UTC)
 	return generatedTime
 }
 

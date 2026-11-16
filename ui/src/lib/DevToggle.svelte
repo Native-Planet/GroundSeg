@@ -1,6 +1,6 @@
 <script>
-  import { devShipClass } from '$lib/stores/devclass'
-  import { resetSetup } from '$lib/stores/websocket'
+  import { devShipClass } from '#lib/stores/devclass.js'
+  import { resetSetup } from '#lib/stores/websocket.js'
 </script>
   <div class="wrapper">
     {"Reset to Setup:".toUpperCase()}

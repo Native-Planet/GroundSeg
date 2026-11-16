@@ -1,9 +1,9 @@
 <script>
   import ShipCard from "./ShipCard.svelte"
   import NewShipCard from "./NewShipCard.svelte"
-  import { wide } from '$lib/stores/display'
-  import { structure } from '$lib/stores/data'
-  import { sortModes } from '$lib/stores/patp'
+  import { wide } from '#lib/stores/display.js'
+  import { structure } from '#lib/stores/data.js'
+  import { sortModes } from '#lib/stores/patp.js'
 
   const sortMode = 'hierarchical'
   

@@ -1,5 +1,5 @@
 <script>
-  import { openModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   import { snapTimeChangeActive } from '../store'
   import SnapTime from '../SnapTime.svelte'
 
@@ -35,7 +35,7 @@
 
   const handleMouseUp = () => {
     if (curSnapTime != snapTime) {
-      openModal(SnapTime,{"patp":patp,"snapTime":snapTime,"curSnapTime":curSnapTime})
+      modals.open(SnapTime,{"patp":patp,"snapTime":snapTime,"curSnapTime":curSnapTime})
       snapTimeChangeActive.set(true)
     }
   }

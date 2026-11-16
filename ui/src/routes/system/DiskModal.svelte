@@ -1,8 +1,8 @@
 <script>
-  import { structure } from '$lib/stores/data'
-  import { shutdownDevice, restartDevice } from '$lib/stores/websocket'
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
+  import { structure } from '#lib/stores/data.js'
+  import { shutdownDevice, restartDevice } from '#lib/stores/websocket.js'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
 
   export let isOpen
 

@@ -1,9 +1,9 @@
 <script>
   import Fa from 'svelte-fa'
   import { faXmark } from '@fortawesome/free-solid-svg-icons';
-  import { structure } from '$lib/stores/data'
-  import Drawer from '$lib/Drawer.svelte'
-  import LogArea from '$lib/LogArea.svelte'
+  import { structure } from '#lib/stores/data.js'
+  import Drawer from '#lib/Drawer.svelte'
+  import LogArea from '#lib/LogArea.svelte'
   export let patp
   export let isOpen
   let type = "urbit"

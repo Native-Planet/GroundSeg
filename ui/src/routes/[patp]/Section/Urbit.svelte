@@ -4,39 +4,53 @@
   import Clipboard from 'clipboard'
   import { onMount, createEventDispatcher } from 'svelte'
   import CustomUrbitDomain from './CustomUrbitDomain.svelte'
-  import { toggleUrbitAlias } from '$lib/stores/websocket'
-  import { page } from '$app/stores'
+  import { toggleUrbitAlias } from '#lib/stores/websocket.js'
+  import { page } from '$app/state'
 
   import Fa from 'svelte-fa'
   import { faRepeat } from '@fortawesome/free-solid-svg-icons'
-  import { URBIT_MODE } from '$lib/stores/data'
-  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
+  import { URBIT_MODE } from '#lib/stores/data.js'
+  let pfx = $derived($URBIT_MODE ? "/apps/groundseg" : "")
 
-  export let urbitAlias
-  export let showUrbAlias
-  export let patp
-  export let url = "#"
-  export let lusCode = ""
-  export let running = false
-  export let startramRegistered = false
-  export let remote = false
+  /**
+   * @typedef {Object} Props
+   * @property {any} urbitAlias
+   * @property {any} showUrbAlias
+   * @property {any} patp
+   * @property {string} [url]
+   * @property {string} [lusCode]
+   * @property {boolean} [running]
+   * @property {boolean} [startramRegistered]
+   * @property {boolean} [remote]
+   */
 
-  let urlType;
-  $: {
+  /** @type {Props} */
+  let {
+    urbitAlias,
+    showUrbAlias,
+    patp,
+    url = "#",
+    lusCode = "",
+    running = false,
+    startramRegistered = false,
+    remote = false
+  } = $props();
+
+  let urlType = $derived.by(() => {
     try {
-      urlType = new URL(url);
+      return new URL(url);
     } catch (error) {
-      urlType = null;
+      return null;
     }
-  }
-  $: urlStripped = urlType == null ? url : `${urlType?.hostname}`
-  $: urlFixed = urlStripped == null ? url : remote ? url : (urlStripped == url) ? url : "http://" + $page.url.hostname + ":" + urlType.port 
-  $: displayedUrl = (showUrbAlias && remote ? "https://"+urbitAlias : urlFixed)
+  });
+  let urlStripped = $derived(urlType == null ? url : `${urlType?.hostname}`)
+  let urlFixed = $derived(urlStripped == null ? url : remote ? url : (urlStripped == url) ? url : "http://" + page.url.hostname + ":" + urlType.port)
+  let displayedUrl = ($derived(showUrbAlias && remote ? "https://"+urbitAlias : urlFixed))
 
   const dispatch = createEventDispatcher()
-  let copied = false
+  let copied = $state(false)
   let copy
-  let showCustom = false
+  let showCustom = $state(false)
 
   onMount(()=>{
     copy = new Clipboard('#lus-code');
@@ -63,17 +77,17 @@
       {/if}
     </button>
     <a href={displayedUrl} class:disabled={!running} target="_blank" class="btn">
-      {showUrbAlias && (urbitAlias.length > 0) && remote ? "Custom" : ""} URL ↗ 
+      {showUrbAlias && (urbitAlias.length > 0) && remote ? "Custom" : ""} URL ↗
     </a>
     <div class="spacer"></div>
-    {#if urbitAlias.length > 0 && remote} 
-      <button class="btn domain-btn" on:click={()=>toggleUrbitAlias(patp)}><Fa icon={faRepeat} size="1x" /> Switch URL</button>
+    {#if urbitAlias.length > 0 && remote}
+      <button class="btn domain-btn" onclick={()=>toggleUrbitAlias(patp)}><Fa icon={faRepeat} size="1x" /> Switch URL</button>
     {/if}
     <button
       disabled={!startramRegistered}
       class="btn domain-btn"
       class:active={showCustom}
-      on:click={()=>showCustom = !showCustom}>
+      onclick={()=>showCustom = !showCustom}>
       {urbitAlias.length > 0 ? "Modify" : "Set"} Custom Urbit Domain
     </button>
   </div>
@@ -130,11 +144,11 @@
   }
   .btn:disabled {
     opacity: .6;
-    pointer-events: none; 
+    pointer-events: none;
   }
   .disabled {
     opacity: .6;
-    pointer-events: none; 
+    pointer-events: none;
   }
   .active {
     background: var(--btn-secondary);

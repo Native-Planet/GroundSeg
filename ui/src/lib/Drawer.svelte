@@ -3,7 +3,7 @@
   import { quintOut } from 'svelte/easing';
   import Fa from 'svelte-fa'
   import { faXmark } from '@fortawesome/free-solid-svg-icons';
-  import { closeModal } from 'svelte-modals'
+  import { modals } from 'svelte-modals'
   export let title
 </script>
 <div 
@@ -14,7 +14,7 @@
   >
   <div class="contents">
     <div class="title">{title}</div>
-    <div class="x" on:click={closeModal}>
+    <div class="x" on:click={() => modals.close()}>
       <Fa icon={faXmark} size="1x"/>
     </div>
     <slot />

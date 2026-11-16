@@ -5,7 +5,7 @@
   import { slide } from 'svelte/transition'
 	import { quintOut } from 'svelte/easing'
 
-  import { ssids, submitNetwork } from '$lib/stores/websocket'
+  import { ssids, submitNetwork } from '#lib/stores/websocket.js'
 
   let status = ""  // current status
   let selected = "" // selected network to attempt connection

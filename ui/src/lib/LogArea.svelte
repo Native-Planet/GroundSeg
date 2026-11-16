@@ -1,9 +1,9 @@
 <script>
-  import { page } from '$app/stores'
+  import { page } from '$app/state'
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from 'svelte'
-  import { URBIT_MODE } from '$lib/stores/data'
-  import { wsPort } from '$lib/stores/websocket'
-  import { logs, connect, disconnect } from '$lib/stores/logsocket'
+  import { URBIT_MODE } from '#lib/stores/data.js'
+  import { wsPort } from '#lib/stores/websocket.js'
+  import { logs, connect, disconnect } from '#lib/stores/logsocket.js'
   import Clipboard from 'clipboard'
 
   export let type
@@ -13,7 +13,7 @@
   $: lines = ($logs[type]) || []
 
   onMount(()=> {
-    const hostname = $page.url.hostname
+    const hostname = page.url.hostname
     if (!$URBIT_MODE) {
       if (customHostname) {
         connect("ws://" + customHostname + ":" + $wsPort + "/logs",type) // if GS_CUSTOM_HOSTNAME is set

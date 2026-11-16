@@ -1,9 +1,9 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-  import { startramGetRegions, startramRegister } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
+  import { startramGetRegions, startramRegister } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
   export let regionMode = false
   export let isOpen
   let key = ''
@@ -21,7 +21,7 @@
   afterUpdate(()=>{
     if (completed) {
       if (tRegister == null) {
-        closeModal()
+        modals.close()
       }
     } else {
       if (tRegister == "complete") {

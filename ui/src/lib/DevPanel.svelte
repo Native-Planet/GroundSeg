@@ -1,5 +1,5 @@
 <script>
-    import { structure } from '$lib/stores/data'
+    import { structure } from '#lib/stores/data.js'
   import { 
     devStartramReminder,
     devStartramReminderToggle,
@@ -7,7 +7,7 @@
     printMounts,
     devBackupTlon,
     devRestoreTlon
-  } from '$lib/stores/websocket'
+  } from '#lib/stores/websocket.js'
 
   let openDevPanel = !false
 

@@ -1,9 +1,9 @@
 <script>
   import Clipboard from 'clipboard'
   import { onMount } from 'svelte'
-  import { setVereTag } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
-  import { devShipClass } from '$lib/stores/devclass'
+  import { setVereTag } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
+  import { devShipClass } from '#lib/stores/devclass.js'
   export let patp
 
   $: ship = ($structure?.urbits?.[patp]?.info) || {}

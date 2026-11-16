@@ -1,6 +1,6 @@
 <script>
-  import { setupSkip, setupStarTram } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { setupSkip, setupStarTram } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   let key = ''
   let activeRegion = "us-east";
 

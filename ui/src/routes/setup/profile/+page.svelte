@@ -1,5 +1,5 @@
 <script>
-  import { setupPassword } from '$lib/stores/websocket'
+  import { setupPassword } from '#lib/stores/websocket.js'
   let pwd = ''
   let cfm = ''
 

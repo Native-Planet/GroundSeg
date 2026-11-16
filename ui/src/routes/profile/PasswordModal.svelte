@@ -1,23 +1,18 @@
 <script>
-  import { page } from '$app/stores'
-  import { onMount, afterUpdate } from 'svelte'
-  import { modifyPassword } from '$lib/stores/websocket'
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
+  import { page } from '$app/state'
+  import { modifyPassword } from '#lib/stores/websocket.js'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
 
-  export let isOpen
+  let { isOpen } = $props()
 
-  let cur = ''
-  let pwd = ''
-  let cfm = ''
-  let pageRoute;
-
-  onMount(()=>{
-    pageRoute = $page.route.id
-  })
-  afterUpdate(()=>{
-    if (pageRoute != $page.route.id) {
-      closeModal()
+  let cur = $state('')
+  let pwd = $state('')
+  let cfm = $state('')
+  const pageRoute = page.route.id
+  $effect(()=>{
+    if (pageRoute != page.route.id) {
+      modals.close()
     }
   })
 </script>

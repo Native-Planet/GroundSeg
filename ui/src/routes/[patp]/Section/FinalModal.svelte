@@ -1,10 +1,10 @@
 <script>
   import Fa from 'svelte-fa'
   import { faPlugCircleExclamation } from '@fortawesome/free-solid-svg-icons';
-  import { URBIT_MODE } from '$lib/stores/data';
+  import { URBIT_MODE } from '#lib/stores/data.js';
 
-  import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
 
   import { 
     rebuildContainer,
@@ -12,7 +12,7 @@
     toggleUrbitPower,
     toggleDevMode,
     toggleNetwork,
-  } from '$lib/stores/websocket'
+  } from '#lib/stores/websocket.js'
 
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 

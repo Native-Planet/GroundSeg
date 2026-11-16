@@ -1,7 +1,7 @@
 <script>
   // Modal
-  import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
+  import { modals } from 'svelte-modals'
 
   export let isOpen
   export let info

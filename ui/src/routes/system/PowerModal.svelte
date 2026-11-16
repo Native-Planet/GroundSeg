@@ -1,9 +1,9 @@
 <script>
-  import { structure, connected } from '$lib/stores/data'
+  import { structure, connected } from '#lib/stores/data.js'
   import { afterUpdate } from 'svelte'
-  import { shutdownDevice, restartDevice } from '$lib/stores/websocket'
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
+  import { shutdownDevice, restartDevice } from '#lib/stores/websocket.js'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
   export let info
 
   let isConnected = $connected
@@ -19,7 +19,7 @@
     if (!$connected) {
       setTimeout(waitForConn, 1000)
     } else {
-      closeModal()
+      modals.close()
     }
   }
 

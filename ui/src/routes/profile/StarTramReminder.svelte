@@ -1,6 +1,6 @@
 <script>
-  import { structure } from '$lib/stores/data'
-  import { setStartramReminder, setAllStartramReminder } from '$lib/stores/websocket'
+  import { structure } from '#lib/stores/data.js'
+  import { setStartramReminder, setAllStartramReminder } from '#lib/stores/websocket.js'
   $: urbits = $structure?.urbits || {}
   $: urbitKeys = Object.keys(urbits)
   $: selectAllCheck = selectSwitcher(urbits)

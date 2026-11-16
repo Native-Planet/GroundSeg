@@ -4,9 +4,9 @@
 
   import Clipboard from 'clipboard'
   import { onMount } from 'svelte'
-  import { toggleRustFSLink } from '$lib/stores/websocket'
+  import { toggleRustFSLink } from '#lib/stores/websocket.js'
   import CustomMinIODomain from './CustomMinIODomain.svelte'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { URBIT_MODE } from '#lib/stores/data.js'
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   export let running

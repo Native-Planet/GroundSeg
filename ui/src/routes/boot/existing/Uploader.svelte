@@ -2,11 +2,11 @@
   import { onMount } from 'svelte'
   import { Sha256 } from '@aws-crypto/sha256-browser';
   import { goto } from '$app/navigation';
-  import { checkPatp } from '$lib/stores/patp';
-  import { toBase64 } from '$lib/stores/gs-crypto'
-  import { freeUpload, uploadMetadata } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
-  //import { processFile /*, manifest*/ } from '$lib/stores/uploader'
+  import { checkPatp } from '#lib/stores/patp.js';
+  import { toBase64 } from '#lib/stores/gs-crypto.js'
+  import { freeUpload, uploadMetadata } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
+  //import { processFile /*, manifest*/ } from '#lib/stores/uploader.js'
 
   import Dropzone from "dropzone"
 

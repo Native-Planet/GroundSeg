@@ -1,6 +1,6 @@
 <script>
   import './profile.css'
-  import { wide } from '$lib/stores/display'
+  import { wide } from '#lib/stores/display.js'
   import Password from './Password.svelte'
   import StarTram from './StarTram.svelte'
   import Hermes from './Hermes.svelte'

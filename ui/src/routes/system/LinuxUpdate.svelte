@@ -1,5 +1,5 @@
 <script>
-  import { updateLinux } from '$lib/stores/websocket'
+  import { updateLinux } from '#lib/stores/websocket.js'
 </script>
 
 <div class="container">

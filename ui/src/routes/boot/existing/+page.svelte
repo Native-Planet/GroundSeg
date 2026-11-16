@@ -1,8 +1,8 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-  import { wide } from '$lib/stores/display';
+  import { wide } from '#lib/stores/display.js';
   import { goto } from '$app/navigation';
-  import { structure } from '$lib/stores/data'
+  import { structure } from '#lib/stores/data.js'
 
   import Dropzone from './Dropzone.svelte';
   import NotFree from './NotFree.svelte';
@@ -22,9 +22,6 @@
     confirmed = true
   }
 
-  $: upload = ($structure?.upload) || {}
-
-  // debug
   $: upload = ($structure?.upload) || {}
   $: status = (upload?.status) || ""
   $: patp = (upload?.patp) || ""

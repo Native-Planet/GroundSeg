@@ -1,9 +1,9 @@
 <script>
-	import { page } from '$app/stores'
+	import { page } from '$app/state'
   import Header from './Header.svelte'
   import Body from './Body.svelte'
   import Sigil from './Sigil.svelte'
-  $: patp = $page.params.patp
+  let patp = $derived(page.params.patp)
 </script>
 
 <div class="wrapper">

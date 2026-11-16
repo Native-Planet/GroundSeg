@@ -2,8 +2,8 @@
   import './system.css'
   import { showLogs } from './store'
 
-  import { structure, URBIT_MODE } from '$lib/stores/data'
-  import { wide } from '$lib/stores/display'
+  import { structure, URBIT_MODE } from '#lib/stores/data.js'
+  import { wide } from '#lib/stores/display.js'
 
   import LinuxUpdate from './LinuxUpdate.svelte'
   import Connection from './Connection.svelte'

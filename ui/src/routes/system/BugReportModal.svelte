@@ -1,9 +1,9 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { submitReport } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
+  import { submitReport } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
   export let isOpen
   let contact = ''
   let description = ''
@@ -29,7 +29,7 @@
 
   afterUpdate(()=>{
     if (tBugReport == "done") {
-      closeModal()
+      modals.close()
     }
   })
 

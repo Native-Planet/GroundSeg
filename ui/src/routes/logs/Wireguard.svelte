@@ -1,5 +1,5 @@
 <script>
-  import { structure } from '$lib/stores/data'
+  import { structure } from '#lib/stores/data.js'
   export let wide
 
   $: logs =($structure?.logs?.containers?.wireguard?.logs) || []

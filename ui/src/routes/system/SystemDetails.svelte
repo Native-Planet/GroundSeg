@@ -1,6 +1,6 @@
 <script>
-  import { updateLinux, restartGroundSeg, setSwap, checkUpdates } from '$lib/stores/websocket'
-  import { connected, structure } from '$lib/stores/data'
+  import { updateLinux, restartGroundSeg, setSwap, checkUpdates } from '#lib/stores/websocket.js'
+  import { connected, structure } from '#lib/stores/data.js'
 
   import { afterUpdate } from 'svelte'
 

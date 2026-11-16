@@ -55,7 +55,7 @@ func mDNSServer() {
 		} else {
 			// check if there's already a nativeplanet.local
 			counter := 2
-			domainBase := strings.Split(LocalDomain, ".")[0]
+			domainBase, _, _ := strings.Cut(LocalDomain, ".")
 			for contains(domains, domainBase) {
 				LocalDomain = fmt.Sprintf("nativeplanet%d.local", counter)
 				zap.L().Info(fmt.Sprintf("Incrementing to %v...", LocalDomain))

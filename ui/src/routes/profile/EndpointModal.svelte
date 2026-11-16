@@ -1,9 +1,9 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { startramEndpoint } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
+  import { startramEndpoint } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
   export let isOpen
 
   let success = false
@@ -18,7 +18,7 @@
   afterUpdate(()=>{
     if (completed) {
       if (tEndpoint.length < 1) {
-        closeModal()
+        modals.close()
       }
     } else {
       if (tEndpoint == "complete") {

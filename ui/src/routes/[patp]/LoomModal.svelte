@@ -1,10 +1,10 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { setUrbitLoom } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
-  import { closeModal } from 'svelte-modals'
-  import Modal from '$lib/Modal.svelte'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import { setUrbitLoom } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
+  import { modals } from 'svelte-modals'
+  import Modal from '#lib/Modal.svelte'
+  import { URBIT_MODE } from '#lib/stores/data.js'
   export let patp
   export let curLoomSize
   export let loomSize
@@ -15,7 +15,7 @@
 
   afterUpdate(()=>{
     if (tLoom == "done") {
-      closeModal()
+      modals.close()
     }
 
   })

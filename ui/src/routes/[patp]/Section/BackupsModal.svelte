@@ -1,8 +1,8 @@
 <script>
-  import { structure } from '$lib/stores/data'
-  import { restoreTlonBackup } from '$lib/stores/websocket'
+  import { structure } from '#lib/stores/data.js'
+  import { restoreTlonBackup } from '#lib/stores/websocket.js'
   import BackupItem from './RestoreTlon/BackupItem.svelte'
-  import Modal from '$lib/Modal.svelte'
+  import Modal from '#lib/Modal.svelte'
   export let isOpen
   export let patp
 

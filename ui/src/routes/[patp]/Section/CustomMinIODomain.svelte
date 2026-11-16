@@ -1,11 +1,11 @@
 <script>
   // Style
   import "../theme.css"
-  import { removeRustFSDomain, setRustFSDomain } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
+  import { removeRustFSDomain, setRustFSDomain } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
   import { createEventDispatcher, afterUpdate } from 'svelte'
-  import DocsModal from '$lib/DocsModal.svelte'
-  import { openModal } from 'svelte-modals'
+  import DocsModal from '#lib/DocsModal.svelte'
+  import { modals } from 'svelte-modals'
   export let patp
   export let minioAlias
   export let minioAliasMode = "local"
@@ -49,7 +49,7 @@
 <div>
   <div class="section-title-wrapper">
     <div class="section-title">Custom {modeLabel} S3 Domain</div>
-    <div class="what" on:click={()=>openModal(DocsModal, {info:docsInfo})}>?</div>
+    <div class="what" on:click={()=>modals.open(DocsModal, {info:docsInfo})}>?</div>
   </div>
   <div class="wrapper">
     <input type="text" placeholder="storage.example.com" bind:value={domain} disabled={t.length > 0} />

@@ -1,7 +1,7 @@
 <script>
-  import { structure } from '$lib/stores/data'
-  import Drawer from '$lib/Drawer.svelte'
-  import LogArea from '$lib/LogArea.svelte'
+  import { structure } from '#lib/stores/data.js'
+  import Drawer from '#lib/Drawer.svelte'
+  import LogArea from '#lib/LogArea.svelte'
   export let title
   export let isOpen
   let type = "system"

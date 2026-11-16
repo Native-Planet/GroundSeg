@@ -1,5 +1,5 @@
 <script>
-  import { structure, URBIT_MODE, daysUntilDate, startramMaxReminderDays } from '$lib/stores/data'
+  import { structure, URBIT_MODE, daysUntilDate, startramMaxReminderDays } from '#lib/stores/data.js'
   import { goto } from '$app/navigation';
 
   $: startram = $structure?.profile?.startram || {}

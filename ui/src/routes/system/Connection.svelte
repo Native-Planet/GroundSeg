@@ -1,8 +1,8 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { toggleWifi, connectWifi } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
-  import ToggleButton from '$lib/ToggleButton.svelte'
+  import { toggleWifi, connectWifi } from '#lib/stores/websocket.js'
+  import { structure } from '#lib/stores/data.js'
+  import ToggleButton from '#lib/ToggleButton.svelte'
 
   import Fa from 'svelte-fa'
   import { faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';

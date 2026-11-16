@@ -1,5 +1,5 @@
 <script>
-  import { wide } from '$lib/stores/display'
+  import { wide } from '#lib/stores/display.js'
   import './system.css'
   import Interactive from './Interactive.svelte'
   import BugReport from './BugReport.svelte'

@@ -1,8 +1,8 @@
 <script>
   import "../theme.css"
-  import { structure, URBIT_MODE } from '$lib/stores/data'
-  import { setUrbitExtraArgs } from '$lib/stores/websocket'
-  import { lintPersistentArgs } from '$lib/urbitArgs'
+  import { structure, URBIT_MODE } from '#lib/stores/data.js'
+  import { setUrbitExtraArgs } from '#lib/stores/websocket.js'
+  import { lintPersistentArgs } from '#lib/urbitArgs.js'
 
   export let patp
   export let ownShip = false

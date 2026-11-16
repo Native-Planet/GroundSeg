@@ -264,7 +264,7 @@ func RectifyUrbit() {
 						serviceCreated = false
 					}
 					// for urbit web
-					subd := strings.Split(remote.URL, ".")[0]
+					subd, _, _ := strings.Cut(remote.URL, ".")
 					if subd == patp && remote.SvcType == "urbit-web" && remote.Status == "ok" {
 						// update alias
 						if remote.Alias == "null" && local.CustomUrbitWeb != "" {

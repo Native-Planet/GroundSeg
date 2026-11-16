@@ -1,13 +1,13 @@
 <script>
   import Clipboard from 'clipboard'
   import { onMount } from 'svelte'
-  import { structure } from '$lib/stores/data'
-  import { page } from '$app/stores'
-  import { openModal } from 'svelte-modals'
+  import { structure } from '#lib/stores/data.js'
+  import { page } from '$app/state'
+  import { modals } from 'svelte-modals'
   import BugReportModal from './BugReportModal.svelte'
 
   let copy;
-  let copied = false
+  let copied = $state(false)
 
   onMount(()=>{
     copy = new Clipboard('#public-group');
@@ -23,11 +23,11 @@
   <div class="spacer"></div>
   <div class="links">
     <button
-      on:click={()=>openModal(BugReportModal)}
+      onclick={()=>modals.open(BugReportModal)}
       class="link">
       Report Bug
     </button>
-    <a href="http://{$page.url.hostname}:19999" target="_blank" class="link">Beszel</a>
+    <a href="http://{page.url.hostname}:19999" target="_blank" class="link">Beszel</a>
     <span>|</span>
     <a href="https://twitter.com/NativePlanetIO" target="_blank" class="link">Twitter</a>
     <a href="mailto:support@nativeplanet.io" target="_blank" class="link">Email</a>
