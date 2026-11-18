@@ -163,6 +163,9 @@ func applyUrbitDefaults(target *structs.UrbitDocker) {
 	if target.SnapTime == 0 {
 		target.SnapTime = defaults.UrbitConfig.SnapTime
 	}
+	if !structs.IsValidVereBits(target.VereBits) {
+		target.VereBits = defaults.UrbitConfig.VereBits
+	}
 }
 
 func UpdateUrbitConfigForPier(pier string, mutate func(*structs.UrbitDocker)) error {

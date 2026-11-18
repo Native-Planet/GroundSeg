@@ -28,6 +28,7 @@ func TestBuildUrbitBootCommandUsesAssignedAmesPortInLocalMode(t *testing.T) {
 		"--loom=31",
 		"--dirname=zod",
 		"--devmode=False",
+		"--vere-bits=32",
 		"--http-port=80",
 		"--port=34344",
 		"--snap-time=60",
@@ -60,6 +61,7 @@ func TestBuildUrbitBootCommandKeepsDefaultLocalAmesPortImplicit(t *testing.T) {
 		"--loom=31",
 		"--dirname=zod",
 		"--devmode=False",
+		"--vere-bits=32",
 		"--snap-time=60",
 	}
 	if !reflect.DeepEqual(command.ScriptArgs, expectedArgs) {
@@ -92,5 +94,73 @@ func TestLocalUrbitPortBindingsUseAssignedAmesPort(t *testing.T) {
 	}
 	if _, exists := exposedPorts["34344/udp"]; !exists {
 		t.Fatalf("expected assigned ames port to be exposed, got %+v", exposedPorts)
+	}
+}
+
+func TestBuildUrbitBootCommandPassesConfiguredVereBits(t *testing.T) {
+	shipConf := structs.UrbitDocker{
+		PierName: "zod",
+		Network:  "none",
+		LoomSize: 31,
+		SnapTime: 60,
+		VereBits: 64,
+	}
+
+	command, err := BuildUrbitBootCommand(shipConf, structs.SysConfig{}, "boot")
+	if err != nil {
+		t.Fatalf("failed to build boot command: %v", err)
+	}
+	found := false
+	for _, arg := range command.ScriptArgs {
+		if arg == "--vere-bits=64" {
+			found = true
+		}
+		if arg == "--vere-bits=32" {
+			t.Fatalf("unexpected 32-bit flag in %#v", command.ScriptArgs)
+		}
+	}
+	if !found {
+		t.Fatalf("expected --vere-bits=64 in %#v", command.ScriptArgs)
+	}
+}
+
+func TestBuildUrbitBootCommandDefaultsUnsetVereBitsTo32(t *testing.T) {
+	shipConf := structs.UrbitDocker{
+		PierName: "zod",
+		Network:  "none",
+		LoomSize: 31,
+		SnapTime: 60,
+		VereBits: 48,
+	}
+
+	command, err := BuildUrbitBootCommand(shipConf, structs.SysConfig{}, "boot")
+	if err != nil {
+		t.Fatalf("failed to build boot command: %v", err)
+	}
+	found := false
+	for _, arg := range command.ScriptArgs {
+		if arg == "--vere-bits=32" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected --vere-bits=32 in %#v", command.ScriptArgs)
+	}
+}
+
+func TestValidatePersistentExtraArgsBlocksVereBitsAndNoMigrate(t *testing.T) {
+	for _, input := range []string{"--vere-bits=64", "--no-migrate"} {
+		if _, err := ValidatePersistentExtraArgs(input); err == nil {
+			t.Fatalf("expected %q to be rejected as an extra arg", input)
+		}
+	}
+}
+
+func TestMigrateIsMaintenanceBootStatus(t *testing.T) {
+	if !IsMaintenanceBootStatus("migrate") {
+		t.Fatalf("migrate should be a maintenance boot status")
+	}
+	if got := PersistentBootStatusAfterContainerBuild("migrate"); got != "noboot" {
+		t.Fatalf("migrate should persist as noboot, got %q", got)
 	}
 }

@@ -931,6 +931,16 @@ export const setVereTag = (patp, vereTag) => {
   send(payload)
 }
 
+export const setVereBits = (patp, vereBits) => {
+  let payload = {
+    "type":"urbit",
+    "action":"vere-bits",
+    "patp":patp,
+    "value": vereBits
+  }
+  send(payload)
+}
+
 export const setPackSchedule = (patp, frequency, intervalType, time, day, date) => {
   let payload = {
     "type":"urbit",
