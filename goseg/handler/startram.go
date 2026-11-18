@@ -12,6 +12,7 @@ import (
 	"groundseg/structs"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -220,7 +221,14 @@ func loadFreshWireguard() error {
 	return docker.LoadWireguard()
 }
 
+var startramRegistrationMu sync.Mutex
+
 func handleStartramRegister(regCode, region string) {
+	if !startramRegistrationMu.TryLock() {
+		zap.L().Info("StarTram registration is already in progress")
+		return
+	}
+	defer startramRegistrationMu.Unlock()
 	// error handling
 	handleError := func(errmsg string) {
 		msg := fmt.Sprintf("Error: %s", errmsg)
