@@ -45,12 +45,8 @@ import (
 )
 
 var (
-	//go:embed web/*
-	//go:embed web/_app/*
-	//go:embed web/_app/immutable/assets/_*
-	//go:embed web/_app/immutable/chunks/_*
-	//go:embed web/_app/immutable/entry/_*
-	// we need to explicitly embed stuff starting with underscore
+	// Include underscore-prefixed Svelte assets without requiring specific filenames.
+	//go:embed all:web
 	content       embed.FS
 	webContent, _ = fs.Sub(content, "web")
 	fileServer    = http.FileServer(http.FS(webContent))

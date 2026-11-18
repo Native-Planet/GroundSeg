@@ -3,12 +3,14 @@ package startram
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
@@ -32,8 +34,9 @@ import (
 )
 
 var (
-	EventBus = make(chan structs.Event, 100)
-	Regions  = make(map[string]structs.StartramRegion)
+	EventBus                = make(chan structs.Event, 100)
+	Regions                 = make(map[string]structs.StartramRegion)
+	errConfigurationPending = errors.New("StarTram WireGuard configuration is still provisioning")
 )
 
 // get available regions from endpoint
@@ -68,11 +71,19 @@ func GetRegions() (map[string]structs.StartramRegion, error) {
 
 // retrieve the reg info for the local pubkey
 func Retrieve() (structs.StartramRetrieve, error) {
+	return retrieve(context.Background())
+}
+
+func retrieve(ctx context.Context) (structs.StartramRetrieve, error) {
 	var retrieve structs.StartramRetrieve
 	conf := config.Conf()
 	regionUrl := "https://" + conf.EndpointUrl + "/v1/retrieve?pubkey=" + conf.Pubkey
 	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(regionUrl)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, regionUrl, nil)
+	if err != nil {
+		return retrieve, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		errmsg := maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err))
 		zap.L().Warn(errmsg)
@@ -103,6 +114,9 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	if retrieve.Error != 0 {
 		return retrieve, fmt.Errorf("StarTram retrieve returned API error %d: %v", retrieve.Error, retrieve.Debug)
 	}
+	if strings.TrimSpace(retrieve.Conf) == "" {
+		return retrieve, errConfigurationPending
+	}
 	if _, err := config.DecodeStartramWireguardConfig(retrieve.Conf); err != nil {
 		return retrieve, err
 	}
@@ -120,6 +134,29 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	}
 	EventBus <- structs.Event{Type: "retrieve", Data: nil}
 	return retrieve, nil
+}
+
+// Wait for asynchronous provisioning without submitting another registration.
+func waitForRegistration(ctx context.Context, interval time.Duration, fetch func(context.Context) (structs.StartramRetrieve, error)) error {
+	for {
+		_, err := fetch(ctx)
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return fmt.Errorf("waiting for StarTram configuration: %w", ctx.Err())
+		}
+		if !errors.Is(err, errConfigurationPending) {
+			return err
+		}
+		timer := time.NewTimer(interval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return fmt.Errorf("waiting for StarTram configuration: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
 }
 
 // register your pubkey
@@ -155,9 +192,10 @@ func Register(regCode string, region string) error {
 		if err != nil {
 			return fmt.Errorf("Error updating registration status: %v", err)
 		}
-		_, err := Retrieve()
-		if err != nil {
-			return fmt.Errorf("Error retrieving post-registration: %v", err)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+		if err := waitForRegistration(ctx, 2*time.Second, retrieve); err != nil {
+			return fmt.Errorf("Error retrieving post-registration: %w", err)
 		}
 	} else {
 		err = config.UpdateConf(map[string]any{
