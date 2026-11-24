@@ -29,6 +29,8 @@ var (
 		{canonical: "--bootstrap-url", aliases: []string{"--bootstrap-url"}},
 		{canonical: "--prop-url", aliases: []string{"--prop-url"}},
 		{canonical: "--prop-name", aliases: []string{"--prop-name"}},
+		{canonical: "--vere-bits", aliases: []string{"--vere-bits"}},
+		{canonical: "--no-migrate", aliases: []string{"--no-migrate"}},
 	}
 	firstBootArgRules = []flagRule{
 		{canonical: "-G/--key-string", aliases: []string{"-G", "--key-string"}},
@@ -64,6 +66,7 @@ func BuildUrbitBootCommand(shipConf structs.UrbitDocker, systemConf structs.SysC
 		"--loom=" + loomValue,
 		"--dirname=" + shipConf.PierName,
 		"--devmode=" + devMode,
+		"--vere-bits=" + fmt.Sprintf("%d", shipConf.EffectiveVereBits()),
 	}
 	if shipConf.Network == "wireguard" || amesPort != "34343" {
 		scriptArgs = append(scriptArgs,

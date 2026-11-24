@@ -18,6 +18,7 @@ var (
 	#httpPort="80"
 	loom="31"
 	devMode="False"
+	vereBits="32"
 	
 	# Find the first directory and start urbit with the ship therein
 	dirnames="*/"
@@ -37,7 +38,7 @@ var (
 		if [[ ${#patp} -eq 3 ]]; then
 			[[ $suf == *"$patp"* ]] && echo "$patp" && return
 		else
-			for p in "${patp_arr[@]}"; dofa
+			for p in "${patp_arr[@]}"; do
 				[[ ${#p} -eq 6 && $pre == *"${p:0:3}"* && $suf == *"${p:3:3}"* ]] || return
 			done
 			echo "$patp"
@@ -59,6 +60,10 @@ var (
 	for i in "$@"
 	do
 	case $i in
+	   --vere-bits=*)
+		  vereBits="${i#*=}"
+		  shift
+		  ;;
 	   --loom=*)
 		  loom="${i#*=}"
 		  shift
@@ -77,6 +82,16 @@ var (
 	echo "Running with no STDIN"
 	ttyflag="-t"
 	fi
+
+	# select the vere binary width (32/64) for this container
+	vereBinDir="/usr/local/vere/${vereBits}"
+	if [ -x "${vereBinDir}/urbit" ]; then
+		export PATH="${vereBinDir}:${PATH}"
+	elif [ "$vereBits" != "32" ]; then
+		echo "vere${vereBits} is not available in this image (missing ${vereBinDir}/urbit)"
+		exit 1
+	fi
+	echo "vere binary: $(command -v urbit) ($(urbit -R 2>/dev/null | head -n 1))"
 	
 	file="${dirname}/.vere.lock"
 	if [ -e "$file" ]; then
@@ -98,6 +113,7 @@ var (
 	httpPort="80"
 	loom="31"
 	devMode="False"
+	vereBits="32"
 	snapTime="60"
 	extraArgs=()
 	
@@ -141,6 +157,10 @@ var (
 	for i in "$@"
 	do
 	case $i in
+	   --vere-bits=*)
+		  vereBits="${i#*=}"
+		  shift
+		  ;;
 	  -p=*|--port=*)
 		  amesPort="${i#*=}"
 		  shift
@@ -179,6 +199,16 @@ var (
 	echo "Running with no STDIN"
 	ttyflag="-t"
 	fi
+
+	# select the vere binary width (32/64) for this container
+	vereBinDir="/usr/local/vere/${vereBits}"
+	if [ -x "${vereBinDir}/urbit" ]; then
+		export PATH="${vereBinDir}:${PATH}"
+	elif [ "$vereBits" != "32" ]; then
+		echo "vere${vereBits} is not available in this image (missing ${vereBinDir}/urbit)"
+		exit 1
+	fi
+	echo "vere binary: $(command -v urbit) ($(urbit -R 2>/dev/null | head -n 1))"
 
 	managedRunArgs=()
 	if [ -n "$ttyflag" ]; then
@@ -424,6 +454,7 @@ var (
 	#httpPort="80"
 	loom="31"
 	devMode="False"
+	vereBits="32"
 	
 	# Find the first directory and start urbit with the ship therein
 	dirnames="*/"
@@ -465,6 +496,10 @@ var (
 	for i in "$@"
 	do
 	case $i in
+	   --vere-bits=*)
+		  vereBits="${i#*=}"
+		  shift
+		  ;;
 	#  -p=*|--port=*)
 	#      amesPort="${i#*=}"
 	#      shift
@@ -496,6 +531,16 @@ var (
 	echo "Running with no STDIN"
 	ttyflag="-t"
 	fi
+
+	# select the vere binary width (32/64) for this container
+	vereBinDir="/usr/local/vere/${vereBits}"
+	if [ -x "${vereBinDir}/urbit" ]; then
+		export PATH="${vereBinDir}:${PATH}"
+	elif [ "$vereBits" != "32" ]; then
+		echo "vere${vereBits} is not available in this image (missing ${vereBinDir}/urbit)"
+		exit 1
+	fi
+	echo "vere binary: $(command -v urbit) ($(urbit -R 2>/dev/null | head -n 1))"
 	
 	file="${dirname}/.vere.lock"
 	if [ -e "$file" ]; then
@@ -519,6 +564,7 @@ var (
 	#httpPort="80"
 	loom="31"
 	devMode="False"
+	vereBits="32"
 	
 	# Find the first directory and start urbit with the ship therein
 	dirnames="*/"
@@ -560,6 +606,10 @@ var (
 	for i in "$@"
 	do
 	case $i in
+	   --vere-bits=*)
+		  vereBits="${i#*=}"
+		  shift
+		  ;;
 	#  -p=*|--port=*)
 	#      amesPort="${i#*=}"
 	#      shift
@@ -591,6 +641,16 @@ var (
 	echo "Running with no STDIN"
 	ttyflag="-t"
 	fi
+
+	# select the vere binary width (32/64) for this container
+	vereBinDir="/usr/local/vere/${vereBits}"
+	if [ -x "${vereBinDir}/urbit" ]; then
+		export PATH="${vereBinDir}:${PATH}"
+	elif [ "$vereBits" != "32" ]; then
+		echo "vere${vereBits} is not available in this image (missing ${vereBinDir}/urbit)"
+		exit 1
+	fi
+	echo "vere binary: $(command -v urbit) ($(urbit -R 2>/dev/null | head -n 1))"
 	
 	file="${dirname}/.vere.lock"
 	if [ -e "$file" ]; then
@@ -614,6 +674,7 @@ var (
 	#httpPort="80"
 	loom="31"
 	devMode="False"
+	vereBits="32"
 	
 	# Find the first directory and start urbit with the ship therein
 	dirnames="*/"
@@ -655,6 +716,10 @@ var (
 	for i in "$@"
 	do
 	case $i in
+	   --vere-bits=*)
+		  vereBits="${i#*=}"
+		  shift
+		  ;;
 	   --loom=*)
 		  loom="${i#*=}"
 		  shift
@@ -673,6 +738,16 @@ var (
 	echo "Running with no STDIN"
 	ttyflag="-t"
 	fi
+
+	# select the vere binary width (32/64) for this container
+	vereBinDir="/usr/local/vere/${vereBits}"
+	if [ -x "${vereBinDir}/urbit" ]; then
+		export PATH="${vereBinDir}:${PATH}"
+	elif [ "$vereBits" != "32" ]; then
+		echo "vere${vereBits} is not available in this image (missing ${vereBinDir}/urbit)"
+		exit 1
+	fi
+	echo "vere binary: $(command -v urbit) ($(urbit -R 2>/dev/null | head -n 1))"
 	
 	file="${dirname}/.vere.lock"
 	if [ -e "$file" ]; then
@@ -696,6 +771,7 @@ var (
 	#httpPort="80"
 	loom="31"
 	devMode="False"
+	vereBits="32"
 
 	# Find the first directory and start urbit with the ship therein
 	dirnames="*/"
@@ -737,6 +813,10 @@ var (
 	for i in "$@"
 	do
 	case $i in
+	   --vere-bits=*)
+		  vereBits="${i#*=}"
+		  shift
+		  ;;
 	   --loom=*)
 		  loom="${i#*=}"
 		  shift
@@ -755,6 +835,16 @@ var (
 	echo "Running with no STDIN"
 	ttyflag="-t"
 	fi
+
+	# select the vere binary width (32/64) for this container
+	vereBinDir="/usr/local/vere/${vereBits}"
+	if [ -x "${vereBinDir}/urbit" ]; then
+		export PATH="${vereBinDir}:${PATH}"
+	elif [ "$vereBits" != "32" ]; then
+		echo "vere${vereBits} is not available in this image (missing ${vereBinDir}/urbit)"
+		exit 1
+	fi
+	echo "vere binary: $(command -v urbit) ($(urbit -R 2>/dev/null | head -n 1))"
 
 	file="${dirname}/.vere.lock"
 	if [ -e "$file" ]; then
@@ -782,6 +872,7 @@ var (
 	#httpPort="80"
 	loom="31"
 	devMode="False"
+	vereBits="32"
 	
 	# Find the first directory and start urbit with the ship therein
 	dirnames="*/"
@@ -823,6 +914,10 @@ var (
 	for i in "$@"
 	do
 	case $i in
+	   --vere-bits=*)
+		  vereBits="${i#*=}"
+		  shift
+		  ;;
 	   --loom=*)
 		  loom="${i#*=}"
 		  shift
@@ -841,6 +936,16 @@ var (
 	echo "Running with no STDIN"
 	ttyflag="-t"
 	fi
+
+	# select the vere binary width (32/64) for this container
+	vereBinDir="/usr/local/vere/${vereBits}"
+	if [ -x "${vereBinDir}/urbit" ]; then
+		export PATH="${vereBinDir}:${PATH}"
+	elif [ "$vereBits" != "32" ]; then
+		echo "vere${vereBits} is not available in this image (missing ${vereBinDir}/urbit)"
+		exit 1
+	fi
+	echo "vere binary: $(command -v urbit) ($(urbit -R 2>/dev/null | head -n 1))"
 	
 	file="${dirname}/.vere.lock"
 	if [ -e "$file" ]; then
@@ -853,6 +958,141 @@ var (
 	
 	urbit -Lx $ttyflag --loom $loom $dirname
 	urbit meld --loom $loom $dirname`
+
+	MigrateScript = `#!/bin/bash
+	echo "VERE MIGRATE"
+	log_file="migrate.log"
+	exec > >(tee -a "$log_file") 2>&1
+
+	set -eu
+	# set defaults
+	loom="31"
+	vereBits="32"
+
+	# Find the first directory and start urbit with the ship therein
+	dirnames="*/"
+	dirs=( $dirnames )
+	dirname=''${dirnames[0]}
+
+	# Patp checker
+	check_patp() {
+		patp="$1"
+		pre="dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
+		suf="zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
+		[[ "${patp:0:1}" == "~" ]] && patp="${patp:1}"
+		patp_arr=(${patp//-/ })
+
+		[[ "${patp:0:3}" == "doz" ]] && return
+
+		if [[ ${#patp} -eq 3 ]]; then
+			[[ $suf == *"$patp"* ]] && echo "$patp" && return
+		else
+			for p in "${patp_arr[@]}"; do
+				[[ ${#p} -eq 6 && $pre == *"${p:0:3}"* && $suf == *"${p:3:3}"* ]] || return
+			done
+			echo "$patp"
+		fi
+	}
+
+	# Find a directory with a valid patp
+	for patp in *; do
+		if [[ -d $patp ]]; then
+			result=$(echo $(check_patp "$patp"))
+			if [[ -n $result ]]; then
+			  dirname=$result
+			  break
+			fi
+		fi
+	done
+
+	# check args
+	for i in "$@"
+	do
+	case $i in
+	   --vere-bits=*)
+		  vereBits="${i#*=}"
+		  shift
+		  ;;
+	   --loom=*)
+		  loom="${i#*=}"
+		  shift
+		  ;;
+	   --dirname=*)
+		  dirname="${i#*=}"
+		  shift
+		  ;;
+	esac
+	done
+
+	if [ "$vereBits" != "32" ] && [ "$vereBits" != "64" ]; then
+		echo "Unsupported vere width: $vereBits (expected 32 or 64)"
+		exit 1
+	fi
+
+	# If the container is not started with the -i flag
+	# then STDIN will be closed and we need to start
+	# Urbit/vere with the -t flag.
+	ttyflag=""
+	if [ ! -t 0 ]; then
+	echo "Running with no STDIN"
+	ttyflag="-t"
+	fi
+
+	file="${dirname}/.vere.lock"
+	if [ -e "$file" ]; then
+		content=$(cat "$file")
+		if [ "$content" == "1" ]; then
+			rm "$file"
+			echo "File .vere.lock containing PID 1 has been deleted."
+		fi
+	fi
+
+	# resolve the vere binary for a given width; /bin/urbit is the 32-bit fallback
+	select_vere() {
+		local bits="$1"
+		local dir="/usr/local/vere/${bits}"
+		if [ -x "${dir}/urbit" ]; then
+			echo "${dir}/urbit"
+		elif [ "$bits" = "32" ]; then
+			command -v urbit
+		else
+			return 1
+		fi
+	}
+
+	targetBin="$(select_vere "$vereBits")" || {
+		echo "vere${vereBits} is not available in this image (missing /usr/local/vere/${vereBits}/urbit)"
+		exit 1
+	}
+
+	# detect the width of the current snapshot. image.bin stores a word-size flag in
+	# the low bit of its second 64-bit word: 1 means 64-bit, 0 means 32-bit. piers on
+	# the pre-vere-4 (north/south.bin) layout have no image.bin and are 32-bit.
+	currentBits="32"
+	imageFile="${dirname}/.urb/chk/image.bin"
+	if [ -f "$imageFile" ]; then
+		pamByte=$(od -An -t u1 -j 8 -N 1 "$imageFile" | tr -d '[:space:]')
+		if [ $(( ${pamByte:-0} & 1 )) -eq 1 ]; then
+			currentBits="64"
+		fi
+	fi
+	echo "Snapshot width: ${currentBits}-bit, target width: ${vereBits}-bit"
+
+	if [ "$currentBits" != "$vereBits" ]; then
+		# a cross-width migration needs a snapshot that is current with the event log,
+		# so replay to head with the binary that matches the snapshot first.
+		currentBin="$(select_vere "$currentBits")" || {
+			echo "vere${currentBits} is not available in this image; cannot bring the snapshot up to date"
+			exit 1
+		}
+		echo "Bringing the snapshot up to date with $("$currentBin" -R 2>/dev/null | head -n 1)"
+		"$currentBin" -Lx $ttyflag --loom $loom $dirname
+	fi
+
+	# booting once with the target binary migrates the snapshot in place
+	echo "Booting with $("$targetBin" -R 2>/dev/null | head -n 1) to migrate the snapshot"
+	"$targetBin" -Lx $ttyflag --loom $loom $dirname
+	echo "VERE MIGRATE DONE (${vereBits}-bit)"`
 
 	Fixer = fmt.Sprintf(`if [[ $(systemctl is-failed groundseg)  == "failed" ]]; then 
 		echo "Started: $(date)" >> %s/logs/fixer.log

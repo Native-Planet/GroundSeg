@@ -351,6 +351,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.Network = shipNetworks[pier]
 		urbit.Info.URL = urbitURL
 		urbit.Info.LoomSize = dockerConfig.LoomSize
+		urbit.Info.VereBits = dockerConfig.EffectiveVereBits()
 		urbit.Info.DiskUsage = dockerStats.DiskUsage
 		urbit.Info.MemUsage = dockerStats.MemoryUsage
 		urbit.Info.ExtraArgs = dockerConfig.ExtraArgs

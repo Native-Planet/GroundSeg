@@ -85,6 +85,8 @@ func UrbitHandler(msg []byte) error {
 		return handleExtraArgs(patp, urbitPayload, shipConf)
 	case "vere-tag":
 		return handleVereTag(patp, urbitPayload, shipConf)
+	case "vere-bits":
+		return handleVereBits(patp, urbitPayload, shipConf)
 	case "toggle-boot-status":
 		return toggleBootStatus(patp, shipConf)
 	case "toggle-auto-reboot":
@@ -1334,6 +1336,137 @@ func handleVereTag(patp string, urbitPayload structs.WsUrbitPayload, shipConf st
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "vereTag", Event: "success"}
 	time.Sleep(3 * time.Second)
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "vereTag", Event: ""}
+	return nil
+}
+
+// switch a ship between the 32-bit and 64-bit vere binaries shipped in the urbit image
+func handleVereBits(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	target := urbitPayload.Payload.Value
+	if !structs.IsValidVereBits(target) {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "vereBits", Event: "error"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "vereBits", Event: ""}
+		return fmt.Errorf("unsupported vere width %d for %s (expected 32 or 64)", target, patp)
+	}
+	if shipConf.EffectiveVereBits() == target {
+		zap.L().Info(fmt.Sprintf("%s is already running %d-bit vere", patp, target))
+		return nil
+	}
+	return migrateVereBits(patp, shipConf, target)
+}
+
+func setShipVereBits(patp string, bits int) error {
+	return config.UpdateUrbitConfigForPier(patp, func(shipConf *structs.UrbitDocker) {
+		shipConf.VereBits = bits
+	})
+}
+
+// migrateVereBits stops the ship cleanly, boots it once with the target-width
+// binary (which migrates the snapshot in place), then restores its power state.
+func migrateVereBits(patp string, shipConf structs.UrbitDocker, target int) error {
+	const transitionType = "vereBits"
+	done, err := beginShipMaintenance(patp, transitionType)
+	if err != nil {
+		return err
+	}
+	defer done()
+
+	previousBits := shipConf.EffectiveVereBits()
+	zap.L().Info(fmt.Sprintf("Switching %s from %d-bit to %d-bit vere", patp, previousBits, target))
+	var (
+		previousBootStatus    = shipConf.BootStatus
+		previousDesiredStatus string
+		shouldRestart         bool
+		maintenanceChanged    bool
+		revertBitsOnError     bool
+	)
+	migrateError := func(err error) error {
+		if revertBitsOnError {
+			if revertErr := setShipVereBits(patp, previousBits); revertErr != nil {
+				zap.L().Warn(fmt.Sprintf("Failed to restore %s to %d-bit vere after migration error: %v", patp, previousBits, revertErr))
+			}
+		}
+		if maintenanceChanged {
+			restoreAfterMaintenanceError(patp, previousBootStatus, previousDesiredStatus, shouldRestart)
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "error"}
+		return err
+	}
+	defer func() {
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: ""}
+	}()
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "loading"}
+
+	statuses, err := docker.GetShipStatus([]string{patp})
+	if err != nil {
+		return migrateError(fmt.Errorf("Failed to get ship status for %s: %v", patp, err))
+	}
+	status, exists := statuses[patp]
+	if !exists {
+		return migrateError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
+	}
+	isRunning := strings.Contains(status, "Up")
+	previousDesiredStatus = currentDesiredStatus(patp, status, previousBootStatus)
+	shouldRestart = isRunning || previousDesiredStatus == "running" || previousBootStatus == "boot"
+	// prevent die/stop watchers from restarting the ship while maintenance exits are expected
+	updateDesiredContainerStatus(patp, "stopped")
+	maintenanceChanged = true
+	if isRunning {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "stopping"}
+		if err := click.BarExit(patp); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to stop ship with |exit for vere migration %s: %v", patp, err))
+			if err = docker.StopContainerByName(patp); err != nil {
+				return migrateError(fmt.Errorf("Failed to stop ship for vere migration %s: %v", patp, err))
+			}
+		}
+		if err := WaitCompleteWithTimeout(patp, 10*time.Minute); err != nil {
+			return migrateError(err)
+		}
+	}
+
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "migrating"}
+	if err := setShipVereBits(patp, target); err != nil {
+		return migrateError(fmt.Errorf("Failed to update %s urbit config to %d-bit vere: %v", patp, target, err))
+	}
+	revertBitsOnError = true
+	if err := setShipBootStatus(patp, "migrate"); err != nil {
+		return migrateError(fmt.Errorf("Failed to update %s urbit config to migrate: %v", patp, err))
+	}
+	if err := startShipWithDesiredStatus(patp, "stopped"); err != nil {
+		return migrateError(fmt.Errorf("Failed to start vere migration for %s: %v", patp, err))
+	}
+	zap.L().Info(fmt.Sprintf("Waiting for %d-bit vere migration to complete for %s", target, patp))
+	if err := WaitCompleteWithTimeout(patp, 6*time.Hour); err != nil {
+		return migrateError(err)
+	}
+	exitCode, err := docker.GetContainerExitCode(patp)
+	if err != nil {
+		return migrateError(fmt.Errorf("Failed to read vere migration result for %s: %v", patp, err))
+	}
+	if exitCode != 0 {
+		return migrateError(fmt.Errorf("Vere migration for %s exited with code %d, ship stays on %d-bit (see migrate.log in the pier volume)", patp, exitCode, previousBits))
+	}
+	// the pier is now on the target width; a failure from here on must not undo that
+	revertBitsOnError = false
+	zap.L().Info(fmt.Sprintf("%s migrated to %d-bit vere", patp, target))
+
+	if shouldRestart {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "starting"}
+		updateDesiredContainerStatus(patp, "running")
+		if err := setShipBootStatus(patp, "boot"); err != nil {
+			return migrateError(fmt.Errorf("Failed to update %s urbit config to boot: %v", patp, err))
+		}
+		if err := startShipWithDesiredStatus(patp, "running"); err != nil {
+			return migrateError(fmt.Errorf("Failed to restart %s after vere migration: %v", patp, err))
+		}
+	} else {
+		if err := setShipBootStatus(patp, docker.PersistentBootStatusAfterContainerBuild(previousBootStatus)); err != nil {
+			return migrateError(fmt.Errorf("Failed to restore %s boot status after vere migration: %v", patp, err))
+		}
+		updateDesiredContainerStatus(patp, "stopped")
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: transitionType, Event: "success"}
 	return nil
 }
 

@@ -174,6 +174,7 @@ type Urbit struct {
 		MemUsage                 uint64         `json:"memUsage"`
 		DiskUsage                int64          `json:"diskUsage"`
 		LoomSize                 int            `json:"loomSize"`
+		VereBits                 int            `json:"vereBits"`
 		SnapTime                 int            `json:"snapTime"`
 		ExtraArgs                string         `json:"extraArgs"`
 		BootCommandBase          string         `json:"bootCommandBase"`
@@ -245,6 +246,7 @@ type UrbitTransitionBroadcast struct {
 	SnapTime                  string `json:"snapTime"`
 	ExtraArgs                 string `json:"extraArgs"`
 	VereTag                   string `json:"vereTag"`
+	VereBits                  string `json:"vereBits"`
 }
 
 // used to construct broadcast pier info subobject

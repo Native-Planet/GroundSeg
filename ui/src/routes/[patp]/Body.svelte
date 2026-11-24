@@ -16,6 +16,7 @@
   import Urbit from './Section/Urbit.svelte'
   import MinIO from './Section/MinIO.svelte'
   import Loom from './Section/Loom.svelte'
+  import VereBits from './Section/VereBits.svelte'
   import SnapTime from './Section/SnapTime.svelte'
   import AdditionalArgs from './Section/AdditionalArgs.svelte'
   import PackMeld from './Section/PackMeld.svelte'
@@ -181,6 +182,12 @@
   <Loom
     {patp}
     {loomSize} 
+    {ownShip}
+    />
+
+  <!-- Vere loom width (32/64-bit) -->
+  <VereBits
+    {patp}
     {ownShip}
     />
 

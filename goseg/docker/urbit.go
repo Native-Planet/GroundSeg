@@ -129,6 +129,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		scriptContent = defaults.RollChopScript
 	case "roll":
 		scriptContent = defaults.RollScript
+	case "migrate":
+		scriptContent = defaults.MigrateScript
 	default:
 		return containerConfig, hostConfig, fmt.Errorf("Unknown action: %s", act)
 	}
