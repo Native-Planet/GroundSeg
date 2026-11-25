@@ -33,22 +33,29 @@ func TlonBackupRemote() {
 		if conf.RemoteBackupPassword != "" && conf.WgRegistered && remoteBackupDue(backupTime, lastAttempt, now) {
 			lastAttempt = now
 			zap.L().Info("Time to backup ships remotely")
-			for _, patp := range conf.Piers {
-				backupFile, err := latestDailyBackup(BackupDir, patp)
-				if err != nil {
-					zap.L().Error(fmt.Sprintf("Failed to list backup files for %s: %v", patp, err))
-					continue
-				}
-				if backupFile == "" {
-					zap.L().Warn(fmt.Sprintf("No valid backup files found for %s", patp))
-					continue
-				}
-				if err := startram.UploadBackup(patp, conf.RemoteBackupPassword, backupFile); err != nil {
-					zap.L().Error(fmt.Sprintf("Failed to upload backup for %v: %v", patp, err))
-				}
-			}
+			uploadScheduledBackups(BackupDir, conf.Piers, conf.RemoteBackupPassword, startram.UploadBackup)
 		}
 		time.Sleep(time.Minute)
+	}
+}
+
+func uploadScheduledBackups(root string, piers []string, password string, upload func(ship, password, file string) error) {
+	for _, patp := range piers {
+		if !config.UrbitConf(patp).RemoteTlonBackup {
+			continue
+		}
+		backupFile, err := latestDailyBackup(root, patp)
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to list backup files for %s: %v", patp, err))
+			continue
+		}
+		if backupFile == "" {
+			zap.L().Warn(fmt.Sprintf("No valid backup files found for %s", patp))
+			continue
+		}
+		if err := upload(patp, password, backupFile); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to upload backup for %v: %v", patp, err))
+		}
 	}
 }
 
@@ -87,88 +94,93 @@ func latestDailyBackup(root, ship string) (string, error) {
 func TlonBackupLocal() {
 	for {
 		zap.L().Info("Checking local backups")
-		conf := config.Conf()
-		for _, patp := range conf.Piers {
-			// get local tz
-			location := time.Now().Location()
-			// default backup time is midnight
-			backupTime := time.Date(0, 1, 1, 0, 0, 0, 0, location)
-			// time format
-			timeFormat := "1504"
-			// retrieve config
-			shipConf := config.UrbitConf(patp)
-			shipBackupDir := filepath.Join(BackupDir, patp)
-			shipBackupDirDaily := filepath.Join(shipBackupDir, "daily")
-			shipBackupDirWeekly := filepath.Join(shipBackupDir, "weekly")
-			shipBackupDirMonthly := filepath.Join(shipBackupDir, "monthly")
-			if err := os.MkdirAll(shipBackupDirDaily, 0755); err != nil {
-				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
-				continue
-			}
-			if err := os.MkdirAll(shipBackupDirWeekly, 0755); err != nil {
-				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
-				continue
-			}
-			if err := os.MkdirAll(shipBackupDirMonthly, 0755); err != nil {
-				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
-				continue
-			}
-			// parse backup time
-			parsedTime, err := time.ParseInLocation(timeFormat, shipConf.BackupTime, location)
-			if err == nil {
-				backupTime = parsedTime
-			}
-			// List all files in shipBackupDir that are unix timestamps
-			files, err := filepath.Glob(filepath.Join(shipBackupDirDaily, "[0-9]*"))
-			if err != nil {
-				zap.L().Error(fmt.Sprintf("Failed to list backup files for %v: %v", patp, err))
-				continue
-			}
+		createScheduledBackups(BackupDir, config.Conf().Piers, backups.CreateBackup)
+		time.Sleep(1 * time.Hour) // check every hour
+	}
+}
 
-			// check if backups exists, if exists get latest timestamp
-			var mostRecentBackup time.Time
-			if len(files) > 0 {
-				// Find the most recent backup
-				var latestUnixTime int64
-				for _, file := range files {
-					fileName := filepath.Base(file)
-					unixTime, err := strconv.ParseInt(fileName, 10, 64)
-					if err == nil && unixTime > latestUnixTime {
-						latestUnixTime = unixTime
-					}
+func createScheduledBackups(root string, piers []string, create func(ship, daily, weekly, monthly string) error) {
+	for _, patp := range piers {
+		shipConf := config.UrbitConf(patp)
+		if !shipConf.LocalTlonBackup {
+			continue
+		}
+		// get local tz
+		location := time.Now().Location()
+		// default backup time is midnight
+		backupTime := time.Date(0, 1, 1, 0, 0, 0, 0, location)
+		// time format
+		timeFormat := "1504"
+		shipBackupDir := filepath.Join(root, patp)
+		shipBackupDirDaily := filepath.Join(shipBackupDir, "daily")
+		shipBackupDirWeekly := filepath.Join(shipBackupDir, "weekly")
+		shipBackupDirMonthly := filepath.Join(shipBackupDir, "monthly")
+		if err := os.MkdirAll(shipBackupDirDaily, 0755); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
+			continue
+		}
+		if err := os.MkdirAll(shipBackupDirWeekly, 0755); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
+			continue
+		}
+		if err := os.MkdirAll(shipBackupDirMonthly, 0755); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
+			continue
+		}
+		// parse backup time
+		parsedTime, err := time.ParseInLocation(timeFormat, shipConf.BackupTime, location)
+		if err == nil {
+			backupTime = parsedTime
+		}
+		// List all files in shipBackupDir that are unix timestamps
+		files, err := filepath.Glob(filepath.Join(shipBackupDirDaily, "[0-9]*"))
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to list backup files for %v: %v", patp, err))
+			continue
+		}
+
+		// check if backups exists, if exists get latest timestamp
+		var mostRecentBackup time.Time
+		if len(files) > 0 {
+			// Find the most recent backup
+			var latestUnixTime int64
+			for _, file := range files {
+				fileName := filepath.Base(file)
+				unixTime, err := strconv.ParseInt(fileName, 10, 64)
+				if err == nil && unixTime > latestUnixTime {
+					latestUnixTime = unixTime
 				}
-
-				// Convert the most recent unix timestamp to time.Time
-				if latestUnixTime > 0 {
-					mostRecentBackup = time.Unix(latestUnixTime, 0)
-				}
 			}
 
-			// If no valid backups found, set mostRecentBackup to zero time
-			if mostRecentBackup.IsZero() {
-				mostRecentBackup = time.Time{}
-			}
-
-			zap.L().Debug(fmt.Sprintf("Most recent backup for %v: %v", patp, mostRecentBackup))
-
-			// Get the current time
-			now := time.Now()
-
-			// Check if it's time for a backup
-			if now.After(mostRecentBackup.AddDate(0, 0, 1)) && // Check if at least a day has passed since the last backup
-				(now.Hour() > backupTime.Hour() || // Current hour is later than backup hour
-					(now.Hour() == backupTime.Hour() && now.Minute() >= backupTime.Minute())) { // Current hour is equal and minute is equal or later
-
-				// Create backup
-				err := backups.CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMonthly)
-				if err != nil {
-					zap.L().Error(fmt.Sprintf("Failed to create backup for %v: %v", patp, err))
-				} else {
-					zap.L().Info(fmt.Sprintf("Successfully created backup for %v", patp))
-				}
+			// Convert the most recent unix timestamp to time.Time
+			if latestUnixTime > 0 {
+				mostRecentBackup = time.Unix(latestUnixTime, 0)
 			}
 		}
-		time.Sleep(1 * time.Hour) // check every hour
+
+		// If no valid backups found, set mostRecentBackup to zero time
+		if mostRecentBackup.IsZero() {
+			mostRecentBackup = time.Time{}
+		}
+
+		zap.L().Debug(fmt.Sprintf("Most recent backup for %v: %v", patp, mostRecentBackup))
+
+		// Get the current time
+		now := time.Now()
+
+		// Check if it's time for a backup
+		if now.After(mostRecentBackup.AddDate(0, 0, 1)) && // Check if at least a day has passed since the last backup
+			(now.Hour() > backupTime.Hour() || // Current hour is later than backup hour
+				(now.Hour() == backupTime.Hour() && now.Minute() >= backupTime.Minute())) { // Current hour is equal and minute is equal or later
+
+			// Create backup
+			err := create(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMonthly)
+			if err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to create backup for %v: %v", patp, err))
+			} else {
+				zap.L().Info(fmt.Sprintf("Successfully created backup for %v", patp))
+			}
+		}
 	}
 }
 
