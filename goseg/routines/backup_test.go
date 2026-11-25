@@ -3,9 +3,59 @@ package routines
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
+
+	"groundseg/config"
+	"groundseg/structs"
 )
+
+func TestScheduledBackupsHonorShipSettings(t *testing.T) {
+	saved := config.UrbitsConfig
+	t.Cleanup(func() { config.UrbitsConfig = saved })
+	config.UrbitsConfig = map[string]structs.UrbitDocker{
+		"zod": {},
+		"nec": {LocalTlonBackup: true},
+		"bud": {RemoteTlonBackup: true},
+		"wes": {LocalTlonBackup: true, RemoteTlonBackup: true},
+	}
+	piers := []string{"zod", "nec", "bud", "wes"}
+	root := t.TempDir()
+
+	var created []string
+	createScheduledBackups(root, piers, func(ship, daily, weekly, monthly string) error {
+		created = append(created, ship)
+		return nil
+	})
+	if !slices.Equal(created, []string{"nec", "wes"}) {
+		t.Errorf("local backup calls = %v, want [nec wes]", created)
+	}
+	for _, ship := range []string{"zod", "bud"} {
+		if _, err := os.Stat(filepath.Join(root, ship)); !os.IsNotExist(err) {
+			t.Errorf("expected no local backup directory for %s, got %v", ship, err)
+		}
+	}
+
+	// An existing daily archive makes every ship a candidate for upload.
+	for _, ship := range piers {
+		daily := filepath.Join(root, ship, "daily")
+		if err := os.MkdirAll(daily, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(daily, "100"), []byte("backup"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var uploaded []string
+	uploadScheduledBackups(root, piers, "password", func(ship, password, file string) error {
+		uploaded = append(uploaded, ship)
+		return nil
+	})
+	if !slices.Equal(uploaded, []string{"bud", "wes"}) {
+		t.Errorf("remote upload calls = %v, want [bud wes]", uploaded)
+	}
+}
 
 func TestRemoteBackupDailySchedule(t *testing.T) {
 	now := time.Date(2026, 11, 16, 23, 30, 0, 0, time.FixedZone("CST", -6*60*60))

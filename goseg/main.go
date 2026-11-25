@@ -314,9 +314,6 @@ func main() {
 	go routines.PackScheduleLoop()
 	// chop limiter
 	go routines.ChopAtLimit() // vere 3.0
-	// backups
-	go routines.TlonBackupLocal()
-	go routines.TlonBackupRemote()
 	// block until version info returns
 	if remoteVersion == true {
 		select {
@@ -355,8 +352,14 @@ func main() {
 	}
 	// Load Beszel monitoring.
 	loadService(docker.LoadBeszel, "Unable to load Beszel!")
-	// Load Urbits
-	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
+	// The first scheduled backup pass needs each ship's saved configuration.
+	go func() {
+		if err := docker.LoadUrbits(); err != nil {
+			zap.L().Error(fmt.Sprintf("Unable to load Urbit ships! %v", err))
+		}
+		go routines.TlonBackupLocal()
+		routines.TlonBackupRemote()
+	}()
 	// Load Hermes sidecars after ships so code-derived sidecars can connect.
 	loadService(docker.LoadHermes, "Unable to load Hermes containers!")
 	// Auto-link S3 for ships that are still unlinked after RustFS provisioning.
